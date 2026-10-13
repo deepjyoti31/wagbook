@@ -1,0 +1,36 @@
+import Link from "next/link";
+import { Suspense } from "react";
+import { Nav } from "@/components/nav";
+import { requireOrg } from "@/lib/auth";
+
+/**
+ * The signed-in shell: kennel name, navigation, and the page.
+ * Everything that reads the session sits inside <Suspense>, as Next.js cache
+ * components require, so the shell itself renders instantly.
+ */
+export default function AppLayout({ children }: LayoutProps<"/app">) {
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-paper p-2 sm:static sm:order-first sm:border-b sm:border-t-0">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-4">
+          <Link href="/app" className="hidden text-lg font-extrabold tracking-tight sm:block">
+            <Suspense fallback="Wagbook">
+              <OrgName />
+            </Suspense>
+          </Link>
+          <div className="flex-1 sm:flex-none">
+            <Suspense fallback={<div className="min-h-12" />}>
+              <Nav />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5 sm:pb-12">{children}</main>
+    </div>
+  );
+}
+
+async function OrgName() {
+  const { org } = await requireOrg();
+  return org.name;
+}

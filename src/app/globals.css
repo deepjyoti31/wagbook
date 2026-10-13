@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/*
+ * Wagbook's look, in one place. See docs/03-architecture.md, "Design system".
+ *
+ * The app is used on a phone, in a kennel, often outdoors and one-handed. So:
+ * strong contrast, big touch targets, no web fonts to download, and colour
+ * that always means the same thing:
+ *   marigold  needs attention (arrivals, the kennel door tag)
+ *   leaf      done or in house
+ *   alert     medication, incidents, things that went wrong
+ */
+@theme {
+  --color-ink: #14213d;
+  --color-slate: #55607a;
+  --color-ground: #edf0f5;
+  --color-paper: #ffffff;
+  --color-rule: #d5dae4;
+  --color-marigold: #f2a900;
+  --color-marigold-soft: #fdf1cf;
+  --color-leaf: #1b7446;
+  --color-leaf-soft: #ddf1e5;
+  --color-alert: #b3261e;
+  --color-alert-soft: #fbe4e2;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Numbers line up in columns everywhere: dates, prices, kennel codes. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/*
+ * The kennel door tag: the one piece of decoration in the app. It is how a
+ * kennel is shown everywhere, shaped like the tag hung on a kennel door.
+ */
+.door-tag {
+  display: inline-flex;
+  align-items: center;
+  min-width: 3.25rem;
+  padding: 0.2rem 0.6rem 0.2rem 1.35rem;
+  background: var(--color-marigold);
+  color: var(--color-ink);
+  font-weight: 800;
+  font-size: 0.9375rem;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  white-space: nowrap;
+  clip-path: polygon(0.55rem 0, 100% 0, 100% 100%, 0.55rem 100%, 0 50%);
+  position: relative;
+}
+.door-tag::before {
+  content: "";
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-top: -0.2rem;
+  border-radius: 9999px;
+  background: var(--color-ground);
+}
+.door-tag[data-empty="true"] {
+  background: var(--color-rule);
+  color: var(--color-slate);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

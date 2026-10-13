@@ -1,0 +1,62 @@
+-- =============================================================================
+-- A minimal stand-in for the parts of Supabase that Wagbook's migrations rely
+-- on, so the migrations can run inside PGlite (Postgres compiled to
+-- WebAssembly) during tests. This file is NEVER applied to a real database.
+--
+-- Real Supabase provides: the anon / authenticated / service_role roles, the
+-- auth schema (users, uid()), the storage schema (buckets, objects) and an
+-- extensions schema. See docs/03-architecture.md, "Testing the database".
+-- =============================================================================
+
+create schema if not exists extensions;
+create schema if not exists auth;
+create schema if not exists storage;
+
+create role anon nologin;
+create role authenticated nologin;
+create role service_role nologin bypassrls;
+
+create table auth.users (
+  id uuid primary key default gen_random_uuid(),
+  email text unique,
+  created_at timestamptz not null default now()
+);
+
+-- Supabase reads the signed-in user's id from the request's JWT claims.
+-- Tests set the same setting by hand to act as a given user.
+create function auth.uid()
+returns uuid
+language sql
+stable
+as $$
+  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+$$;
+
+create table storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean not null default false,
+  file_size_limit bigint,
+  allowed_mime_types text[]
+);
+
+create table storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text not null,
+  owner uuid,
+  created_at timestamptz not null default now()
+);
+alter table storage.objects enable row level security;
+
+grant usage on schema public, extensions, auth, storage to anon, authenticated, service_role;
+grant execute on function auth.uid() to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to authenticated;
+
+-- Supabase's defaults hand new objects in public to every API role. Recreate
+-- that here so the tests prove our migrations really take it back.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+set search_path = public, extensions;
