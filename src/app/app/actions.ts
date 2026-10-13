@@ -52,6 +52,9 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
   if (tasks.error) console.error("generate_care_tasks failed", tasks.error.message);
 
   revalidatePath("/app", "layout");
+  // From the booking page, reopen it saying so: the check-in form is gone once the pet is in.
+  if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_in`);
+  if (form.get("from") === "today") redirect("/app?done=checked_in");
   return { ok: "Checked in." };
 }
 
@@ -73,6 +76,8 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
   if (data.length === 0) return { error: "This pet is not checked in. Refresh the page." };
 
   revalidatePath("/app", "layout");
+  if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_out`);
+  if (form.get("from") === "today") redirect("/app?done=checked_out");
   return { ok: "Checked out." };
 }
 

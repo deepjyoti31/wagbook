@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run src",
     "test:db": "vitest run tests/db",
+    "test:e2e": "node scripts/e2e.mjs",
     "gen:db": "tsx scripts/gen-db.mts",
     "check": "npm run check:dash && npm run lint && npm run typecheck && npm run test && npm run build",
     "check:dash": "node scripts/check-dash.mjs"
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^22.20.5",
     "@types/react": "^19",

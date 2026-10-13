@@ -1,0 +1,225 @@
+import { expect, test, type Browser, type Page } from "@playwright/test";
+
+/**
+ * The whole day at a kennel, in a real browser at phone width, against a
+ * local Supabase loaded with supabase/seed.sql. The steps share one database
+ * and run in order; `npm run test:e2e` resets the database first.
+ */
+
+test.describe.configure({ mode: "serial" });
+
+const PASSWORD = "wagbook-demo";
+
+/** The kennel's calendar date, plus some days. The demo kennel is in India. */
+function day(offset = 0): string {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+async function signIn(page: Page, who: string, password = PASSWORD) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(who.includes("@") ? who : `${who}@demo.wagbook.test`);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(/\/app|\/onboarding/);
+}
+
+/** A fresh browser with nobody signed in: what a parent has. */
+async function privateWindow(browser: Browser) {
+  const context = await browser.newContext({ viewport: { width: 360, height: 780 } });
+  return { context, page: await context.newPage() };
+}
+
+async function openBooking(page: Page, pet: string, status: string) {
+  await page.goto("/app/bookings");
+  await page.getByRole("link").filter({ hasText: pet }).filter({ hasText: status }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: pet })).toBeVisible();
+}
+
+test("signing in shows today at the kennel", async ({ page }) => {
+  await signIn(page, "staff");
+  await expect(page.getByText("4 in house of 12 kennels")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Meals 2 of 12/ })).toBeVisible();
+  // Nothing on the page is wider than the phone.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test("checking in with the checklist", async ({ page }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Coco", "Confirmed");
+  await page.getByLabel("I have seen the vaccination certificates").check();
+  await page.getByLabel("Belongings", { exact: false }).first().fill("Red harness, chew toy");
+  await page.getByLabel("Anything said at the gate").fill("Eats slowly");
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("In house", { exact: true })).toBeVisible();
+});
+
+test("double booking is refused with a clear sentence", async ({ page }) => {
+  await signIn(page, "staff");
+  // Coco is in house until day 4 in K05.
+  await page.goto(`/app/bookings/new`);
+  await page.locator("select[name=petId]").selectOption({ label: "Coco, Beagle (Kavya Example)" });
+  await page.getByLabel("Check-in date").fill(day(1));
+  await page.getByLabel("Check-out date").fill(day(3));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("This pet already has a booking that overlaps those dates.")).toBeVisible();
+  // What was typed is still there.
+  await expect(page.getByLabel("Check-out date")).toHaveValue(day(3));
+
+  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  await page.getByLabel("Check-in date").fill(day(1));
+  await page.getByLabel("Check-out date").fill(day(3));
+  await page.locator("select[name=kennelId]").selectOption({ label: "K05" });
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("That kennel is already taken for some of those dates.")).toBeVisible();
+});
+
+test("staff cannot set a price; a family is booked together as a request, then confirmed", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/bookings/new");
+  await expect(page.getByLabel("Price")).toHaveCount(0);
+  await expect(page.getByText("Only an owner or manager can change a price.")).toBeVisible();
+
+  await page.locator("select[name=petId]").selectOption({ label: "Biscuit, Labrador (Priya Demo)" });
+  await page.getByRole("checkbox", { name: /Pepper/ }).check();
+  await page.getByLabel("Check-in date").fill(day(30));
+  await page.getByLabel("Check-out date").fill(day(33));
+  await page.getByRole("button", { name: "Save as request" }).click();
+  await expect(page.getByText("Saved as a request. It holds no space until you confirm it.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Booked together/ })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Confirmed. The space is now held.")).toBeVisible();
+});
+
+test("a pet that overstays is extended to today", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app");
+  const bruno = page.getByRole("listitem").filter({ hasText: "Bruno" });
+  await bruno.getByRole("button", { name: "Extend to today" }).click();
+  await expect(page.getByText("Stay extended to today.")).toBeVisible();
+});
+
+test("the care round: one tap, and safe to tap twice", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/care?kind=medication");
+  const tablet = page.getByRole("listitem").filter({ hasText: "Thyroid tablet" });
+  await tablet.getByRole("button", { name: "Done" }).dblclick();
+  await expect(tablet.getByText("Done", { exact: true }).first()).toBeVisible();
+  await page.goto("/app");
+  await expect(page.getByRole("link", { name: /Medicines 1 of 1/ })).toBeVisible();
+
+  await page.goto("/app/care?kind=meal&show=pending");
+  const lunch = page.getByRole("listitem").filter({ hasText: "Mango" }).filter({ hasText: "Lunch" });
+  await lunch.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Mango" }).filter({ hasText: "Lunch" })).toHaveCount(0);
+});
+
+test("solo play is planned and ticked", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/play");
+  await page.getByRole("button", { name: "Plan today" }).click();
+  await expect(page.getByText(/Planned \d+ sessions? of 20 minutes/)).toBeVisible();
+  await page.getByRole("button", { name: "Done" }).first().click();
+  await expect(page.getByText(/1 of \d+ sessions done/)).toBeVisible();
+});
+
+test("a booking is cancelled with a reason", async ({ page }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Tofu", "Confirmed");
+  await page.getByLabel("Why is it cancelled?").fill("Parent's plans changed");
+  await page.getByRole("button", { name: "Cancel booking" }).click();
+  await expect(page.getByText("Booking cancelled. The space is free again.")).toBeVisible();
+});
+
+test("a parent sends the intake form, and staff accept it", async ({ page, browser }) => {
+  const parent = await privateWindow(browser);
+  await parent.page.goto("/i/demo");
+  await parent.page.getByLabel("Your name").fill("Sanjay Invented");
+  await parent.page.getByLabel("Mobile number").fill("9800000199");
+  await parent.page.getByLabel("Name", { exact: true }).fill("Whiskers");
+  await parent.page.getByLabel("Drop-off date").fill(day(40));
+  await parent.page.getByLabel("Pick-up date").fill(day(42));
+  await parent.page.getByRole("checkbox").check();
+  await parent.page.getByRole("button", { name: /Send to/ }).click();
+  await expect(parent.page.getByText(/Thank you|sent/i).first()).toBeVisible();
+  await parent.context.close();
+
+  await signIn(page, "staff");
+  await page.goto("/app/more/intake");
+  await page.getByRole("button", { name: "Accept and book" }).click();
+  await page.waitForURL(/\/app\/bookings\/new/);
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Whiskers" })).toBeVisible();
+});
+
+test("the parent's stay page opens in a private window", async ({ page, browser }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Mango", "In house");
+  const link = await page.getByText(/\/s\/[0-9a-f]{64}/).innerText();
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link.trim());
+  await expect(parent.page.getByText("Mango").first()).toBeVisible();
+  await expect(parent.page.getByText("Staying with us now")).toBeVisible();
+  await parent.context.close();
+});
+
+test("a manager changes a price and adds an extra", async ({ page }) => {
+  await signIn(page, "manager");
+  await openBooking(page, "Mango", "Request");
+  await page.getByLabel("Price per night").fill("1100");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Booking saved.")).toBeVisible();
+  await page.getByLabel("From your price list").selectOption({ label: "Grooming, ₹2,000" });
+  await page.getByRole("button", { name: "Add extra" }).click();
+  await expect(page.getByText("Added Grooming.")).toBeVisible();
+  await expect(page.getByText(/Estimated total/)).toBeVisible();
+});
+
+test("the calendar shows kennels by day and books from an empty square", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/calendar");
+  await expect(page.getByRole("region", { name: "Kennels by day" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByRole("link", { name: /Book K12 from/ }).first().click();
+  await expect(page.locator("select[name=kennelId]")).toHaveValue(/[0-9a-f-]{36}/);
+});
+
+test("a new person creates a kennel, invites a colleague, who joins and switches between kennels", async ({ page, browser }) => {
+  const email = `new-${Date.now()}@example.test`;
+  await page.goto("/login");
+  await page.getByRole("link", { name: "Create an account" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByLabel("Kennel name").fill("Second Test Kennel");
+  await page.getByLabel("Link name").fill(`second-${Date.now() % 100000}`);
+  await page.getByLabel("Your name").fill("Tester");
+  await page.getByRole("button", { name: /Create/ }).click();
+  await page.waitForURL(/\/app\/more\/kennels/);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("Added 10 kennels.")).toBeVisible();
+
+  // Invite the demo staff member, who then has two kennels.
+  await page.goto("/app/more/people");
+  await page.getByLabel("Their name").fill("Meena");
+  await page.getByLabel("Their email").fill("staff@demo.wagbook.test");
+  await page.getByRole("button", { name: "Invite" }).click();
+  await expect(page.getByText(/Meena/).first()).toBeVisible();
+
+  const staff = await privateWindow(browser);
+  await signIn(staff.page, "staff");
+  await staff.page.goto("/onboarding");
+  await staff.page.getByRole("button", { name: "Join" }).click();
+  await staff.page.goto("/app/more");
+  await staff.page.getByRole("button", { name: /Switch to/ }).first().click();
+  await staff.page.goto("/app/more");
+  await expect(staff.page.getByText(/You also work at/)).toBeVisible();
+  await staff.page.getByRole("button", { name: "Sign out" }).click();
+  await staff.page.waitForURL(/\/login/);
+  await staff.context.close();
+});

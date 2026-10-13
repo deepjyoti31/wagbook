@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 
 /**
  * Test database harness.
@@ -16,6 +17,7 @@ import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const MIGRATIONS_DIR = join(here, "..", "..", "supabase", "migrations");
+export const SEED_PATH = join(here, "..", "..", "supabase", "seed.sql");
 
 export function migrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR)
@@ -24,7 +26,7 @@ export function migrationFiles(): string[] {
 }
 
 export async function createTestDb(): Promise<PGlite> {
-  const db = new PGlite({ extensions: { btree_gist } });
+  const db = new PGlite({ extensions: { btree_gist, pgcrypto } });
   await db.exec(readFileSync(join(here, "supabase-shim.sql"), "utf8"));
   for (const file of migrationFiles()) {
     try {

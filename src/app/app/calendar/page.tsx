@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { buttonStyles, Empty, Loading, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { addDays, calendarDays, calendarGrid, isISODate, todayIn, type ISODate } from "@/lib/core";
+import { addDays, calendarDays, calendarGrid, isISODate, isOverstaying, todayIn, type ISODate } from "@/lib/core";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calendar" };
@@ -62,7 +62,17 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
   const rows = kennels.data.filter((k) => k.is_active || held.has(k.id));
   const grid = calendarGrid(
     rows.map((k) => k.id),
-    stays.data.map((s) => ({ id: s.id, kind: s.kind, status: s.status, startDate: s.start_date, endDate: s.end_date, kennelId: s.kennel_id, pet: s.pets?.name ?? "Pet" })),
+    stays.data.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      status: s.status,
+      startDate: s.start_date,
+      // A pet still here after its check-out date is in its kennel today, even though the booking no longer holds it.
+      endDate: s.status === "checked_in" && s.end_date <= today ? (s.kind === "daycare" ? today : addDays(today, 1)) : s.end_date,
+      kennelId: s.kennel_id,
+      pet: s.pets?.name ?? "Pet",
+      overstay: isOverstaying({ status: s.status, endDate: s.end_date }, today),
+    })),
     days,
   );
   const labels = days.map((d) => dayLabel(d, org.locale));
@@ -81,7 +91,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
       </div>
       {(requests.count ?? 0) > 0 ? (
         <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">
-          {requests.count === 1 ? "One request" : `${requests.count} requests`} in these days hold no space and are not shown.{" "}
+          {requests.count === 1 ? "One request in these days holds no space and is not shown." : `${requests.count} requests in these days hold no space and are not shown.`}{" "}
           <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
             See bookings
           </Link>
@@ -95,7 +105,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
           </Link>
         </Empty>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-rule bg-paper" role="region" aria-label="Kennels by day" tabIndex={0}>
+        <div className="relative overflow-x-auto rounded-xl border border-rule bg-paper" role="region" aria-label="Kennels by day" tabIndex={0}>
           <table className="border-collapse text-sm">
             <thead>
               <tr>
@@ -138,7 +148,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                         <td key={day} className="h-12 border-b border-rule p-0">
                           <Link
                             href={`/app/bookings/${stay.id}`}
-                            className={`flex h-12 items-center overflow-hidden whitespace-nowrap px-1 font-semibold ${stay.status === "checked_in" ? "bg-leaf-soft text-leaf" : "bg-ground text-ink"}`}
+                            className={`flex h-12 items-center overflow-hidden whitespace-nowrap px-1 font-semibold ${
+                              stay.overstay ? "bg-alert-soft text-alert" : stay.status === "checked_in" ? "bg-leaf-soft text-leaf" : "bg-ground text-ink"
+                            }`}
                             title={stay.pet}
                           >
                             {starts ? stay.pet.slice(0, 9) : <span className="sr-only">{stay.pet}</span>}
@@ -180,7 +192,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
           </table>
         </div>
       )}
-      <p className="mt-3 text-sm text-slate">Green: in house. Grey: booked. Tap a booking to open it, or an empty square to book that kennel from that day.</p>
+      <p className="mt-3 text-sm text-slate">Green: in house. Grey: booked. Red: still here after the check-out date. Tap a booking to open it, or an empty square to book that kennel from that day.</p>
     </>
   );
 }

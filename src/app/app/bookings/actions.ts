@@ -174,7 +174,11 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
   return { ok: "Booking saved." };
 }
 
-/** Change a booking's status from one of `from` to `to`, with an optional extra change. */
+/**
+ * Change a booking's status from one of `from` to `to`, with an optional extra
+ * change, then reopen the booking page saying what happened. (The form that
+ * was pressed disappears once the status changes, and its message with it.)
+ */
 async function moveStatus(
   form: FormData,
   from: ("requested" | "confirmed" | "checked_in")[],
@@ -195,26 +199,23 @@ async function moveStatus(
   if (error) return { error: friendlyError(error) };
   if (data.length === 0) return { error: "This booking has changed since you opened it. Refresh the page." };
   revalidatePath("/app", "layout");
-  return {};
+  redirect(`/app/bookings/${id.data}?done=${to}`);
 }
 
 /** Accept a request: from now on it holds space, so capacity is checked. */
 export async function confirmRequest(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await moveStatus(form, ["requested"], "confirmed");
-  return result.error ? result : { ok: "Confirmed. The space is now held." };
+  return moveStatus(form, ["requested"], "confirmed");
 }
 
 export async function cancelBooking(_state: FormState, form: FormData): Promise<FormState> {
   const reason = text(form, "reason");
   if (!reason) return { error: "Say why the booking is cancelled." };
   if (reason.length > 500) return { error: "Keep the reason under 500 characters." };
-  const result = await moveStatus(form, ["requested", "confirmed"], "cancelled", { cancel_reason: reason });
-  return result.error ? result : { ok: "Booking cancelled. The space is free again." };
+  return moveStatus(form, ["requested", "confirmed"], "cancelled", { cancel_reason: reason });
 }
 
 export async function markNoShow(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await moveStatus(form, ["confirmed"], "no_show");
-  return result.error ? result : { ok: "Marked as did not arrive. The space is free again." };
+  return moveStatus(form, ["confirmed"], "no_show");
 }
 
 /**
@@ -261,6 +262,8 @@ export async function extendToToday(_state: FormState, form: FormData): Promise<
     return { error: friendlyError(error) };
   }
   revalidatePath("/app", "layout");
+  if (form.get("from") === "booking") redirect(`/app/bookings/${id.data}?done=extended`);
+  if (form.get("from") === "today") redirect("/app?done=extended");
   return { ok: `Stay extended to ${formatDate(today)}.` };
 }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, PageTitle, Section, Select } from "@/components/ui";
+import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { CARE_KIND_PLURAL, CARE_KINDS } from "@/lib/care";
@@ -15,15 +15,24 @@ import { extendToToday } from "./bookings/actions";
 
 export const metadata: Metadata = { title: "Today" };
 
-export default function TodayPage() {
+export default function TodayPage({ searchParams }: PageProps<"/app">) {
   return (
     <Suspense fallback={<Loading label="Loading today" />}>
-      <Today />
+      <Today searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Today() {
+/** What to say after a step that moves a pet off its list (the form that was pressed goes with it). */
+const DONE: Record<string, string> = {
+  checked_in: "Checked in.",
+  checked_out: "Checked out. The kennel is free for the next pet.",
+  extended: "Stay extended to today.",
+};
+
+async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) {
+  const doneKey = (await searchParams).done;
+  const done = typeof doneKey === "string" && doneKey in DONE ? DONE[doneKey] : null;
   const { org } = await requireOrg();
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
@@ -68,6 +77,8 @@ async function Today() {
           New booking
         </Link>
       </PageTitle>
+
+      {done ? <Notice tone="ok">{done}</Notice> : null}
 
       <p className="mb-6 text-lg">
         <strong className="font-extrabold">{inHouse.length}</strong> in house
@@ -123,6 +134,7 @@ async function Today() {
                 <BookingSummary booking={b} today={today} />
                 <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
                   <input type="hidden" name="bookingId" value={b.id} />
+                    <input type="hidden" name="from" value="today" />
                   <label className="min-w-36 flex-1">
                     <span className="sr-only">Kennel for {b.pets?.name}</span>
                     <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
@@ -157,6 +169,7 @@ async function Today() {
                   {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
                     <ActionForm action={extendToToday} className="contents">
                       <input type="hidden" name="bookingId" value={b.id} />
+                    <input type="hidden" name="from" value="today" />
                       <SubmitButton variant="secondary" pendingLabel="Extending">
                         Extend to today
                       </SubmitButton>
@@ -177,6 +190,7 @@ async function Today() {
                   ) : null}
                   <ActionForm action={checkOut} className="contents">
                     <input type="hidden" name="bookingId" value={b.id} />
+                    <input type="hidden" name="from" value="today" />
                     <SubmitButton pendingLabel="Checking out" variant={b.end_date <= today ? "primary" : "secondary"}>
                       Check out
                     </SubmitButton>

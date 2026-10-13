@@ -30,12 +30,24 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
   );
 }
 
+/** What to say after a step that changes the booking's status (see moveStatus in ../actions.ts). */
+const DONE: Record<string, string> = {
+  confirmed: "Confirmed. The space is now held.",
+  checked_in: "Checked in.",
+  checked_out: "Checked out. The kennel is free for the next pet.",
+  cancelled: "Booking cancelled. The space is free again.",
+  no_show: "Marked as did not arrive. The space is free again.",
+  extended: "Stay extended to today.",
+};
+
 const BOOKING =
   "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
-  const justBooked = (await searchParams).new === "1";
+  const query = await searchParams;
+  const justBooked = query.new === "1";
+  const done = typeof query.done === "string" && query.done in DONE ? DONE[query.done] : null;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org, canManage } = await requireOrg();
   const supabase = await createClient();
@@ -146,6 +158,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           {family.data.length > 0 ? ` ${family.data.length + 1} pets booked together.` : ""}
         </Notice>
       ) : null}
+
+      {done ? <Notice tone="ok">{done}</Notice> : null}
 
       {open ? (
         <Section title="Next">
@@ -439,6 +453,7 @@ function NextStep({
         {overstay ? (
           <ActionForm action={extendToToday} className="w-full">
             <input type="hidden" name="bookingId" value={b.id} />
+            <input type="hidden" name="from" value="booking" />
             <p className="mb-2">Still here after {formatDate(stayEnds)}? Extend the stay so the kennel stays held.</p>
             <SubmitButton pendingLabel="Extending">Extend to today</SubmitButton>
           </ActionForm>
@@ -450,6 +465,7 @@ function NextStep({
         ) : null}
         <ActionForm action={checkOut} className="contents">
           <input type="hidden" name="bookingId" value={b.id} />
+          <input type="hidden" name="from" value="booking" />
           <SubmitButton pendingLabel="Checking out" variant={stayEnds <= today ? "primary" : "secondary"}>
             Check out
           </SubmitButton>
@@ -464,6 +480,7 @@ function NextStep({
       <ActionForm action={checkIn} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
         <input type="hidden" name="bookingId" value={b.id} />
         <input type="hidden" name="checklist" value="1" />
+        <input type="hidden" name="from" value="booking" />
         <p className="font-bold">Check-in checklist</p>
         <Field label="Kennel">
           <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
