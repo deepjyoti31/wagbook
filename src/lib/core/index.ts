@@ -4,6 +4,7 @@
  * both server and browser code.
  */
 export * from "./amount-in-words";
+export * from "./bookings";
 export * from "./dates";
 export * from "./gst";
 export * from "./invoice-number";

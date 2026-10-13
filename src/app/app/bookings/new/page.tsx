@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { FamilyPicker } from "@/components/family-picker";
 import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatMoney, isISODate, todayIn } from "@/lib/core";
@@ -23,11 +24,11 @@ export default function NewBookingPage({ searchParams }: PageProps<"/app/booking
 
 async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/new">, "searchParams">) {
   const params = await searchParams;
-  const { org } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const supabase = await createClient();
 
   const [pets, kennels, services] = await Promise.all([
-    supabase.from("pets").select("id, name, breed, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
+    supabase.from("pets").select("id, name, breed, client_id, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
     supabase.from("kennels").select("id, name").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
   ]);
@@ -47,35 +48,23 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
   const pick = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
   const start = pick(params.start);
   const end = pick(params.end);
+  const kennel = pick(params.kennel);
   const price = (kind: string) => {
     const s = services.data.find((x) => x.kind === kind);
     return s ? formatMoney(s.price_minor, { currency: org.currency, locale: org.locale, trimZeros: true }) : null;
   };
   const boarding = price("boarding");
   const daycare = price("daycare");
-  const priceHint =
-    boarding || daycare
-      ? `Leave empty to use your usual price${boarding ? ` (${boarding} a night` : " ("}${boarding && daycare ? ", " : ""}${daycare ? `${daycare} a day for day boarding` : ""}).`
-      : "Per night for boarding, per day for day boarding. Set your usual prices in Settings to skip this.";
+  const usual = [boarding ? `${boarding} a night` : null, daycare ? `${daycare} a day for day boarding` : null].filter(Boolean).join(", ");
 
   return (
     <ActionForm action={createBooking}>
-      <Field label="Pet">
-        <Select name="petId" required defaultValue={pick(params.pet) ?? ""}>
-          <option value="" disabled>
-            Choose a pet
-          </option>
-          {pets.data.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-              {p.breed ? `, ${p.breed}` : ""}
-              {p.clients ? ` (${p.clients.full_name})` : ""}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <FamilyPicker
+        defaultPetId={pick(params.pet)}
+        pets={pets.data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null }))}
+      />
       <Field label="Stay">
-        <Select name="kind" defaultValue="boarding">
+        <Select name="kind" defaultValue={pick(params.kind) === "daycare" ? "daycare" : "boarding"}>
           <option value="boarding">Boarding (overnight)</option>
           <option value="daycare">Day boarding (no night)</option>
         </Select>
@@ -88,8 +77,8 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           <Input name="endDate" type="date" defaultValue={end && isISODate(end) ? end : undefined} />
         </Field>
       </div>
-      <Field label="Kennel" hint="You can leave this until check-in. Space is still held.">
-        <Select name="kennelId" defaultValue="">
+      <Field label="Kennel" hint="You can leave this until check-in. Space is still held. Other pets booked together get theirs at check-in.">
+        <Select name="kennelId" defaultValue={kennel && kennels.data.some((k) => k.id === kennel) ? kennel : ""}>
           <option value="">Decide at check-in</option>
           {kennels.data.map((k) => (
             <option key={k.id} value={k.id}>
@@ -98,18 +87,34 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           ))}
         </Select>
       </Field>
-      <Field label="Price" hint={priceHint}>
-        <Input name="rate" inputMode="decimal" placeholder={boarding ?? undefined} />
-      </Field>
+      {canManage ? (
+        <Field
+          label="Price"
+          hint={usual ? `Leave empty to use your usual price (${usual}).` : "Per night for boarding, per day for day boarding. Set your usual prices in Settings to skip this."}
+        >
+          <Input name="rate" inputMode="decimal" placeholder={boarding ?? undefined} />
+        </Field>
+      ) : (
+        <p className="text-slate">
+          {usual ? `Priced at your usual price: ${usual}.` : "Your usual prices are not set yet. Ask an owner or manager to set them in Settings."} Only an owner or
+          manager can change a price.
+        </p>
+      )}
       <Field label="Notes for staff">
         <Textarea name="notes" maxLength={2000} />
       </Field>
       <div className="flex flex-wrap gap-3">
-        <SubmitButton pendingLabel="Booking">Confirm booking</SubmitButton>
+        <SubmitButton name="intent" value="confirmed" pendingLabel="Booking">
+          Confirm booking
+        </SubmitButton>
+        <SubmitButton name="intent" value="requested" variant="secondary" pendingLabel="Saving">
+          Save as request
+        </SubmitButton>
         <Link href="/app/bookings" className={buttonStyles.quiet}>
           Back to bookings
         </Link>
       </div>
+      <p className="text-sm text-slate">A request holds no space. Confirm it later from the booking.</p>
     </ActionForm>
   );
 }

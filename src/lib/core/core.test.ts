@@ -4,6 +4,7 @@ import {
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
   isValidGstin, isValidVpa, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
   quoteStay, todayIn, toDecimalString, upiLink, whatsappLink, yardsNeeded,
+  calendarDays, calendarGrid, isOverstaying, peaksTouching, playMinutesOn, playWindows,
 } from "./index";
 
 describe("dates", () => {
@@ -266,5 +267,105 @@ describe("solo play scheduling", () => {
     for (const d of dogs(10)) expect(plan.sessions.some((s) => s.dogId === d.id)).toBe(true);
     expect(plan.shortfall).toHaveLength(8);
     expect(plan.shortfall.every((s) => s.missing === 1)).toBe(true);
+  });
+});
+
+describe("bookings", () => {
+  const diwali = { name: "Diwali", startDate: "2027-10-28", endDate: "2027-11-02", noRefund: true, playSessionMinutes: 15 };
+  const longWeekend = { name: "Long weekend", startDate: "2027-11-01", endDate: "2027-11-03", noRefund: false, playSessionMinutes: 18 };
+
+  it("knows which peak periods a stay touches", () => {
+    expect(peaksTouching({ kind: "boarding", startDate: "2027-10-25", endDate: "2027-10-29" }, [diwali, longWeekend])).toEqual([diwali]);
+    // Leaving on the first day of the period: no night inside it.
+    expect(peaksTouching({ kind: "boarding", startDate: "2027-10-25", endDate: "2027-10-28" }, [diwali])).toEqual([]);
+    // Day boarding on that day does touch it.
+    expect(peaksTouching({ kind: "daycare", startDate: "2027-10-28", endDate: "2027-10-28" }, [diwali])).toEqual([diwali]);
+    expect(peaksTouching({ kind: "boarding", startDate: "2027-11-02", endDate: "2027-11-05" }, [diwali, longWeekend])).toEqual([diwali, longWeekend]);
+  });
+
+  it("shortens play to the shortest peak length on a day", () => {
+    expect(playMinutesOn("2027-10-20", 20, [diwali, longWeekend])).toBe(20);
+    expect(playMinutesOn("2027-10-29", 20, [diwali, longWeekend])).toBe(15);
+    expect(playMinutesOn("2027-11-03", 20, [diwali, longWeekend])).toBe(18);
+    expect(playMinutesOn("2027-10-29", 20, [{ ...diwali, playSessionMinutes: null }])).toBe(20);
+  });
+
+  it("spots a pet that has stayed past its check-out date", () => {
+    expect(isOverstaying({ status: "checked_in", endDate: "2027-04-14" }, "2027-04-15")).toBe(true);
+    expect(isOverstaying({ status: "checked_in", endDate: "2027-04-15" }, "2027-04-15")).toBe(false);
+    expect(isOverstaying({ status: "confirmed", endDate: "2027-04-14" }, "2027-04-15")).toBe(false);
+  });
+
+  it("lays stays out on the calendar, freeing a kennel on its check-out day", () => {
+    const days = calendarDays("2027-04-14", 4);
+    expect(days).toEqual(["2027-04-14", "2027-04-15", "2027-04-16", "2027-04-17"]);
+    const a = { id: "a", kennelId: "k1", kind: "boarding" as const, startDate: "2027-04-13", endDate: "2027-04-15" };
+    const b = { id: "b", kennelId: "k1", kind: "boarding" as const, startDate: "2027-04-15", endDate: "2027-04-20" };
+    const c = { id: "c", kennelId: null, kind: "daycare" as const, startDate: "2027-04-16", endDate: "2027-04-16" };
+    const grid = calendarGrid(["k1", "k2"], [a, b, c], days);
+    expect(grid.byKennel.get("k1")!.map((x) => x?.id ?? null)).toEqual(["a", "b", "b", "b"]);
+    expect(grid.byKennel.get("k2")!.every((x) => x === null)).toBe(true);
+    expect(grid.unassigned.map((d) => d.map((x) => x.id))).toEqual([[], [], ["c"], []]);
+  });
+
+  it("adds extras to the estimate of a stay", () => {
+    const totals = quoteStay(
+      {
+        kind: "boarding", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-17", rateMinor: 120000, discountMinor: 10000,
+        addOns: [{ description: "Grooming", quantity: 2, unitPriceMinor: 200000 }, { description: "Pick-up", quantity: 1, unitPriceMinor: 50000 }],
+      },
+      { mode: "none" },
+    );
+    expect(totals.lines).toHaveLength(3);
+    // 3 nights x 1,200 - 100 discount + 2 x 2,000 grooming + 500 pick-up.
+    expect(totals.totalMinor).toBe(360000 - 10000 + 400000 + 50000);
+  });
+});
+
+describe("solo play around a timetable that already exists", () => {
+  it("builds windows from opening hours and a break", () => {
+    expect(playWindows("08:00:00", "18:00:00")).toEqual([{ start: "08:00", end: "18:00" }]);
+    expect(playWindows("07:00", "19:00", "11:00", "16:00")).toEqual([
+      { start: "07:00", end: "11:00" },
+      { start: "16:00", end: "19:00" },
+    ]);
+  });
+
+  it("keeps existing sessions, counts them, and never plans on top of them", () => {
+    const existing = [
+      { dogId: "a", yardId: "y1", start: "08:00", end: "08:20" },
+      { dogId: "b", yardId: "y1", start: "08:20", end: "08:40" },
+    ];
+    const plan = planPlaySessions({
+      dogs: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      yards: [{ id: "y1" }],
+      windows: [{ start: "08:00", end: "10:00" }],
+      sessionMinutes: 20,
+      sessionsPerDog: 2,
+      existing,
+    });
+    // a and b need one more each, c needs two.
+    expect(plan.slotsNeeded).toBe(4);
+    expect(plan.shortfall).toEqual([]);
+    expect(plan.sessions.filter((s) => s.dogId === "c")).toHaveLength(2);
+    expect(plan.sessions.filter((s) => s.dogId === "a")).toHaveLength(1);
+    // Nothing new in the slots already taken.
+    expect(plan.sessions.some((s) => s.start === "08:00" || s.start === "08:20")).toBe(false);
+    // Fair before full: c gets its first session before a or b get their second.
+    expect(plan.sessions[0].dogId).toBe("c");
+  });
+
+  it("keeps the changeover after an existing session and the gap for its dog", () => {
+    const plan = planPlaySessions({
+      dogs: [{ id: "a" }],
+      yards: [{ id: "y1" }],
+      windows: [{ start: "08:00", end: "12:00" }],
+      sessionMinutes: 20,
+      sessionsPerDog: 2,
+      changeoverMinutes: 10,
+      minGapMinutes: 60,
+      existing: [{ dogId: "a", yardId: "y1", start: "08:00", end: "08:20" }],
+    });
+    expect(plan.sessions).toEqual([{ dogId: "a", yardId: "y1", start: "09:30", end: "09:50" }]);
   });
 });

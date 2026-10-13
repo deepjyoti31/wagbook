@@ -4,49 +4,73 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { isISODate, parseMoney } from "@/lib/core";
+import { formatDate, isISODate, parseMoney, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
+import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
+const Id = z.uuid();
 const isoDate = z.string().refine(isISODate, "Choose a valid date.");
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a time like 10:30.");
 
-const NewBooking = z
+const Stay = z
   .object({
-    petId: z.uuid("Choose a pet."),
     kind: z.enum(["boarding", "daycare"]),
     startDate: isoDate,
     endDate: isoDate,
-    kennelId: z.uuid().nullable(),
-    notes: z.string().max(2000).nullable(),
   })
   .refine((b) => b.endDate >= b.startDate, "Check-out cannot be before check-in.")
   .refine((b) => b.kind !== "boarding" || b.endDate > b.startDate, "A boarding stay needs at least one night. For a day visit, choose day boarding.");
 
+const NewBooking = z.object({
+  petIds: z.array(z.uuid("Choose a pet.")).min(1, "Choose a pet.").max(6, "Book at most six pets together."),
+  kennelId: z.uuid().nullable(),
+  notes: z.string().max(2000).nullable(),
+  status: z.enum(["confirmed", "requested"]),
+});
+
+/** A typed price, or null when the box was left empty. Undefined means it could not be read. */
+function typedMoney(form: FormData, name: string): number | null | undefined {
+  const typed = text(form, name);
+  if (typed === null) return null;
+  const minor = parseMoney(typed);
+  return minor === null || minor < 0 ? undefined : minor;
+}
+
+/**
+ * Book one pet, or several pets of one parent together. Several pets share a
+ * group_id and are inserted in one statement, so either all are booked or
+ * none is. Staff book at the usual price; only owners and managers can type a
+ * different one (the database refuses anything else, see bookings_guard_price).
+ */
 export async function createBooking(_state: FormState, form: FormData): Promise<FormState> {
-  const { org } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const kind = form.get("kind") === "daycare" ? "daycare" : "boarding";
   const start = text(form, "startDate");
+  const stay = Stay.safeParse({ kind, startDate: start, endDate: text(form, "endDate") ?? (kind === "daycare" ? start : null) });
+  if (!stay.success) return { error: stay.error.issues[0].message };
+
+  const first = text(form, "petId");
+  const also = form.getAll("alsoPetId").filter((v): v is string => typeof v === "string" && v !== "" && v !== first);
   const parsed = NewBooking.safeParse({
-    petId: form.get("petId"),
-    kind,
-    startDate: start,
-    // Day boarding for a single day needs only one date.
-    endDate: text(form, "endDate") ?? (kind === "daycare" ? start : null),
+    petIds: first ? [first, ...new Set(also)] : [],
     kennelId: text(form, "kennelId"),
     notes: text(form, "notes"),
+    status: form.get("intent") === "requested" ? "requested" : "confirmed",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const b = parsed.data;
+  const b = { ...parsed.data, ...stay.data };
 
   const supabase = await createClient();
 
-  // The pet decides the client. Reading it through our own session also proves it belongs to this organisation.
-  const pet = await supabase.from("pets").select("id, client_id").eq("org_id", org.id).eq("id", b.petId).is("deleted_at", null).maybeSingle();
-  if (pet.error) return { error: friendlyError(pet.error) };
-  if (!pet.data) return { error: "That pet could not be found." };
+  // The pets decide the parent. Reading them through our own session also proves they belong to this organisation.
+  const pets = await supabase.from("pets").select("id, client_id").eq("org_id", org.id).in("id", b.petIds).is("deleted_at", null);
+  if (pets.error) return { error: friendlyError(pets.error) };
+  if (pets.data.length !== b.petIds.length) return { error: "That pet could not be found." };
+  const clientId = pets.data[0].client_id;
+  if (pets.data.some((p) => p.client_id !== clientId)) return { error: "Only pets of the same parent can be booked together." };
 
-  // Price: what was typed, otherwise the default from the rate card.
   const service = await supabase
     .from("services")
     .select("price_minor, tax_rate_bp, sac_code")
@@ -57,52 +81,237 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
     .maybeSingle();
   if (service.error) return { error: friendlyError(service.error) };
 
-  const typedRate = text(form, "rate");
-  const rateMinor = typedRate === null ? (service.data?.price_minor ?? null) : parseMoney(typedRate);
-  if (rateMinor === null || rateMinor < 0) {
+  const typed = canManage ? typedMoney(form, "rate") : null;
+  if (typed === undefined) return { error: "Enter the price as a number, like 1200 or 1200.50." };
+  const rateMinor = typed ?? service.data?.price_minor ?? null;
+  if (rateMinor === null) {
+    const what = b.kind === "boarding" ? "boarding" : "day boarding";
     return {
-      error: typedRate === null
-        ? `Enter a price, or set your ${b.kind === "boarding" ? "boarding" : "day boarding"} price in Settings so it fills in by itself.`
-        : "Enter the price as a number, like 1200 or 1200.50.",
+      error: canManage
+        ? `Enter a price, or set your ${what} price in Settings so it fills in by itself.`
+        : `Your usual ${what} price is not set yet. Ask an owner or manager to set it in Settings.`,
     };
   }
 
-  const { error } = await supabase.from("bookings").insert({
-    org_id: org.id,
-    client_id: pet.data.client_id,
-    pet_id: b.petId,
-    kind: b.kind,
-    status: "confirmed",
-    start_date: b.startDate,
-    end_date: b.endDate,
-    kennel_id: b.kennelId,
-    rate_minor: rateMinor,
-    tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
-    sac_code: service.data?.sac_code ?? null,
-    notes: b.notes,
-  });
+  const groupId = b.petIds.length > 1 ? crypto.randomUUID() : null;
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert(
+      b.petIds.map((petId, i) => ({
+        org_id: org.id,
+        client_id: clientId,
+        pet_id: petId,
+        kind: b.kind,
+        status: b.status,
+        start_date: b.startDate,
+        end_date: b.endDate,
+        // A kennel is one pet's: the others are given theirs at check-in.
+        kennel_id: i === 0 ? b.kennelId : null,
+        rate_minor: rateMinor,
+        tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
+        sac_code: service.data?.sac_code ?? null,
+        notes: b.notes,
+        group_id: groupId,
+      })),
+    )
+    .select("id");
   if (error) return { error: friendlyError(error) };
 
   revalidatePath("/app", "layout");
-  redirect("/app/bookings");
+  redirect(`/app/bookings/${data[0].id}?new=1`);
 }
 
-export async function cancelBooking(_state: FormState, form: FormData): Promise<FormState> {
-  const { org } = await requireOrg();
-  const id = z.uuid().safeParse(form.get("bookingId"));
+/**
+ * Change a booking's dates, kennel, notes and belongings, and (owners and
+ * managers only) its price and discount. Every date change goes through the
+ * same database rules as a new booking.
+ */
+export async function updateBooking(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const id = Id.safeParse(form.get("bookingId"));
   if (!id.success) return { error: "That booking could not be found." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("bookings")
-    .update({ status: "cancelled", cancel_reason: text(form, "reason") })
-    .eq("org_id", org.id)
-    .eq("id", id.data)
-    .in("status", ["requested", "confirmed"])
-    .select("id");
+  const current = await supabase.from("bookings").select("kind, status").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  if (current.error) return { error: friendlyError(current.error) };
+  if (!current.data) return { error: "That booking could not be found." };
+  if (!["requested", "confirmed", "checked_in"].includes(current.data.status)) return { error: "A finished or cancelled booking cannot be changed." };
+
+  const kind = current.data.kind;
+  const start = text(form, "startDate");
+  const stay = Stay.safeParse({ kind, startDate: start, endDate: text(form, "endDate") ?? (kind === "daycare" ? start : null) });
+  if (!stay.success) return { error: stay.error.issues[0].message };
+
+  const kennel = text(form, "kennelId");
+  if (kennel !== null && !Id.safeParse(kennel).success) return { error: "That kennel could not be found." };
+  const arrival = text(form, "expectedArrival");
+  const departure = text(form, "expectedDeparture");
+  for (const t of [arrival, departure]) if (t !== null && !clock.safeParse(t).success) return { error: "Enter a time like 10:30." };
+
+  const update: TablesUpdate<"bookings"> = {
+    start_date: stay.data.startDate,
+    end_date: stay.data.endDate,
+    kennel_id: kennel,
+    expected_arrival: arrival,
+    expected_departure: departure,
+    notes: text(form, "notes"),
+    belongings: text(form, "belongings"),
+  };
+  if (canManage) {
+    const rate = typedMoney(form, "rate");
+    const discount = typedMoney(form, "discount");
+    if (rate === undefined || rate === null) return { error: "Enter the price as a number, like 1200." };
+    if (discount === undefined) return { error: "Enter the discount as a number, like 200, or leave it empty." };
+    update.rate_minor = rate;
+    update.discount_minor = discount ?? 0;
+  }
+
+  const { data, error } = await supabase.from("bookings").update(update).eq("org_id", org.id).eq("id", id.data).select("id");
   if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "Only a booking that has not started can be cancelled." };
+  if (data.length === 0) return { error: "That booking could not be found." };
 
   revalidatePath("/app", "layout");
-  return { ok: "Booking cancelled." };
+  return { ok: "Booking saved." };
+}
+
+/** Change a booking's status from one of `from` to `to`, with an optional extra change. */
+async function moveStatus(
+  form: FormData,
+  from: ("requested" | "confirmed" | "checked_in")[],
+  to: "confirmed" | "cancelled" | "no_show",
+  extra: TablesUpdate<"bookings"> = {},
+): Promise<{ error?: string }> {
+  const { org } = await requireOrg();
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: "That booking could not be found." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ status: to, ...extra })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .in("status", from)
+    .select("id");
+  if (error) return { error: friendlyError(error) };
+  if (data.length === 0) return { error: "This booking has changed since you opened it. Refresh the page." };
+  revalidatePath("/app", "layout");
+  return {};
+}
+
+/** Accept a request: from now on it holds space, so capacity is checked. */
+export async function confirmRequest(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await moveStatus(form, ["requested"], "confirmed");
+  return result.error ? result : { ok: "Confirmed. The space is now held." };
+}
+
+export async function cancelBooking(_state: FormState, form: FormData): Promise<FormState> {
+  const reason = text(form, "reason");
+  if (!reason) return { error: "Say why the booking is cancelled." };
+  if (reason.length > 500) return { error: "Keep the reason under 500 characters." };
+  const result = await moveStatus(form, ["requested", "confirmed"], "cancelled", { cancel_reason: reason });
+  return result.error ? result : { ok: "Booking cancelled. The space is free again." };
+}
+
+export async function markNoShow(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await moveStatus(form, ["confirmed"], "no_show");
+  return result.error ? result : { ok: "Marked as did not arrive. The space is free again." };
+}
+
+/**
+ * A pet still here after its check-out date keeps its kennel until today. The
+ * database refuses this when the kennel is promised to another pet, and then
+ * the sentence says what to do instead.
+ */
+export async function extendToToday(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: "That booking could not be found." };
+  const today = todayIn(org.time_zone);
+
+  const supabase = await createClient();
+  const current = await supabase
+    .from("bookings")
+    .select("status, end_date, kennel_id, kennels(name), pets(name)")
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .maybeSingle();
+  if (current.error) return { error: friendlyError(current.error) };
+  if (!current.data || current.data.status !== "checked_in") return { error: "This pet is not checked in. Refresh the page." };
+  if (current.data.end_date >= today) return { ok: "This stay already runs to today." };
+
+  const { error } = await supabase.from("bookings").update({ end_date: today }).eq("org_id", org.id).eq("id", id.data).eq("status", "checked_in");
+  if (error) {
+    if (current.data.kennel_id && `${error.message} ${error.details ?? ""}`.includes("bookings_no_kennel_overlap")) {
+      const next = await supabase
+        .from("bookings")
+        .select("start_date, pets(name)")
+        .eq("org_id", org.id)
+        .eq("kennel_id", current.data.kennel_id)
+        .in("status", ["confirmed", "checked_in"])
+        .neq("id", id.data)
+        .gte("start_date", current.data.end_date)
+        .order("start_date")
+        .limit(1)
+        .maybeSingle();
+      const who = next.data ? `${next.data.pets?.name ?? "Another pet"} from ${formatDate(next.data.start_date)}` : "another pet";
+      return {
+        error: `${current.data.kennels?.name ?? "This kennel"} is promised to ${who}. Move ${current.data.pets?.name ?? "this pet"} to a free kennel on the booking page, then extend.`,
+      };
+    }
+    return { error: friendlyError(error) };
+  }
+  revalidatePath("/app", "layout");
+  return { ok: `Stay extended to ${formatDate(today)}.` };
+}
+
+/** Add an extra from the price list (at its listed price) or a one-off item with its own price. */
+export async function addExtra(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const bookingId = Id.safeParse(form.get("bookingId"));
+  if (!bookingId.success) return { error: "That booking could not be found." };
+  const quantityText = text(form, "quantity") ?? "1";
+  const quantity = Number(quantityText);
+  if (!/^\d{1,4}(\.\d{1,2})?$/.test(quantityText) || quantity <= 0) return { error: "Enter how many, like 1 or 2." };
+
+  const supabase = await createClient();
+  const serviceId = text(form, "serviceId");
+  let item: { service_id: string | null; description: string; unit_price_minor: number; tax_rate_bp: number; sac_code: string | null };
+  if (serviceId) {
+    if (!Id.safeParse(serviceId).success) return { error: "Choose an extra from the list." };
+    const s = await supabase.from("services").select("id, name, price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("id", serviceId).eq("is_active", true).maybeSingle();
+    if (s.error) return { error: friendlyError(s.error) };
+    if (!s.data) return { error: "That extra is no longer on your price list." };
+    item = {
+      service_id: s.data.id,
+      description: s.data.name,
+      unit_price_minor: s.data.price_minor,
+      tax_rate_bp: org.tax_mode === "none" ? 0 : (s.data.tax_rate_bp ?? org.default_tax_rate_bp),
+      sac_code: s.data.sac_code,
+    };
+  } else {
+    const description = text(form, "description");
+    const price = typedMoney(form, "price");
+    if (!description) return { error: "Choose an extra from the list, or describe a one-off item." };
+    if (description.length > 200) return { error: "Keep the description under 200 characters." };
+    if (price === undefined || price === null) return { error: "Enter the price of the item, like 500." };
+    item = { service_id: null, description, unit_price_minor: price, tax_rate_bp: org.tax_mode === "none" ? 0 : org.default_tax_rate_bp, sac_code: null };
+  }
+
+  const { error } = await supabase.from("booking_items").insert({ org_id: org.id, booking_id: bookingId.data, quantity, ...item });
+  if (error) return { error: friendlyError(error) };
+  revalidatePath("/app", "layout");
+  return { ok: `Added ${item.description}.` };
+}
+
+export async function removeExtra(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  if (!canManage) return { error: "Only an owner or manager can remove an extra." };
+  const id = Id.safeParse(form.get("itemId"));
+  if (!id.success) return { error: "That extra could not be found." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("booking_items").delete().eq("org_id", org.id).eq("id", id.data).select("id");
+  if (error) return { error: friendlyError(error) };
+  if (data.length === 0) return { error: "That extra could not be found." };
+  revalidatePath("/app", "layout");
+  return { ok: "Extra removed." };
 }

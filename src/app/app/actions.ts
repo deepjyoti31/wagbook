@@ -6,7 +6,8 @@ import { z } from "zod";
 import { getMemberships, rememberOrg, requireOrg } from "@/lib/auth";
 import { todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
-import type { FormState } from "@/lib/forms";
+import { checked, text, type FormState } from "@/lib/forms";
+import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
@@ -15,6 +16,10 @@ const Id = z.uuid();
  * Check a pet in: mark the booking as in house and, if chosen, put it in a
  * kennel. The database stamps who did it and when, refuses a kennel that is
  * already taken, and starts producing the pet's daily care tasks.
+ *
+ * From the booking page the form also carries the check-in checklist:
+ * belongings, what the parent said at the gate, and whether the vaccination
+ * certificates were seen. From Today it does not, and those are left alone.
  */
 export async function checkIn(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
@@ -23,10 +28,18 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
   const kennelId = typeof kennel === "string" && kennel !== "" ? Id.safeParse(kennel) : null;
   if (!bookingId.success || (kennelId && !kennelId.success)) return { error: "That booking could not be found." };
 
+  const checklist: TablesUpdate<"bookings"> = {};
+  if (form.has("checklist")) {
+    checklist.belongings = text(form, "belongings");
+    checklist.gate_notes = text(form, "gateNotes");
+    // The database records the real time and person; any value marks it.
+    checklist.vaccinations_checked_at = checked(form, "vaccinationsChecked") ? new Date().toISOString() : null;
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bookings")
-    .update({ status: "checked_in", ...(kennelId ? { kennel_id: kennelId.data } : {}) })
+    .update({ status: "checked_in", ...(kennelId ? { kennel_id: kennelId.data } : {}), ...checklist })
     .eq("org_id", org.id)
     .eq("id", bookingId.data)
     .eq("status", "confirmed")

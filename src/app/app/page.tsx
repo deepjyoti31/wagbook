@@ -4,11 +4,14 @@ import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { dailyUpdateMessage, formatDate, formatPhone, todayIn, whatsappLink } from "@/lib/core";
+import { flagText } from "@/lib/bookings";
+import { CARE_KIND_PLURAL, CARE_KINDS } from "@/lib/care";
+import { dailyUpdateMessage, formatDate, formatPhone, isOverstaying, todayIn, whatsappLink } from "@/lib/core";
 import { bookingCards, type BookingCard } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
+import { extendToToday } from "./bookings/actions";
 
 export const metadata: Metadata = { title: "Today" };
 
@@ -25,12 +28,17 @@ async function Today() {
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
 
-  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, origin] = await Promise.all([
+  // Make sure today's care tasks exist before counting them. Safe to repeat.
+  const generated = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: today });
+  if (generated.error) console.error("generate_care_tasks failed", generated.error.message);
+
+  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, origin] = await Promise.all([
     // Confirmed and due today or earlier: includes anyone who was expected yesterday and has not turned up.
     bookingCards(supabase, org.id).eq("status", "confirmed").lte("start_date", today).order("start_date"),
     bookingCards(supabase, org.id).eq("status", "checked_in").order("end_date"),
     supabase.from("kennels").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("is_active", true),
     supabase.from("intake_submissions").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "new"),
+    supabase.from("care_tasks").select("kind, status").eq("org_id", org.id).eq("task_date", today).limit(10000),
     siteOrigin(),
   ]);
   if (arrivalsRes.error || inHouseRes.error) throw new Error("Could not load today's bookings.");
@@ -39,6 +47,11 @@ async function Today() {
   const inHouse = inHouseRes.data;
   const capacity = kennelsRes.count ?? 0;
   const newForms = intakeRes.count ?? 0;
+  // Done out of what is owed: a task skipped on purpose is no longer owed.
+  const care = CARE_KINDS.map((kind) => {
+    const mine = (tasksRes.data ?? []).filter((t) => t.kind === kind && t.status !== "skipped");
+    return { kind, done: mine.filter((t) => t.status === "done").length, total: mine.length };
+  }).filter((c) => c.total > 0);
 
   // Kennels free for each arrival's whole stay.
   const freeKennels = await Promise.all(
@@ -84,6 +97,22 @@ async function Today() {
         </p>
       ) : null}
 
+      {care.length > 0 ? (
+        <div className="mb-7 flex flex-wrap gap-2">
+          {care.map((c) => (
+            <Link
+              key={c.kind}
+              href={`/app/care?kind=${c.kind}&show=pending`}
+              className={`inline-flex min-h-12 items-center gap-2 rounded-lg border px-4 font-semibold ${
+                c.done === c.total ? "border-leaf bg-leaf-soft text-leaf" : c.kind === "medication" ? "border-alert bg-alert-soft text-alert" : "border-rule bg-paper"
+              }`}
+            >
+              {CARE_KIND_PLURAL[c.kind]} {c.done} of {c.total}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
       <Section title="Arriving" count={arrivals.length}>
         {arrivals.length === 0 ? (
           <Empty>Nobody is due to arrive today.</Empty>
@@ -125,6 +154,14 @@ async function Today() {
               <LedgerRow key={b.id}>
                 <BookingSummary booking={b} today={today} />
                 <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                  {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
+                    <ActionForm action={extendToToday} className="contents">
+                      <input type="hidden" name="bookingId" value={b.id} />
+                      <SubmitButton variant="secondary" pendingLabel="Extending">
+                        Extend to today
+                      </SubmitButton>
+                    </ActionForm>
+                  ) : null}
                   {b.clients ? (
                     <a
                       href={whatsappLink(
@@ -162,7 +199,9 @@ function BookingSummary({ booking: b, today }: { booking: BookingCard; today: st
     <div className="min-w-0 flex-1 basis-64">
       <p className="flex flex-wrap items-center gap-2">
         <DoorTag name={b.kennels?.name} />
-        <span className="text-lg font-bold">{b.pets?.name ?? "Unknown pet"}</span>
+        <Link href={`/app/bookings/${b.id}`} className="text-lg font-bold underline-offset-4 hover:underline">
+          {b.pets?.name ?? "Unknown pet"}
+        </Link>
         {b.pets?.breed ? <span className="text-slate">{b.pets.breed}</span> : null}
         {b.kind === "daycare" ? <Badge>Day boarding</Badge> : null}
         {leavesToday ? <Badge tone="attention">Leaves today</Badge> : null}
@@ -170,7 +209,7 @@ function BookingSummary({ booking: b, today }: { booking: BookingCard; today: st
         {late ? <Badge tone="alert">Was due {formatDate(b.start_date)}</Badge> : null}
         {(b.pets?.flags ?? []).map((f) => (
           <Badge key={f} tone="alert">
-            {f.replaceAll("_", " ")}
+            {flagText(f)}
           </Badge>
         ))}
       </p>
