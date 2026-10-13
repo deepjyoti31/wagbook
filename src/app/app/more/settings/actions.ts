@@ -77,11 +77,6 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     prices[kind] = minor;
   }
 
-  const sessions = Number(text(form, "play_sessions_per_day") ?? 0);
-  const minutes = Number(text(form, "play_session_minutes") ?? 20);
-  if (!Number.isInteger(sessions) || sessions < 0 || sessions > 12) return { error: "Play sessions a day must be between 0 and 12." };
-  if (!Number.isInteger(minutes) || minutes < 5 || minutes > 240) return { error: "A play session is between 5 and 240 minutes." };
-
   const update: TablesUpdate<"organizations"> = {
     name,
     legal_name: text(form, "legal_name"),
@@ -104,8 +99,6 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     invoice_prefix: prefix,
     intake_enabled: checked(form, "intake_enabled"),
     intake_notice: text(form, "intake_notice"),
-    play_sessions_per_day: sessions,
-    play_session_minutes: minutes,
   };
 
   const supabase = await createClient();

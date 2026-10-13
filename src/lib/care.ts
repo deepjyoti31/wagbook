@@ -37,3 +37,9 @@ export const STARTER_ROUTINES: { kind: Enums<"care_kind">; label: string; due_ti
 export function clockText(time: string | null): string {
   return time ? time.slice(0, 5) : "Any time";
 }
+
+/**
+ * Least time between the end of a pet's play session and the start of its
+ * next, so its sessions are spread over the day rather than back to back.
+ */
+export const PLAY_GAP_MINUTES = 120;

@@ -146,17 +146,6 @@ async function Settings() {
           </label>
         </Group>
 
-        <Group title="Solo play" about="For kennels where every pet gets a yard to itself. Set sessions to 0 if you do not schedule play.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Sessions for each pet, per day">
-              <Input name="play_sessions_per_day" type="number" min={0} max={12} defaultValue={org.play_sessions_per_day} />
-            </Field>
-            <Field label="Minutes per session">
-              <Input name="play_session_minutes" type="number" min={5} max={240} defaultValue={org.play_session_minutes} />
-            </Field>
-          </div>
-        </Group>
-
         <Group title="Intake form">
           <label className="flex items-start gap-3">
             <input type="checkbox" name="intake_enabled" defaultChecked={org.intake_enabled} className="mt-1 size-5" />
