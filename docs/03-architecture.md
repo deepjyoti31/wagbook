@@ -223,8 +223,9 @@ Docker or a live project.
 ## Testing
 
 ```
-npm run test:unit    40 tests   pure logic, under a second
-npm run test:db      96 tests   real Postgres in-process, about 40 seconds
+npm run test:unit    48 tests   pure logic, under a second
+npm run test:db     116 tests   real Postgres in-process, about 40 seconds
+npm run test:e2e     13 tests   a real browser against the built app and a local Supabase (needs Docker)
 ```
 
 ### How the database tests work
@@ -253,7 +254,9 @@ What each file covers:
 | --- | --- |
 | `smoke.test.ts` | The migrations apply. |
 | `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but four functions; tenants are isolated in every table; role limits. |
-| `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps. |
+| `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps, the price rule, extras, families, requests, overstays, the check-in checklist. |
+| `care.test.ts` | Medicines need a reason to be skipped, a double tap keeps the first stamp, the stay page counts what was ticked, play hours, moving a play session. |
+| `seed.test.ts` | `supabase/seed.sql` applies on top of the migrations and builds the demo kennel. |
 | `billing.test.ts` | Numbering, freezing, voiding, tax checks, payments, balances. |
 | `intake.test.ts` | The public form, hostile payloads, accepting, the stay page. |
 | `hardening.test.ts` | Regression tests for the findings of the security reviews. Read [05](05-security-and-privacy.md) before touching. |
@@ -263,11 +266,25 @@ These tests have been checked by breaking the database on purpose (switching off
 constraint, granting anon a table, dropping the invoice guard). Each break made tests fail. When you add a rule, do the
 same once: remove the rule, see your test fail, put it back.
 
+### The end-to-end tests
+
+`e2e/walk.spec.ts` walks a kennel's day in Chromium at 360 pixels wide: sign in, check in with the checklist, a double
+booking refused, a family request confirmed, an overstay extended, the care round, play, a cancellation, a parent's
+intake form accepted, the stay page in a private window, a manager's price change and extra, the calendar, and a new
+person creating a kennel and inviting a colleague who joins and switches.
+
+```bash
+npx -y supabase@2.120.0 start     # once; needs Docker. Applies migrations and supabase/seed.sql
+npm run test:e2e                  # resets the database to the seed, builds the app, runs the walk
+E2E_BASE_URL=http://localhost:3000 npx playwright test    # against a dev server you already run
+```
+
+The tests share one database and run in order. `scripts/e2e.mjs` resets it first, so a run always starts from the seed.
+
 ### What is not tested automatically
 
-The screens. There are no browser tests yet, and PGlite is not Supabase: it has no PostgREST, no real Auth, no real
-Storage. Milestone M1 adds an end-to-end smoke test against a real project. Until then, a screen is "verified" only
-when someone has used it against a real Supabase project, and `HANDOFF.md` records which have been.
+A hosted Supabase project (the local stack is the same software, but email, settings screens and network differ),
+real phones, and WhatsApp itself (Wagbook only builds the link). `HANDOFF.md` records what has been checked by hand.
 
 ## Design system
 

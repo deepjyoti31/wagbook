@@ -41,6 +41,7 @@ In summary:
 | Data | Staff | Manager | Owner |
 | --- | --- | --- | --- |
 | Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Also delete | Same as manager |
+| The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
 | A pet's own care routine | Read, add, edit | Also delete | Same |
 | House routines, kennels, rate card, peak periods, play yards | Read | Add, edit, delete | Same |
 | Kennel settings | Read | Edit | Also delete the kennel |
@@ -180,6 +181,15 @@ fixed, with tests under "second pass" in `tests/db/hardening.test.ts`:
 
 **Add an entry here for every future review**, with the date, who or what reviewed, what was found, and the tests.
 
+### 13 October 2026: price rule and the M2 and M3 screens
+
+What changed: the price guard triggers (D15), the family booking rule, the medicine skip rule, and the screens of
+milestones M2 and M3. Checked: each new rule's test fails when the rule is removed (`bookings_guard_price`,
+`booking_items_guard_price`, `bookings_check_group`, the medicine note constraint). The new triggers are
+`security invoker` and set `search_path = ''`; they read only rows the caller can already read. No new function is
+granted to `anon`. Every new Server Action starts with `requireOrg()`, filters by `org_id`, and repeats the role check
+only to give a sentence (the database is what refuses).
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -189,8 +199,8 @@ These are real. Do not describe Wagbook as free of them.
 | The signed-in screens have not been exercised against a live Supabase project | PostgREST, real Auth and real Storage may behave differently from the in-process tests | Milestone M1, first |
 | Intake flood limits are per kennel and per phone number, not per visitor | A determined attacker can fill a kennel's hourly quota and block real parents for that hour | M9: rate limiting at the edge, or a challenge |
 | No script-src Content Security Policy | An injected script would run. React's escaping is the only defence. | M9: nonces |
-| Staff can edit a booking's price | A dishonest worker could lower a price. The audit log records it. | Decide in M2 whether price becomes manager only |
-| A pet that overstays does not hold its kennel past its end date | Someone else could be booked into that kennel while the pet is still there. Today shows "Was due to leave" in red. | M2: extend the stay at one tap, or hold until check-out |
+| A draft invoice's lines are editable by staff | The price rule for bookings (D15) does not yet cover bills | M4: build the bill from the booking and apply the same rule |
+| A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
 | An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | M6: invitations by link, which need no lookup |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |

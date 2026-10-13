@@ -30,18 +30,26 @@ One person can belong to several kennels, with a different role in each.
 /app                  Today                                          signed in
 /app/bookings         Current and upcoming, Past                     signed in
 /app/bookings/new     New booking                                    signed in
+/app/bookings/{id}    One booking                                    signed in
+/app/calendar         Kennels by day                                 signed in
+/app/care             Today's care tasks                             signed in
+/app/play             Today's solo play timetable                    signed in
 /app/dogs             Pets (search)                                  signed in
 /app/dogs/new         Add a pet and its parent                       signed in
 /app/more             Menu, account, switch kennel, sign out         signed in
 /app/more/intake      Forms from parents                             signed in
 /app/more/kennels     Kennels                                        signed in
+/app/more/routines    Daily (house) routines                         signed in
+/app/more/play        Play yards, play hours, yard calculator        signed in
+/app/more/extras      Extras on the price list                       signed in
+/app/more/peak        Peak periods                                   signed in
 /app/more/people      People and invitations                         signed in
-/app/more/settings    Kennel details, prices, UPI, tax, play, intake signed in
+/app/more/settings    Kennel details, prices, UPI, tax, intake       signed in
 /i/{slug}             A kennel's intake form                         public
 /s/{token}            One stay, for the parent                       public, secret link
 ```
 
-Planned routes: `/app/bookings/{id}`, `/app/calendar`, `/app/care`, `/app/play`, `/app/bills`, `/app/dogs/{id}`,
+Planned routes: `/app/bills`, `/app/dogs/{id}`,
 `/app/clients/{id}`, `/app/more/reports`, `/app/more/expenses`, `/inv/{token}` (a bill, for the parent).
 
 The folder is called `dogs` because that is what almost every kennel calls them; the screen says "Pets" because cats
@@ -86,8 +94,8 @@ cookie is only a preference: membership is checked on every request.
 
 Kennel details (name, phones, email, address, usual drop-off and pick-up times), usual prices for boarding and day
 boarding, UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
-prefix, whether prices include tax), solo play (sessions per pet per day, minutes), intake form (on or off, consent
-wording). Staff can look but not save.
+prefix, whether prices include tax), intake form (on or off, consent wording). Staff can look but not save. Solo play
+settings are on Play yards (D3).
 
 Planned (M4): time zone, currency, locale and financial year start as visible settings. Today they are columns with
 Indian defaults.
@@ -151,9 +159,11 @@ Export everything held about a parent, and erase it on request, keeping only wha
 
 ### C1. New booking. Built.
 
-Pet, boarding or day boarding, dates, kennel (optional: "Decide at check-in"), price (optional: uses the usual price),
-notes for staff. The price and tax rate are copied onto the booking, so changing the rate card later never changes an
-old booking.
+Pet (and, ticked, any other pets of the same parent: see C4), boarding or day boarding, dates, kennel (optional:
+"Decide at check-in"), notes for staff. Two buttons: Confirm booking, or Save as request (C6). The price is the usual
+price for the kind of stay; only owners and managers see a Price box and can type another. The price and tax rate are
+copied onto the booking, so changing the rate card later never changes an old booking. Opening it from the calendar
+fills in the kennel and the date. After booking, the booking page opens.
 
 What the database refuses, whatever the screen does:
 
@@ -164,43 +174,69 @@ What the database refuses, whatever the screen does:
 | More pets in house on any day than kennels in service (once at least one kennel exists) | `WB020` |
 | A kennel that is out of service | `WB021` |
 | Boarding with no night; check-out before check-in; longer than a year | check constraints |
+| Staff booking at a price that is not on the price list, or with a discount | `WB023` |
+| Staff changing a booking's price, discount, tax or kind | `WB022` |
+| Pets of two different parents in one family booking | `WB024` |
 
 A kennel is free again on the day its guest checks out, so one dog can leave and another arrive in the same kennel on
 the same day. Day boarding holds its kennel for every day of the visit, including the last.
 
 ### C2. Bookings list. Built.
 
-Two tabs: Current and upcoming; Past. Each row: kennel tag, pet, status, parent, dates, nights or days, price. A
-confirmed or requested booking can be cancelled.
+Two tabs: Current and upcoming; Past. Each row: kennel tag, pet, status (a request says "Request"), "Family" when booked
+with other pets, any peak period it touches, parent, dates, nights or days, price. A row opens the booking page, where
+cancelling happens. A Calendar button opens C5.
 
-### C3. Booking page. Planned (M2).
+### C3. Booking page. Built.
 
-One booking: change dates, kennel, price, notes; add extras (grooming and so on) from the rate card; belongings list;
-check in and out; cancel with a reason; mark as did not arrive; link to the parent's stay page; the bill.
+`/app/bookings/{id}`. The pet, kennel, status, dates, peak periods it touches and the pet's warning flags, then:
 
-### C4. Family bookings. Database ready.
+- **Next**: for a request, Confirm booking. For a confirmed booking, the check-in checklist (D6) and Did not arrive.
+  For a pet in house, Check out, Send update, and Extend to today when it has stayed past its check-out date.
+- **Parent's stay page**: the link, Copy link, Open it, and Send confirmation (WhatsApp, with dates, nights and the
+  estimated total).
+- **Booked together**: the other pets of a family booking.
+- **What it costs**: the stay and its extras as lines with an estimated total (tax included where the kennel charges
+  it); add an extra from the price list or a one-off item; owners and managers can remove one.
+- **Change this booking**: dates, kennel (free ones offered), expected drop-off and pick-up times, belongings, notes;
+  price per night or day and a discount for owners and managers only.
+- **The pet's own routines** (D2) and what the parent said about food, health, allergies and behaviour.
+- **Cancel**, with a reason (required), and a warning when the stay touches a no-refund peak period.
 
-`bookings.group_id` ties together bookings made at once for pets of one family. Planned (M2): choose several pets in New
-booking.
+After a step that changes the status, the page comes back saying what happened. The bill is M4.
 
-### C5. Calendar. Planned (M2).
+### C4. Family bookings. Built.
 
-A grid of kennels by days showing who is where, with free kennels obvious. `occupancy_by_day()` already returns the
-count per day.
+In New booking, choosing a pet lists the other pets of the same parent with a tick box each. Ticked pets are booked in
+the same statement (all or none), share a `group_id`, and show each other on the booking page. Only the first pet gets
+the chosen kennel; the others get theirs at check-in. The database refuses a group that mixes parents (`WB024`).
 
-### C6. Requests. Database ready.
+### C5. Calendar. Built.
 
-A booking can have status `requested`, which holds no space. Planned (M2): let staff save a request and confirm it later.
+`/app/calendar`. Kennels down the side, fourteen days across, Earlier and Later to move, scrolling sideways on a phone
+with the kennel column fixed. A row of "in house of kennels" per day from `occupancy_by_day()`, red when full. Each cell
+shows the pet holding that kennel that night (green when in house, grey when booked, red when still here after its
+check-out date) and opens the booking. An empty cell from today on opens New booking for that kennel and day. Pets with
+no kennel yet are counted in a last row. Requests are not shown; a note says how many there are.
 
-### C7. Peak periods. Database ready.
+### C6. Requests. Built.
 
-Table `peak_periods`: a named range of dates with an optional no-refund flag and an optional shorter play session.
-Planned (M2): a settings screen, a badge on bookings that touch a peak period, a warning when cancelling one.
+Save as request in New booking. A request holds no space and is not counted for capacity or kennels. Confirm booking on
+its page turns it into a confirmed booking, and only then do the database's space rules apply.
 
-### C8. Rate card and extras. Database ready.
+### C7. Peak periods. Built.
 
-Table `services` holds the usual price per kind and any number of extras. Settings edits the two usual prices today.
-Planned (M2): manage extras; add them to a booking as `booking_items`.
+More, then Peak periods: add (name, first and last day, no refund, shorter play sessions) and remove, owners and
+managers. A stay touches a period when any night it holds a kennel (any day, for day boarding) falls inside it
+(`peaksTouching()`). Such bookings carry a badge on Bookings and on the booking page, and cancelling one marked no
+refund shows a warning. Prices never change.
+
+### C8. Rate card and extras. Built.
+
+Settings edits the two usual prices. More, then Extras: add an extra (each time or by the hour), change its price, take
+it off the list; owners and managers. On the booking page anyone adds an extra at its listed price, or a one-off item
+with its own price (a vet bill paid for the parent). Changing what an extra costs, or removing one, is for owners and
+managers (`WB025`, and the delete policy).
 
 ---
 
@@ -208,27 +244,47 @@ Planned (M2): manage extras; add them to a booking as `booking_items`.
 
 ### D1. Today. Built.
 
-The date, "N in house of M kennels, N to arrive", a prompt when forms from parents are waiting, then two lists.
+The date, "N in house of M kennels, N to arrive", today's care counts ("Meals 2 of 12", medicines in red until done)
+linking to the Care screen, a prompt when forms from parents are waiting, then two lists. Pet names open the booking.
 
 - **Arriving**: confirmed bookings due today or earlier (so yesterday's no-show is still visible, marked "Was due").
   Each has a kennel picker offering only kennels free for the whole stay, and Check in.
 - **In house**: checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
-  parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves.
+  parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves. A pet
+  still here after its check-out date also gets Extend to today, which moves the check-out date to today, or says
+  which pet the kennel is promised to and what to do instead.
 
 Pet flags (for example "bite history" or "escape risk") show in red on every row.
 
-### D2. Daily care tasks. Database ready.
+### D2. Daily care tasks. Built.
 
 `care_items` are routines: house routines for every pet (meals at set times, cleaning) and routines for one pet (a
-tablet at 8 pm). `generate_care_tasks(org, date)` turns them into the day's `care_tasks` for every pet in house; it is
-safe to call again. A task is ticked done (who and when are stamped by the database and cannot be forged) or skipped
-with a note. Planned (M3): the Care screen, grouped by time of day, one tap to tick.
+tablet at 8 pm). More, then Daily routines: the house routines, a starter set (breakfast, a kennel clean, lunch, dinner),
+add and stop; owners and managers. A pet's own routines are added and stopped from its booking page by anyone.
 
-### D3. Solo play timetable. Database ready.
+`generate_care_tasks(org, date)` turns routines into the day's `care_tasks` for every pet checked in, from its first day
+until it is checked out (so an overstaying pet is still fed). Today and the Care screen call it when opened; it is safe
+to repeat.
 
-`play_yards` and `play_sessions`; the database refuses two pets in one yard at once, and one pet in two yards at once.
-`planPlaySessions()` in `src/lib/core/play-schedule.ts` builds a fair timetable, and `yardsNeeded()` answers "how many
-yards do I need to keep my promise". Planned (M3): the Play screen and a "what do I need" calculator in Settings.
+`/app/care`: today's tasks grouped by time; within a time, medicines first, then kennel by kennel in kennel order. A pending
+medicine has a red edge and badge and is never folded away. One tap on Done; a second tap does nothing (the database keeps
+the first who and when). Skip opens a note; a medicine cannot be skipped without one (constraint
+`care_tasks_skipped_medication_needs_note`). Undo puts a task back. Filters: Still to do, and by kind.
+
+Not yet: `care_items.requires_photo` is not offered or enforced, because photos arrive in M5.
+
+### D3. Solo play timetable. Built.
+
+More, then Play yards (owners and managers): yards (add, take out of use), sessions per pet per day, minutes per session,
+minutes between pets, opening hours and an optional break. A calculator there answers "how many yards do I need"
+(`yardsNeeded()`) for any numbers, as a plain form that works without JavaScript.
+
+`/app/play`: Plan today builds a fair timetable for every pet in house (`planPlaySessions()`): everyone gets a first
+session before anyone gets a second, at least two hours between a pet's sessions, pets taken in kennel order, around any
+sessions already planned, so it can be pressed again after new arrivals. A peak period's shorter session length applies.
+The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees the slot). The database refuses two pets
+in one yard at once, or one pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
+to happen.
 
 ### D4. Updates to parents. Partly built.
 
@@ -241,9 +297,11 @@ on the stay page and opens WhatsApp.
 Table `incidents`: what happened, how serious, what was done, whether the parent and a vet were told. Planned (M6): log
 one from a pet's row in two taps; show a pet's history.
 
-### D6. Check-in checklist. Planned (M2).
+### D6. Check-in checklist. Built.
 
-At check-in: confirm vaccinations, record belongings, note anything the parent said at the gate.
+On the booking page of a confirmed booking: kennel (free ones offered), the pet's vaccinations with "Expired" or "Runs
+out during the stay" in red, a tick for "I have seen the vaccination certificates" (the database stamps who and when),
+belongings, and anything said at the gate. Check in from Today stays one tap and leaves these alone.
 
 ---
 
@@ -291,9 +349,10 @@ kennel. Times are on the kennel's clock.
 It shows no prices, no staff notes, no medical details and no other pets. The link stops working when the booking is
 cancelled and thirty days after check-out. The page is marked not to be indexed by search engines.
 
-### F2. Booking confirmation message. Built as a function, not yet wired.
+### F2. Booking confirmation message. Built.
 
-`bookingConfirmedMessage()` writes it. Planned (M2): a "Send confirmation" button after booking.
+Send confirmation on the booking page opens WhatsApp to the parent with `bookingConfirmedMessage()`: dates, nights (days
+for day boarding), the estimated total and the stay link.
 
 ### F3. Photos. Planned (M5).
 
@@ -311,7 +370,7 @@ access rules exist.
 | Languages other than English | Planned (M8) |
 | Audit log of every change to bookings, money, settings and people | Database ready. Viewer planned (M7). |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Planned (M8) |
-| Demo data for trying Wagbook | Planned (M1) |
+| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase |
 
 ## Words on screen
 

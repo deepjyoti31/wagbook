@@ -23,7 +23,11 @@ settings, security review and fixes, documentation.
 
 ## M1. Prove it against a real Supabase
 
-- [ ] Not started. **Do this first.** Nothing in M0's screens has run against a live project.
+- [ ] Partly done, 13 October 2026. Done: every migration and the seed apply on Supabase's own Postgres 17 (the local
+  stack from the Supabase CLI); `supabase/seed.sql` and `supabase/config.toml`; the whole walk below runs as Playwright
+  tests (`npm run test:e2e`, 13 tests) against that local stack, and a second CI job runs it. Still to do, and it needs a
+  person: follow `10-setup-and-deploy.md` on a hosted Supabase project, try the real sign-up email and the
+  `/auth/confirm` round trip, and record the migration freeze when production exists. See `HANDOFF.md`.
 
 **Build**
 
@@ -61,7 +65,7 @@ settings, security review and fixes, documentation.
 
 ## M2. Bookings, properly
 
-- [ ] Not started.
+- [x] Finished 13 October 2026. Price is manager only (D15).
 
 **Build**
 
@@ -95,7 +99,7 @@ settings, security review and fixes, documentation.
 
 ## M3. The care round
 
-- [ ] Not started.
+- [x] Finished 13 October 2026. Not timed with a stopwatch on a real phone; see `HANDOFF.md`.
 
 **Build**
 

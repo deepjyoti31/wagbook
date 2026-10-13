@@ -238,3 +238,46 @@ server and runs anywhere Node does; the self-hosting guide in M10 covers Docker.
 
 **Cost.** Two vendors' free plans have limits and terms that can change. Vercel's free plan is for non-commercial
 use; a kennel running its business on it should read the terms and may need the paid plan or another host.
+
+---
+
+## D15. Only owners and managers decide what a stay costs
+
+**Status:** Decided by the owner, 13 October 2026 (milestone M2).
+
+**Situation.** Staff run the day and make most bookings. A booking's price could be changed by anyone, recorded only
+in the audit log. A dishonest worker could lower a price and pocket the difference.
+
+**Decision.** Staff book at the price on the price list and cannot change it. Owners and managers set any price and
+discount. In detail, enforced by triggers in `20261008000300_kennels_and_bookings.sql`:
+
+- A new booking by staff must have a rate, tax rate and SAC code exactly as an active price list row of its kind gives
+  them, and no discount (`WB023`).
+- Staff cannot change an existing booking's rate, discount, tax rate, SAC code or kind (`WB022`).
+- Staff add extras from the price list only at the listed price (`WB023`), may add a one-off item with no price list
+  entry at any price (a vet bill paid for the parent; it only ever adds to the bill), and cannot change what an extra
+  costs afterwards (`WB025`). Removing an extra was already manager only.
+
+**Why a trigger and not column grants.** The roadmap suggested column grants and a policy. Every member signs in as
+the same database role, `authenticated`, so a grant cannot tell a manager from staff, and an update policy cannot
+compare old and new values. A `before` trigger can, using `my_org_ids_with_role()`.
+
+**Cost.** A kennel with no usual price set cannot be booked by staff until a manager sets one. The screen says so.
+
+**Look again** in M4: a draft invoice is still editable by staff, line by line. The bill must be built from the
+booking, and editing its money should follow the same rule.
+
+---
+
+## D16. Playwright for the end-to-end tests, and the Supabase CLI through npx
+
+**Status:** Decided, 13 October 2026 (milestone M1).
+
+**Decision.** `@playwright/test` is a development dependency. The Supabase CLI is run with `npx -y supabase@2.120.0`
+(pinned in `scripts/e2e.mjs` and the CI workflow) rather than installed as a dependency.
+
+**Why.** The roadmap asks for browser tests of the whole day against a local Supabase. Playwright drives a real
+Chromium at phone width, waits for the page by itself, and records a trace on failure. Installing the Supabase CLI as
+a package would download a binary on every `npm ci`, for everyone, including cloud sessions that never run Docker.
+
+**Cost.** One large development dependency. The tests need Docker and are kept out of `npm run check`.

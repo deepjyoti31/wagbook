@@ -22,10 +22,11 @@ and money matters more than speed of delivery.
 | `npm run check` | The gate: lint, typecheck, all tests, production build. Must pass before you say you are done. |
 | `npm run test:unit` | Pure logic tests in `src/` (fast). |
 | `npm run test:db` | Database tests: applies every migration to an in-process Postgres and attacks it. |
+| `npm run test:e2e` | Browser walk of the whole day against a local Supabase (`npx -y supabase@2.120.0 start` first; needs Docker). Not part of `check`. |
 | `npm run gen:db` | Regenerates `src/lib/supabase/database.types.ts`, `docs/reference/schema.md` and `docs/reference/error-codes.md` from the migrations. |
 | `npm run typecheck` | `next typegen` then `tsc`. |
 
-No Docker, no Supabase account and no network are needed for any of these.
+No Docker, no Supabase account and no network are needed for any of these, except `test:e2e`.
 
 ## Where things are
 
