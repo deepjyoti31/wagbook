@@ -166,12 +166,23 @@ create table public.organizations (
   allow_overbooking boolean not null default false,
   play_sessions_per_day smallint not null default 0 check (play_sessions_per_day between 0 and 12),
   play_session_minutes smallint not null default 20 check (play_session_minutes between 5 and 240),
+  play_changeover_minutes smallint not null default 0 check (play_changeover_minutes between 0 and 60),
+  play_day_start time not null default '08:00',
+  play_day_end time not null default '18:00',
+  play_break_start time,
+  play_break_end time,
   intake_enabled boolean not null default true,
   intake_notice text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint organizations_gst_needs_registration
-    check (tax_mode <> 'gst_india' or (tax_id is not null and gst_state_code is not null))
+    check (tax_mode <> 'gst_india' or (tax_id is not null and gst_state_code is not null)),
+  constraint organizations_play_hours_in_order check (play_day_end > play_day_start),
+  constraint organizations_play_break_inside_day check (
+    (play_break_start is null and play_break_end is null)
+    or (play_break_start is not null and play_break_end is not null
+        and play_break_start > play_day_start and play_break_end < play_day_end and play_break_end > play_break_start)
+  )
 );
 
 comment on table public.organizations is
@@ -196,6 +207,11 @@ comment on column public.organizations.check_out_time is 'Usual latest pickup ti
 comment on column public.organizations.allow_overbooking is 'When false, the database refuses a booking that would put more pets in house than there are active kennels.';
 comment on column public.organizations.play_sessions_per_day is 'Solo play sessions each boarded pet should get per day. 0 turns play scheduling off.';
 comment on column public.organizations.play_session_minutes is 'Normal length of one play session. Peak periods can override it.';
+comment on column public.organizations.play_changeover_minutes is 'Minutes a yard stands empty between two pets, to walk one out and the next in.';
+comment on column public.organizations.play_day_start is 'When the play yards open. Local clock time at the kennel.';
+comment on column public.organizations.play_day_end is 'When the play yards close. No session runs past this.';
+comment on column public.organizations.play_break_start is 'Start of an optional break in play, such as the midday heat. Empty for no break.';
+comment on column public.organizations.play_break_end is 'End of the optional break in play.';
 comment on column public.organizations.intake_enabled is 'Whether the public intake form at /i/{slug} accepts submissions.';
 comment on column public.organizations.intake_notice is 'Privacy and consent text shown on the intake form, in the kennel''s own words. A default is used when empty.';
 

@@ -29,6 +29,10 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB015` | that invitation is no longer open | `20261008000100_foundation.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
+| `WB022` | only an owner or manager can change the price or the kind of stay | `20261008000300_kennels_and_bookings.sql` |
+| `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
+| `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
+| `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql` |
 | `WB030` | an issued invoice cannot be deleted. Void it instead. | `20261008000500_billing.sql` |
 | `WB031` | a void invoice cannot be changed | `20261008000500_billing.sql` |
 | `WB032` | an issued invoice cannot be edited. Void it and issue a new one.<br>lines of an issued invoice cannot be changed<br>a line cannot be moved to another invoice | `20261008000500_billing.sql` |

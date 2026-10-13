@@ -141,6 +141,9 @@ export type Database = {
           cancelled_at: string | null;
           cancel_reason: string | null;
           belongings: string | null;
+          gate_notes: string | null;
+          vaccinations_checked_at: string | null;
+          vaccinations_checked_by: string | null;
           notes: string | null;
           source: string;
           group_id: string | null;
@@ -172,6 +175,9 @@ export type Database = {
           cancelled_at?: string | null;
           cancel_reason?: string | null;
           belongings?: string | null;
+          gate_notes?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
           notes?: string | null;
           source?: string;
           group_id?: string | null;
@@ -203,6 +209,9 @@ export type Database = {
           cancelled_at?: string | null;
           cancel_reason?: string | null;
           belongings?: string | null;
+          gate_notes?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
           notes?: string | null;
           source?: string;
           group_id?: string | null;
@@ -1028,6 +1037,11 @@ export type Database = {
           allow_overbooking: boolean;
           play_sessions_per_day: number;
           play_session_minutes: number;
+          play_changeover_minutes: number;
+          play_day_start: string;
+          play_day_end: string;
+          play_break_start: string | null;
+          play_break_end: string | null;
           intake_enabled: boolean;
           intake_notice: string | null;
           created_at: string;
@@ -1066,6 +1080,11 @@ export type Database = {
           allow_overbooking?: boolean;
           play_sessions_per_day?: number;
           play_session_minutes?: number;
+          play_changeover_minutes?: number;
+          play_day_start?: string;
+          play_day_end?: string;
+          play_break_start?: string | null;
+          play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
           created_at?: string;
@@ -1104,6 +1123,11 @@ export type Database = {
           allow_overbooking?: boolean;
           play_sessions_per_day?: number;
           play_session_minutes?: number;
+          play_changeover_minutes?: number;
+          play_day_start?: string;
+          play_day_end?: string;
+          play_break_start?: string | null;
+          play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
           created_at?: string;

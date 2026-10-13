@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 23. Views: 1. Functions: 36.
+Migrations applied: 9. Tables: 23. Views: 1. Functions: 39.
 
 ## Contents
 
@@ -110,6 +110,7 @@ Add-ons charged on top of the stay: grooming, pick-up and drop, a vet bill paid 
 
 - `booking_items_audit` (after insert or delete or update) runs `audit_row()`
 - `booking_items_forbid_org_change` (before update) runs `forbid_org_change()`
+- `booking_items_guard_price` (before insert or update) runs `booking_items_guard_price()`
 - `booking_items_set_updated_at` (before update) runs `set_updated_at()`
 - `booking_items_stamp_actor` (before insert or update) runs `stamp_actor()`
 
@@ -149,6 +150,9 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 | `cancelled_at` | `timestamp with time zone` |  |  |  |
 | `cancel_reason` | `text` |  |  |  |
 | `belongings` | `text` |  |  | What came with the pet (bed, leash, food, medicines) so it all goes home again. |
+| `gate_notes` | `text` |  |  | Anything the parent said at drop-off: a change of food, a recent illness, who will collect. |
+| `vaccinations_checked_at` | `timestamp with time zone` |  |  | When a staff member confirmed at check-in that they had seen the pet's vaccination certificates. Stamped by the database. |
+| `vaccinations_checked_by` | `uuid` |  |  | Who confirmed the vaccinations at check-in. Stamped by the database. |
 | `notes` | `text` |  |  |  |
 | `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. |
 | `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. |
@@ -170,6 +174,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 - Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON DELETE RESTRICT`
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
+- Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
 - Check `bookings_at_most_a_year`: `CHECK (((end_date - start_date) <= 366))`
@@ -192,9 +197,12 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
+- `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
+- `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
 - `bookings_set_updated_at` (before update) runs `set_updated_at()`
 - `bookings_stamp_status` (before insert or update) runs `bookings_stamp_status()`
+- `bookings_stamp_vaccinations_checked` (before insert or update) runs `stamp_when_set()`
 
 **Access**
 
@@ -282,6 +290,7 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 - Foreign key `care_tasks_org_id_care_item_id_fkey`: `FOREIGN KEY (org_id, care_item_id) REFERENCES care_items(org_id, id) ON DELETE SET NULL (care_item_id)`
 - Foreign key `care_tasks_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `care_tasks_label_check`: `CHECK (((char_length(label) >= 1) AND (char_length(label) <= 80)))`
+- Check `care_tasks_skipped_medication_needs_note`: `CHECK (((kind <> 'medication'::care_kind) OR (status <> 'skipped'::task_status) OR (char_length(btrim(COALESCE(note, ''::text))) > 0)))`
 
 **Indexes**
 
@@ -808,6 +817,11 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `allow_overbooking` | `boolean` | yes | `false` | When false, the database refuses a booking that would put more pets in house than there are active kennels. |
 | `play_sessions_per_day` | `smallint` | yes | `0` | Solo play sessions each boarded pet should get per day. 0 turns play scheduling off. |
 | `play_session_minutes` | `smallint` | yes | `20` | Normal length of one play session. Peak periods can override it. |
+| `play_changeover_minutes` | `smallint` | yes | `0` | Minutes a yard stands empty between two pets, to walk one out and the next in. |
+| `play_day_start` | `time without time zone` | yes | `'08:00:00'::time without time zone` | When the play yards open. Local clock time at the kennel. |
+| `play_day_end` | `time without time zone` | yes | `'18:00:00'::time without time zone` | When the play yards close. No session runs past this. |
+| `play_break_start` | `time without time zone` |  |  | Start of an optional break in play, such as the midday heat. Empty for no break. |
+| `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
 | `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default is used when empty. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -826,6 +840,9 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_invoice_prefix_check`: `CHECK ((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
+- Check `organizations_play_break_inside_day`: `CHECK ((((play_break_start IS NULL) AND (play_break_end IS NULL)) OR ((play_break_start IS NOT NULL) AND (play_break_end IS NOT NULL) AND (play_break_start > play_day_start) AND (play_break_end < play_day_end) AND (play_break_end > play_break_start))))`
+- Check `organizations_play_changeover_minutes_check`: `CHECK (((play_changeover_minutes >= 0) AND (play_changeover_minutes <= 60)))`
+- Check `organizations_play_hours_in_order`: `CHECK ((play_day_end > play_day_start))`
 - Check `organizations_play_session_minutes_check`: `CHECK (((play_session_minutes >= 5) AND (play_session_minutes <= 240)))`
 - Check `organizations_play_sessions_per_day_check`: `CHECK (((play_sessions_per_day >= 0) AND (play_sessions_per_day <= 12)))`
 - Check `organizations_slug_check`: `CHECK ((slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'::text))`
@@ -1284,6 +1301,18 @@ available_kennels(p_org uuid, p_kind booking_kind, p_start date, p_end date) ret
 
 Active kennels with no booking holding them at any point in the given stay. Used to offer kennels when booking or checking in.
 
+### booking_items_guard_price
+
+```
+booking_items_guard_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: staff add extras from the price list at the listed price (or one-off items with no price list entry) and cannot change what an extra costs afterwards.
+
 ### bookings_check_capacity
 
 ```
@@ -1295,6 +1324,30 @@ bookings_check_capacity() returns trigger
 - Volatility: volatile
 
 Trigger: refuses a booking that would put more pets in house than there are active kennels on any day of the stay, and refuses a kennel that is out of service.
+
+### bookings_check_group
+
+```
+bookings_check_group() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: every booking sharing a group_id has the same client.
+
+### bookings_guard_price
+
+```
+bookings_guard_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list, with no discount, and cannot change the price, discount, tax or kind of an existing booking.
 
 ### bookings_stamp_status
 
@@ -1366,7 +1419,7 @@ generate_care_tasks(p_org uuid, p_date date) returns integer
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Creates the day's tasks for every pet in house from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.
+Creates the day's tasks for every pet in house (checked in, on or after its first day) from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.
 
 ### get_public_intake_form
 

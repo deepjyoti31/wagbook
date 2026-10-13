@@ -191,7 +191,8 @@ describe("rows stay in their organisation", () => {
       (await db.query<{ id: string }>("insert into public.care_items (org_id, kind, label, due_time) values ($1, 'meal', 'Theirs', '09:00') returning id", [other.org])).rows[0].id,
     );
     const bookingId = await book(db, k, { pet: k.pets[0], start: "2028-02-01", end: "2028-02-03" });
-    expect((await fails(staff, "insert into public.booking_items (org_id, booking_id, service_id, description, unit_price_minor) values ($1, $2, $3, 'x', 1)", [k.org, bookingId, svc])).code).toBe("23503");
+    // As the owner, so the price guard (which refuses staff first) does not hide what the foreign key does.
+    expect((await fails(k.owner, "insert into public.booking_items (org_id, booking_id, service_id, description, unit_price_minor) values ($1, $2, $3, 'x', 1)", [k.org, bookingId, svc])).code).toBe("23503");
     expect((await fails(staff, "insert into public.care_tasks (org_id, booking_id, pet_id, care_item_id, task_date, kind, label) values ($1, $2, $3, $4, '2028-02-01', 'meal', 'x')", [k.org, bookingId, k.pets[0], item])).code).toBe("23503");
   });
 });

@@ -59,7 +59,11 @@ create table public.care_tasks (
   updated_at timestamptz not null default now(),
   -- The task must be about the booking's own pet.
   foreign key (org_id, booking_id, pet_id) references public.bookings (org_id, id, pet_id) on delete cascade,
-  foreign key (org_id, care_item_id) references public.care_items (org_id, id) on delete set null (care_item_id)
+  foreign key (org_id, care_item_id) references public.care_items (org_id, id) on delete set null (care_item_id),
+  -- A medicine that was not given is something the parent and the next shift
+  -- must be able to read about, so skipping one needs a reason.
+  constraint care_tasks_skipped_medication_needs_note
+    check (kind <> 'medication' or status <> 'skipped' or char_length(btrim(coalesce(note, ''))) > 0)
 );
 
 comment on table public.care_tasks is
@@ -124,7 +128,9 @@ begin
    and (ci.pet_id is null or ci.pet_id = b.pet_id)
   where b.org_id = p_org
     and b.status = 'checked_in'
-    and p_date between b.start_date and b.end_date
+    -- From the first day until the pet is checked out, even past its end date:
+    -- a pet that stays longer than planned still has to be fed.
+    and p_date >= b.start_date
   on conflict (booking_id, task_date, care_item_id) where care_item_id is not null do nothing;
 
   get diagnostics v_created = row_count;
@@ -132,7 +138,7 @@ begin
 end;
 $$;
 comment on function public.generate_care_tasks(uuid, date) is
-  'Creates the day''s tasks for every pet in house from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.';
+  'Creates the day''s tasks for every pet in house (checked in, on or after its first day) from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.';
 
 -- ---------------------------------------------------------------------------
 -- Solo play: one pet in a yard at a time

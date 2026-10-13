@@ -141,8 +141,11 @@ grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, ken
               tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, group_id)
+              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
+              vaccinations_checked_at, notes, group_id)
   on public.bookings to authenticated;
+-- Who may change a price is decided by a trigger, not here: owners, managers
+-- and staff all sign in as the same role. See bookings_guard_price().
 
 -- ---------------------------------------------------------------------------
 -- Setup tables: any member reads; managers add, edit and delete.

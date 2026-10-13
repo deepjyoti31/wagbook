@@ -30,6 +30,11 @@ const BY_CONSTRAINT: [needle: string, message: string][] = [
   ["organizations_upi_vpa_check", "That does not look like a UPI ID. It should look like name@bank."],
   ["kennels_org_id_name_key", "A kennel with that name already exists."],
   ["services_one_default_per_kind", "There is already a default price for that kind of stay."],
+  ["care_tasks_skipped_medication_needs_note", "Say why the medicine was not given. The parent and the next shift need to know."],
+  ["organizations_play_hours_in_order", "The yards must close after they open."],
+  ["organizations_play_break_inside_day", "The break must start and end while the yards are open."],
+  ["peak_periods_check", "The last day cannot be before the first day."],
+  ["play_yards_org_id_name_key", "A yard with that name already exists."],
 ];
 
 const BY_CODE: Record<string, string> = {
