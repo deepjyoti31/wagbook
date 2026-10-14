@@ -160,7 +160,8 @@ create table public.bookings (
   unique (org_id, id, pet_id),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   -- The pet must belong to the client on the booking.
-  foreign key (org_id, client_id, pet_id) references public.pets (org_id, client_id, id) on delete restrict,
+  -- When two parents are merged a pet moves to the other parent; its bookings move with it.
+  foreign key (org_id, client_id, pet_id) references public.pets (org_id, client_id, id) on update cascade on delete restrict,
   foreign key (org_id, kennel_id) references public.kennels (org_id, id) on delete set null (kennel_id),
   constraint bookings_dates_in_order check (end_date >= start_date),
   constraint bookings_boarding_has_a_night check (kind <> 'boarding' or end_date > start_date),

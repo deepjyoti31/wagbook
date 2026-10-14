@@ -152,6 +152,11 @@ declare
   -- void_invoice only) and the link to a booking that is being deleted.
   v_ignore text[] := array['status', 'voided_at', 'voided_by', 'void_reason', 'updated_at', 'booking_id'];
 begin
+  -- Merging two parents (merge_clients) moves issued bills to the parent who
+  -- stays. The buyer printed on the bill is frozen and does not change.
+  if coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    v_ignore := array_append(v_ignore, 'client_id');
+  end if;
   if tg_op = 'DELETE' then
     if old.status <> 'draft' and exists (select 1 from public.organizations o where o.id = old.org_id) then
       raise exception 'WB030: an issued invoice cannot be deleted. Void it instead.' using errcode = '23514';
@@ -677,3 +682,65 @@ left join lateral (
 ) p on true;
 
 comment on view public.invoice_balances is 'Each invoice with what has been paid against it and what is still due.';
+
+-- ---------------------------------------------------------------------------
+-- Merging two parents who turn out to be the same person.
+-- ---------------------------------------------------------------------------
+
+create function public.merge_clients(p_keep uuid, p_merge uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_keep public.clients;
+  v_merge public.clients;
+begin
+  -- SECURITY DEFINER: issued bills are frozen against every edit, including
+  -- their parent. Merging is the one thing allowed to move them, so it runs
+  -- with that permission and checks the caller itself.
+  select * into v_keep from public.clients c where c.id = p_keep for update;
+  select * into v_merge from public.clients c where c.id = p_merge for update;
+  if v_keep.id is null or v_merge.id is null or v_keep.id = v_merge.id or v_keep.org_id <> v_merge.org_id
+     or v_keep.deleted_at is not null or v_merge.deleted_at is not null
+     or v_keep.org_id not in (select public.my_org_ids()) then
+    raise exception 'WB018: choose two different parents of this kennel' using errcode = '22023';
+  end if;
+  if v_keep.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    raise exception 'WB002: only an owner or manager can merge parents' using errcode = '42501';
+  end if;
+
+  -- Pets, and with them their bookings (on update cascade).
+  update public.pets p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
+  -- Anything else that names the parent.
+  update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
+  perform set_config('wagbook.merging', 'on', true);
+  update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
+  perform set_config('wagbook.merging', 'off', true);
+  update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
+  update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
+
+  -- Fill in what the kept parent is missing, and keep both sets of notes.
+  update public.clients c set
+    alt_phone = coalesce(c.alt_phone, case when v_merge.phone <> c.phone then v_merge.phone end, v_merge.alt_phone),
+    email = coalesce(c.email, v_merge.email),
+    address = coalesce(c.address, v_merge.address),
+    city = coalesce(c.city, v_merge.city),
+    postal_code = coalesce(c.postal_code, v_merge.postal_code),
+    gst_state_code = coalesce(c.gst_state_code, v_merge.gst_state_code),
+    tax_id = coalesce(c.tax_id, v_merge.tax_id),
+    emergency_name = coalesce(c.emergency_name, v_merge.emergency_name),
+    emergency_phone = coalesce(c.emergency_phone, v_merge.emergency_phone),
+    notes = nullif(concat_ws(E'\n', c.notes, v_merge.notes), ''),
+    consent_at = coalesce(c.consent_at, v_merge.consent_at),
+    consent_source = coalesce(c.consent_source, v_merge.consent_source)
+  where c.id = v_keep.id;
+
+  -- The other record is hidden, not deleted: the audit log still names it.
+  update public.clients c set deleted_at = now() where c.id = v_merge.id;
+  return v_keep.id;
+end;
+$$;
+comment on function public.merge_clients(uuid, uuid) is
+  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';

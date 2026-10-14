@@ -20,7 +20,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
 | `WB003` | invoice not found<br>submission not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB010` | unknown time zone "%" | `20261008000100_foundation.sql` |
@@ -28,6 +28,9 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB012` | you already own the maximum number of kennels | `20261008000100_foundation.sql` |
 | `WB014` | enter the person's name | `20261008000100_foundation.sql` |
 | `WB015` | that invitation is no longer open | `20261008000100_foundation.sql` |
+| `WB016` | that invitation link has expired or was already used. Ask for a new one. | `20261008000100_foundation.sql` |
+| `WB017` | you already work at this kennel | `20261008000100_foundation.sql` |
+| `WB018` | choose two different parents of this kennel | `20261008000500_billing.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
 | `WB022` | only an owner or manager can change the price or the kind of stay | `20261008000300_kennels_and_bookings.sql` |

@@ -684,6 +684,56 @@ export type Database = {
           },
         ];
       };
+      invitation_links: {
+        Row: {
+          id: string;
+          org_id: string;
+          token: string;
+          role: Database["public"]["Enums"]["member_role"];
+          display_name: string;
+          created_by: string | null;
+          created_at: string;
+          expires_at: string;
+          used_at: string | null;
+          used_by: string | null;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          token?: string;
+          role: Database["public"]["Enums"]["member_role"];
+          display_name: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          token?: string;
+          role?: Database["public"]["Enums"]["member_role"];
+          display_name?: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+          revoked_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitation_links_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invoice_counters: {
         Row: {
           org_id: string;
@@ -1662,9 +1712,17 @@ export type Database = {
         Args: { p_submission: string };
         Returns: string;
       };
+      accept_invitation_link: {
+        Args: { p_token: string };
+        Returns: string;
+      };
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
+      };
+      create_invitation_link: {
+        Args: { p_org: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
+        Returns: string;
       };
       create_organization: {
         Args: { p_name: string; p_slug: string; p_display_name: string };
@@ -1681,6 +1739,10 @@ export type Database = {
       generate_care_tasks: {
         Args: { p_org: string; p_date: string };
         Returns: number;
+      };
+      get_invitation_link: {
+        Args: { p_token: string };
+        Returns: { org_name: string; role: Database["public"]["Enums"]["member_role"]; display_name: string; usable: boolean; already_member: boolean }[];
       };
       get_public_intake_form: {
         Args: { p_slug: string };
@@ -1705,6 +1767,10 @@ export type Database = {
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
+      merge_clients: {
+        Args: { p_keep: string; p_merge: string };
+        Returns: string;
       };
       my_invitations: {
         Args: Record<PropertyKey, never>;

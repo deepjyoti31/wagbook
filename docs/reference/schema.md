@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 23. Views: 1. Functions: 43.
+Migrations applied: 9. Tables: 24. Views: 1. Functions: 47.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
 - Views: [invoice_balances](#invoice_balances)
 - [Functions](#functions)
 
@@ -171,7 +171,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 - Foreign key `bookings_checked_out_by_fkey`: `FOREIGN KEY (checked_out_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `bookings_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `bookings_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE RESTRICT`
-- Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON DELETE RESTRICT`
+- Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
 - Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
@@ -518,6 +518,48 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 - `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `intake_submissions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `intake_submissions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### invitation_links
+
+A one-time link that lets someone with no account yet join an organisation in a given role. Made by create_invitation_link(), used by accept_invitation_link().
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `token` | `text` | yes | `new_token()` | The secret in the link (/join/{token}). Anyone holding it can use it once, so it expires and can be withdrawn. |
+| `role` | `member_role` | yes |  |  |
+| `display_name` | `text` | yes |  | The name the person will be shown under, as the inviter typed it. |
+| `created_by` | `uuid` |  |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `expires_at` | `timestamp with time zone` | yes | `(now() + '7 days'::interval)` |  |
+| `used_at` | `timestamp with time zone` |  |  |  |
+| `used_by` | `uuid` |  |  |  |
+| `revoked_at` | `timestamp with time zone` |  |  | Set when a manager withdraws the link. A withdrawn link cannot be used. |
+
+**Constraints**
+
+- Primary key `invitation_links_pkey`: `PRIMARY KEY (id)`
+- Unique `invitation_links_token_key`: `UNIQUE (token)`
+- Foreign key `invitation_links_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `invitation_links_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `invitation_links_used_by_fkey`: `FOREIGN KEY (used_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `invitation_links_display_name_check`: `CHECK (((char_length(display_name) >= 1) AND (char_length(display_name) <= 80)))`
+- Check `invitation_links_used_together`: `CHECK (((used_at IS NULL) = (used_by IS NULL)))`
+
+**Indexes**
+
+- `CREATE INDEX invitation_links_org_idx ON public.invitation_links USING btree (org_id, created_at DESC)`
+
+**Triggers**
+
+- `invitation_links_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `invitation_links_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `invitation_links_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### invoice_counters
 
@@ -1284,6 +1326,18 @@ accept_intake(p_submission uuid) returns uuid
 
 Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added. Returns the client id. Creating the booking is a separate step.
 
+### accept_invitation_link
+
+```
+accept_invitation_link(p_token text) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Joins the signed-in person to the organisation of an invitation link, in its role. Works once; refuses an expired or withdrawn link and someone who is already a member.
+
 ### audit_row
 
 ```
@@ -1368,6 +1422,18 @@ bookings_stamp_status() returns trigger
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
 
+### create_invitation_link
+
+```
+create_invitation_link(p_org uuid, p_role member_role, p_display_name text) returns text
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Makes an invitation link for someone with no account yet. Owner or manager; only owners can invite owners. Returns the secret token.
+
 ### create_organization
 
 ```
@@ -1427,6 +1493,18 @@ generate_care_tasks(p_org uuid, p_date date) returns integer
 - Volatility: volatile
 
 Creates the day's tasks for every pet in house (checked in, on or after its first day) from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.
+
+### get_invitation_link
+
+```
+get_invitation_link(p_token text) returns TABLE(org_name text, role member_role, display_name text, usable boolean, already_member boolean)
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+What an invitation link is for (kennel name, role, name), for a signed-in person holding it, and whether it can still be used.
 
 ### get_public_intake_form
 
@@ -1547,6 +1625,18 @@ issue_invoice(p_invoice uuid) returns invoices
 - Volatility: volatile
 
 Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.
+
+### merge_clients
+
+```
+merge_clients(p_keep uuid, p_merge uuid) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
 
 ### my_invitations
 

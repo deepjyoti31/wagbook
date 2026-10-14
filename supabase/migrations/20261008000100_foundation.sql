@@ -481,3 +481,124 @@ end;
 $$;
 comment on function public.respond_to_invitation(uuid, boolean) is
   'Accepts or declines a pending invitation for the signed-in user. The only way a membership becomes active, apart from creating an organisation.';
+
+-- ---------------------------------------------------------------------------
+-- Invitation links: for someone who has no Wagbook account yet.
+--
+-- A manager makes a link and sends it (on WhatsApp, usually). Whoever opens it
+-- signs up or signs in, sees which kennel and role it is for, and joins. The
+-- link is a secret: it works once, for seven days, and can be withdrawn.
+-- Nobody writes this table directly; the functions below do.
+-- ---------------------------------------------------------------------------
+
+create table public.invitation_links (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  token text not null unique default public.new_token(),
+  role public.member_role not null,
+  display_name text not null check (char_length(display_name) between 1 and 80),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days',
+  used_at timestamptz,
+  used_by uuid references auth.users (id) on delete set null,
+  revoked_at timestamptz,
+  constraint invitation_links_used_together check ((used_at is null) = (used_by is null))
+);
+
+comment on table public.invitation_links is
+  'A one-time link that lets someone with no account yet join an organisation in a given role. Made by create_invitation_link(), used by accept_invitation_link().';
+comment on column public.invitation_links.token is 'The secret in the link (/join/{token}). Anyone holding it can use it once, so it expires and can be withdrawn.';
+comment on column public.invitation_links.display_name is 'The name the person will be shown under, as the inviter typed it.';
+comment on column public.invitation_links.revoked_at is 'Set when a manager withdraws the link. A withdrawn link cannot be used.';
+
+create index invitation_links_org_idx on public.invitation_links (org_id, created_at desc);
+
+create function public.create_invitation_link(p_org uuid, p_role public.member_role, p_display_name text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_token text;
+begin
+  -- SECURITY DEFINER: nobody may insert into invitation_links directly, so
+  -- the role rules below cannot be skipped. They mirror invite_member_by_email().
+  if p_org not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    raise exception 'WB002: only an owner or manager can invite people' using errcode = '42501';
+  end if;
+  if p_role = 'owner' and p_org not in (select public.my_org_ids_with_role(array['owner']::public.member_role[])) then
+    raise exception 'WB002: only an owner can invite another owner' using errcode = '42501';
+  end if;
+  if char_length(btrim(coalesce(p_display_name, ''))) not between 1 and 80 then
+    raise exception 'WB014: enter the person''s name' using errcode = '22023';
+  end if;
+  insert into public.invitation_links (org_id, role, display_name, created_by)
+  values (p_org, p_role, btrim(p_display_name), (select auth.uid()))
+  returning token into v_token;
+  return v_token;
+end;
+$$;
+comment on function public.create_invitation_link(uuid, public.member_role, text) is
+  'Makes an invitation link for someone with no account yet. Owner or manager; only owners can invite owners. Returns the secret token.';
+
+create function public.get_invitation_link(p_token text)
+returns table (org_name text, role public.member_role, display_name text, usable boolean, already_member boolean)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  -- SECURITY DEFINER: the person opening the link is not a member yet, so
+  -- cannot read the organisation. They see its name and the role, nothing else.
+  select o.name, l.role, l.display_name,
+         l.used_at is null and l.revoked_at is null and l.expires_at > now(),
+         exists (select 1 from public.memberships m where m.org_id = l.org_id and m.user_id = (select auth.uid()) and m.accepted_at is not null)
+  from public.invitation_links l
+  join public.organizations o on o.id = l.org_id
+  where (select auth.uid()) is not null and char_length(p_token) = 64 and l.token = p_token;
+$$;
+comment on function public.get_invitation_link(text) is
+  'What an invitation link is for (kennel name, role, name), for a signed-in person holding it, and whether it can still be used.';
+
+create function public.accept_invitation_link(p_token text)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := (select auth.uid());
+  v_link public.invitation_links;
+  v_member public.memberships;
+begin
+  -- SECURITY DEFINER: joining creates a membership, which no policy allows a
+  -- non-member to insert. The token is the permission, checked here.
+  if v_user is null then
+    raise exception 'WB001: sign in first' using errcode = '28000';
+  end if;
+  select * into v_link from public.invitation_links l where char_length(p_token) = 64 and l.token = p_token for update;
+  if v_link.id is null or v_link.used_at is not null or v_link.revoked_at is not null or v_link.expires_at <= now() then
+    raise exception 'WB016: that invitation link has expired or was already used. Ask for a new one.' using errcode = 'P0002';
+  end if;
+
+  select * into v_member from public.memberships m where m.org_id = v_link.org_id and m.user_id = v_user;
+  if v_member.accepted_at is not null then
+    raise exception 'WB017: you already work at this kennel' using errcode = '23505';
+  elsif v_member.user_id is not null then
+    -- An email invitation was waiting: the link answers it.
+    update public.memberships m
+    set role = v_link.role, display_name = v_link.display_name, is_active = true, accepted_at = now()
+    where m.org_id = v_link.org_id and m.user_id = v_user;
+  else
+    insert into public.memberships (org_id, user_id, role, display_name, is_active, accepted_at, invited_by)
+    values (v_link.org_id, v_user, v_link.role, v_link.display_name, true, now(), v_link.created_by);
+  end if;
+
+  update public.invitation_links l set used_at = now(), used_by = v_user where l.id = v_link.id;
+  return v_link.org_id;
+end;
+$$;
+comment on function public.accept_invitation_link(text) is
+  'Joins the signed-in person to the organisation of an invitation link, in its role. Works once; refuses an expired or withdrawn link and someone who is already a member.';
