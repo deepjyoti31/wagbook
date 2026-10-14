@@ -190,7 +190,7 @@ settings, security review and fixes, documentation.
 
 ## M6. Pets, parents and people
 
-- [ ] Not started.
+- [x] Finished 14 October 2026. Invitation links: D19.
 
 **Build**
 

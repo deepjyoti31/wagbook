@@ -32,6 +32,13 @@ async function privateWindow(browser: Browser) {
   return { context, page: await context.newPage() };
 }
 
+/** A pet's own page, found through the search on Pets. */
+async function openPet(page: Page, pet: string) {
+  await page.goto(`/app/dogs?q=${encodeURIComponent(pet)}`);
+  await page.getByRole("link", { name: pet, exact: true }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: pet })).toBeVisible();
+}
+
 async function openBooking(page: Page, pet: string, status: string) {
   await page.goto("/app/bookings");
   await page.getByRole("link").filter({ hasText: pet }).filter({ hasText: status }).first().click();
@@ -206,8 +213,9 @@ test("a new person creates a kennel, invites a colleague, who joins and switches
 
   // Invite the demo staff member, who then has two kennels.
   await page.goto("/app/more/people");
-  await page.getByLabel("Their name").fill("Meena");
-  await page.getByLabel("Their email").fill("staff@demo.wagbook.test");
+  const byEmail = page.locator("form").filter({ has: page.getByLabel("Their email") });
+  await byEmail.getByLabel("Their name").fill("Meena");
+  await byEmail.getByLabel("Their email").fill("staff@demo.wagbook.test");
   await page.getByRole("button", { name: "Invite" }).click();
   await expect(page.getByText(/Meena/).first()).toBeVisible();
 
@@ -301,13 +309,14 @@ async function photoWithLocation(page: Page): Promise<Buffer> {
 
 test("a photo of the pet, and an update with a photo that the parent sees without the location", async ({ page, browser }) => {
   await signIn(page, "staff");
-  await openBooking(page, "Pepper", "In house");
+  await openPet(page, "Pepper");
   const photo = await photoWithLocation(page);
   await page.locator("input[name=photo]").setInputFiles({ name: "pepper.jpg", mimeType: "image/jpeg", buffer: photo });
   await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
   await page.getByRole("button", { name: "Save photo" }).click();
   await expect(page.getByText("Photo saved.")).toBeVisible();
 
+  await openBooking(page, "Pepper", "In house");
   await page.getByRole("link", { name: "Write update" }).first().click();
   await page.getByLabel("How is the pet doing?").fill("Pepper played fetch all morning.");
   await page.locator("input[name=photos]").setInputFiles({ name: "fetch.jpg", mimeType: "image/jpeg", buffer: photo });
@@ -346,7 +355,7 @@ test("a photo of the pet, and an update with a photo that the parent sees withou
 
 test("a vaccination is recorded with its certificate", async ({ page }) => {
   await signIn(page, "staff");
-  await openBooking(page, "Pepper", "In house");
+  await openPet(page, "Pepper");
   await page.getByText("Add a vaccination").click();
   await page.getByLabel("Vaccine").fill("Kennel cough");
   await page.getByLabel("Valid until").fill("2030-01-01");
@@ -354,4 +363,103 @@ test("a vaccination is recorded with its certificate", async ({ page }) => {
   await page.getByRole("button", { name: "Save vaccination" }).click();
   await expect(page.getByText("Recorded Kennel cough.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Certificate" })).toBeVisible();
+});
+
+test("search finds a pet by its parent's name or phone number", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto(`/app/dogs?q=${encodeURIComponent("98000 00103")}`);
+  await expect(page.getByRole("link", { name: "Coco", exact: true })).toBeVisible();
+  await page.goto(`/app/dogs?q=${encodeURIComponent("Vikram")}`);
+  await expect(page.getByRole("link", { name: "Rocky", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Luna", exact: true })).toBeVisible();
+});
+
+test("a pet's details change, and an incident shows on Today until it is dealt with", async ({ page }) => {
+  await signIn(page, "staff");
+  await openPet(page, "Bruno");
+  await page.getByLabel("Weight in kg").fill("37.5");
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Write down an incident" }).click();
+  await page.locator("select[name=category]").selectOption("injury");
+  await page.locator("select[name=severity]").selectOption("high");
+  await page.getByLabel("Describe it").fill("Cut on the left front paw after play.");
+  await page.getByRole("button", { name: "Save incident" }).click();
+  await expect(page.getByText("Incident written down.")).toBeVisible();
+
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: /Incidents to deal with/ })).toBeVisible();
+  await page.getByRole("link", { name: /Bruno.*High/ }).click();
+  await page.getByRole("button", { name: "Parent has been told" }).click();
+  await expect(page.getByText("Marked as told.")).toBeVisible();
+  await page.getByRole("button", { name: "Dealt with" }).click();
+  await expect(page.getByText("Marked as dealt with.")).toBeVisible();
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: /Incidents to deal with/ })).toHaveCount(0);
+});
+
+test("a parent's details change, and a second record of the same parent is merged in", async ({ page }) => {
+  await signIn(page, "manager");
+  // A walk-in entered under a second number by mistake.
+  await page.goto("/app/dogs/new");
+  await page.getByLabel("Mobile number").fill("9800000188");
+  await page.getByLabel("Name").first().fill("Priya D");
+  await page.locator("input[name=petName]").fill("Toffee");
+  await page.getByRole("button", { name: "Save pet" }).click();
+  await page.waitForURL(/\/app\/dogs$/);
+
+  await openPet(page, "Biscuit");
+  await page.getByRole("link", { name: "Priya Demo" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Priya Demo" })).toBeVisible();
+  await page.getByLabel("City").fill("Mysuru");
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  await page.getByLabel("The other record's phone number").fill("98000 00188");
+  await page.getByRole("button", { name: "Find" }).click();
+  await page.getByRole("button", { name: "Merge into Priya Demo" }).click();
+  await expect(page.getByText("Merged.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Toffee/ })).toBeVisible();
+  await expect(page.getByText(/also 98000 00188/)).toBeVisible();
+});
+
+test("someone with no account joins with an invite link, and is suspended and restored", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/people");
+  await page.getByRole("textbox", { name: "Their name" }).first().fill("Kiran");
+  await page.getByRole("button", { name: "Make a link" }).click();
+  await expect(page.getByText("Link made.")).toBeVisible();
+  const href = (await page.getByRole("link", { name: "Send on WhatsApp" }).first().getAttribute("href"))!;
+  const joinPath = /\/join\/[0-9a-f]{64}/.exec(decodeURIComponent(href))![0];
+
+  const kiran = await privateWindow(browser);
+  await kiran.page.goto(joinPath);
+  await kiran.page.getByRole("link", { name: "Create an account" }).click();
+  await kiran.page.getByLabel("Email").fill(`kiran-${Date.now()}@example.test`);
+  await kiran.page.getByLabel("Password").fill(PASSWORD);
+  await kiran.page.getByRole("button", { name: "Create account" }).click();
+  await kiran.page.getByRole("button", { name: /Join Wagbook Demo Kennel/ }).click();
+  await kiran.page.waitForURL(/\/app$/);
+  await expect(kiran.page.getByText(/in house of 12 kennels/)).toBeVisible();
+
+  // The same link does not work twice.
+  await page.reload();
+  await expect(page.getByRole("link", { name: "Send on WhatsApp" })).toHaveCount(0);
+
+  const row = page.getByRole("listitem").filter({ hasText: "Kiran" });
+  await row.getByText("Change").click();
+  await row.getByRole("button", { name: "Suspend" }).click();
+  await expect(page.getByText(/^Suspended\./)).toBeVisible();
+  await kiran.page.goto("/app");
+  await kiran.page.waitForURL(/\/onboarding/);
+
+  // The Change panel stays open after the last change; open it only if it closed.
+  const restore = page.getByRole("listitem").filter({ hasText: "Kiran" }).getByRole("button", { name: "Restore" });
+  if (!(await restore.isVisible())) await page.getByRole("listitem").filter({ hasText: "Kiran" }).getByText("Change").click();
+  await restore.click();
+  await expect(page.getByText("They can use Wagbook here again.")).toBeVisible();
+  await kiran.page.goto("/app");
+  await expect(kiran.page.getByText(/in house of 12 kennels/)).toBeVisible();
+  await kiran.context.close();
 });

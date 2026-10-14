@@ -6,7 +6,8 @@ import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { CARE_KIND_PLURAL, CARE_KINDS } from "@/lib/care";
-import { formatDate, formatPhone, isOverstaying, todayIn } from "@/lib/core";
+import { formatDate, formatPhone, isOverstaying, todayIn, vaccinationWarnings } from "@/lib/core";
+import { SEVERITY_SHORT } from "@/lib/pets";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
 import { bookingCards, type BookingCard } from "@/lib/queries";
@@ -45,19 +46,37 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const generated = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: today });
   if (generated.error) console.error("generate_care_tasks failed", generated.error.message);
 
-  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes] = await Promise.all([
+  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes] = await Promise.all([
     // Confirmed and due today or earlier: includes anyone who was expected yesterday and has not turned up.
     bookingCards(supabase, org.id).eq("status", "confirmed").lte("start_date", today).order("start_date"),
     bookingCards(supabase, org.id).eq("status", "checked_in").order("end_date"),
     supabase.from("kennels").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("is_active", true),
     supabase.from("intake_submissions").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "new"),
     supabase.from("care_tasks").select("kind, status").eq("org_id", org.id).eq("task_date", today).limit(10000),
+    // Incidents still open that matter now: serious ones, and any the parent has not been told about.
+    supabase
+      .from("incidents")
+      .select("id, severity, category, description, parent_notified_at, pets(id, name)")
+      .eq("org_id", org.id)
+      .is("resolved_at", null)
+      .in("severity", ["medium", "high"])
+      .order("occurred_at", { ascending: false })
+      .limit(20),
   ]);
   if (arrivalsRes.error || inHouseRes.error) throw new Error("Could not load today's bookings.");
 
   const arrivals = arrivalsRes.data;
   const inHouse = inHouseRes.data;
   const photos = await signedUrls(supabase, [...arrivals, ...inHouse].map((b) => b.pets?.photo_path), { small: true });
+  const incidents = (incidentsRes.data ?? []).filter((i) => i.severity === "high" || !i.parent_notified_at);
+  // Vaccinations of the pets arriving, to warn before they come in.
+  const vaccinations =
+    arrivals.length > 0
+      ? ((await supabase.from("vaccinations").select("pet_id, vaccine, valid_until").eq("org_id", org.id).in("pet_id", arrivals.map((b) => b.pets?.id ?? ""))).data ?? [])
+      : [];
+  const vaccineWarnings = new Map(
+    arrivals.map((b) => [b.id, vaccinationWarnings(vaccinations.filter((v) => v.pet_id === b.pets?.id), { startDate: b.start_date, endDate: b.end_date })]),
+  );
   const capacity = kennelsRes.count ?? 0;
   const newForms = intakeRes.count ?? 0;
   // Done out of what is owed: a task skipped on purpose is no longer owed.
@@ -140,6 +159,25 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </div>
       ) : null}
 
+      {incidents.length > 0 ? (
+        <Section title="Incidents to deal with" count={incidents.length}>
+          <ul className="space-y-2">
+            {incidents.map((i) => (
+              <li key={i.id}>
+                <Link href={`/app/dogs/${i.pets?.id}`} className="block rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
+                  <span className="flex flex-wrap items-center gap-2 font-bold">
+                    {i.pets?.name}
+                    <Badge tone="alert">{SEVERITY_SHORT[i.severity]}</Badge>
+                    {i.parent_notified_at ? null : <Badge tone="attention">Parent not told</Badge>}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block">{i.description}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
       <Section title="Arriving" count={arrivals.length}>
         {arrivals.length === 0 ? (
           <Empty>Nobody is due to arrive today.</Empty>
@@ -147,7 +185,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           <Ledger>
             {arrivals.map((b, i) => (
               <LedgerRow key={b.id}>
-                <BookingSummary booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
+                <BookingSummary
+                  booking={b}
+                  today={today}
+                  photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
+                  vaccineWarning={(vaccineWarnings.get(b.id) ?? []).length > 0}
+                />
                 <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
                   <input type="hidden" name="bookingId" value={b.id} />
                     <input type="hidden" name="from" value="today" />
@@ -194,6 +237,11 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                   <Link href={`/app/bookings/${b.id}/update`} className={buttonStyles.whatsapp}>
                     Write update
                   </Link>
+                  {b.pets ? (
+                    <Link href={`/app/dogs/${b.pets.id}/incident`} className={buttonStyles.quiet}>
+                      Incident
+                    </Link>
+                  ) : null}
                   <ActionForm action={checkOut} className="contents">
                     <input type="hidden" name="bookingId" value={b.id} />
                     <input type="hidden" name="from" value="today" />
@@ -211,7 +259,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   );
 }
 
-function BookingSummary({ booking: b, today, photo }: { booking: BookingCard; today: string; photo?: string | null }) {
+function BookingSummary({ booking: b, today, photo, vaccineWarning }: { booking: BookingCard; today: string; photo?: string | null; vaccineWarning?: boolean }) {
   const leavesToday = b.status === "checked_in" && b.end_date === today;
   const overdue = b.status === "checked_in" && b.end_date < today;
   const late = b.status === "confirmed" && b.start_date < today;
@@ -229,6 +277,7 @@ function BookingSummary({ booking: b, today, photo }: { booking: BookingCard; to
         {leavesToday ? <Badge tone="attention">Leaves today</Badge> : null}
         {overdue ? <Badge tone="alert">Was due to leave {formatDate(b.end_date)}</Badge> : null}
         {late ? <Badge tone="alert">Was due {formatDate(b.start_date)}</Badge> : null}
+        {vaccineWarning ? <Badge tone="attention">Check vaccinations</Badge> : null}
         {(b.pets?.flags ?? []).map((f) => (
           <Badge key={f} tone="alert">
             {flagText(f)}

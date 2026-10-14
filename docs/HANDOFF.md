@@ -2,15 +2,17 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 14 October 2026, after milestones M4 and M5.
+Last updated: 14 October 2026, after milestone M6.
 
 ## In one paragraph
 
-The database for the whole product exists, with its rules enforced and tested (135 database tests, 56 unit tests).
-Built: M2 (bookings), M3 (the care round and play), M4 (bills, payments, the parent's bill with a UPI QR code, printing)
-and M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates). The whole day,
-from booking to a paid bill and a photo the parent sees, is walked in a real browser at 360 pixels wide against a
-**local** Supabase (`npm run test:e2e`, 18 of 18 pass). What has still never happened is a **hosted** Supabase project:
+The database for the whole product exists, with its rules enforced and tested (142 database tests, 60 unit tests).
+Built: M2 (bookings), M3 (the care round and play), M4 (bills, payments, the parent's bill with a UPI QR code, printing),
+M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates) and M6 (pet and parent
+pages, search by parent and phone, vaccination warnings, incidents, people with invitation links, merging parents). The
+whole day, from booking to a paid bill and a photo the parent sees, plus a new colleague joining through a link, is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 22 of 22 pass, also green
+in CI). What has still never happened is a **hosted** Supabase project:
 the setup guide, real sign-up email and production settings. That is what is left of M1.
 
 ## What is verified, and how
@@ -31,10 +33,11 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | Location data is removed from photos | `src/lib/core/jpeg.test.ts`; and end to end, a real JPEG with planted GPS data comes back from Storage without it, resized to 1,600 pixels | High |
 | Printed bills | Printed to A4 PDF from Chromium for all three tax modes (no tax, India GST, one tax): white page, no buttons, everything in `06` | Medium: looked at, not compared by an accountant |
 | Intake form with hostile input, accepting, reviewing once, stay page contents and expiry | `tests/db/intake.test.ts`, `hardening.test.ts` | High |
-| Pure logic: dates, money, GST, invoice numbers, play planning (including around existing sessions), peaks, calendar grid, UPI, WhatsApp | `src/lib/core/core.test.ts` and others (48) | High |
+| Pure logic: dates, money, GST, invoice numbers, play planning (including around existing sessions), peaks, calendar grid, UPI, WhatsApp, vaccination status and warnings | `src/lib/core/core.test.ts` and others (60) | High |
+| Invitation links (who makes them, single use, expiry, withdrawal), merging parents (pets, stays, issued bills, payments move; printed buyer kept), suspend and restore | `tests/db/people.test.ts`; rules removed once to see the tests fail | High |
 | Generated types and reference docs match the migrations | `tests/db/generated.test.ts` | High |
-| The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate | High for the local stack |
-| Every screen at 360 pixels wide, no sideways scroll, no browser errors | Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos | Medium: desktop Chromium at phone size, not a phone |
+| The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate, search by phone and parent name, a pet's details changed and a high incident shown on Today until dealt with, a parent's details changed and a duplicate merged in, a new person joining through an invitation link then suspended and restored | High for the local stack |
+| Every screen at 360 pixels wide, no sideways scroll, no browser errors | Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search | Medium: desktop Chromium at phone size, not a phone |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -57,8 +60,7 @@ the setup guide, real sign-up email and production settings. That is what is lef
 1. **Finish M1** (needs the owner): create a development Supabase project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
    email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job.
-2. **Then M6, pets, parents and people** ([08-roadmap.md](08-roadmap.md)). The pet page should take over the photo and
-   vaccination forms that live on the booking page for now.
+2. **Then M7, reports and expenses** ([08-roadmap.md](08-roadmap.md)).
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -106,6 +108,11 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - A bill made before check-out is not rebuilt when the stay changes afterwards; Make bill on the draft brings it back
   in line, and an issued bill must be cancelled and made again.
 - An update's photos cannot be removed once posted, except by deleting files as a manager in Supabase.
+- Invitation links are not tied to an email or phone: whoever holds one can join, once (D19). Right for how kennels
+  hire?
+- Merging parents keeps the record you are on and hides the other. There is no "unmerge".
+- Any member can edit any detail of a pet or parent, including phone numbers. Should changing a parent's phone be for
+  managers only?
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
 - A person can own at most five kennels on one installation. Enough?
 - Forms from parents stay "new" until someone deals with them; there is no expiry.
@@ -119,7 +126,8 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - `care_items.requires_photo` is not offered or enforced: proof photos on tasks are not built.
 - The bill's stay line shows its dates as 2026-10-12 rather than 12 Oct 2026 (it comes from `stayLines()` and is frozen
   on issued bills).
-- Pet photo, vaccinations and certificates live on the booking page until the pet page exists (M6).
+- Pets and parents cannot be hidden from lists from the screen yet (soft delete exists in the database).
+- Incidents cannot be edited once written; add a new one or ask a manager.
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
 - Settings has no fields yet for time zone, currency, locale or financial year start. They default to India (M4).
@@ -129,7 +137,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 191 tests, build
+npm run check        # dash check, lint, typecheck, 202 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e` (see
@@ -139,6 +147,8 @@ above).
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 14 October 2026. M6 (pet and parent pages, search, vaccination warnings, incidents, people, invitation links,
+  merging parents); fixed another vanishing success message (incident buttons).
 - 14 October 2026. M4 (bills, payments, UPI QR, printing; staff issue only bills that match the booking) and M5
   (photos, updates, stay page photos through a token-checked storage policy, certificates) built; e2e walk extended to
   18 tests.

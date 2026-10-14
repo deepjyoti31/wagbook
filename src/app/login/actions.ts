@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { FormState } from "@/lib/forms";
+import { text, type FormState } from "@/lib/forms";
+import { safeDestination } from "@/lib/safe-redirect";
 import { siteOrigin } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +36,8 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
     // Deliberately the same message for a wrong email and a wrong password.
     return { error: error.code === "email_not_confirmed" ? "Confirm your email first. Check your inbox for the link." : "That email and password do not match." };
   }
-  redirect("/app");
+  // Back to where they were going, such as an invitation link. Only ever a page on this site.
+  redirect(safeDestination(text(form, "next"), await siteOrigin(), "/app"));
 }
 
 export async function signUp(_state: FormState, form: FormData): Promise<FormState> {
@@ -43,10 +45,12 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
   const parsed = parse(form);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  const origin = await siteOrigin();
+  const destination = safeDestination(text(form, "next"), origin, "/onboarding");
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
-    options: { emailRedirectTo: `${await siteOrigin()}/auth/confirm?next=/onboarding` },
+    options: { emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(destination)}` },
   });
   if (error) {
     if (isUnreachable(error)) return { error: UNREACHABLE };
@@ -57,7 +61,7 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
   }
   // With email confirmation on, there is no session yet.
   if (!data.session) return { ok: "Almost there. Open the link we just emailed you to confirm your address." };
-  redirect("/onboarding");
+  redirect(destination);
 }
 
 export async function signOut(): Promise<void> {

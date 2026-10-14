@@ -326,3 +326,23 @@ showing (safely: nothing would be exposed). The end-to-end test would fail first
 **Photos are stored twice.** The photo (long edge 1,600 pixels) and a small copy (480 pixels, `name.small.jpg`) for
 lists and slow connections, both made in the browser. Supabase's image resizing is a paid feature and is not used.
 
+---
+
+## D19. Invitation links that work for whoever holds them, once
+
+**Status:** Decided, 14 October 2026 (milestone M6).
+
+**Situation.** Kennel staff often have no email they check, and the person adding them is on WhatsApp. The email
+invitation (D7) needs an account first and reveals whether an email has one.
+
+**Decision.** An owner or manager makes a link for a name and a role. It works once, for seven days, and can be
+withdrawn. It is not tied to an email or phone: whoever opens it signs up or signs in and joins. The link carries a
+64-character token; the join page says nothing about the kennel until the visitor is signed in.
+
+**Why.** It fits how kennels hire (a message on WhatsApp), needs no lookup of accounts, and the person still has to act
+to join, as D7 requires. Binding it to an email would bring back the email problem; binding it to a phone number would
+need phone sign-in, which Wagbook does not have.
+
+**Cost.** A forwarded link lets someone else join, once, in that role. The new member appears on People at once and can
+be suspended or removed. See `05`, known limitations.
+

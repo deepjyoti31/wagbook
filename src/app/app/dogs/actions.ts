@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { normalizePhone } from "@/lib/core";
+import { isISODate, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
-import { PET_FLAGS } from "@/lib/pets";
+import { INCIDENT_CATEGORIES, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
 
 const NewPet = z.object({
@@ -78,4 +78,138 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
 
   revalidatePath("/app", "layout");
   redirect("/app/dogs");
+}
+
+const Id = z.uuid();
+const long = z.string().max(2000, "Keep notes under 2,000 characters.").nullable();
+
+const PetDetails = z.object({
+  name: z.string().min(1, "Enter the pet's name.").max(80),
+  species: z.enum(["dog", "cat", "other"]),
+  sex: z.enum(["male", "female", "unknown"]),
+  breed: z.string().max(80).nullable(),
+  color: z.string().max(80).nullable(),
+  microchip: z.string().max(40).nullable(),
+  dateOfBirth: z.string().refine(isISODate, "Enter the date of birth as a date.").nullable(),
+  weightKg: z.number().positive().lt(200).nullable(),
+  foodNotes: long,
+  medicalNotes: long,
+  allergies: long,
+  behaviourNotes: long,
+  vetName: z.string().max(120).nullable(),
+  vetPhone: z.string().max(40).nullable(),
+});
+
+/** Change anything about a pet. Any member: details change at the gate, not only in the office. */
+export async function updatePet(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const petId = Id.safeParse(form.get("petId"));
+  if (!petId.success) return { error: "That pet could not be found." };
+  const weight = text(form, "weightKg");
+  const parsed = PetDetails.safeParse({
+    name: text(form, "name") ?? "",
+    species: form.get("species"),
+    sex: form.get("sex"),
+    breed: text(form, "breed"),
+    color: text(form, "color"),
+    microchip: text(form, "microchip"),
+    dateOfBirth: text(form, "dateOfBirth"),
+    weightKg: weight === null ? null : Number(weight),
+    foodNotes: text(form, "foodNotes"),
+    medicalNotes: text(form, "medicalNotes"),
+    allergies: text(form, "allergies"),
+    behaviourNotes: text(form, "behaviourNotes"),
+    vetName: text(form, "vetName"),
+    vetPhone: text(form, "vetPhone"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? "Enter the weight in kilograms, like 34.5." : parsed.error.issues[0].message };
+  const p = parsed.data;
+  const neutered = form.get("isNeutered");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pets")
+    .update({
+      name: p.name,
+      species: p.species,
+      sex: p.sex,
+      breed: p.breed,
+      color: p.color,
+      microchip: p.microchip,
+      date_of_birth: p.dateOfBirth,
+      weight_kg: p.weightKg,
+      is_neutered: neutered === "yes" ? true : neutered === "no" ? false : null,
+      food_notes: p.foodNotes,
+      medical_notes: p.medicalNotes,
+      allergies: p.allergies,
+      behaviour_notes: p.behaviourNotes,
+      vet_name: p.vetName,
+      vet_phone: p.vetPhone,
+      flags: PET_FLAGS.filter((f) => checked(form, `flag_${f}`)),
+    })
+    .eq("org_id", org.id)
+    .eq("id", petId.data)
+    .select("id");
+  if (error) return { error: friendlyError(error) };
+  if (data.length === 0) return { error: "That pet could not be found." };
+  revalidatePath("/app", "layout");
+  return { ok: "Saved." };
+}
+
+const Incident = z.object({
+  category: z.enum(INCIDENT_CATEGORIES, "Choose what happened."),
+  severity: z.enum(["low", "medium", "high"], "Choose how serious it is."),
+  description: z.string().min(1, "Say what happened.").max(4000, "Keep it under 4,000 characters."),
+  actionTaken: z.string().max(4000).nullable(),
+});
+
+/** Write down something out of the ordinary, while it is fresh. */
+export async function addIncident(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const petId = Id.safeParse(form.get("petId"));
+  if (!petId.success) return { error: "That pet could not be found." };
+  const parsed = Incident.safeParse({
+    category: form.get("category"),
+    severity: form.get("severity"),
+    description: text(form, "description") ?? "",
+    actionTaken: text(form, "actionTaken"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const i = parsed.data;
+
+  const supabase = await createClient();
+  // The stay it happened in: the pet's current one, if it is in house.
+  const stay = await supabase.from("bookings").select("id").eq("org_id", org.id).eq("pet_id", petId.data).eq("status", "checked_in").order("start_date", { ascending: false }).limit(1).maybeSingle();
+  const { error } = await supabase.from("incidents").insert({
+    org_id: org.id,
+    pet_id: petId.data,
+    booking_id: stay.data?.id ?? null,
+    category: i.category,
+    severity: i.severity,
+    description: i.description,
+    action_taken: i.actionTaken,
+    vet_visited: checked(form, "vetVisited"),
+    // The database stamps the real time and who; any value marks it.
+    parent_notified_at: checked(form, "parentTold") ? new Date().toISOString() : null,
+  });
+  if (error) return { error: friendlyError(error) };
+  revalidatePath("/app", "layout");
+  redirect(`/app/dogs/${petId.data}?done=incident`);
+}
+
+/** Mark that the parent was told, or that the incident is over. */
+export async function updateIncident(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const id = Id.safeParse(form.get("incidentId"));
+  if (!id.success) return { error: "That incident could not be found." };
+  const what = form.get("what");
+  const change = what === "told" ? { parent_notified_at: new Date().toISOString() } : what === "resolved" ? { resolved_at: new Date().toISOString() } : null;
+  if (!change) return { error: "That incident could not be found." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("incidents").update(change).eq("org_id", org.id).eq("id", id.data).select("id, pet_id");
+  if (error) return { error: friendlyError(error) };
+  if (data.length === 0) return { error: "That incident could not be found." };
+  revalidatePath("/app", "layout");
+  // The button that was pressed goes away, and its message with it: say so on the page.
+  redirect(`/app/dogs/${data[0].pet_id}?done=${what}`);
 }

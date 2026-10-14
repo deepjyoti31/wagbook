@@ -20,6 +20,9 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchParams">) {
   const params = await searchParams;
   const signup = params.mode === "signup";
+  // Where to go afterwards, such as an invitation link. Checked again on the server (safeDestination).
+  const next = typeof params.next === "string" && params.next.startsWith("/") ? params.next : null;
+  const keep = next ? `&next=${encodeURIComponent(next)}` : "";
   return (
     <>
       <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{signup ? "Create your account" : "Sign in to Wagbook"}</h1>
@@ -28,7 +31,9 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
           That link has expired or was already used. Sign in, or ask for a new one.
         </p>
       ) : null}
+      {next?.startsWith("/join/") ? <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">You have been invited to a kennel. {signup ? "Create your account" : "Sign in"} to see it and join.</p> : null}
       <ActionForm action={signup ? signUp : signIn}>
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <Field label="Email">
           <Input name="email" type="email" autoComplete="email" required />
         </Field>
@@ -41,7 +46,7 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
       </ActionForm>
       <p className="mt-6 text-slate">
         {signup ? "Already have an account? " : "New to Wagbook? "}
-        <Link href={signup ? "/login" : "/login?mode=signup"} className="font-semibold text-ink underline underline-offset-4">
+        <Link href={signup ? `/login?mode=signin${keep}` : `/login?mode=signup${keep}`} className="font-semibold text-ink underline underline-offset-4">
           {signup ? "Sign in" : "Create an account"}
         </Link>
       </p>

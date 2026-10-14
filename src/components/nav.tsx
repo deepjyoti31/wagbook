@@ -17,14 +17,16 @@ const ITEMS = [
  */
 export function Nav() {
   const pathname = usePathname();
-  // The calendar is part of bookings, play is part of the care round, and bills live under More.
+  // The calendar is part of bookings, play is part of the care round, bills live under More, and parents sit with their pets.
   const section = pathname.startsWith("/app/calendar")
     ? "/app/bookings"
     : pathname.startsWith("/app/play")
       ? "/app/care"
       : pathname.startsWith("/app/bills")
         ? "/app/more"
-        : pathname;
+        : pathname.startsWith("/app/clients")
+          ? "/app/dogs"
+          : pathname;
   const isActive = (href: string) => (href === "/app" ? section === "/app" : section.startsWith(href));
   return (
     <nav aria-label="Main" className="flex justify-around gap-1 sm:justify-start">

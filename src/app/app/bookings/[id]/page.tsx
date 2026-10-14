@@ -9,8 +9,7 @@ import { checkIn, checkOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
 import { PaymentForm } from "@/components/payment-form";
 import { PetAvatar } from "@/components/pet-avatar";
-import { PhotoInput } from "@/components/photo-input";
-import { addVaccination, setPetPhoto } from "@/app/app/media/actions";
+import { VaccinationList, VaccinationWarnings } from "@/components/pet-panels";
 import { signedUrls } from "@/lib/media";
 import { RoutineForm } from "@/components/routine-form";
 import { makeBill } from "@/app/app/bills/actions";
@@ -20,7 +19,7 @@ import { flagText, STATUS_LABEL, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
   bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
-  todayIn, toDecimalString, whatsappLink,
+  todayIn, toDecimalString, vaccinationWarnings, whatsappLink,
 } from "@/lib/core";
 import { peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
@@ -195,6 +194,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       ) : null}
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
+      {b.status === "requested" || b.status === "confirmed" ? (
+        <VaccinationWarnings warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
+      ) : null}
 
       {open ? (
         <Section title="Next">
@@ -473,57 +475,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
       {pet ? (
         <Section title={`About ${pet.name}`}>
-          <ActionForm action={setPetPhoto} className="mb-4 space-y-3 rounded-xl border border-rule bg-paper p-4">
-            <input type="hidden" name="petId" value={pet.id} />
-            <PhotoInput name="photo" label={pet.photo_path ? "Change the photo" : "Add a photo, so the team knows which dog is which"} />
-            <SubmitButton variant="secondary" pendingLabel="Saving">
-              Save photo
-            </SubmitButton>
-          </ActionForm>
-
           <div className="mb-4 rounded-xl border border-rule bg-paper p-4">
             <p className="mb-2 font-bold">Vaccinations</p>
-            {vaccinations.data.length === 0 ? (
-              <p className="text-slate">None on record.</p>
-            ) : (
-              <ul className="mb-3 space-y-2">
-                {vaccinations.data.map((v) => (
-                  <li key={v.id} className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{v.vaccine.replaceAll("_", " ")}</span>
-                    {v.valid_until ? (
-                      <Badge tone={v.valid_until < today ? "alert" : v.valid_until < b.end_date ? "attention" : "good"}>Valid until {formatDate(v.valid_until)}</Badge>
-                    ) : null}
-                    {v.certificate_path && fullMedia.get(v.certificate_path) ? (
-                      <a href={fullMedia.get(v.certificate_path)} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center underline underline-offset-4">
-                        Certificate
-                      </a>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <details>
-              <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">Add a vaccination</summary>
-              <ActionForm action={addVaccination} className="mt-2 space-y-3">
-                <input type="hidden" name="petId" value={pet.id} />
-                <Field label="Vaccine">
-                  <Input name="vaccine" required maxLength={60} placeholder="rabies" />
-                </Field>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Given on">
-                    <Input name="givenOn" type="date" />
-                  </Field>
-                  <Field label="Valid until">
-                    <Input name="validUntil" type="date" />
-                  </Field>
-                </div>
-                <PhotoInput name="certificate" label="Certificate, a photo or a PDF" accept="image/*,application/pdf" />
-                <SubmitButton variant="secondary" pendingLabel="Saving">
-                  Save vaccination
-                </SubmitButton>
-              </ActionForm>
-            </details>
+            <VaccinationList records={vaccinations.data} today={today} certificates={fullMedia} />
           </div>
+          <Link href={`/app/dogs/${pet.id}`} className={`${buttonStyles.secondary} mb-4`}>
+            {pet.name}&apos;s page: details, photo, vaccinations, incidents
+          </Link>
 
           {pet.food_notes || pet.medical_notes || pet.allergies || pet.behaviour_notes ? (
           <dl className="space-y-3 rounded-xl border border-rule bg-paper p-4">

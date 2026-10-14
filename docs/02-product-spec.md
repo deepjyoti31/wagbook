@@ -36,6 +36,9 @@ One person can belong to several kennels, with a different role in each.
 /app/play             Today's solo play timetable                    signed in
 /app/dogs             Pets (search)                                  signed in
 /app/dogs/new         Add a pet and its parent                       signed in
+/app/dogs/{id}        One pet: details, photo, vaccinations, stays, incidents  signed in
+/app/dogs/{id}/incident  Write down an incident                      signed in
+/app/clients/{id}     One parent: details, pets, stays, bills, merge signed in
 /app/more             Menu, account, switch kennel, sign out         signed in
 /app/more/intake      Forms from parents                             signed in
 /app/more/kennels     Kennels                                        signed in
@@ -53,7 +56,9 @@ One person can belong to several kennels, with a different role in each.
 /inv/{token}          One bill, for the parent                       public, secret link
 ```
 
-Planned routes: `/app/dogs/{id}`, `/app/clients/{id}`, `/app/more/reports`, `/app/more/expenses`.
+/join/{token}         Join a kennel with an invitation link          public, then signed in
+
+Planned routes: `/app/more/reports`, `/app/more/expenses`.
 
 The folder is called `dogs` because that is what almost every kennel calls them; the screen says "Pets" because cats
 board too. Leave both as they are.
@@ -86,7 +91,13 @@ account, but a pending row appears in the list only when it does, so the inviter
 [05](05-security-and-privacy.md)). Inviting someone who is already a member changes nothing.
 Managers cannot invite or remove owners.
 
-Planned (M6): change a member's role and name from the screen; invite someone who has no account yet by sending a link.
+**Invitation links (M6).** For someone with no account yet: an owner or manager enters a name and a role and presses
+Make a link, then sends it with "Send on WhatsApp" or Copy link. The link works once, for seven days, and can be
+withdrawn. Whoever opens it creates an account or signs in, sees which kennel and role it is for, and presses Join. A
+signed-out visitor learns nothing from the link. Only owners can make a link that grants owner.
+
+**Changing people (M6).** On People, Change opens a colleague's name and role, Suspend (they lose access at once; their
+history stays) or Restore, and Remove. Managers change staff and managers; only owners change owners.
 
 ### A5. Work at more than one kennel. Built.
 
@@ -115,7 +126,9 @@ notes and medicines, allergies, behaviour, and "staff should know" flags (see `s
 
 ### B2. Pets list. Built.
 
-Search by name. Each row shows breed, weight, flags in red, the parent with a tap-to-call number, and "Book a stay".
+Search by the pet's name, the parent's name, or the parent's phone number typed any way (`98765 43210`, `+91...`). Each
+row shows the pet's photo, breed, weight, flags in red, the parent (opening their page) with a tap-to-call number, and
+"Book a stay". The pet's name opens its page.
 
 ### B3. Intake form for parents. Built.
 
@@ -139,21 +152,31 @@ be read fully cannot be accepted; the screen says to call the parent.
 
 Accepting never rewrites an existing client's details. Only pets with new names are added.
 
-### B5. Pet page. Planned (M6).
+### B5. Pet page. Built.
 
-Everything about one pet: details, edit, photo, vaccinations with expiry warnings, past stays, incidents.
+`/app/dogs/{id}`: photo, breed, weight, flags, the parent; incidents (with "Parent has been told" and "Dealt with");
+vaccinations with their status (valid, expires soon within 30 days, expired, no date) and certificates, and Add a
+vaccination; stays; change the photo; every detail editable by any member (name, animal, breed, sex, neutered, date of
+birth, weight, colour, microchip, food, health, allergies, behaviour, flags, vet). Book a stay.
 
-### B6. Parent page. Planned (M6).
+### B6. Parent page. Built.
 
-One parent: their pets, stays, bills, what they owe, edit details, WhatsApp button.
+`/app/clients/{id}`: phone numbers, what they owe in all, WhatsApp; their pets, stays and bills with what is due; every
+detail editable (name, phones, email, address, emergency contact, GSTIN and state, notes, consent if none is on record).
 
-### B7. Vaccination records. Partly built.
+**Merging (B9, M6).** For owners and managers: "Same person as another parent?" finds another record by its phone
+number and merges it into this one. Pets, their stays, bills (issued ones keep the buyer printed on them), payments and
+forms move here; missing details are filled in from the other record, both sets of notes are kept, and the other
+number is kept as "another number". The other record is hidden, not deleted (`merge_clients`).
 
-Table `vaccinations` (vaccine, given on, valid until, certificate file). The intake form collects the dates. On the
-booking page (until the pet page exists, M6) staff see a pet's vaccinations with their expiry, open the certificate,
-and add a vaccination with a photo or PDF of its certificate; the check-in checklist marks one that has expired or runs
-out during the stay. Planned: certificate upload in the intake form (M9, see `05`, known limitations); warnings at
-booking (M6).
+### B7. Vaccination records. Built, except intake uploads.
+
+Table `vaccinations` (vaccine, given on, valid until, certificate file). The intake form collects the dates. The pet page
+shows each with its status and certificate, and adds one with a photo or PDF of its certificate. Warnings
+(`vaccinationWarnings()`): a request or confirmed booking says when there are no vaccinations on record, when one
+expired before arrival, or when one runs out before the pet goes home; arrivals on Today carry "Check vaccinations";
+the check-in checklist lists them with their dates. Only dates are judged: which vaccines a kennel requires is its own
+policy. Planned: certificate upload in the intake form (M9, see `05`, known limitations).
 
 ### B8. Forget a parent. Planned (M9).
 
@@ -305,10 +328,13 @@ from any JPEG. Paths follow the storage layout, organisation first.
 A pet's photo, set from its booking page, shows small on every row (Today, Bookings, Care, Play), and on the stay
 page.
 
-### D5. Incidents. Database ready.
+### D5. Incidents. Built.
 
-Table `incidents`: what happened, how serious, what was done, whether the parent and a vet were told. Planned (M6): log
-one from a pet's row in two taps; show a pet's history.
+"Incident" on a pet's row on Today (and "Write down an incident" on its page) opens a short form: what happened (illness,
+injury, fight, escape, behaviour, damage, other), how serious (low, medium: tell the parent today, high: tell the parent
+and a vet now), what happened in words, what was done, vet seen, parent told. It is tied to the pet's current stay. The
+pet page lists them with "Parent has been told" (the database stamps who and when) and "Dealt with". Today shows, at the
+top, every open high one and every open medium or high one the parent has not been told about.
 
 ### D6. Check-in checklist. Built.
 

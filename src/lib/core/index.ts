@@ -16,4 +16,5 @@ export * from "./qr";
 export * from "./stay";
 export * from "./tax";
 export * from "./upi";
+export * from "./vaccinations";
 export * from "./whatsapp";

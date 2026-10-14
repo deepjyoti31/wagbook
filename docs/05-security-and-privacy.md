@@ -52,7 +52,8 @@ In summary:
 | Payments received | Read, add | Also refunds, corrections, removal | Same |
 | Expenses | Nothing | Everything | Everything |
 | Forms from parents | Read; accept or decline, once | Also delete | Same |
-| People | See colleagues | Invite and manage staff and managers | Also owners |
+| People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
+| Merge two parents | No | Yes (`merge_clients`) | Same |
 | Audit log | Nothing | Read | Read |
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
@@ -211,6 +212,16 @@ the server (`stripJpegMetadata()`). Checked: each new rule's test fails without 
 uploaded through the app, comes back from Storage without it; another kennel's member and a request without the
 token cannot read the file.
 
+### 14 October 2026: people, invitation links and merging
+
+What changed: `invitation_links` (no direct writes; owners and managers read and withdraw), `create_invitation_link()`
+(owner or manager; owner links only by owners), `get_invitation_link()` and `accept_invitation_link()` (any signed-in
+person holding the token; single use, seven days, withdrawable), and `merge_clients()` (owner or manager; may move
+issued bills to another parent through a session flag that only it sets, while the printed buyer stays frozen). All
+`security definer` with the reason in their comments; none is granted to the anonymous role. The join page shows a
+signed-out visitor nothing about the kennel. Checked: `tests/db/people.test.ts`, each rule removed once to see its test
+fail; the end-to-end walk joins a new account through a link, uses it once, and suspends and restores it.
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -226,7 +237,8 @@ These are real. Do not describe Wagbook as free of them.
 | The intake form does not take certificate uploads yet | Parents send certificates on WhatsApp; staff add them at check-in | M9, together with rate limits at the edge, because anonymous uploads would multiply the intake flood risk |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
-| An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | M6: invitations by link, which need no lookup |
+| An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | Invitation links (M6) need no lookup; the email invitation stays for people who already have an account. Remove it if this matters more than the convenience. |
+| An invitation link works for whoever holds it | A forwarded link lets someone else join, once, in its role, within seven days | Send it to one person; withdraw it from People if it went astray; suspend or remove the wrong person. The person's name and role show on People as soon as they join. |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |
 | Two race fixes have no automated test | See the review log, numbers 6 and 16 | M1: stage them against real Postgres with two connections |
 | No two-factor sign-in | A stolen password is enough | Supabase supports it; M9 |

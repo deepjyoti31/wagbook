@@ -224,9 +224,9 @@ Docker or a live project.
 ## Testing
 
 ```
-npm run test:unit    56 tests   pure logic, under a second
-npm run test:db     135 tests   real Postgres in-process, about 40 seconds
-npm run test:e2e     18 tests   a real browser against the built app and a local Supabase (needs Docker)
+npm run test:unit    60 tests   pure logic, under a second
+npm run test:db     142 tests   real Postgres in-process, about 40 seconds
+npm run test:e2e     22 tests   a real browser against the built app and a local Supabase (needs Docker)
 ```
 
 ### How the database tests work
@@ -259,6 +259,7 @@ What each file covers:
 | `care.test.ts` | Medicines need a reason to be skipped, a double tap keeps the first stamp, the stay page counts what was ticked, play hours, moving a play session. |
 | `seed.test.ts` | `supabase/seed.sql` applies on top of the migrations and builds the demo kennel. |
 | `bills.test.ts` | `computeInvoice()` against `issue_invoice()` over awkward cases in all three tax modes; staff issue only what the booking says; one live bill per booking; advances; saving drafts. |
+| `people.test.ts` | Invitation links (who can make them, single use, expiry, withdrawal, nobody writes them directly), merging parents (what moves, issued bills keep their buyer, who may), suspending and restoring members. |
 | `media.test.ts` | Photos on a stay page reach only the holder of that stay's token; stored paths stay in their kennel; another kennel cannot read a file. |
 | `billing.test.ts` | Numbering, freezing, voiding, tax checks, payments, balances. |
 | `intake.test.ts` | The public form, hostile payloads, accepting, the stay page. |
