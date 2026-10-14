@@ -7,7 +7,10 @@ import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { checkIn, checkOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
+import { PaymentForm } from "@/components/payment-form";
 import { RoutineForm } from "@/components/routine-form";
+import { makeBill } from "@/app/app/bills/actions";
+import { PAYMENT_METHOD_LABEL } from "@/lib/billing";
 import { requireOrg } from "@/lib/auth";
 import { flagText, STATUS_LABEL, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
@@ -34,7 +37,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 const DONE: Record<string, string> = {
   confirmed: "Confirmed. The space is now held.",
   checked_in: "Checked in.",
-  checked_out: "Checked out. The kennel is free for the next pet.",
+  checked_out: "Checked out. The kennel is free for the next pet. Make the bill below.",
   cancelled: "Booking cancelled. The space is free again.",
   no_show: "Marked as did not arrive. The space is free again.",
   extended: "Stay extended to today.",
@@ -60,7 +63,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, vaccinations, routines, origin] = await Promise.all([
+  const [items, extras, peaks, family, kennels, vaccinations, routines, bill, advances, origin] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
@@ -70,9 +73,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
     supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date }),
     supabase.from("vaccinations").select("id, vaccine, valid_until").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
     supabase.from("care_items").select("id, kind, label, details, due_time").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
+    supabase.from("invoice_balances").select("invoice_id, status, number, total_minor, due_minor").eq("org_id", org.id).eq("booking_id", id).neq("status", "void").maybeSingle(),
+    supabase
+      .from("payments")
+      .select("id, direction, amount_minor, method, received_on, reference")
+      .eq("org_id", org.id)
+      .eq("booking_id", id)
+      .is("invoice_id", null)
+      .order("received_on"),
     siteOrigin(),
   ]);
-  if (items.error || extras.error || peaks.error || family.error || vaccinations.error || routines.error) throw new Error("Could not load the booking.");
+  if (items.error || extras.error || peaks.error || family.error || vaccinations.error || routines.error || bill.error || advances.error) {
+    throw new Error("Could not load the booking.");
+  }
 
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: org.locale, trimZeros: true });
   const open = b.status === "requested" || b.status === "confirmed" || b.status === "checked_in";
@@ -235,7 +248,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             <span className="text-lg font-extrabold">{money(quote.totalMinor)}</span>
           </LedgerRow>
         </Ledger>
-        <p className="mt-2 text-sm text-slate">An estimate. The bill is made at check-out.</p>
+        <p className="mt-2 text-sm text-slate">An estimate. The bill is made from these lines, usually at check-out.</p>
 
         {open ? (
           <ActionForm action={addExtra} className="mt-4 space-y-4 rounded-xl border border-rule bg-paper p-4">
@@ -283,6 +296,42 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         ) : null}
       </Section>
+
+      {b.status !== "requested" && b.status !== "cancelled" ? (
+        <Section title="Bill">
+          {bill.data ? (
+            <Link href={`/app/bills/${bill.data.invoice_id}`} className="flex min-h-12 flex-wrap items-center gap-3 rounded-xl border border-rule bg-paper px-4 py-3 hover:bg-ground">
+              <span className="font-bold">{bill.data.number ?? "Draft bill"}</span>
+              <span className="flex-1 tabular-nums">{money(bill.data.total_minor ?? 0)}</span>
+              {bill.data.status === "issued" ? (
+                (bill.data.due_minor ?? 0) > 0 ? <Badge tone="attention">{money(bill.data.due_minor ?? 0)} due</Badge> : <Badge tone="good">Paid</Badge>
+              ) : (
+                <Badge tone="attention">Not issued yet</Badge>
+              )}
+            </Link>
+          ) : (
+            <ActionForm action={makeBill} className="space-y-2">
+              <input type="hidden" name="bookingId" value={b.id} />
+              <p>{b.status === "checked_out" ? `${pet?.name ?? "The pet"} has gone home. Make the bill and send it.` : "No bill yet. Make it at check-out, or now if the parent pays in advance."}</p>
+              <SubmitButton variant={b.status === "checked_out" ? "primary" : "secondary"} pendingLabel="Making the bill">
+                Make bill
+              </SubmitButton>
+            </ActionForm>
+          )}
+
+          {advances.data.length > 0 ? (
+            <ul className="mt-3 space-y-1">
+              {advances.data.map((p) => (
+                <li key={p.id} className="text-slate">
+                  {p.direction === "out" ? "Refund" : "Advance"} of {money(p.amount_minor)} on {formatDate(p.received_on)}, {PAYMENT_METHOD_LABEL[p.method]}
+                  {p.reference ? `, ${p.reference}` : ""}. Counts against the bill when it is issued.
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {bill.data?.status !== "issued" ? <PaymentForm bookingId={b.id} defaultAmount="" today={today} canRefund={false} /> : null}
+        </Section>
+      ) : null}
 
       {open ? (
         <Section title="Change this booking">

@@ -31,7 +31,10 @@ const DONE: Record<string, string> = {
 };
 
 async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) {
-  const doneKey = (await searchParams).done;
+  const query = await searchParams;
+  const doneKey = query.done;
+  // After a check-out, the next job is the bill.
+  const billFor = doneKey === "checked_out" && typeof query.booking === "string" && /^[0-9a-f-]{36}$/.test(query.booking) ? query.booking : null;
   const done = typeof doneKey === "string" && doneKey in DONE ? DONE[doneKey] : null;
   const { org } = await requireOrg();
   const supabase = await createClient();
@@ -78,7 +81,19 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Link>
       </PageTitle>
 
-      {done ? <Notice tone="ok">{done}</Notice> : null}
+      {done ? (
+        <Notice tone="ok">
+          {done}
+          {billFor ? (
+            <>
+              {" "}
+              <Link href={`/app/bookings/${billFor}`} className="underline underline-offset-4">
+                Make the bill
+              </Link>
+            </>
+          ) : null}
+        </Notice>
+      ) : null}
 
       <p className="mb-6 text-lg">
         <strong className="font-extrabold">{inHouse.length}</strong> in house

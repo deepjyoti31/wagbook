@@ -321,6 +321,7 @@ grant execute on function public.available_kennels(uuid, public.booking_kind, da
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
+grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;

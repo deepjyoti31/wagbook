@@ -11,6 +11,7 @@ export * from "./invoice-number";
 export * from "./money";
 export * from "./phone";
 export * from "./play-schedule";
+export * from "./qr";
 export * from "./stay";
 export * from "./tax";
 export * from "./upi";

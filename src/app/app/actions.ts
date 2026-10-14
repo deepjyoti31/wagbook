@@ -77,7 +77,7 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
 
   revalidatePath("/app", "layout");
   if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_out`);
-  if (form.get("from") === "today") redirect("/app?done=checked_out");
+  if (form.get("from") === "today") redirect(`/app?done=checked_out&booking=${bookingId.data}`);
   return { ok: "Checked out." };
 }
 

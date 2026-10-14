@@ -10,6 +10,7 @@ import { signOut } from "@/app/login/actions";
 export const metadata: Metadata = { title: "More" };
 
 const LINKS = [
+  { href: "/app/bills", title: "Bills", about: "What parents owe, bills to send, and payments." },
   { href: "/app/more/intake", title: "Forms from parents", about: "Review what parents sent, and share your intake link." },
   { href: "/app/more/kennels", title: "Kennels", about: "Add kennels and take them in or out of service." },
   { href: "/app/more/people", title: "People", about: "See who works here and invite your team." },

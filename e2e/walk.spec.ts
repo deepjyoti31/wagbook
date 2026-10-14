@@ -223,3 +223,59 @@ test("a new person creates a kennel, invites a colleague, who joins and switches
   await staff.page.waitForURL(/\/login/);
   await staff.context.close();
 });
+
+test("an advance is recorded on a booking before the bill", async ({ page }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Coco", "In house");
+  await page.getByLabel("Amount").fill("1000");
+  await page.getByRole("button", { name: "Record advance" }).click();
+  await expect(page.getByText("Advance recorded.")).toBeVisible();
+  await expect(page.getByText(/Advance of ₹1,000/)).toBeVisible();
+});
+
+test("check out, make the bill, issue it, and the parent sees it with a UPI QR code", async ({ page, browser }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Mango", "In house");
+  await page.getByRole("button", { name: "Check out" }).click();
+  await expect(page.getByText(/Checked out\. .*Make the bill below\./)).toBeVisible();
+  await page.getByRole("button", { name: "Make bill" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
+  await page.getByRole("button", { name: "Issue bill" }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+  const number = await page.getByRole("heading", { level: 1 }).innerText();
+  expect(number).toMatch(/^WB\/\d{2}-\d{2}\/0001$/);
+
+  const link = (await page.getByRole("link", { name: "Open it" }).getAttribute("href"))!;
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link);
+  await expect(parent.page.getByRole("heading", { name: "Bill", exact: true })).toBeVisible();
+  await expect(parent.page.getByText(number)).toBeVisible();
+  await expect(parent.page.getByRole("img", { name: /QR code to pay/ })).toBeVisible();
+  await expect(parent.page.getByRole("link", { name: "Pay with UPI" })).toHaveAttribute("href", /^upi:\/\/pay\?pa=demokennel%40okdemo/);
+  await expect(parent.page.getByText(/Rupees One Thousand Two Hundred Only/)).toBeVisible();
+  expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  // A payment recorded by the kennel, and only that, makes the bill paid.
+  await page.getByRole("button", { name: "Record payment" }).click();
+  await expect(page.getByText("Payment recorded.")).toBeVisible();
+  await expect(page.getByText("Nothing due")).toBeVisible();
+  await parent.page.reload();
+  await expect(parent.page.getByText("Paid in full")).toBeVisible();
+  await expect(parent.page.getByRole("img", { name: /QR code to pay/ })).toHaveCount(0);
+  await parent.context.close();
+});
+
+test("a manager changes a line on a draft bill before issuing it", async ({ page }) => {
+  await signIn(page, "manager");
+  await openBooking(page, "Biscuit", "In house");
+  await page.getByRole("button", { name: "Make bill" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
+  await page.getByText("Change").first().click();
+  await page.getByLabel("Discount").first().fill("500");
+  await page.getByRole("button", { name: "Save line" }).first().click();
+  await expect(page.getByText("Bill updated.")).toBeVisible();
+  await expect(page.getByText(/less ₹500/)).toBeVisible();
+  await page.getByRole("button", { name: "Issue bill" }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Send bill" })).toHaveAttribute("href", /^https:\/\/wa\.me\/919800000101\?text=/);
+});

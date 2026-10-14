@@ -9,6 +9,14 @@ import { saveSettings } from "./actions";
 
 export const metadata: Metadata = { title: "Settings" };
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** Every time zone the runtime knows, with the kennel's own first if it is unusual. */
+function timeZones(current: string): string[] {
+  const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+  return all.includes(current) ? all : [current, ...all];
+}
+
 export default function SettingsPage() {
   return (
     <>
@@ -143,6 +151,39 @@ async function Settings() {
           <label className="flex items-start gap-3">
             <input type="checkbox" name="prices_include_tax" defaultChecked={org.prices_include_tax} className="mt-1 size-5" />
             <span>My prices already include tax</span>
+          </label>
+        </Group>
+
+        <Group title="Region" about="What dates, times, money and bills follow. Changing the currency does not convert prices already set.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Time zone" hint="Decides what today is for arrivals, care and bills.">
+              <Select name="time_zone" defaultValue={org.time_zone}>
+                {timeZones(org.time_zone).map((z) => (
+                  <option key={z} value={z}>
+                    {z.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Currency" hint="Three letters, like INR.">
+              <Input name="currency" defaultValue={org.currency} maxLength={3} autoCapitalize="characters" />
+            </Field>
+            <Field label="Number and date style" hint="Like en-IN, which writes 1,20,000.">
+              <Input name="locale" defaultValue={org.locale} maxLength={20} autoCapitalize="none" spellCheck={false} />
+            </Field>
+            <Field label="Financial year starts in" hint="April in India. Bill numbers start again from 1 each year.">
+              <Select name="fiscal_year_start_month" defaultValue={String(org.fiscal_year_start_month)}>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={String(i + 1)}>
+                    {m}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="round_invoice_totals" defaultChecked={org.round_invoice_totals} className="mt-1 size-5" />
+            <span>Round bill totals to a whole rupee (or unit), with the difference shown as round off</span>
           </label>
         </Group>
 

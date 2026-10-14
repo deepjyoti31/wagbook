@@ -57,6 +57,7 @@ export function errorCodes(): string {
     "| WB020 to WB029 | Bookings and capacity |",
     "| WB030 to WB039 | Invoices |",
     "| WB040 to WB049 | The public intake form |",
+    "| WB050 to WB059 | Bills and payments (continued) |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 23. Views: 1. Functions: 39.
+Migrations applied: 9. Tables: 23. Views: 1. Functions: 41.
 
 ## Contents
 
@@ -675,6 +675,7 @@ END)`
 
 **Indexes**
 
+- `CREATE UNIQUE INDEX invoices_one_live_per_booking ON public.invoices USING btree (org_id, booking_id) WHERE ((booking_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE INDEX invoices_org_booking_idx ON public.invoices USING btree (org_id, booking_id)`
 - `CREATE INDEX invoices_org_client_idx ON public.invoices USING btree (org_id, client_id)`
 - `CREATE INDEX invoices_org_issued_idx ON public.invoices USING btree (org_id, issued_on DESC)`
@@ -1481,6 +1482,18 @@ invite_member_by_email(p_org uuid, p_email text, p_role member_role, p_display_n
 
 Invites an existing account to an organisation, or corrects an invitation that has not been answered yet. Someone who is already a member is left unchanged. The person becomes a member only when they accept. Owner or manager only; only owners can invite or change owners. Returns nothing in every case.
 
+### invoice_expected_lines
+
+```
+invoice_expected_lines(p_booking uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The lines a bill for a booking should have, as quantity, unit price, discount and tax rate: the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
+
 ### invoice_lines_guard
 
 ```
@@ -1527,7 +1540,7 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Any member may issue.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.
 
 ### my_invitations
 
@@ -1624,6 +1637,18 @@ safe_date(p_text text) returns date
 - Volatility: immutable
 
 Reads a YYYY-MM-DD string as a date, or returns null if it is anything else. For text that arrived from the public internet.
+
+### save_invoice_draft
+
+```
+save_invoice_draft(p_invoice uuid, p_totals jsonb, p_lines jsonb) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Replaces a draft invoice's lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.
 
 ### set_updated_at
 

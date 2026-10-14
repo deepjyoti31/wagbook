@@ -1698,6 +1698,10 @@ export type Database = {
         Args: { p_org: string; p_email: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
         Returns: undefined;
       };
+      invoice_expected_lines: {
+        Args: { p_booking: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
+        Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
+      };
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
@@ -1729,6 +1733,10 @@ export type Database = {
       safe_date: {
         Args: { p_text: string };
         Returns: string;
+      };
+      save_invoice_draft: {
+        Args: { p_invoice: string; p_totals: Json; p_lines: Json };
+        Returns: undefined;
       };
       stay_range: {
         Args: { p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };

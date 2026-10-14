@@ -15,6 +15,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB020 to WB029 | Bookings and capacity |
 | WB030 to WB039 | Invoices |
 | WB040 to WB049 | The public intake form |
+| WB050 to WB059 | Bills and payments (continued) |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -53,3 +54,5 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB047` | the stay dates are not valid<br>check-out is before check-in | `20261008000600_intake_and_public_pages.sql` |
 | `WB048` | too many submissions right now. Please try again in a while.<br>we already have your form. The kennel will be in touch. | `20261008000600_intake_and_public_pages.sql` |
 | `WB049` | this form has already been dealt with<br>this form was declined and cannot be accepted | `20261008000600_intake_and_public_pages.sql` |
+| `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
+| `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |

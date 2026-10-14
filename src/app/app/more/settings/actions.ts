@@ -77,7 +77,24 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     prices[kind] = minor;
   }
 
+  const timeZone = text(form, "time_zone") ?? org.time_zone;
+  const currency = (text(form, "currency") ?? org.currency).toUpperCase();
+  const locale = text(form, "locale") ?? org.locale;
+  const fiscalStart = Number(text(form, "fiscal_year_start_month") ?? org.fiscal_year_start_month);
+  if (!/^[A-Z]{3}$/.test(currency)) return { error: "The currency is three capital letters, like INR." };
+  try {
+    new Intl.NumberFormat(locale, { style: "currency", currency }).format(1);
+  } catch {
+    return { error: "That number style or currency is not one this system knows. Try en-IN and INR." };
+  }
+  if (!Number.isInteger(fiscalStart) || fiscalStart < 1 || fiscalStart > 12) return { error: "Choose the month your financial year starts." };
+
   const update: TablesUpdate<"organizations"> = {
+    time_zone: timeZone,
+    currency,
+    locale,
+    fiscal_year_start_month: fiscalStart,
+    round_invoice_totals: checked(form, "round_invoice_totals"),
     name,
     legal_name: text(form, "legal_name"),
     ...phones,
