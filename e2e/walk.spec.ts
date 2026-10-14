@@ -279,3 +279,79 @@ test("a manager changes a line on a draft bill before issuing it", async ({ page
   await expect(page.getByText(/^Issued\./)).toBeVisible();
   await expect(page.getByRole("link", { name: "Send bill" })).toHaveAttribute("href", /^https:\/\/wa\.me\/919800000101\?text=/);
 });
+
+/** A real JPEG drawn in the browser, with a fake camera location planted in it, as a phone would write. */
+async function photoWithLocation(page: Page): Promise<Buffer> {
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 2400;
+    c.height = 1800;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#c98a3d";
+    ctx.fillRect(0, 0, 2400, 1800);
+    ctx.fillStyle = "#14213d";
+    ctx.fillRect(600, 400, 1200, 1000);
+    return c.toDataURL("image/jpeg", 0.9);
+  });
+  const jpeg = Buffer.from(dataUrl.split(",")[1], "base64");
+  const payload = Buffer.from("Exif\0\0GPSLatitude 12.9716 N GPSLongitude 77.5946 E", "latin1");
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1, (payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+  return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
+}
+
+test("a photo of the pet, and an update with a photo that the parent sees without the location", async ({ page, browser }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Pepper", "In house");
+  const photo = await photoWithLocation(page);
+  await page.locator("input[name=photo]").setInputFiles({ name: "pepper.jpg", mimeType: "image/jpeg", buffer: photo });
+  await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
+  await page.getByRole("button", { name: "Save photo" }).click();
+  await expect(page.getByText("Photo saved.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Write update" }).first().click();
+  await page.getByLabel("How is the pet doing?").fill("Pepper played fetch all morning.");
+  await page.locator("input[name=photos]").setInputFiles({ name: "fetch.jpg", mimeType: "image/jpeg", buffer: photo });
+  await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
+  await page.getByRole("button", { name: "Save update" }).click();
+  await expect(page.getByText("Saved. It is on the parent's stay page now.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Send on WhatsApp" })).toHaveAttribute("href", /wa\.me\/919800000101\?text=Pepper/);
+
+  await page.getByRole("link", { name: "Back to the booking" }).click();
+  const link = await page.getByText(/\/s\/[0-9a-f]{64}/).innerText();
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link.trim());
+  await expect(parent.page.getByText("Pepper played fetch all morning.")).toBeVisible();
+  const shown = parent.page.locator("a[target=_blank] img").first();
+  await expect(shown).toBeVisible();
+  expect(await shown.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+  // The photo itself: shrunk to about 1,600 pixels and with no location in it.
+  const fullUrl = (await parent.page.locator("a[target=_blank]").first().getAttribute("href"))!;
+  const bytes = Buffer.from(await (await parent.page.request.get(fullUrl)).body());
+  expect(bytes.subarray(0, 2).toString("hex")).toBe("ffd8");
+  expect(bytes.toString("latin1")).not.toContain("GPS");
+  const size = await parent.page.evaluate(async (u) => {
+    const img = new Image();
+    img.src = u;
+    await img.decode();
+    return Math.max(img.naturalWidth, img.naturalHeight);
+  }, fullUrl);
+  expect(size).toBe(1600);
+  await parent.context.close();
+
+  // Without the stay's token the same file is out of reach.
+  const bare = fullUrl.replace(/\/sign\//, "/authenticated/").split("?")[0];
+  expect((await page.request.get(bare)).status()).toBeGreaterThanOrEqual(400);
+});
+
+test("a vaccination is recorded with its certificate", async ({ page }) => {
+  await signIn(page, "staff");
+  await openBooking(page, "Pepper", "In house");
+  await page.getByText("Add a vaccination").click();
+  await page.getByLabel("Vaccine").fill("Kennel cough");
+  await page.getByLabel("Valid until").fill("2030-01-01");
+  await page.locator("input[name=certificate]").setInputFiles({ name: "certificate.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%Wagbook test\n%%EOF\n") });
+  await page.getByRole("button", { name: "Save vaccination" }).click();
+  await expect(page.getByText("Recorded Kennel cough.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Certificate" })).toBeVisible();
+});

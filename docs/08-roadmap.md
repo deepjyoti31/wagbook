@@ -128,7 +128,8 @@ settings, security review and fixes, documentation.
 
 ## M4. Bills and payments
 
-- [ ] Not started. Read [06-billing-and-gst.md](06-billing-and-gst.md) first.
+- [x] Finished 14 October 2026. Staff issue only bills that match their booking (D15). Not timed on a real phone; see
+  `HANDOFF.md`.
 
 **Build**
 
@@ -160,7 +161,9 @@ settings, security review and fixes, documentation.
 
 ## M5. Photos and updates
 
-- [ ] Not started.
+- [x] Finished 14 October 2026, except certificate upload in the intake form, moved to M9 with the edge rate limits
+  (anonymous uploads would multiply the intake flood risk; see `05`). Certificates are uploaded by staff on the booking
+  page until the pet page exists (M6). Photos for parents: D18.
 
 **Build**
 
@@ -260,6 +263,8 @@ settings, security review and fixes, documentation.
 4. Two-factor sign-in for owners.
 5. A documented backup and restore drill.
 6. A second independent security review. Log it in `05`.
+7. Vaccination certificate upload in the intake form (moved from M5): anonymous uploads under the submission's own
+   folder, at most one per pet, only within an hour of submitting, behind the same rate limits as item 2.
 
 ---
 

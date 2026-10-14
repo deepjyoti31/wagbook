@@ -59,9 +59,10 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
    `revoke all on function ... from public, anon;` then grant to `authenticated` only if the app calls it.
 5. **`security definer` is the exception.** Use it only when the caller must do something row level security forbids,
    and then the function must check `auth.uid()` and membership itself. Say why in the comment.
-6. **The anonymous role can call exactly four functions** (`get_public_intake_form`, `submit_intake`,
-   `get_public_stay`, `get_public_invoice`) and can touch no table. Adding a fifth needs a line in
-   `tests/db/security.test.ts` and a paragraph in `docs/05-security-and-privacy.md`.
+6. **The anonymous role can call exactly five functions** (`get_public_intake_form`, `submit_intake`,
+   `get_public_stay`, `get_public_invoice`, and `stay_media_visible`, which Storage calls for photos on a stay page)
+   and can touch no table. Adding another needs a line in `tests/db/security.test.ts` and a paragraph in
+   `docs/05-security-and-privacy.md`.
 7. **The service role key is never used.** Not in the app, not in scripts, not in tests.
 8. **Money is `bigint` in minor units** (paise), in columns ending `_minor`. Tax rates are integer basis points,
    ending `_bp` (1800 is 18%). Never a float, never a decimal string in the database.

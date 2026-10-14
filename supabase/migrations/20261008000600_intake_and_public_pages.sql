@@ -331,7 +331,7 @@ as $$
       'time_zone', o.time_zone,
       'locale', o.locale
     ),
-    'pet', jsonb_build_object('name', p.name, 'species', p.species, 'breed', p.breed),
+    'pet', jsonb_build_object('name', p.name, 'species', p.species, 'breed', p.breed, 'photo', p.photo_path),
     'booking', jsonb_build_object(
       'kind', b.kind,
       'status', b.status,
@@ -341,9 +341,9 @@ as $$
       'checked_out_at', b.checked_out_at
     ),
     'updates', coalesce((
-      select jsonb_agg(jsonb_build_object('at', u.created_at, 'body', u.body) order by u.created_at desc)
+      select jsonb_agg(jsonb_build_object('at', u.created_at, 'body', u.body, 'photos', u.media_paths) order by u.created_at desc)
       from (
-        select su.created_at, su.body
+        select su.created_at, su.body, su.media_paths
         from public.stay_updates su
         where su.booking_id = b.id and su.is_visible_to_parent
         order by su.created_at desc
@@ -374,7 +374,7 @@ as $$
     and (b.status <> 'checked_out' or b.checked_out_at > now() - interval '30 days');
 $$;
 comment on function public.get_public_stay(text) is
-  'PUBLIC. The parent''s stay page for one booking, found by its secret token: kennel contact, pet name, dates, status, parent-visible updates and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out.';
+  'PUBLIC. The parent''s stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).';
 
 create function public.get_public_invoice(p_token text)
 returns jsonb

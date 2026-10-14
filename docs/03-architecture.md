@@ -170,8 +170,9 @@ Points to copy:
 
 ### Public pages
 
-`/i/{slug}` and `/s/{token}` use `createAnonClient()`, which has no session, and call one of the four public database
-functions. Those functions return only what the page shows. Public pages never query a table.
+`/i/{slug}`, `/s/{token}` and `/inv/{token}` use `createAnonClient()`, which has no session, and call one of the public
+database functions. Those functions return only what the page shows. Public pages never query a table. The stay page
+also asks Storage for signed photo links with `createAnonClient({ stayToken })`; see `05`, "Photos on the stay page".
 
 ## The database
 
@@ -223,9 +224,9 @@ Docker or a live project.
 ## Testing
 
 ```
-npm run test:unit    48 tests   pure logic, under a second
-npm run test:db     116 tests   real Postgres in-process, about 40 seconds
-npm run test:e2e     13 tests   a real browser against the built app and a local Supabase (needs Docker)
+npm run test:unit    56 tests   pure logic, under a second
+npm run test:db     135 tests   real Postgres in-process, about 40 seconds
+npm run test:e2e     18 tests   a real browser against the built app and a local Supabase (needs Docker)
 ```
 
 ### How the database tests work
@@ -253,10 +254,12 @@ What each file covers:
 | File | Covers |
 | --- | --- |
 | `smoke.test.ts` | The migrations apply. |
-| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but four functions; tenants are isolated in every table; role limits. |
+| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but five functions; tenants are isolated in every table; role limits. |
 | `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps, the price rule, extras, families, requests, overstays, the check-in checklist. |
 | `care.test.ts` | Medicines need a reason to be skipped, a double tap keeps the first stamp, the stay page counts what was ticked, play hours, moving a play session. |
 | `seed.test.ts` | `supabase/seed.sql` applies on top of the migrations and builds the demo kennel. |
+| `bills.test.ts` | `computeInvoice()` against `issue_invoice()` over awkward cases in all three tax modes; staff issue only what the booking says; one live bill per booking; advances; saving drafts. |
+| `media.test.ts` | Photos on a stay page reach only the holder of that stay's token; stored paths stay in their kennel; another kennel cannot read a file. |
 | `billing.test.ts` | Numbering, freezing, voiding, tax checks, payments, balances. |
 | `intake.test.ts` | The public form, hostile payloads, accepting, the stay page. |
 | `hardening.test.ts` | Regression tests for the findings of the security reviews. Read [05](05-security-and-privacy.md) before touching. |

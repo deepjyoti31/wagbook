@@ -79,7 +79,8 @@ alter table storage.objects enable row level security;
 
 grant usage on schema public, extensions, auth, storage to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
-grant select, insert, update, delete on storage.objects to authenticated;
+-- As on Supabase: both API roles reach storage.objects, and the policies decide.
+grant select, insert, update, delete on storage.objects to anon, authenticated;
 
 -- Supabase's defaults hand new objects in public to every API role. Recreate
 -- that here so the tests prove our migrations really take it back.

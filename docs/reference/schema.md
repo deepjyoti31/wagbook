@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 23. Views: 1. Functions: 41.
+Migrations applied: 9. Tables: 23. Views: 1. Functions: 43.
 
 ## Contents
 
@@ -290,6 +290,7 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 - Foreign key `care_tasks_org_id_care_item_id_fkey`: `FOREIGN KEY (org_id, care_item_id) REFERENCES care_items(org_id, id) ON DELETE SET NULL (care_item_id)`
 - Foreign key `care_tasks_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `care_tasks_label_check`: `CHECK (((char_length(label) >= 1) AND (char_length(label) <= 80)))`
+- Check `care_tasks_photo_in_org`: `CHECK (paths_in_org(ARRAY[photo_path], org_id))`
 - Check `care_tasks_skipped_medication_needs_note`: `CHECK (((kind <> 'medication'::care_kind) OR (status <> 'skipped'::task_status) OR (char_length(btrim(COALESCE(note, ''::text))) > 0)))`
 
 **Indexes**
@@ -398,6 +399,7 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 - Foreign key `expenses_recorded_by_fkey`: `FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Check `expenses_amount_minor_check`: `CHECK ((amount_minor > 0))`
 - Check `expenses_category_check`: `CHECK (((char_length(category) >= 1) AND (char_length(category) <= 60)))`
+- Check `expenses_receipt_in_org`: `CHECK (paths_in_org(ARRAY[receipt_path], org_id))`
 
 **Indexes**
 
@@ -996,6 +998,7 @@ An animal in the kennel's care. Belongs to one client.
 - Foreign key `pets_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE CASCADE`
 - Foreign key `pets_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `pets_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `pets_photo_in_org`: `CHECK (paths_in_org(ARRAY[photo_path], org_id))`
 - Check `pets_species_check`: `CHECK ((species = ANY (ARRAY['dog'::text, 'cat'::text, 'other'::text])))`
 - Check `pets_weight_kg_check`: `CHECK (((weight_kg IS NULL) OR ((weight_kg > (0)::numeric) AND (weight_kg < (200)::numeric))))`
 
@@ -1176,7 +1179,9 @@ A note about how a pet is doing, usually with photos. Doubles as the shift hando
 - Foreign key `stay_updates_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `stay_updates_org_id_booking_id_pet_id_fkey`: `FOREIGN KEY (org_id, booking_id, pet_id) REFERENCES bookings(org_id, id, pet_id) ON DELETE CASCADE`
 - Foreign key `stay_updates_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `stay_updates_at_most_six_photos`: `CHECK ((cardinality(media_paths) <= 6))`
 - Check `stay_updates_body_check`: `CHECK (((char_length(body) >= 1) AND (char_length(body) <= 2000)))`
+- Check `stay_updates_media_in_org`: `CHECK (paths_in_org(media_paths, org_id))`
 
 **Indexes**
 
@@ -1221,6 +1226,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 - Foreign key `vaccinations_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `vaccinations_org_id_pet_id_fkey`: `FOREIGN KEY (org_id, pet_id) REFERENCES pets(org_id, id) ON DELETE CASCADE`
 - Foreign key `vaccinations_verified_by_fkey`: `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `vaccinations_certificate_in_org`: `CHECK (paths_in_org(ARRAY[certificate_path], org_id))`
 - Check `vaccinations_check`: `CHECK (((valid_until IS NULL) OR (given_on IS NULL) OR (valid_until >= given_on)))`
 - Check `vaccinations_vaccine_check`: `CHECK (((char_length(vaccine) >= 1) AND (char_length(vaccine) <= 60)))`
 
@@ -1456,7 +1462,7 @@ get_public_stay(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name, dates, status, parent-visible updates and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out.
+PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).
 
 ### intake_submissions_stamp_review
 
@@ -1602,6 +1608,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 
 Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.
 
+### paths_in_org
+
+```
+paths_in_org(p_paths text[], p_org uuid) returns boolean
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+True when every path that is set is inside the given organisation's folder. Empty paths are allowed.
+
 ### protect_last_owner
 
 ```
@@ -1697,6 +1715,18 @@ stamp_when_set() returns trigger
 - Volatility: volatile
 
 Trigger for a pair of "when" and "who" columns (named in the two trigger arguments) that record a one-off confirmation, such as a certificate being checked. Sending any time marks it; the database then records the real time and the signed-in user, and later edits cannot change them. Sending null clears both.
+
+### stay_media_visible
+
+```
+stay_media_visible(p_name text) returns boolean
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+PUBLIC, through Storage only. True when the request carries a live stay's token (x-wagbook-stay header) and the file is that stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one). SECURITY DEFINER because the anonymous role can read no table.
 
 ### stay_range
 

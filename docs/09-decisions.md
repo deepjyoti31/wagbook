@@ -179,7 +179,7 @@ zone bugs.
 **Cost.** A little more code written by hand.
 
 **Runtime dependencies today:** `next`, `react`, `react-dom`, `@supabase/ssr`, `@supabase/supabase-js`, `zod`,
-`server-only`. Adding one needs an entry here.
+`server-only`, `qrcode-generator` (D17). Adding one needs an entry here.
 
 ---
 
@@ -264,8 +264,10 @@ compare old and new values. A `before` trigger can, using `my_org_ids_with_role(
 
 **Cost.** A kennel with no usual price set cannot be booked by staff until a manager sets one. The screen says so.
 
-**Look again** in M4: a draft invoice is still editable by staff, line by line. The bill must be built from the
-booking, and editing its money should follow the same rule.
+**Extended in M4 (14 October 2026).** Staff may make and change draft bills, but `issue_invoice()` lets staff issue
+only a bill whose lines are exactly what its booking says: the stay at the booked rate, discount and tax, and each extra
+at its own price (`invoice_expected_lines()`, `WB050`). An edited bill is issued by an owner or manager. The screen
+offers line editing to owners and managers only.
 
 ---
 
@@ -281,3 +283,46 @@ Chromium at phone width, waits for the page by itself, and records a trace on fa
 a package would download a binary on every `npm ci`, for everyone, including cloud sessions that never run Docker.
 
 **Cost.** One large development dependency. The tests need Docker and are kept out of `npm run check`.
+
+---
+
+## D17. QR codes drawn by qrcode-generator, checked by jsqr
+
+**Status:** Decided, 14 October 2026 (milestone M4).
+
+**Situation.** A bill shows a UPI QR code. `07-whatsapp-and-upi.md` rules out third-party QR image services (they
+would see every bill's payment details) and allows a dependency with no dependencies of its own, or a short encoder.
+
+**Decision.** `qrcode-generator` (MIT, no dependencies) builds the QR matrix; `src/lib/core/qr.ts` turns it into one
+SVG path drawn on the server. `jsqr` (Apache-2.0, no dependencies) is a development dependency used only by
+`qr.test.ts`, which decodes the drawn code and checks it gives back the exact UPI link.
+
+**Why not write the encoder.** A QR code is Reed-Solomon codes, masks and version tables. A parent scans it to pay; a
+long-used library is less likely to be wrong than a new one, and the decode test catches either.
+
+**Cost.** Two small packages. If one is abandoned, the other still checks a replacement.
+
+---
+
+## D18. Photos for parents through Storage, with the stay token in a header
+
+**Status:** Decided, 14 October 2026 (milestone M5).
+
+**Situation.** The stay page must show photos to a parent who has no account. Files are private. The service role key
+is never used, Postgres cannot sign Storage links, and Wagbook holds no other secret.
+
+**Decision.** The stay page asks Storage for signed links (an hour) as the anonymous role and sends the stay token in an
+`x-wagbook-stay` header. Storage passes request headers to Postgres, and a policy on `storage.objects` calls
+`stay_media_visible(name)`, which allows the read only for that live stay's pet photo and the photos on its updates shown
+to the parent. Tested in PGlite (`media.test.ts`) and through the real Storage in the end-to-end walk.
+
+**Why.** The rule lives in the database like every other rule, no secret is added, and a parent's link opens their own
+photos only. A route handler streaming files would still have needed some credential to read them.
+
+**Cost.** A fifth function the anonymous role can run (pinned in `security.test.ts`). It depends on Storage passing
+`request.headers` to Postgres, which Supabase's Storage does today; if it stopped, photos on stay pages would stop
+showing (safely: nothing would be exposed). The end-to-end test would fail first.
+
+**Photos are stored twice.** The photo (long edge 1,600 pixels) and a small copy (480 pixels, `name.small.jpg`) for
+lists and slow connections, both made in the browser. Supabase's image resizing is a paid feature and is not used.
+

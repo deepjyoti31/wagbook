@@ -1726,6 +1726,10 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { day: string; occupied: number; capacity: number }[];
       };
+      paths_in_org: {
+        Args: { p_paths: string[]; p_org: string };
+        Returns: boolean;
+      };
       respond_to_invitation: {
         Args: { p_org: string; p_accept: boolean };
         Returns: undefined;
@@ -1737,6 +1741,10 @@ export type Database = {
       save_invoice_draft: {
         Args: { p_invoice: string; p_totals: Json; p_lines: Json };
         Returns: undefined;
+      };
+      stay_media_visible: {
+        Args: { p_name: string };
+        Returns: boolean;
       };
       stay_range: {
         Args: { p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };

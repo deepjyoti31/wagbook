@@ -6,7 +6,9 @@ import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Loading, PageTitle, 
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { formatDate, todayIn, toClock, toMinutes } from "@/lib/core";
+import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
+import { PetAvatar } from "@/components/pet-avatar";
 import { clearPlan, moveSession, planToday, sessionDone, sessionSkip, sessionUndo } from "./actions";
 
 export const metadata: Metadata = { title: "Play" };
@@ -35,7 +37,7 @@ async function Play() {
     supabase.from("play_yards").select("id, name").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     supabase
       .from("play_sessions")
-      .select("id, yard_id, pet_id, starts_at, duration_minutes, status, note, bookings(kennels(name), pets(name, flags))")
+      .select("id, yard_id, pet_id, starts_at, duration_minutes, status, note, bookings(kennels(name), pets(name, flags, photo_path))")
       .eq("org_id", org.id)
       .eq("session_date", today)
       .order("starts_at"),
@@ -55,6 +57,7 @@ async function Play() {
   }
 
   const live = sessions.data.filter((s) => s.status !== "skipped");
+  const photos = await signedUrls(supabase, sessions.data.map((s) => s.bookings?.pets?.photo_path), { small: true });
   const perPet = new Map<string, number>();
   for (const s of live) perPet.set(s.pet_id, (perPet.get(s.pet_id) ?? 0) + 1);
   const short = (inHouse.data ?? []).filter((b) => (perPet.get(b.pet_id) ?? 0) < org.play_sessions_per_day).length;
@@ -102,7 +105,8 @@ async function Play() {
                     return (
                       <li key={s.id} className={`px-4 py-3 ${s.status === "skipped" ? "text-slate" : ""}`}>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <div className="min-w-0 flex-1 basis-56">
+                          <PetAvatar name={pet?.name ?? "?"} url={pet?.photo_path ? photos.get(pet.photo_path) : null} />
+                          <div className="min-w-0 flex-1 basis-48">
                             <p className="flex flex-wrap items-center gap-2">
                               <span className="font-extrabold">
                                 {start} to {end}

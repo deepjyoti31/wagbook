@@ -8,7 +8,9 @@ import { flagText } from "@/lib/bookings";
 import { CARE_KIND_LABEL, CARE_KIND_PLURAL, CARE_KINDS, clockText } from "@/lib/care";
 import { formatDate, todayIn } from "@/lib/core";
 import type { Enums } from "@/lib/supabase/database.types";
+import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
+import { PetAvatar } from "@/components/pet-avatar";
 import { markDone, skipTask, undoTask } from "./actions";
 
 export const metadata: Metadata = { title: "Care" };
@@ -29,7 +31,7 @@ export default function CarePage({ searchParams }: PageProps<"/app/care">) {
 }
 
 const TASK =
-  "id, kind, label, details, due_time, status, note, done_at, bookings(id, kennels(name, sort_order), pets(name, flags))" as const;
+  "id, kind, label, details, due_time, status, note, done_at, bookings(id, kennels(name, sort_order), pets(name, flags, photo_path))" as const;
 
 async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams">) {
   const params = await searchParams;
@@ -60,6 +62,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
       (a.bookings?.pets?.name ?? "").localeCompare(b.bookings?.pets?.name ?? ""),
   );
   const shown = pendingOnly ? tasks.filter((t) => t.status === "pending") : tasks;
+  const photos = await signedUrls(supabase, shown.map((t) => t.bookings?.pets?.photo_path), { small: true });
   const pending = tasks.filter((t) => t.status === "pending").length;
 
   const groups = new Map<string, typeof shown>();
@@ -114,7 +117,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
           <Section key={time} title={time} count={list.filter((t) => t.status === "pending").length}>
             <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
               {list.map((t) => (
-                <TaskRow key={t.id} task={t} />
+                <TaskRow key={t.id} task={t} photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null} />
               ))}
             </ul>
           </Section>
@@ -131,16 +134,17 @@ type Task = {
   details: string | null;
   status: Enums<"task_status">;
   note: string | null;
-  bookings: { id: string; kennels: { name: string } | null; pets: { name: string; flags: string[] } | null } | null;
+  bookings: { id: string; kennels: { name: string } | null; pets: { name: string; flags: string[]; photo_path: string | null } | null } | null;
 };
 
-function TaskRow({ task: t }: { task: Task }) {
+function TaskRow({ task: t, photo }: { task: Task; photo?: string | null }) {
   const medicine = t.kind === "medication";
   const pet = t.bookings?.pets;
   return (
     <li className={`px-4 py-3 ${medicine && t.status === "pending" ? "border-l-4 border-alert bg-alert-soft" : ""}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1 basis-56">
+        <PetAvatar name={pet?.name ?? "?"} url={photo} />
+        <div className="min-w-0 flex-1 basis-48">
           <p className="flex flex-wrap items-center gap-2">
             <DoorTag name={t.bookings?.kennels?.name} />
             <span className="text-lg font-bold">{pet?.name ?? "Pet"}</span>

@@ -8,6 +8,7 @@ export * from "./bookings";
 export * from "./dates";
 export * from "./gst";
 export * from "./invoice-number";
+export * from "./jpeg";
 export * from "./money";
 export * from "./phone";
 export * from "./play-schedule";

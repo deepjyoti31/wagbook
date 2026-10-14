@@ -8,6 +8,10 @@ import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, L
 import { checkIn, checkOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
 import { PaymentForm } from "@/components/payment-form";
+import { PetAvatar } from "@/components/pet-avatar";
+import { PhotoInput } from "@/components/photo-input";
+import { addVaccination, setPetPhoto } from "@/app/app/media/actions";
+import { signedUrls } from "@/lib/media";
 import { RoutineForm } from "@/components/routine-form";
 import { makeBill } from "@/app/app/bills/actions";
 import { PAYMENT_METHOD_LABEL } from "@/lib/billing";
@@ -15,7 +19,7 @@ import { requireOrg } from "@/lib/auth";
 import { flagText, STATUS_LABEL, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  bookingConfirmedMessage, chargeableUnits, dailyUpdateMessage, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
+  bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
   todayIn, toDecimalString, whatsappLink,
 } from "@/lib/core";
 import { peakPeriods, toPeak } from "@/lib/queries";
@@ -44,7 +48,7 @@ const DONE: Record<string, string> = {
 };
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -63,7 +67,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, vaccinations, routines, bill, advances, origin] = await Promise.all([
+  const [items, extras, peaks, family, kennels, vaccinations, routines, bill, advances, updates, origin] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
@@ -71,7 +75,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       ? supabase.from("bookings").select("id, status, pets(name)").eq("org_id", org.id).eq("group_id", b.group_id).neq("id", b.id)
       : Promise.resolve({ data: [], error: null }),
     supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date }),
-    supabase.from("vaccinations").select("id, vaccine, valid_until").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
+    supabase.from("vaccinations").select("id, vaccine, valid_until, certificate_path").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
     supabase.from("care_items").select("id, kind, label, details, due_time").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
     supabase.from("invoice_balances").select("invoice_id, status, number, total_minor, due_minor").eq("org_id", org.id).eq("booking_id", id).neq("status", "void").maybeSingle(),
     supabase
@@ -81,12 +85,25 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       .eq("booking_id", id)
       .is("invoice_id", null)
       .order("received_on"),
+    supabase
+      .from("stay_updates")
+      .select("id, body, media_paths, is_visible_to_parent, created_at")
+      .eq("org_id", org.id)
+      .eq("booking_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
     siteOrigin(),
   ]);
-  if (items.error || extras.error || peaks.error || family.error || vaccinations.error || routines.error || bill.error || advances.error) {
+  if (items.error || extras.error || peaks.error || family.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error) {
     throw new Error("Could not load the booking.");
   }
 
+  const media = await signedUrls(
+    supabase,
+    [pet?.photo_path, ...updates.data.flatMap((u) => u.media_paths), ...vaccinations.data.map((v) => v.certificate_path)],
+    { small: true },
+  );
+  const fullMedia = await signedUrls(supabase, vaccinations.data.map((v) => v.certificate_path));
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: org.locale, trimZeros: true });
   const open = b.status === "requested" || b.status === "confirmed" || b.status === "checked_in";
   const touching = peaksTouching({ kind: b.kind, startDate: b.start_date, endDate: b.end_date }, (peaks.data ?? []).map(toPeak));
@@ -129,6 +146,11 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
   return (
     <>
+      {pet ? (
+        <div className="mb-3">
+          <PetAvatar name={pet.name} url={pet.photo_path ? media.get(pet.photo_path) : null} size="lg" />
+        </div>
+      ) : null}
       <PageTitle title={pet?.name ?? "Booking"}>
         <Link href="/app/bookings" className={buttonStyles.quiet}>
           All bookings
@@ -183,11 +205,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             freeKennels={freeKennels}
             vaccinations={vaccinations.data}
             stayEnds={b.end_date}
-            updateLink={
-              parent && b.status === "checked_in"
-                ? whatsappLink(dailyUpdateMessage({ petName: pet?.name ?? "Your pet", note: "", stayUrl }), parent.phone)
-                : null
-            }
+            updateLink={b.status === "checked_in" ? `/app/bookings/${b.id}/update` : null}
           />
         </Section>
       ) : null}
@@ -420,8 +438,94 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         </Section>
       ) : null}
 
-      {pet && (pet.food_notes || pet.medical_notes || pet.allergies || pet.behaviour_notes) ? (
+      {b.status !== "cancelled" && b.status !== "no_show" ? (
+        <Section title="Updates" count={updates.data.length}>
+          {updates.data.length === 0 ? (
+            <Empty>No updates yet.</Empty>
+          ) : (
+            <ul className="space-y-3">
+              {updates.data.map((u) => (
+                <li key={u.id} className="rounded-xl border border-rule bg-paper p-4">
+                  <p className="mb-1 flex flex-wrap items-center gap-2 text-sm text-slate">
+                    {new Intl.DateTimeFormat(org.locale, { timeZone: org.time_zone, day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(u.created_at))}
+                    {u.is_visible_to_parent ? <Badge tone="good">Parent sees it</Badge> : <Badge>Team only</Badge>}
+                  </p>
+                  <p className="whitespace-pre-line">{u.body}</p>
+                  {u.media_paths.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {u.media_paths.map((m) =>
+                        media.get(m) ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file
+                          <img key={m} src={media.get(m)} alt="" loading="lazy" className="size-20 rounded-lg object-cover" />
+                        ) : null,
+                      )}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link href={`/app/bookings/${b.id}/update`} className={`${buttonStyles.secondary} mt-3`}>
+            Write update
+          </Link>
+        </Section>
+      ) : null}
+
+      {pet ? (
         <Section title={`About ${pet.name}`}>
+          <ActionForm action={setPetPhoto} className="mb-4 space-y-3 rounded-xl border border-rule bg-paper p-4">
+            <input type="hidden" name="petId" value={pet.id} />
+            <PhotoInput name="photo" label={pet.photo_path ? "Change the photo" : "Add a photo, so the team knows which dog is which"} />
+            <SubmitButton variant="secondary" pendingLabel="Saving">
+              Save photo
+            </SubmitButton>
+          </ActionForm>
+
+          <div className="mb-4 rounded-xl border border-rule bg-paper p-4">
+            <p className="mb-2 font-bold">Vaccinations</p>
+            {vaccinations.data.length === 0 ? (
+              <p className="text-slate">None on record.</p>
+            ) : (
+              <ul className="mb-3 space-y-2">
+                {vaccinations.data.map((v) => (
+                  <li key={v.id} className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{v.vaccine.replaceAll("_", " ")}</span>
+                    {v.valid_until ? (
+                      <Badge tone={v.valid_until < today ? "alert" : v.valid_until < b.end_date ? "attention" : "good"}>Valid until {formatDate(v.valid_until)}</Badge>
+                    ) : null}
+                    {v.certificate_path && fullMedia.get(v.certificate_path) ? (
+                      <a href={fullMedia.get(v.certificate_path)} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center underline underline-offset-4">
+                        Certificate
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <details>
+              <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">Add a vaccination</summary>
+              <ActionForm action={addVaccination} className="mt-2 space-y-3">
+                <input type="hidden" name="petId" value={pet.id} />
+                <Field label="Vaccine">
+                  <Input name="vaccine" required maxLength={60} placeholder="rabies" />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Given on">
+                    <Input name="givenOn" type="date" />
+                  </Field>
+                  <Field label="Valid until">
+                    <Input name="validUntil" type="date" />
+                  </Field>
+                </div>
+                <PhotoInput name="certificate" label="Certificate, a photo or a PDF" accept="image/*,application/pdf" />
+                <SubmitButton variant="secondary" pendingLabel="Saving">
+                  Save vaccination
+                </SubmitButton>
+              </ActionForm>
+            </details>
+          </div>
+
+          {pet.food_notes || pet.medical_notes || pet.allergies || pet.behaviour_notes ? (
           <dl className="space-y-3 rounded-xl border border-rule bg-paper p-4">
             <About label="Food">{pet.food_notes}</About>
             <About label="Health and medicines" alert>
@@ -432,6 +536,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             </About>
             <About label="Behaviour">{pet.behaviour_notes}</About>
           </dl>
+          ) : null}
         </Section>
       ) : null}
 
@@ -508,9 +613,9 @@ function NextStep({
           </ActionForm>
         ) : null}
         {updateLink ? (
-          <a href={updateLink} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
-            Send update
-          </a>
+          <Link href={updateLink} className={buttonStyles.whatsapp}>
+            Write update
+          </Link>
         ) : null}
         <ActionForm action={checkOut} className="contents">
           <input type="hidden" name="bookingId" value={b.id} />

@@ -6,7 +6,9 @@ import { requireOrg } from "@/lib/auth";
 import { STATUS_LABEL, stayText } from "@/lib/bookings";
 import { addDays, formatMoney, peaksTouching, todayIn } from "@/lib/core";
 import { bookingCards, peakPeriods, toPeak } from "@/lib/queries";
+import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
+import { PetAvatar } from "@/components/pet-avatar";
 
 export const metadata: Metadata = { title: "Bookings" };
 
@@ -40,6 +42,7 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
   const [{ data, error }, peaks] = await Promise.all([query, past ? Promise.resolve({ data: [], error: null }) : peakPeriods(supabase, org.id, today, addDays(today, 400))]);
   if (error || peaks.error) throw new Error("Could not load bookings.");
   const periods = (peaks.data ?? []).map(toPeak);
+  const photos = await signedUrls(supabase, data.map((b) => b.pets?.photo_path), { small: true });
 
   const tab = (active: boolean) =>
     `inline-flex min-h-12 items-center rounded-lg px-4 font-semibold ${active ? "bg-ink text-paper" : "bg-paper text-ink border border-rule"}`;
@@ -63,7 +66,9 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
             const touching = peaksTouching({ kind: b.kind, startDate: b.start_date, endDate: b.end_date }, periods);
             return (
               <li key={b.id}>
-                <Link href={`/app/bookings/${b.id}`} className="block px-4 py-3 hover:bg-ground">
+                <Link href={`/app/bookings/${b.id}`} className="flex gap-3 px-4 py-3 hover:bg-ground">
+                  <PetAvatar name={b.pets?.name ?? "?"} url={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
+                  <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2">
                     <DoorTag name={b.kennels?.name} />
                     <span className="text-lg font-bold">{b.pets?.name ?? "Unknown pet"}</span>
@@ -86,6 +91,7 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
                     {b.clients?.full_name}. {stayText(b.kind, b.start_date, b.end_date)} at{" "}
                     {formatMoney(b.rate_minor, { currency: org.currency, locale: org.locale, trimZeros: true })}.
                   </p>
+                  </div>
                 </Link>
               </li>
             );

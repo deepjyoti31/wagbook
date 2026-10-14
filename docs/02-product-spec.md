@@ -44,13 +44,16 @@ One person can belong to several kennels, with a different role in each.
 /app/more/extras      Extras on the price list                       signed in
 /app/more/peak        Peak periods                                   signed in
 /app/more/people      People and invitations                         signed in
-/app/more/settings    Kennel details, prices, UPI, tax, intake       signed in
+/app/more/settings    Kennel details, prices, UPI, tax, region, intake signed in
+/app/bills            Bills: owed, drafts, recent                    signed in
+/app/bills/{id}       One bill and its payments                      signed in
+/app/bookings/{id}/update  Write an update with photos               signed in
 /i/{slug}             A kennel's intake form                         public
 /s/{token}            One stay, for the parent                       public, secret link
+/inv/{token}          One bill, for the parent                       public, secret link
 ```
 
-Planned routes: `/app/bills`, `/app/dogs/{id}`,
-`/app/clients/{id}`, `/app/more/reports`, `/app/more/expenses`, `/inv/{token}` (a bill, for the parent).
+Planned routes: `/app/dogs/{id}`, `/app/clients/{id}`, `/app/more/reports`, `/app/more/expenses`.
 
 The folder is called `dogs` because that is what almost every kennel calls them; the screen says "Pets" because cats
 board too. Leave both as they are.
@@ -97,8 +100,8 @@ boarding, UPI ID and payee name, tax (off, India GST, or one tax at one rate; GS
 prefix, whether prices include tax), intake form (on or off, consent wording). Staff can look but not save. Solo play
 settings are on Play yards (D3).
 
-Planned (M4): time zone, currency, locale and financial year start as visible settings. Today they are columns with
-Indian defaults.
+Region (built in M4): time zone, currency, number and date style, the month the financial year starts, and whether bill
+totals are rounded to a whole unit.
 
 ---
 
@@ -144,10 +147,13 @@ Everything about one pet: details, edit, photo, vaccinations with expiry warning
 
 One parent: their pets, stays, bills, what they owe, edit details, WhatsApp button.
 
-### B7. Vaccination records. Database ready.
+### B7. Vaccination records. Partly built.
 
-Table `vaccinations` (vaccine, given on, valid until, certificate file). The intake form already collects them. Planned
-(M6): show and edit them, warn at booking and at check-in when one has expired or will expire during the stay.
+Table `vaccinations` (vaccine, given on, valid until, certificate file). The intake form collects the dates. On the
+booking page (until the pet page exists, M6) staff see a pet's vaccinations with their expiry, open the certificate,
+and add a vaccination with a photo or PDF of its certificate; the check-in checklist marks one that has expired or runs
+out during the stay. Planned: certificate upload in the intake form (M9, see `05`, known limitations); warnings at
+booking (M6).
 
 ### B8. Forget a parent. Planned (M9).
 
@@ -286,11 +292,18 @@ The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees
 in one yard at once, or one pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
 to happen.
 
-### D4. Updates to parents. Partly built.
+### D4. Updates to parents. Built.
 
-Today, "Send update" opens WhatsApp with a message and the stay link. Database ready: `stay_updates`, short notes marked
-visible to the parent, shown on the stay page. Planned (M5): write an update with photos from the pet's row; it appears
-on the stay page and opens WhatsApp.
+Write update, from a pet's row on Today or from its booking: a note, up to four photos, and "Show to the parent" (on by
+default; off makes it a note for the team). Saving puts it on the stay page and offers "Send on WhatsApp" with the
+note and the stay link. The booking page lists its updates with their photos and who can see them.
+
+Photos are redrawn in the browser before upload: turned the right way up, about 1,600 pixels on the long edge, saved as
+JPEG, which leaves behind the location and camera data, plus a small copy for lists. The server strips metadata again
+from any JPEG. Paths follow the storage layout, organisation first.
+
+A pet's photo, set from its booking page, shows small on every row (Today, Bookings, Care, Play), and on the stay
+page.
 
 ### D5. Incidents. Database ready.
 
@@ -307,25 +320,33 @@ belongings, and anything said at the gate. Check in from Today stays one tap and
 
 ## E. Money
 
-Nothing in this section has a screen yet. All of it is in the database, with tests. Details in
-[06-billing-and-gst.md](06-billing-and-gst.md).
+Details in [06-billing-and-gst.md](06-billing-and-gst.md).
 
-### E1. Bills. Database ready. Screens planned (M4).
+### E1. Bills. Built.
 
-A draft invoice is built from a booking (`stayLines()` and `computeInvoice()` in `src/lib/core`). Issuing it
-(`issue_invoice`) checks every line's arithmetic, gives it the next number for the financial year, and freezes it,
-including the kennel's and parent's details as they were that day. An issued invoice can never be edited or deleted,
-only voided with a reason by an owner or manager; the number stays used.
+Make bill, on the booking page (and offered after check-out), builds a draft from the booking: the stay at its booked
+rate, discount and tax, then each extra (`billForBooking()`, `stayLines()`, `computeInvoice()`), saved in one go
+(`save_invoice_draft`). A stay has one live bill; pressing Make bill again brings a draft back in line with the booking
+or opens the issued bill. Owners and managers can change, add and remove lines of a draft. Issue checks every sum
+(`issue_invoice`), gives the next number for the financial year and freezes it; staff can issue only a bill exactly as
+its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
+cancel an issued bill with a reason; the number stays used. Bills, under More: what is owed first, then drafts, then
+recent.
 
-### E2. Bill for the parent. Database ready. Screen planned (M4).
+### E2. Bill for the parent. Built.
 
-`/inv/{token}`: the bill, what has been paid, and a "Pay with UPI" button and QR code for the balance.
-`get_public_invoice` already returns exactly what that page needs.
+`/inv/{token}`: titled Tax invoice or Bill; the kennel's name, legal name, address, GSTIN or tax number and state; the
+number and date; who is billed; place of supply under GST; each line with its SAC, quantity, price, discount and tax
+(CGST and SGST, IGST, or the kennel's one tax); totals, round off, and the amount in words; what is paid and what is
+due. While money is due and the bill carries a UPI ID: "Pay with UPI" on phones and a QR code everywhere, drawn on the
+server (D17). "Print or save as PDF" prints a clean A4 page. A cancelled bill says so. Never marked paid by a tap: only
+a payment recorded by the kennel.
 
-### E3. Payments. Database ready. Screen planned (M4).
+### E3. Payments. Built.
 
-Record money received: amount, method (UPI, cash, card, bank transfer, other), date, reference. Advances are payments
-not yet tied to an invoice. A refund is a payment marked as going out (the amount is always positive), and only owners and managers can record one. Wagbook records
+On a bill: Record payment (amount defaults to what is due, method, date, reference such as the UPI transaction number);
+owners and managers can record a refund. On a booking before its bill: Record advance. Issuing the bill takes in the
+advances for that stay, and payments on a cancelled bill move to the next one for the same stay. Wagbook records
 payments; it never moves money.
 
 ### E4. Expenses. Database ready. Screen planned (M7).
@@ -354,10 +375,11 @@ cancelled and thirty days after check-out. The page is marked not to be indexed 
 Send confirmation on the booking page opens WhatsApp to the parent with `bookingConfirmedMessage()`: dates, nights (days
 for day boarding), the estimated total and the stay link.
 
-### F3. Photos. Planned (M5).
+### F3. Photos. Built.
 
-Photos attached to updates, shown on the stay page through short-lived links. The `pet-media` storage bucket and its
-access rules exist.
+The stay page shows the pet's photo and each shared update's photos (the small copy, opening the full photo), through
+links that last an hour. The page asks Storage with the stay's own token; the database lets that token open only that
+stay's shared photos (D18, and `05`, "Photos on the stay page").
 
 ---
 

@@ -4,7 +4,13 @@
 > rate and which service code apply to boarding, and what must appear on its invoices are questions for the kennel's
 > own accountant. Every place this page says "ask your accountant" means it.
 
-Everything here exists in the database and in `src/lib/core`, with tests. None of it has a screen yet (milestone M4).
+Everything here exists in the database and in `src/lib/core`, with tests, and has screens (milestone M4): Bills under
+More, the bill page, Make bill on a booking, and the parent's bill at `/inv/{token}`.
+
+**Who may issue what.** Any member may make a draft. Staff may issue only a bill whose lines are exactly what its
+booking says, the stay at its booked rate, discount and tax and each extra at its own price; a bill that was changed
+is issued by an owner or manager (`WB050`, decision D15). A booking has at most one live (draft or issued) bill.
+Issuing takes in any advances recorded for the booking.
 
 ## The life of a bill
 

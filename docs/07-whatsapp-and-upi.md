@@ -121,10 +121,10 @@ Never show a parent "Payment received" based on them tapping a link.
 
 ### QR codes
 
-Not built yet. In M4, draw the QR code on the server as an inline SVG from the `upiLink()` string. That needs a small
-QR encoder: either a dependency with no dependencies of its own, or a short implementation in `src/lib/core/`. Record
-the choice in [09-decisions.md](09-decisions.md). Do not call a third-party QR image service: that would send every
-bill's payment details to someone else's server.
+Built in M4. The parent's bill page draws the QR code on the server as one SVG path from the `upiLink()` string
+(`qrMatrix()` and `qrSvgPath()` in `src/lib/core/qr.ts`, using `qrcode-generator`; see D17 in
+[09-decisions.md](09-decisions.md)). A test decodes the drawn code and gets the exact link back. No third-party QR
+image service is called: that would send every bill's payment details to someone else's server.
 
 ## If you outgrow this
 

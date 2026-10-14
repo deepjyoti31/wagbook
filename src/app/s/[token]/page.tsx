@@ -10,9 +10,9 @@ export const metadata: Metadata = { title: "Your pet's stay", robots: { index: f
 
 interface PublicStay {
   kennel: { name: string; time_zone?: string; locale?: string; whatsapp_phone: string | null; phone: string | null; check_in_time: string; check_out_time: string };
-  pet: { name: string; species: string; breed: string | null };
+  pet: { name: string; species: string; breed: string | null; photo: string | null };
   booking: { kind: "boarding" | "daycare"; status: string; start_date: ISODate; end_date: ISODate; checked_in_at: string | null; checked_out_at: string | null };
-  updates: { at: string; body: string }[];
+  updates: { at: string; body: string; photos: string[] | null }[];
   care: { date: ISODate; kind: string; done: number; total: number }[];
 }
 
@@ -51,9 +51,21 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
   const { token } = await params;
   if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) notFound();
 
-  const { data, error } = await createAnonClient().rpc("get_public_stay", { p_token: token });
+  const supabase = createAnonClient({ stayToken: token });
+  const { data, error } = await supabase.rpc("get_public_stay", { p_token: token });
   if (error || !data) notFound();
   const stay = data as unknown as PublicStay;
+
+  // Short-lived links (an hour) to the photos, asked for with this stay's token.
+  // The small copy is shown; tapping opens the photo itself.
+  const paths = [stay.pet.photo, ...stay.updates.flatMap((u) => u.photos ?? [])].filter((p): p is string => Boolean(p));
+  const links = new Map<string, { small?: string; full?: string }>();
+  if (paths.length > 0) {
+    const small = (p: string) => p.replace(/\.jpg$/, ".small.jpg");
+    const { data: signed } = await supabase.storage.from("pet-media").createSignedUrls([...paths, ...paths.map(small)], 3600);
+    const byPath = new Map((signed ?? []).filter((x) => x.signedUrl && !x.error).map((x) => [x.path ?? "", x.signedUrl as string]));
+    for (const p of paths) links.set(p, { small: byPath.get(small(p)) ?? byPath.get(p), full: byPath.get(p) });
+  }
   const status = STATUS[stay.booking.status] ?? STATUS.confirmed;
   const contact = stay.kennel.whatsapp_phone ?? stay.kennel.phone;
 
@@ -65,6 +77,10 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
 
   return (
     <>
+      {stay.pet.photo && links.get(stay.pet.photo)?.small ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file
+        <img src={links.get(stay.pet.photo)?.small} alt={stay.pet.name} className="mb-3 size-24 rounded-full object-cover" />
+      ) : null}
       <p className="font-semibold text-slate">{stay.kennel.name}</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{stay.pet.name}&apos;s stay</h1>
       <p className="mt-3">
@@ -81,11 +97,24 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
 
       <Section title="Updates">
         {stay.updates.length === 0 ? (
-          <p className="text-slate">No updates yet. Photos come to you on WhatsApp; notes from the team appear here.</p>
+          <p className="text-slate">No updates yet. Notes and photos from the team appear here.</p>
         ) : (
           <ul className="space-y-3">
             {stay.updates.map((u, i) => (
               <li key={i} className="rounded-xl border border-rule bg-paper p-4">
+                {(u.photos ?? []).length > 0 ? (
+                  <div className="mb-3 grid grid-cols-2 gap-2">
+                    {(u.photos ?? []).map((p) => {
+                      const l = links.get(p);
+                      return l?.small ? (
+                        <a key={p} href={l.full ?? l.small} target="_blank" rel="noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
+                          <img src={l.small} alt={`${stay.pet.name}`} className="aspect-square w-full rounded-lg object-cover" />
+                        </a>
+                      ) : null;
+                    })}
+                  </div>
+                ) : null}
                 <p className="whitespace-pre-line">{u.body}</p>
                 <p className="mt-1 text-sm text-slate">{when.format(new Date(u.at))}</p>
               </li>
