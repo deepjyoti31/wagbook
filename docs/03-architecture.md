@@ -68,6 +68,7 @@ src/
       layout.tsx               Kennel name and navigation
       page.tsx actions.ts      Today; check in, check out, switch kennel
       bookings/ dogs/ more/    One folder per area; page.tsx plus actions.ts
+      more/reports/download/   route.ts: CSV downloads (the one signed-in Route Handler)
     i/[slug]/                  Public intake form
     s/[token]/                 Public stay page
   components/
@@ -88,6 +89,8 @@ src/
     intake.ts                  zod schema of the public intake payload
     pets.ts                    Warning flags offered for a pet
     queries.ts                 Shared read queries (bookingCards)
+    reports.ts                 Expense words, download kinds, fetchAll() past the 1,000 row page
+    history.ts                 The audit log in words, for History of changes
     site.ts                    siteOrigin(): the public address for links
 tests/db/
   supabase-shim.sql            Stand-in for Supabase's roles, auth and storage schemas

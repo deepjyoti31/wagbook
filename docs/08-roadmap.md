@@ -212,7 +212,7 @@ settings, security review and fixes, documentation.
 
 ## M7. Reports and expenses
 
-- [ ] Not started.
+- [x] Finished 14 October 2026. The audit log viewer is called History of changes. Reports refuse staff (D20).
 
 **Build**
 

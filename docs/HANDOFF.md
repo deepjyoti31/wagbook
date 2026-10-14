@@ -2,17 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 14 October 2026, after milestone M6.
+Last updated: 14 October 2026, after milestone M7.
 
 ## In one paragraph
 
-The database for the whole product exists, with its rules enforced and tested (142 database tests, 60 unit tests).
+The database for the whole product exists, with its rules enforced and tested (152 database tests, 76 unit tests).
 Built: M2 (bookings), M3 (the care round and play), M4 (bills, payments, the parent's bill with a UPI QR code, printing),
-M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates) and M6 (pet and parent
-pages, search by parent and phone, vaccination warnings, incidents, people with invitation links, merging parents). The
-whole day, from booking to a paid bill and a photo the parent sees, plus a new colleague joining through a link, is
-walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 22 of 22 pass, also green
-in CI). What has still never happened is a **hosted** Supabase project:
+M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates), M6 (pet and parent
+pages, search by parent and phone, vaccination warnings, incidents, people with invitation links, merging parents) and
+M7 (reports, expenses with receipts, CSV downloads, the history of changes). The whole day, from booking to a paid bill
+and a photo the parent sees, plus a new colleague joining through a link and the owner reading the month's numbers, is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 25 of 25 pass; the 22
+before M7 are also green in CI). What has still never happened is a **hosted** Supabase project:
 the setup guide, real sign-up email and production settings. That is what is left of M1.
 
 ## What is verified, and how
@@ -35,9 +36,11 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | Intake form with hostile input, accepting, reviewing once, stay page contents and expiry | `tests/db/intake.test.ts`, `hardening.test.ts` | High |
 | Pure logic: dates, money, GST, invoice numbers, play planning (including around existing sessions), peaks, calendar grid, UPI, WhatsApp, vaccination status and warnings | `src/lib/core/core.test.ts` and others (60) | High |
 | Invitation links (who makes them, single use, expiry, withdrawal), merging parents (pets, stays, issued bills, payments move; printed buyer kept), suspend and restore | `tests/db/people.test.ts`; rules removed once to see the tests fail | High |
+| Reports refuse staff, other kennels, strangers and the anonymous role (`WB060`); a member of two kennels gets only the one asked for; occupancy counts nights not check-out days and leaves out requests and cancellations; money by month (payments, refunds, expenses; cancelled bills left out); tax by rate equals the bill's own arithmetic; extras ranked; receipt files for owners and managers only | `tests/db/reports.test.ts`; the role check and the receipt rule each removed once to see the tests fail | High |
+| CSV files: quoting, CRLF, byte order mark, formula-looking text defused; month arithmetic; the history in words | `src/lib/core/reports.test.ts`, `src/lib/history.test.ts` | High |
 | Generated types and reference docs match the migrations | `tests/db/generated.test.ts` | High |
-| The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate, search by phone and parent name, a pet's details changed and a high incident shown on Today until dealt with, a parent's details changed and a duplicate merged in, a new person joining through an invitation link then suspended and restored | High for the local stack |
-| Every screen at 360 pixels wide, no sideways scroll, no browser errors | Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search | Medium: desktop Chromium at phone size, not a phone |
+| The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate, search by phone and parent name, a pet's details changed and a high incident shown on Today until dealt with, a parent's details changed and a duplicate merged in, a new person joining through an invitation link then suspended and restored, an expense with a receipt (staff refused reports, expenses, history and downloads), the month's report and all four downloads, the history filtered to one person's booking changes | High for the local stack |
+| Every screen at 360 pixels wide, no sideways scroll, no browser errors | Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search, Reports, Expenses, History of changes | Medium: desktop Chromium at phone size, not a phone |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -49,6 +52,8 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | `.github/workflows/ci.yml` on GitHub | Never run there. The `e2e` job is new. | It runs exactly what passed here; image pulls in CI may be slow |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
 | "A full meal round for twenty dogs in under two minutes" (M3), "billed, sent, paid and marked paid from a phone in under a minute" (M4), "today's photo within seconds on a slow connection" (M5) | Not timed on a phone or a throttled connection | Each step is one round trip; the stay page loads small copies (480 pixels) of photos. Probably fine; slow networks are M8 |
+| The CSV downloads opened in Excel, Google Sheets and LibreOffice | Checked as text in tests: byte order mark, quoting, CRLF | Low; an accountant opening one would settle it |
+| The tax by rate report as the basis for a GST return | Adds up issued bills by bill date, leaving out cancelled ones; not checked by an accountant | Question 8 for the accountant in `06`; see Open questions |
 | Scanning the QR code with a real UPI app, and paying | No phone here. The code decodes to the exact link in tests. | Some apps ignore the amount (see `07`) |
 | Photos from a real phone camera (HEIC on iPhone, very large photos, rotation) | Tested with a JPEG made in the browser | The browser redraws photos the right way up; a format the browser cannot read is refused with a sentence |
 | Send update, Send confirmation, the intake link on WhatsApp | Only the link is built; WhatsApp was not opened | Low: the functions are unit tested |
@@ -60,7 +65,8 @@ the setup guide, real sign-up email and production settings. That is what is lef
 1. **Finish M1** (needs the owner): create a development Supabase project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
    email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job.
-2. **Then M7, reports and expenses** ([08-roadmap.md](08-roadmap.md)).
+2. **Then M8, works anywhere, in any language** ([08-roadmap.md](08-roadmap.md)). It starts by reading the Next.js docs
+   on internationalisation and recording the approach in `09`.
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -116,6 +122,11 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
 - A person can own at most five kennels on one installation. Enough?
 - Forms from parents stay "new" until someone deals with them; there is no expiry.
+- Reports are for owners and managers only (D20), including how full the kennel was. Should staff see occupancy?
+- Tax by rate counts issued bills by their bill date and leaves cancelled ones out. A bill cancelled in a later month
+  disappears from the earlier month's figure. Is that what the accountant wants for GST returns, or should a
+  cancellation show in the month it happened? (A question for the accountant.)
+- "Received less spent" is money in and out in the month, not profit: it ignores what is owed and when bills fall.
 
 ## Known rough edges in what is built
 
@@ -132,12 +143,20 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
 - Settings has no fields yet for time zone, currency, locale or financial year start. They default to India (M4).
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
+- Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
+  of kennels going in or out of service.
+- A pet that overstays counts in the occupancy report only up to its check-out date unless someone pressed Extend.
+- Removing an expense leaves its receipt file in storage (see `05`, known limitations).
+- More lists Reports, Expenses and History of changes to staff too; staff who open them get a sentence saying they are
+  for owners and managers.
+- History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
+  rows; other ids read "a record no longer here".
 
 ## How to check the state yourself
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 202 tests, build
+npm run check        # dash check, lint, typecheck, 228 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e` (see
@@ -147,6 +166,8 @@ above).
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 14 October 2026. M7 (reports as functions that refuse staff, expenses with receipts for managers only, CSV
+  downloads, history of changes); e2e walk extended to 25 tests.
 - 14 October 2026. M6 (pet and parent pages, search, vaccination warnings, incidents, people, invitation links,
   merging parents); fixed another vanishing success message (incident buttons).
 - 14 October 2026. M4 (bills, payments, UPI QR, printing; staff issue only bills that match the booking) and M5

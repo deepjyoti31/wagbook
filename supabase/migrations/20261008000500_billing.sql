@@ -629,8 +629,8 @@ create table public.expenses (
   org_id uuid not null references public.organizations (id) on delete cascade,
   spent_on date not null,
   category text not null check (char_length(category) between 1 and 60),
-  vendor text,
-  description text,
+  vendor text check (vendor is null or char_length(vendor) <= 120),
+  description text check (description is null or char_length(description) <= 500),
   amount_minor bigint not null check (amount_minor > 0),
   method public.payment_method,
   booking_id uuid,
@@ -644,6 +644,8 @@ create table public.expenses (
 
 comment on table public.expenses is 'Money the kennel spent: food, staff, repairs, vet bills. Owners and managers only.';
 comment on column public.expenses.booking_id is 'Set when the expense was for one pet''s stay, e.g. a vet visit.';
+comment on column public.expenses.category is 'What it was for, in the kennel''s own words: Food, Staff, Rent. Reports total by this.';
+comment on column public.expenses.receipt_path is 'Photo or PDF of the receipt in storage, under {org_id}/expenses/. Only owners and managers can open it.';
 comment on column public.expenses.is_reimbursable is 'True when the parent should pay this back; add it to the booking as an item.';
 
 create index expenses_org_date_idx on public.expenses (org_id, spent_on desc);

@@ -7,6 +7,7 @@
 --     {org_id}/pets/{pet_id}/profile.jpg
 --     {org_id}/vaccinations/{vaccination_id}.pdf
 --     {org_id}/updates/{update_id}/1.jpg
+--     {org_id}/expenses/{expense_id}.jpg     (owners and managers only)
 -- The first folder decides who can see the file. Nothing is public; pages
 -- that show a photo ask for a short-lived signed link.
 -- =============================================================================
@@ -35,10 +36,26 @@ comment on function public.storage_org_id(text) is
 revoke all on function public.storage_org_id(text) from public, anon;
 grant execute on function public.storage_org_id(text) to authenticated;
 
+-- Receipts ({org_id}/expenses/...) are the kennel's own money, and expenses
+-- are for owners and managers only, so their files are too.
 create policy pet_media_select on storage.objects for select to authenticated
-  using (bucket_id = 'pet-media' and public.storage_org_id(name) in (select public.my_org_ids()));
+  using (
+    bucket_id = 'pet-media'
+    and public.storage_org_id(name) in (select public.my_org_ids())
+    and (
+      split_part(name, '/', 2) <> 'expenses'
+      or public.storage_org_id(name) in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+    )
+  );
 create policy pet_media_insert on storage.objects for insert to authenticated
-  with check (bucket_id = 'pet-media' and public.storage_org_id(name) in (select public.my_org_ids()));
+  with check (
+    bucket_id = 'pet-media'
+    and public.storage_org_id(name) in (select public.my_org_ids())
+    and (
+      split_part(name, '/', 2) <> 'expenses'
+      or public.storage_org_id(name) in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+    )
+  );
 -- Replacing or renaming a file is as destructive as deleting it, so both are
 -- for owners and managers. Staff add files; they do not change them.
 create policy pet_media_update on storage.objects for update to authenticated

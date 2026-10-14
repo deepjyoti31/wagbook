@@ -346,3 +346,24 @@ need phone sign-in, which Wagbook does not have.
 **Cost.** A forwarded link lets someone else join, once, in that role. The new member appears on People at once and can
 be suspended or removed. See `05`, known limitations.
 
+## D20. Reports are database functions that refuse staff; downloads are CSV
+
+**Status:** Decided, 14 October 2026 (milestone M7).
+
+**Situation.** The roadmap asks for reports as views or functions that obey row level security. Staff can already
+read bookings, bills and payments one by one (they run the day), but expenses are for owners and managers, and a
+kennel's takings in one number are the owner's business.
+
+**Decision.** Each report is a `security invoker` function taking the kennel and a period. Before anything else it
+calls `check_report_access()`, which raises `WB060` unless the caller is an owner or manager of that kennel, and
+`WB061` for a period over 400 days. Charts are plain HTML and CSS. Downloads are CSV files built by
+`src/lib/core/csv.ts`, with a byte order mark for Excel and formula-looking text defused; no spreadsheet library.
+
+**Why.** Invoker functions keep row level security in force, so a mistake in a report cannot show another kennel's
+rows. The explicit refusal makes "staff do not see reports" a database rule with a test, rather than a hidden menu
+item, and it means staff get a clear sentence rather than a page of zeros (they cannot see expenses, so their numbers
+would be wrong, not just private). CSV opens everywhere an accountant works and needs no dependency.
+
+**Cost.** Staff cannot see even how full the kennel was last month; the calendar shows the days ahead. A view with
+`security_invoker` would have been simpler to query from PostgREST, but could not take a period or refuse anyone.
+

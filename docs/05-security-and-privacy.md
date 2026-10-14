@@ -50,11 +50,12 @@ In summary:
 | Files (photos, certificates) | Add; never replace or remove | Also replace and remove | Same |
 | Void an invoice | No | Yes, with a reason | Yes |
 | Payments received | Read, add | Also refunds, corrections, removal | Same |
-| Expenses | Nothing | Everything | Everything |
+| Expenses, and their receipt files | Nothing | Everything | Everything |
+| Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
 | Forms from parents | Read; accept or decline, once | Also delete | Same |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
-| Audit log | Nothing | Read | Read |
+| Audit log (History of changes) | Nothing | Read | Read |
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
 out: a booking's check-in and check-out stamps, its creator and its link token; an invoice's status, number, dates,
@@ -222,6 +223,21 @@ issued bills to another parent through a session flag that only it sets, while t
 signed-out visitor nothing about the kennel. Checked: `tests/db/people.test.ts`, each rule removed once to see its test
 fail; the end-to-end walk joins a new account through a link, uses it once, and suspends and restores it.
 
+### 14 October 2026: reports, expenses and downloads
+
+What changed: four report functions (`report_occupancy`, `report_money`, `report_tax`, `report_extras`). They run as
+the caller (security invoker), so row level security still applies, and each first calls `check_report_access()`,
+which refuses anyone who is not an owner or manager of the kennel asked about (`WB060`) and any period longer than
+400 days (`WB061`); every query in them filters by the kennel, so a member of two kennels never gets the other's
+numbers. Receipt files (`{org_id}/expenses/...`) are now for owners and managers only in the storage policies, like
+the expenses table. CSV downloads (`/app/more/reports/download`) are for owners and managers, sent with
+`Cache-Control: private, no-store`, and every text cell that a spreadsheet would run as a formula (starting with `=`,
+`+`, `-`, `@`, a tab or a carriage return) gets a leading apostrophe, because names typed on the public intake form
+reach these files. Checked: `tests/db/reports.test.ts` (staff, another kennel, a stranger and the anonymous role are
+refused; a member of both kennels sees only the one asked about; staff cannot add or see a receipt file), with the role
+check and the receipt rule each removed once to see the tests fail; `src/lib/core/reports.test.ts` for the CSV
+escaping; the end-to-end walk checks that staff get the refusal sentence and a 403 from the download.
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -232,7 +248,7 @@ These are real. Do not describe Wagbook as free of them.
 | Intake flood limits are per kennel and per phone number, not per visitor | A determined attacker can fill a kennel's hourly quota and block real parents for that hour | M9: rate limiting at the edge, or a challenge |
 | No script-src Content Security Policy | An injected script would run. React's escaping is the only defence. | M9: nonces |
 | Server Actions accept bodies up to 12 MB | Needed for photos and certificates; any action, including the public intake form, can be sent that much | M9: limits at the edge |
-| A photo replaced by a new one, or a draft's update that failed, can leave a file nobody points at | Storage use grows a little; staff cannot delete files by design | M7 or M8: a manager's clean-up |
+| A photo replaced by a new one, a draft's update that failed, or a removed expense can leave a file nobody points at | Storage use grows a little; staff cannot delete files by design | M9: a manager's clean-up |
 | A photo sent without JavaScript is stored as taken (only its hidden data removed) | It may show sideways and is larger | Most phones run the page's JavaScript; the photo still works |
 | The intake form does not take certificate uploads yet | Parents send certificates on WhatsApp; staff add them at check-in | M9, together with rate limits at the edge, because anonymous uploads would multiply the intake flood risk |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |

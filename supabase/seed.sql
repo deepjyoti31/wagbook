@@ -170,6 +170,11 @@ begin
   insert into public.stay_updates (org_id, booking_id, pet_id, body)
   values (v_org, v_booking, v_pet[1], 'Biscuit ate all his breakfast and had a long sniff around Yard A.');
 
+  -- What the kennel spent lately, for Reports and Expenses (invented shops).
+  insert into public.expenses (org_id, spent_on, category, vendor, amount_minor, method) values
+    (v_org, v_today - 3, 'Food', 'Demo pet supplies', 840000, 'upi'),
+    (v_org, v_today - 1, 'Cleaning', 'Demo hardware', 125000, 'cash');
+
   perform set_config('request.jwt.claim.sub', '', true);
 end;
 $$;

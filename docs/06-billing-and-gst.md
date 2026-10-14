@@ -190,12 +190,14 @@ Write the answers in your own records, not in this repository.
 5. Is `PREFIX/YY-YY/NNNN` acceptable as my invoice series?
 6. Does a voided invoice need a credit note instead once I am registered? (Wagbook does not produce credit notes yet.)
 7. What must I keep, and for how long?
+8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. Is that
+   the figure my return needs, or should a cancellation count in the month it happened?
 
 ## Not built
 
 - Credit notes and debit notes.
 - E-invoicing and e-way bills.
-- GST return exports.
+- GST return exports. Reports gives tax by rate for a month and a CSV of bills, for the accountant to work from.
 - Multiple tax rates on one stay line.
 - Currencies other than the kennel's own on a single invoice.
 

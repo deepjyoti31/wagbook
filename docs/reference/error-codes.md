@@ -16,6 +16,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB030 to WB039 | Invoices |
 | WB040 to WB049 | The public intake form |
 | WB050 to WB059 | Bills and payments (continued) |
+| WB060 to WB069 | Reports and expenses |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -59,3 +60,5 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB049` | this form has already been dealt with<br>this form was declined and cannot be accepted | `20261008000600_intake_and_public_pages.sql` |
 | `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
 | `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
+| `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
+| `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |

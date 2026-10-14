@@ -1720,6 +1720,10 @@ export type Database = {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
       };
+      check_report_access: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: undefined;
+      };
       create_invitation_link: {
         Args: { p_org: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
         Returns: string;
@@ -1795,6 +1799,22 @@ export type Database = {
       paths_in_org: {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
+      };
+      report_extras: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { name: string; stays: number; quantity: number; amount_minor: number }[];
+      };
+      report_money: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { month: string; billed_minor: number; tax_minor: number; bills: number; received_minor: number; refunded_minor: number; spent_minor: number }[];
+      };
+      report_occupancy: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { day: string; boarding: number; day_boarding: number; capacity: number }[];
+      };
+      report_tax: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { tax_rate_bp: number; bills: number; taxable_minor: number; cgst_minor: number; sgst_minor: number; igst_minor: number; tax_minor: number }[];
       };
       respond_to_invitation: {
         Args: { p_org: string; p_accept: boolean };

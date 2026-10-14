@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 24. Views: 1. Functions: 47.
+Migrations applied: 10. Tables: 24. Views: 1. Functions: 52.
 
 ## Contents
 
@@ -379,14 +379,14 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
 | `spent_on` | `date` | yes |  |  |
-| `category` | `text` | yes |  |  |
+| `category` | `text` | yes |  | What it was for, in the kennel's own words: Food, Staff, Rent. Reports total by this. |
 | `vendor` | `text` |  |  |  |
 | `description` | `text` |  |  |  |
 | `amount_minor` | `bigint` | yes |  |  |
 | `method` | `payment_method` |  |  |  |
 | `booking_id` | `uuid` |  |  | Set when the expense was for one pet's stay, e.g. a vet visit. |
 | `is_reimbursable` | `boolean` | yes | `false` | True when the parent should pay this back; add it to the booking as an item. |
-| `receipt_path` | `text` |  |  |  |
+| `receipt_path` | `text` |  |  | Photo or PDF of the receipt in storage, under {org_id}/expenses/. Only owners and managers can open it. |
 | `recorded_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -399,7 +399,9 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 - Foreign key `expenses_recorded_by_fkey`: `FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Check `expenses_amount_minor_check`: `CHECK ((amount_minor > 0))`
 - Check `expenses_category_check`: `CHECK (((char_length(category) >= 1) AND (char_length(category) <= 60)))`
+- Check `expenses_description_check`: `CHECK (((description IS NULL) OR (char_length(description) <= 500)))`
 - Check `expenses_receipt_in_org`: `CHECK (paths_in_org(ARRAY[receipt_path], org_id))`
+- Check `expenses_vendor_check`: `CHECK (((vendor IS NULL) OR (char_length(vendor) <= 120)))`
 
 **Indexes**
 
@@ -1422,6 +1424,18 @@ bookings_stamp_status() returns trigger
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
 
+### check_report_access
+
+```
+check_report_access(p_org uuid, p_from date, p_to date) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Raises unless the caller is an owner or manager of the organisation and the period runs forwards for at most 400 days. Every report calls it first.
+
 ### create_invitation_link
 
 ```
@@ -1721,6 +1735,54 @@ protect_last_owner() returns trigger
 - Volatility: volatile
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
+
+### report_extras
+
+```
+report_extras(p_org uuid, p_from date, p_to date) returns TABLE(name text, stays integer, quantity numeric, amount_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The extras sold on stays that start in the period, biggest first (at most 20): how many stays had each, how many in all, and their value at the price charged, before discount and tax. Extras from the price list are grouped by its current name; one-off items by their description. Owners and managers only.
+
+### report_money
+
+```
+report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+For each month in the period: what was billed (issued bills by bill date; cancelled bills left out) and the tax in it, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
+
+### report_occupancy
+
+```
+report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boarding integer, day_boarding integer, capacity integer)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+For each day: pets staying the night (boarding), pets in for the day (day boarding), and kennels in service today. Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
+
+### report_tax
+
+```
+report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Tax on issued bills in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST). Bills are counted by bill date; cancelled bills are left out. Owners and managers only.
 
 ### respond_to_invitation
 

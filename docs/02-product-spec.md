@@ -46,6 +46,9 @@ One person can belong to several kennels, with a different role in each.
 /app/more/play        Play yards, play hours, yard calculator        signed in
 /app/more/extras      Extras on the price list                       signed in
 /app/more/peak        Peak periods                                   signed in
+/app/more/reports     Reports and CSV downloads                      owners and managers
+/app/more/expenses    Expenses with receipts                         owners and managers
+/app/more/history     History of changes (the audit log)             owners and managers
 /app/more/people      People and invitations                         signed in
 /app/more/settings    Kennel details, prices, UPI, tax, region, intake signed in
 /app/bills            Bills: owed, drafts, recent                    signed in
@@ -57,8 +60,6 @@ One person can belong to several kennels, with a different role in each.
 ```
 
 /join/{token}         Join a kennel with an invitation link          public, then signed in
-
-Planned routes: `/app/more/reports`, `/app/more/expenses`.
 
 The folder is called `dogs` because that is what almost every kennel calls them; the screen says "Pets" because cats
 board too. Leave both as they are.
@@ -375,13 +376,34 @@ owners and managers can record a refund. On a booking before its bill: Record ad
 advances for that stay, and payments on a cancelled bill move to the next one for the same stay. Wagbook records
 payments; it never moves money.
 
-### E4. Expenses. Database ready. Screen planned (M7).
+### E4. Expenses. Built.
 
-What the kennel spent, by category, with a receipt photo.
+`/app/more/expenses`, owners and managers only: amount, what it was for (common words offered, any word allowed), date,
+how it was paid, shop or person, a note, and a photo or PDF of the receipt. The month's total and its total for each
+kind of expense, then each expense with its receipt; one written down by mistake can be removed (the history of
+changes keeps it). Receipt files are for owners and managers only, like the expenses.
 
-### E5. Reports. Planned (M7).
+### E5. Reports. Built.
 
-Occupancy by day and month, income by month, what is owed, GST collected by rate, export to a spreadsheet.
+`/app/more/reports`, owners and managers only, one month at a time:
+
+- How full: nights sold, day boarding days, kennels used as a share of kennels available, the busiest day, and a bar
+  for each day (with the same numbers in a table). Counts confirmed, current and finished stays; kennels are the ones
+  in service today.
+- Money in the month: billed (issued bills by bill date, cancelled ones left out, with the tax in them), received,
+  refunded, spent, and received less spent; what is owed on bills today; the last twelve months side by side.
+- Tax by rate from the month's issued bills (CGST, SGST and IGST under India GST).
+- Extras that sell, on stays starting in the month.
+- Download for a spreadsheet: bookings, bills, payments or expenses for up to 400 days, as a CSV file.
+
+The numbers come from database functions (`report_occupancy`, `report_money`, `report_tax`, `report_extras`) that
+refuse anyone who is not an owner or manager of the kennel.
+
+### E6. History of changes. Built.
+
+`/app/more/history`, owners and managers only: the audit log in words, newest first. "Booking changed" by whom and
+when, with each field as it was and as it is now; filter by kind of record and by person; a link to the booking, bill
+or pet where there is one.
 
 ---
 
@@ -416,7 +438,7 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Install to the phone's home screen (web app manifest, icons) | Built |
 | Works offline or on a bad connection | Planned (M8) |
 | Languages other than English | Planned (M8) |
-| Audit log of every change to bookings, money, settings and people | Database ready. Viewer planned (M7). |
+| Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Planned (M8) |
 | Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase |
 
