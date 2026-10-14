@@ -11,6 +11,8 @@ export const metadata: Metadata = { title: "More" };
 
 const LINKS = [
   { href: "/app/bills", title: "Bills", about: "What parents owe, bills to send, and payments." },
+  { href: "/app/more/reports", title: "Reports", about: "How full you were, money in and out, tax, and downloads. Owners and managers." },
+  { href: "/app/more/expenses", title: "Expenses", about: "What the kennel spent, with receipts. Owners and managers." },
   { href: "/app/more/intake", title: "Forms from parents", about: "Review what parents sent, and share your intake link." },
   { href: "/app/more/kennels", title: "Kennels", about: "Add kennels and take them in or out of service." },
   { href: "/app/more/people", title: "People", about: "See who works here and invite your team." },
@@ -19,6 +21,7 @@ const LINKS = [
   { href: "/app/more/extras", title: "Extras", about: "Grooming, pick-up and anything else you charge for." },
   { href: "/app/more/peak", title: "Peak periods", about: "Festivals and long weekends, with your no-refund rule." },
   { href: "/app/more/settings", title: "Settings", about: "Kennel details, prices, tax and UPI." },
+  { href: "/app/more/history", title: "History of changes", about: "Who changed what, and when. Owners and managers." },
 ] as const;
 
 export default function MorePage() {

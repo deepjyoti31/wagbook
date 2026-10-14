@@ -463,3 +463,67 @@ test("someone with no account joins with an invite link, and is suspended and re
   await expect(kiran.page.getByText(/in house of 12 kennels/)).toBeVisible();
   await kiran.context.close();
 });
+
+test("a manager writes down an expense with its receipt; staff see no money reports", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/expenses");
+  await page.getByLabel("Amount").fill("1250.50");
+  await page.getByLabel("What for").fill("Vet and medicines");
+  await page.getByLabel("Shop or person").fill("Demo Vet Clinic");
+  const receipt = await photoWithLocation(page);
+  await page.locator("input[name=receipt]").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: receipt });
+  await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
+  await page.getByRole("button", { name: "Add expense" }).click();
+  await expect(page.getByText("Expense written down.")).toBeVisible();
+  const row = page.getByRole("listitem").filter({ hasText: "Demo Vet Clinic" });
+  await expect(row).toContainText("₹1,250.50");
+  const receiptUrl = (await row.getByRole("link", { name: "See receipt" }).getAttribute("href"))!;
+  expect((await page.request.get(receiptUrl)).status()).toBe(200);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  const staff = await privateWindow(browser);
+  await signIn(staff.page, "staff");
+  for (const path of ["/app/more/reports", "/app/more/expenses", "/app/more/history"]) {
+    await staff.page.goto(path);
+    await expect(staff.page.getByText(/for owners and managers\.$/)).toBeVisible();
+  }
+  const csv = await staff.page.request.get(`/app/more/reports/download?what=expenses&from=${day(-30)}&to=${day(0)}`);
+  expect(csv.status()).toBe(403);
+  await staff.context.close();
+});
+
+test("reports add up the month, and downloads open in a spreadsheet", async ({ page }) => {
+  await signIn(page, "owner");
+  // The month Biscuit's stay (with grooming) began.
+  await page.goto(`/app/more/reports?month=${day(-2).slice(0, 7)}`);
+  await expect(page.getByText("Nights sold")).toBeVisible();
+  await expect(page.getByText(/Pets in each day\. The top line is all 12 kennels full\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Money in / })).toBeVisible();
+  await expect(page.getByText("Grooming")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByText("See each day").click();
+  await expect(page.getByRole("columnheader", { name: "Overnight" })).toBeVisible();
+
+  const get = (what: string) => page.request.get(`/app/more/reports/download?what=${what}&from=${day(-40)}&to=${day(30)}`);
+  const expenses = await get("expenses");
+  expect(expenses.headers()["content-type"]).toContain("text/csv");
+  expect(expenses.headers()["content-disposition"]).toContain("attachment");
+  const text = await expenses.text();
+  expect(text.startsWith("﻿Date,What for,")).toBe(true);
+  expect(text).toContain("Vet and medicines,Demo Vet Clinic,,1250.50");
+  expect(await (await get("bills")).text()).toMatch(/WB\/\d{2}-\d{2}\/\d{4}/);
+  expect(await (await get("bookings")).text()).toContain("Biscuit");
+  expect((await (await get("payments")).text()).split("\r\n").length).toBeGreaterThan(3);
+  expect((await page.request.get(`/app/more/reports/download?what=bills&from=${day(0)}&to=${day(-1)}`)).status()).toBe(400);
+});
+
+test("the history of changes says who changed a price", async ({ page }) => {
+  await signIn(page, "owner");
+  await page.goto("/app/more/history");
+  await page.getByLabel("What").selectOption({ label: "Booking" });
+  await page.getByLabel("Who").selectOption({ label: "Ravi" });
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(page.getByText(/^Ravi, /).first()).toBeVisible();
+  await expect(page.getByText(/^Rate: was ₹1,200, now/).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
