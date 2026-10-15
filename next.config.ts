@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Photos and certificates are sent to Server Actions. The browser shrinks
+      // photos first (a few hundred kilobytes each), but a phone without
+      // JavaScript sends them as taken, and a certificate PDF may be large.
+      // The storage bucket's own limit is 10 MB a file.
+      bodySizeLimit: "12mb",
+    },
+  },
   turbopack: {
     rules: {
       "*.css": {

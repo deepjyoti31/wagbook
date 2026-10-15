@@ -1,24 +1,41 @@
 "use server";
 
+import type { z } from "zod";
 import { isISODate, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { parentI18n, type I18n } from "@/lib/i18n-server";
 import { IntakePayload } from "@/lib/intake";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
 
 const MAX_PETS = 6;
 
+/** The sentence for the first thing wrong with the form, in the parent's language. */
+function issueText(issue: z.core.$ZodIssue, m: I18n["m"]): string {
+  const e = m.intakeForm.errors;
+  const [first, , field] = issue.path;
+  if (first === "parent" && issue.path[1] === "name") return e.name;
+  if (first === "parent" && issue.path[1] === "phone") return e.phone;
+  if (first === "pets" && issue.path.length === 1) return issue.code === "too_big" ? e.atMostSixPets : e.atLeastOnePet;
+  if (first === "pets" && field === "name") return e.petName;
+  if (first === "consent") return e.consent;
+  return m.errors.codes.WB041;
+}
+
 /**
  * The public intake form. Runs with no signed-in user: it can only call
  * submit_intake(), which validates everything again inside the database.
- * Bound to the kennel's slug by the page.
+ * Bound by the page to the kennel's slug and its language for parents (which
+ * only decides the language of the sentences sent back).
  */
-export async function submitIntake(slug: string, _state: FormState, form: FormData): Promise<FormState> {
-  if (!isSupabaseConfigured()) return { error: "This form is not available right now." };
+export async function submitIntake(slug: string, language: string, _state: FormState, form: FormData): Promise<FormState> {
+  const t = parentI18n(language);
+  const e = t.m.intakeForm.errors;
+  if (!isSupabaseConfigured()) return { error: e.unavailable };
 
   const phone = normalizePhone(text(form, "parent_phone") ?? "");
-  if (!phone) return { error: "Enter a valid mobile number. Outside India, include the country code, like +14155552671." };
+  if (!phone) return { error: e.phone };
 
   const pets = [];
   for (let i = 0; i < MAX_PETS; i++) {
@@ -67,12 +84,12 @@ export async function submitIntake(slug: string, _state: FormState, form: FormDa
     },
     consent: checked(form, "consent"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return { error: issueText(parsed.error.issues[0], t.m) };
   if (parsed.data.stay.start_date && parsed.data.stay.end_date && parsed.data.stay.end_date < parsed.data.stay.start_date) {
-    return { error: "Check-out is before check-in." };
+    return { error: e.datesOrder };
   }
 
   const { error } = await createAnonClient().rpc("submit_intake", { p_slug: slug, p_payload: parsed.data });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
   return { ok: "sent" };
 }

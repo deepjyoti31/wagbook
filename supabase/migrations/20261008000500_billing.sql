@@ -87,6 +87,10 @@ comment on column public.invoices.total_minor is 'What the customer owes: taxabl
 comment on column public.invoices.public_token is 'Secret in the invoice link sent to the parent (/inv/{token}).';
 
 create index invoices_org_issued_idx on public.invoices (org_id, issued_on desc);
+-- One bill per stay at a time: a stay is billed again only after its bill is voided.
+create unique index invoices_one_live_per_booking on public.invoices (org_id, booking_id)
+  where booking_id is not null and status <> 'void';
+comment on index public.invoices_one_live_per_booking is 'A booking has at most one draft or issued invoice, so a stay cannot be billed twice.';
 create index invoices_org_client_idx on public.invoices (org_id, client_id);
 create index invoices_org_booking_idx on public.invoices (org_id, booking_id);
 
@@ -148,6 +152,11 @@ declare
   -- void_invoice only) and the link to a booking that is being deleted.
   v_ignore text[] := array['status', 'voided_at', 'voided_by', 'void_reason', 'updated_at', 'booking_id'];
 begin
+  -- Merging two parents (merge_clients) moves issued bills to the parent who
+  -- stays. The buyer printed on the bill is frozen and does not change.
+  if coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    v_ignore := array_append(v_ignore, 'client_id');
+  end if;
   if tg_op = 'DELETE' then
     if old.status <> 'draft' and exists (select 1 from public.organizations o where o.id = old.org_id) then
       raise exception 'WB030: an issued invoice cannot be deleted. Void it instead.' using errcode = '23514';
@@ -255,6 +264,27 @@ create trigger invoice_lines_guard
 -- ---------------------------------------------------------------------------
 -- Issuing and voiding
 -- ---------------------------------------------------------------------------
+
+create function public.invoice_expected_lines(p_booking uuid, p_tax_mode public.tax_mode)
+returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+language sql
+stable
+set search_path = ''
+as $$
+  select
+    (case when b.kind = 'daycare' then b.end_date - b.start_date + 1 else b.end_date - b.start_date end)::numeric(10, 2),
+    b.rate_minor,
+    b.discount_minor,
+    case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end
+  from public.bookings b
+  where b.id = p_booking
+  union all
+  select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
+  from public.booking_items bi
+  where bi.booking_id = p_booking;
+$$;
+comment on function public.invoice_expected_lines(uuid, public.tax_mode) is
+  'The lines a bill for a booking should have, as quantity, unit price, discount and tax rate: the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.';
 
 create function public.issue_invoice(p_invoice uuid)
 returns public.invoices
@@ -378,6 +408,28 @@ begin
     raise exception 'WB037: the round off is not what the kennel''s rounding setting gives' using errcode = '23514';
   end if;
 
+  -- Staff issue a bill only as its booking prices it: the stay line at the
+  -- booked rate, discount and tax, plus each extra at its own price, nothing
+  -- more and nothing less. A bill that was edited is issued by an owner or
+  -- manager. The same rule as bookings_guard_price() (docs/09-decisions.md, D15).
+  if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    if v_inv.booking_id is null
+       or not exists (select 1 from public.bookings b where b.id = v_inv.booking_id and b.client_id = v_inv.client_id)
+       or exists (
+         (select * from public.invoice_expected_lines(v_inv.booking_id, v_org.tax_mode))
+         except all
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+       )
+       or exists (
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+         except all
+         (select * from public.invoice_expected_lines(v_inv.booking_id, v_org.tax_mode))
+       )
+    then
+      raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
+    end if;
+  end if;
+
   v_today := (now() at time zone v_org.time_zone)::date;
   v_fy := public.fiscal_year_label(v_today, v_org.fiscal_year_start_month);
 
@@ -437,11 +489,22 @@ begin
   returning * into v_inv;
   perform set_config('wagbook.issuing', 'off', true);
 
+  -- Money already received for this stay counts against its bill: advances,
+  -- and anything paid against an earlier bill for it that was voided.
+  if v_inv.booking_id is not null then
+    update public.payments p
+    set invoice_id = v_inv.id
+    where p.org_id = v_inv.org_id
+      and p.booking_id = v_inv.booking_id
+      and (p.invoice_id is null
+           or p.invoice_id in (select i.id from public.invoices i where i.org_id = v_inv.org_id and i.status = 'void'));
+  end if;
+
   return v_inv;
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Any member may issue.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -475,6 +538,46 @@ begin
   return v_inv;
 end;
 $$;
+create function public.save_invoice_draft(p_invoice uuid, p_totals jsonb, p_lines jsonb)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_org uuid;
+begin
+  -- Row level security applies (security invoker): only a member reaches the invoice.
+  update public.invoices i
+  set subtotal_minor = (p_totals ->> 'subtotal_minor')::bigint,
+      discount_minor = (p_totals ->> 'discount_minor')::bigint,
+      taxable_minor = (p_totals ->> 'taxable_minor')::bigint,
+      cgst_minor = (p_totals ->> 'cgst_minor')::bigint,
+      sgst_minor = (p_totals ->> 'sgst_minor')::bigint,
+      igst_minor = (p_totals ->> 'igst_minor')::bigint,
+      tax_minor = (p_totals ->> 'tax_minor')::bigint,
+      round_off_minor = (p_totals ->> 'round_off_minor')::bigint,
+      total_minor = (p_totals ->> 'total_minor')::bigint
+  where i.id = p_invoice and i.status = 'draft'
+  returning i.org_id into v_org;
+  if v_org is null then
+    raise exception 'WB051: only a draft bill can be changed' using errcode = 'P0002';
+  end if;
+
+  delete from public.invoice_lines l where l.invoice_id = p_invoice;
+  insert into public.invoice_lines (org_id, invoice_id, sort_order, description, sac_code, quantity, unit_price_minor,
+                                    discount_minor, taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor)
+  select v_org, p_invoice, x.sort_order, x.description, x.sac_code, x.quantity, x.unit_price_minor, x.discount_minor,
+         x.taxable_minor, x.tax_rate_bp, x.cgst_minor, x.sgst_minor, x.igst_minor, x.tax_minor, x.total_minor
+  from jsonb_to_recordset(p_lines) as x (
+    sort_order integer, description text, sac_code text, quantity numeric, unit_price_minor bigint, discount_minor bigint,
+    taxable_minor bigint, tax_rate_bp integer, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint,
+    total_minor bigint
+  );
+end;
+$$;
+comment on function public.save_invoice_draft(uuid, jsonb, jsonb) is
+  'Replaces a draft invoice''s lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.';
+
 comment on function public.void_invoice(uuid, text) is
   'Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it.';
 
@@ -526,8 +629,8 @@ create table public.expenses (
   org_id uuid not null references public.organizations (id) on delete cascade,
   spent_on date not null,
   category text not null check (char_length(category) between 1 and 60),
-  vendor text,
-  description text,
+  vendor text check (vendor is null or char_length(vendor) <= 120),
+  description text check (description is null or char_length(description) <= 500),
   amount_minor bigint not null check (amount_minor > 0),
   method public.payment_method,
   booking_id uuid,
@@ -541,6 +644,8 @@ create table public.expenses (
 
 comment on table public.expenses is 'Money the kennel spent: food, staff, repairs, vet bills. Owners and managers only.';
 comment on column public.expenses.booking_id is 'Set when the expense was for one pet''s stay, e.g. a vet visit.';
+comment on column public.expenses.category is 'What it was for, in the kennel''s own words: Food, Staff, Rent. Reports total by this.';
+comment on column public.expenses.receipt_path is 'Photo or PDF of the receipt in storage, under {org_id}/expenses/. Only owners and managers can open it.';
 comment on column public.expenses.is_reimbursable is 'True when the parent should pay this back; add it to the booking as an item.';
 
 create index expenses_org_date_idx on public.expenses (org_id, spent_on desc);
@@ -579,3 +684,65 @@ left join lateral (
 ) p on true;
 
 comment on view public.invoice_balances is 'Each invoice with what has been paid against it and what is still due.';
+
+-- ---------------------------------------------------------------------------
+-- Merging two parents who turn out to be the same person.
+-- ---------------------------------------------------------------------------
+
+create function public.merge_clients(p_keep uuid, p_merge uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_keep public.clients;
+  v_merge public.clients;
+begin
+  -- SECURITY DEFINER: issued bills are frozen against every edit, including
+  -- their parent. Merging is the one thing allowed to move them, so it runs
+  -- with that permission and checks the caller itself.
+  select * into v_keep from public.clients c where c.id = p_keep for update;
+  select * into v_merge from public.clients c where c.id = p_merge for update;
+  if v_keep.id is null or v_merge.id is null or v_keep.id = v_merge.id or v_keep.org_id <> v_merge.org_id
+     or v_keep.deleted_at is not null or v_merge.deleted_at is not null
+     or v_keep.org_id not in (select public.my_org_ids()) then
+    raise exception 'WB018: choose two different parents of this kennel' using errcode = '22023';
+  end if;
+  if v_keep.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    raise exception 'WB002: only an owner or manager can merge parents' using errcode = '42501';
+  end if;
+
+  -- Pets, and with them their bookings (on update cascade).
+  update public.pets p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
+  -- Anything else that names the parent.
+  update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
+  perform set_config('wagbook.merging', 'on', true);
+  update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
+  perform set_config('wagbook.merging', 'off', true);
+  update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
+  update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
+
+  -- Fill in what the kept parent is missing, and keep both sets of notes.
+  update public.clients c set
+    alt_phone = coalesce(c.alt_phone, case when v_merge.phone <> c.phone then v_merge.phone end, v_merge.alt_phone),
+    email = coalesce(c.email, v_merge.email),
+    address = coalesce(c.address, v_merge.address),
+    city = coalesce(c.city, v_merge.city),
+    postal_code = coalesce(c.postal_code, v_merge.postal_code),
+    gst_state_code = coalesce(c.gst_state_code, v_merge.gst_state_code),
+    tax_id = coalesce(c.tax_id, v_merge.tax_id),
+    emergency_name = coalesce(c.emergency_name, v_merge.emergency_name),
+    emergency_phone = coalesce(c.emergency_phone, v_merge.emergency_phone),
+    notes = nullif(concat_ws(E'\n', c.notes, v_merge.notes), ''),
+    consent_at = coalesce(c.consent_at, v_merge.consent_at),
+    consent_source = coalesce(c.consent_source, v_merge.consent_source)
+  where c.id = v_keep.id;
+
+  -- The other record is hidden, not deleted: the audit log still names it.
+  update public.clients c set deleted_at = now() where c.id = v_merge.id;
+  return v_keep.id;
+end;
+$$;
+comment on function public.merge_clients(uuid, uuid) is
+  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';

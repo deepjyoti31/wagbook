@@ -141,6 +141,9 @@ export type Database = {
           cancelled_at: string | null;
           cancel_reason: string | null;
           belongings: string | null;
+          gate_notes: string | null;
+          vaccinations_checked_at: string | null;
+          vaccinations_checked_by: string | null;
           notes: string | null;
           source: string;
           group_id: string | null;
@@ -172,6 +175,9 @@ export type Database = {
           cancelled_at?: string | null;
           cancel_reason?: string | null;
           belongings?: string | null;
+          gate_notes?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
           notes?: string | null;
           source?: string;
           group_id?: string | null;
@@ -203,6 +209,9 @@ export type Database = {
           cancelled_at?: string | null;
           cancel_reason?: string | null;
           belongings?: string | null;
+          gate_notes?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
           notes?: string | null;
           source?: string;
           group_id?: string | null;
@@ -675,6 +684,56 @@ export type Database = {
           },
         ];
       };
+      invitation_links: {
+        Row: {
+          id: string;
+          org_id: string;
+          token: string;
+          role: Database["public"]["Enums"]["member_role"];
+          display_name: string;
+          created_by: string | null;
+          created_at: string;
+          expires_at: string;
+          used_at: string | null;
+          used_by: string | null;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          token?: string;
+          role: Database["public"]["Enums"]["member_role"];
+          display_name: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          token?: string;
+          role?: Database["public"]["Enums"]["member_role"];
+          display_name?: string;
+          created_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+          revoked_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitation_links_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invoice_counters: {
         Row: {
           org_id: string;
@@ -954,6 +1013,7 @@ export type Database = {
           role: Database["public"]["Enums"]["member_role"];
           display_name: string;
           phone: string | null;
+          language: string;
           is_active: boolean;
           accepted_at: string | null;
           invited_by: string | null;
@@ -966,6 +1026,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["member_role"];
           display_name: string;
           phone?: string | null;
+          language?: string;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -978,6 +1039,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["member_role"];
           display_name?: string;
           phone?: string | null;
+          language?: string;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -1028,8 +1090,14 @@ export type Database = {
           allow_overbooking: boolean;
           play_sessions_per_day: number;
           play_session_minutes: number;
+          play_changeover_minutes: number;
+          play_day_start: string;
+          play_day_end: string;
+          play_break_start: string | null;
+          play_break_end: string | null;
           intake_enabled: boolean;
           intake_notice: string | null;
+          parent_language: string;
           created_at: string;
           updated_at: string;
         };
@@ -1066,8 +1134,14 @@ export type Database = {
           allow_overbooking?: boolean;
           play_sessions_per_day?: number;
           play_session_minutes?: number;
+          play_changeover_minutes?: number;
+          play_day_start?: string;
+          play_day_end?: string;
+          play_break_start?: string | null;
+          play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
+          parent_language?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1104,8 +1178,14 @@ export type Database = {
           allow_overbooking?: boolean;
           play_sessions_per_day?: number;
           play_session_minutes?: number;
+          play_changeover_minutes?: number;
+          play_day_start?: string;
+          play_day_end?: string;
+          play_break_start?: string | null;
+          play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
+          parent_language?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1638,16 +1718,28 @@ export type Database = {
         Args: { p_submission: string };
         Returns: string;
       };
+      accept_invitation_link: {
+        Args: { p_token: string };
+        Returns: string;
+      };
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
+      };
+      check_report_access: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: undefined;
+      };
+      create_invitation_link: {
+        Args: { p_org: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
+        Returns: string;
       };
       create_organization: {
         Args: { p_name: string; p_slug: string; p_display_name: string };
         Returns: string;
       };
       default_intake_notice: {
-        Args: { p_org_name: string };
+        Args: { p_org_name: string; p_language: string };
         Returns: string;
       };
       fiscal_year_label: {
@@ -1657,6 +1749,10 @@ export type Database = {
       generate_care_tasks: {
         Args: { p_org: string; p_date: string };
         Returns: number;
+      };
+      get_invitation_link: {
+        Args: { p_token: string };
+        Returns: { org_name: string; role: Database["public"]["Enums"]["member_role"]; display_name: string; usable: boolean; already_member: boolean }[];
       };
       get_public_intake_form: {
         Args: { p_slug: string };
@@ -1674,9 +1770,17 @@ export type Database = {
         Args: { p_org: string; p_email: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
         Returns: undefined;
       };
+      invoice_expected_lines: {
+        Args: { p_booking: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
+        Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
+      };
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
+      merge_clients: {
+        Args: { p_keep: string; p_merge: string };
+        Returns: string;
       };
       my_invitations: {
         Args: Record<PropertyKey, never>;
@@ -1698,6 +1802,26 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { day: string; occupied: number; capacity: number }[];
       };
+      paths_in_org: {
+        Args: { p_paths: string[]; p_org: string };
+        Returns: boolean;
+      };
+      report_extras: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { name: string; stays: number; quantity: number; amount_minor: number }[];
+      };
+      report_money: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { month: string; billed_minor: number; tax_minor: number; bills: number; received_minor: number; refunded_minor: number; spent_minor: number }[];
+      };
+      report_occupancy: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { day: string; boarding: number; day_boarding: number; capacity: number }[];
+      };
+      report_tax: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { tax_rate_bp: number; bills: number; taxable_minor: number; cgst_minor: number; sgst_minor: number; igst_minor: number; tax_minor: number }[];
+      };
       respond_to_invitation: {
         Args: { p_org: string; p_accept: boolean };
         Returns: undefined;
@@ -1705,6 +1829,18 @@ export type Database = {
       safe_date: {
         Args: { p_text: string };
         Returns: string;
+      };
+      save_invoice_draft: {
+        Args: { p_invoice: string; p_totals: Json; p_lines: Json };
+        Returns: undefined;
+      };
+      set_my_language: {
+        Args: { p_language: string };
+        Returns: undefined;
+      };
+      stay_media_visible: {
+        Args: { p_name: string };
+        Returns: boolean;
       };
       stay_range: {
         Args: { p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };

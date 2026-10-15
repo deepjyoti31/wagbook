@@ -7,8 +7,8 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly four things, and can read no table.
-3. A parent's link shows one stay or one bill and nothing else.
+2. Someone who is not signed in can do exactly five things, and can read no table.
+3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
 5. An issued invoice cannot be changed by anyone, including owners.
 6. "Who did it and when" cannot be forged or backdated by the person doing it.
@@ -41,17 +41,21 @@ In summary:
 | Data | Staff | Manager | Owner |
 | --- | --- | --- | --- |
 | Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Also delete | Same as manager |
+| The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
 | A pet's own care routine | Read, add, edit | Also delete | Same |
 | House routines, kennels, rate card, peak periods, play yards | Read | Add, edit, delete | Same |
 | Kennel settings | Read | Edit | Also delete the kennel |
 | Draft invoices and their lines | Read, add, edit; remove lines from a draft | Also delete whole drafts | Same |
-| Issue an invoice | Yes | Yes | Yes |
+| Issue an invoice | Only one whose lines are exactly what its booking says (`WB050`) | Any draft | Same |
+| Files (photos, certificates) | Add; never replace or remove | Also replace and remove | Same |
 | Void an invoice | No | Yes, with a reason | Yes |
 | Payments received | Read, add | Also refunds, corrections, removal | Same |
-| Expenses | Nothing | Everything | Everything |
+| Expenses, and their receipt files | Nothing | Everything | Everything |
+| Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
 | Forms from parents | Read; accept or decline, once | Also delete | Same |
-| People | See colleagues | Invite and manage staff and managers | Also owners |
-| Audit log | Nothing | Read | Read |
+| People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
+| Merge two parents | No | Yes (`merge_clients`) | Same |
+| Audit log (History of changes) | Nothing | Read | Read |
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
 out: a booking's check-in and check-out stamps, its creator and its link token; an invoice's status, number, dates,
@@ -60,7 +64,7 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Four functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+Five functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
 is changed on purpose.
 
 | Function | Returns | Guard |
@@ -69,6 +73,16 @@ is changed on purpose.
 | `submit_intake(slug, payload)` | Nothing useful | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
+| `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
+
+**Photos on the stay page (milestone M5).** A parent has no account, Postgres cannot sign storage links, and the
+service role key is never used. So the stay page asks Storage for signed links as the anonymous role, sending the stay
+token in the `x-wagbook-stay` header. Storage passes request headers to Postgres (`request.headers`), and the policy
+lets the anonymous role read a file only when `stay_media_visible()` says so. The links last an hour. Listing the
+bucket with a stay token shows that stay's shared photos and nothing else; without a token, nothing. Paths stored on
+rows must sit in the row's own organisation's folder (constraints `*_in_org`), so a member of two kennels cannot put
+one kennel's photo on the other's stay. `tests/db/media.test.ts` covers this, and the end-to-end walk checks a real
+photo through real Storage.
 
 A stay page never includes prices, staff notes, medical notes, flags, the parent's phone, or other pets.
 
@@ -180,6 +194,63 @@ fixed, with tests under "second pass" in `tests/db/hardening.test.ts`:
 
 **Add an entry here for every future review**, with the date, who or what reviewed, what was found, and the tests.
 
+### 13 October 2026: price rule and the M2 and M3 screens
+
+What changed: the price guard triggers (D15), the family booking rule, the medicine skip rule, and the screens of
+milestones M2 and M3. Checked: each new rule's test fails when the rule is removed (`bookings_guard_price`,
+`booking_items_guard_price`, `bookings_check_group`, the medicine note constraint). The new triggers are
+`security invoker` and set `search_path = ''`; they read only rows the caller can already read. No new function is
+granted to `anon`. Every new Server Action starts with `requireOrg()`, filters by `org_id`, and repeats the role check
+only to give a sentence (the database is what refuses).
+
+### 14 October 2026: bills, photos and the fifth public function
+
+What changed: bills (M4) and photos (M5). Staff can issue only a bill that matches its booking (`WB050`); one live bill
+per booking; advances attach when a bill is issued. A fifth function reachable by the anonymous role,
+`stay_media_visible()`, used only by a storage policy, and path constraints keeping every stored path in its row's
+organisation. Photos are cleaned of location data twice: redrawn in the browser, and stripped of metadata segments on
+the server (`stripJpegMetadata()`). Checked: each new rule's test fails without it; a real JPEG with planted GPS data,
+uploaded through the app, comes back from Storage without it; another kennel's member and a request without the
+token cannot read the file.
+
+### 14 October 2026: people, invitation links and merging
+
+What changed: `invitation_links` (no direct writes; owners and managers read and withdraw), `create_invitation_link()`
+(owner or manager; owner links only by owners), `get_invitation_link()` and `accept_invitation_link()` (any signed-in
+person holding the token; single use, seven days, withdrawable), and `merge_clients()` (owner or manager; may move
+issued bills to another parent through a session flag that only it sets, while the printed buyer stays frozen). All
+`security definer` with the reason in their comments; none is granted to the anonymous role. The join page shows a
+signed-out visitor nothing about the kennel. Checked: `tests/db/people.test.ts`, each rule removed once to see its test
+fail; the end-to-end walk joins a new account through a link, uses it once, and suspends and restores it.
+
+### 14 October 2026: reports, expenses and downloads
+
+What changed: four report functions (`report_occupancy`, `report_money`, `report_tax`, `report_extras`). They run as
+the caller (security invoker), so row level security still applies, and each first calls `check_report_access()`,
+which refuses anyone who is not an owner or manager of the kennel asked about (`WB060`) and any period longer than
+400 days (`WB061`); every query in them filters by the kennel, so a member of two kennels never gets the other's
+numbers. Receipt files (`{org_id}/expenses/...`) are now for owners and managers only in the storage policies, like
+the expenses table. CSV downloads (`/app/more/reports/download`) are for owners and managers, sent with
+`Cache-Control: private, no-store`, and every text cell that a spreadsheet would run as a formula (starting with `=`,
+`+`, `-`, `@`, a tab or a carriage return) gets a leading apostrophe, because names typed on the public intake form
+reach these files. Checked: `tests/db/reports.test.ts` (staff, another kennel, a stranger and the anonymous role are
+refused; a member of both kennels sees only the one asked about; staff cannot add or see a receipt file), with the role
+check and the receipt rule each removed once to see the tests fail; `src/lib/core/reports.test.ts` for the CSV
+escaping; the end-to-end walk checks that staff get the refusal sentence and a 403 from the download.
+
+### 15 October 2026: languages, offline ticks and the service worker
+
+What changed: `memberships.language`, written only through `set_my_language()` (security definer, because staff may
+not update membership rows; it touches only the caller's own rows and only that column, `WB013` for anything not
+offered), and `organizations.parent_language` for owners and managers. The public functions return the kennel's
+parent language, and the bill its locale; nothing else became public. The intake form's default consent wording is
+stored in the language the parent read. A service worker (`public/sw.js`) keeps the last copy of Today and Care, which
+hold pet and parent names and phone numbers, on the phone for offline use; the sign-in page asks it to forget them,
+and with them any ticks not yet sent. `/app/care/sync` takes ticks made offline: it requires a signed-in member, a
+same-origin request and a JSON body of task ids, and can only turn this kennel's pending tasks to done. Checked:
+`tests/db/languages.test.ts` (the own-rows rule removed once to see its test fail), `src/lib/offline-ticks.test.ts`,
+and the end-to-end walk ticks a task offline, comes back online, and sees it sent.
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -189,14 +260,20 @@ These are real. Do not describe Wagbook as free of them.
 | The signed-in screens have not been exercised against a live Supabase project | PostgREST, real Auth and real Storage may behave differently from the in-process tests | Milestone M1, first |
 | Intake flood limits are per kennel and per phone number, not per visitor | A determined attacker can fill a kennel's hourly quota and block real parents for that hour | M9: rate limiting at the edge, or a challenge |
 | No script-src Content Security Policy | An injected script would run. React's escaping is the only defence. | M9: nonces |
-| Staff can edit a booking's price | A dishonest worker could lower a price. The audit log records it. | Decide in M2 whether price becomes manager only |
-| A pet that overstays does not hold its kennel past its end date | Someone else could be booked into that kennel while the pet is still there. Today shows "Was due to leave" in red. | M2: extend the stay at one tap, or hold until check-out |
+| Server Actions accept bodies up to 12 MB | Needed for photos and certificates; any action, including the public intake form, can be sent that much | M9: limits at the edge |
+| A photo replaced by a new one, a draft's update that failed, or a removed expense can leave a file nobody points at | Storage use grows a little; staff cannot delete files by design | M9: a manager's clean-up |
+| A photo sent without JavaScript is stored as taken (only its hidden data removed) | It may show sideways and is larger | Most phones run the page's JavaScript; the photo still works |
+| The intake form does not take certificate uploads yet | Parents send certificates on WhatsApp; staff add them at check-in | M9, together with rate limits at the edge, because anonymous uploads would multiply the intake flood risk |
+| A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
-| An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | M6: invitations by link, which need no lookup |
+| An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | Invitation links (M6) need no lookup; the email invitation stays for people who already have an account. Remove it if this matters more than the convenience. |
+| An invitation link works for whoever holds it | A forwarded link lets someone else join, once, in its role, within seven days | Send it to one person; withdraw it from People if it went astray; suspend or remove the wrong person. The person's name and role show on People as soon as they join. |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |
 | Two race fixes have no automated test | See the review log, numbers 6 and 16 | M1: stage them against real Postgres with two connections |
 | No two-factor sign-in | A stolen password is enough | Supabase supports it; M9 |
 | Links can be forwarded | Whoever has a stay link can see that stay | By design; kept minimal and expiring |
+| Copies of Today and Care stay on a phone for offline use | Whoever holds the phone, still signed in or not, can open the last copy (pet names, parents' phone numbers) with no connection | The copy is replaced on every visit and forgotten when the sign-in page opens. A shared phone should sign out at the end of a shift. |
+| A care task ticked offline is recorded at the time it reached the database | The history shows the sync time, not the time of the tap | By design: the database stamps who and when, and a phone's clock is not trusted |
 | Backups are whatever the Supabase plan provides | The free plan has no automatic backups | See [10-setup-and-deploy.md](10-setup-and-deploy.md) |
 
 ## Checklist for any change that touches data

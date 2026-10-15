@@ -4,7 +4,13 @@
 > rate and which service code apply to boarding, and what must appear on its invoices are questions for the kennel's
 > own accountant. Every place this page says "ask your accountant" means it.
 
-Everything here exists in the database and in `src/lib/core`, with tests. None of it has a screen yet (milestone M4).
+Everything here exists in the database and in `src/lib/core`, with tests, and has screens (milestone M4): Bills under
+More, the bill page, Make bill on a booking, and the parent's bill at `/inv/{token}`.
+
+**Who may issue what.** Any member may make a draft. Staff may issue only a bill whose lines are exactly what its
+booking says, the stay at its booked rate, discount and tax and each extra at its own price; a bill that was changed
+is issued by an owner or manager (`WB050`, decision D15). A booking has at most one live (draft or issued) bill.
+Issuing takes in any advances recorded for the booking.
 
 ## The life of a bill
 
@@ -184,12 +190,17 @@ Write the answers in your own records, not in this repository.
 5. Is `PREFIX/YY-YY/NNNN` acceptable as my invoice series?
 6. Does a voided invoice need a credit note instead once I am registered? (Wagbook does not produce credit notes yet.)
 7. What must I keep, and for how long?
+8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. Is that
+   the figure my return needs, or should a cancellation count in the month it happened?
+9. When the parent's bill is shown in Hindi or Kannada, it says "Tax invoice" in English with the translation in
+   brackets, and the place of supply and tax lines in that language. Is a bill in Hindi or Kannada acceptable, and must
+   "Tax invoice" and the other required details also appear in English?
 
 ## Not built
 
 - Credit notes and debit notes.
 - E-invoicing and e-way bills.
-- GST return exports.
+- GST return exports. Reports gives tax by rate for a month and a CSV of bills, for the accountant to work from.
 - Multiple tax rates on one stay line.
 - Currencies other than the kennel's own on a single invoice.
 

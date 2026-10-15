@@ -57,6 +57,7 @@ alter table public.payments enable row level security;
 alter table public.expenses enable row level security;
 alter table public.intake_submissions enable row level security;
 alter table public.audit_log enable row level security;
+alter table public.invitation_links enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -106,6 +107,20 @@ create policy memberships_delete_self on public.memberships for delete to authen
   using (user_id = (select auth.uid()));
 
 -- ---------------------------------------------------------------------------
+-- invitation_links: owners and managers see their kennel's links and withdraw
+-- them. Made only by create_invitation_link(), used only by
+-- accept_invitation_link(), so there is no insert or delete.
+-- ---------------------------------------------------------------------------
+grant select on public.invitation_links to authenticated;
+grant update (revoked_at) on public.invitation_links to authenticated;
+
+create policy invitation_links_select on public.invitation_links for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy invitation_links_update on public.invitation_links for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+
+-- ---------------------------------------------------------------------------
 -- Daily operations: any member reads, adds and edits; managers delete.
 -- ---------------------------------------------------------------------------
 do $$
@@ -141,8 +156,11 @@ grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, ken
               tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, group_id)
+              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
+              vaccinations_checked_at, notes, group_id)
   on public.bookings to authenticated;
+-- Who may change a price is decided by a trigger, not here: owners, managers
+-- and staff all sign in as the same role. See bookings_guard_price().
 
 -- ---------------------------------------------------------------------------
 -- Setup tables: any member reads; managers add, edit and delete.
@@ -313,11 +331,17 @@ grant execute on function public.create_organization(text, text, text) to authen
 grant execute on function public.invite_member_by_email(uuid, text, public.member_role, text) to authenticated;
 grant execute on function public.my_invitations() to authenticated;
 grant execute on function public.respond_to_invitation(uuid, boolean) to authenticated;
+grant execute on function public.create_invitation_link(uuid, public.member_role, text) to authenticated;
+grant execute on function public.get_invitation_link(text) to authenticated;
+grant execute on function public.accept_invitation_link(text) to authenticated;
+grant execute on function public.set_my_language(text) to authenticated;
+grant execute on function public.merge_clients(uuid, uuid) to authenticated;
 grant execute on function public.occupancy_by_day(uuid, date, date) to authenticated;
 grant execute on function public.available_kennels(uuid, public.booking_kind, date, date) to authenticated;
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
+grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;

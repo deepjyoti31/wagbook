@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { friendlyError } from "@/lib/errors";
 import type { FormState } from "@/lib/forms";
+import { getAppI18n } from "@/lib/i18n-server";
 import { IntakePayload } from "@/lib/intake";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,8 +17,10 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function acceptSubmission(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.intake.errors;
   const id = z.uuid().safeParse(form.get("submissionId"));
-  if (!id.success) return { error: "That form could not be found." };
+  if (!id.success) return { error: e.notFound };
 
   const supabase = await createClient();
   const sub = await supabase
@@ -26,16 +29,14 @@ export async function acceptSubmission(_state: FormState, form: FormData): Promi
     .eq("org_id", org.id)
     .eq("id", id.data)
     .maybeSingle();
-  if (sub.error) return { error: friendlyError(sub.error) };
-  if (!sub.data) return { error: "That form could not be found." };
-  if (sub.data.status !== "new") return { error: "Someone has already dealt with this form." };
+  if (sub.error) return { error: friendlyError(sub.error, t) };
+  if (!sub.data) return { error: e.notFound };
+  if (sub.data.status !== "new") return { error: e.alreadyDealt };
   // The database checks this again. Checking here gives a clearer sentence.
-  if (!IntakePayload.safeParse(sub.data.payload).success) {
-    return { error: "This form could not be read fully, so it cannot be accepted as it is. Call the parent, add them by hand, then decline the form." };
-  }
+  if (!IntakePayload.safeParse(sub.data.payload).success) return { error: e.unreadable };
 
   const accepted = await supabase.rpc("accept_intake", { p_submission: id.data });
-  if (accepted.error) return { error: friendlyError(accepted.error) };
+  if (accepted.error) return { error: friendlyError(accepted.error, t) };
 
   const pet = await supabase
     .from("pets")
@@ -57,8 +58,9 @@ export async function acceptSubmission(_state: FormState, form: FormData): Promi
 
 export async function rejectSubmission(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
   const id = z.uuid().safeParse(form.get("submissionId"));
-  if (!id.success) return { error: "That form could not be found." };
+  if (!id.success) return { error: t.m.intake.errors.notFound };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -67,7 +69,7 @@ export async function rejectSubmission(_state: FormState, form: FormData): Promi
     .eq("org_id", org.id)
     .eq("id", id.data)
     .eq("status", "new");
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
 
   revalidatePath("/app", "layout");
   return {};

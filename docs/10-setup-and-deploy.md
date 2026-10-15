@@ -121,6 +121,20 @@ Open http://localhost:3000. If the values are missing, signing in or opening `/a
    come back and accept it.
 8. **More, then People:** invite a colleague (they need to create an account first).
 
+### Try it with demo data first (needs Docker)
+
+If you have Docker, you can run a whole Supabase on your own computer with a made-up kennel in it, before creating
+anything online:
+
+```bash
+npx -y supabase@2.120.0 start
+```
+
+The first time downloads several gigabytes. It applies the migrations and `supabase/seed.sql`, then prints an API URL
+and a publishable key. Put those two in `.env.local`, run `npm run dev`, and sign in as `owner@demo.wagbook.test`,
+`manager@demo.wagbook.test` or `staff@demo.wagbook.test`, password `wagbook-demo`. `npx -y supabase@2.120.0 db reset`
+puts the demo back as it was. Nothing here is real; never load the demo data into a real kennel's project.
+
 ## Part 3. Put it online
 
 ### 3.1 Vercel

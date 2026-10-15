@@ -23,7 +23,11 @@ settings, security review and fixes, documentation.
 
 ## M1. Prove it against a real Supabase
 
-- [ ] Not started. **Do this first.** Nothing in M0's screens has run against a live project.
+- [ ] Partly done, 13 October 2026. Done: every migration and the seed apply on Supabase's own Postgres 17 (the local
+  stack from the Supabase CLI); `supabase/seed.sql` and `supabase/config.toml`; the whole walk below runs as Playwright
+  tests (`npm run test:e2e`, 13 tests) against that local stack, and a second CI job runs it. Still to do, and it needs a
+  person: follow `10-setup-and-deploy.md` on a hosted Supabase project, try the real sign-up email and the
+  `/auth/confirm` round trip, and record the migration freeze when production exists. See `HANDOFF.md`.
 
 **Build**
 
@@ -61,7 +65,7 @@ settings, security review and fixes, documentation.
 
 ## M2. Bookings, properly
 
-- [ ] Not started.
+- [x] Finished 13 October 2026. Price is manager only (D15).
 
 **Build**
 
@@ -95,7 +99,7 @@ settings, security review and fixes, documentation.
 
 ## M3. The care round
 
-- [ ] Not started.
+- [x] Finished 13 October 2026. Not timed with a stopwatch on a real phone; see `HANDOFF.md`.
 
 **Build**
 
@@ -124,7 +128,8 @@ settings, security review and fixes, documentation.
 
 ## M4. Bills and payments
 
-- [ ] Not started. Read [06-billing-and-gst.md](06-billing-and-gst.md) first.
+- [x] Finished 14 October 2026. Staff issue only bills that match their booking (D15). Not timed on a real phone; see
+  `HANDOFF.md`.
 
 **Build**
 
@@ -156,7 +161,9 @@ settings, security review and fixes, documentation.
 
 ## M5. Photos and updates
 
-- [ ] Not started.
+- [x] Finished 14 October 2026, except certificate upload in the intake form, moved to M9 with the edge rate limits
+  (anonymous uploads would multiply the intake flood risk; see `05`). Certificates are uploaded by staff on the booking
+  page until the pet page exists (M6). Photos for parents: D18.
 
 **Build**
 
@@ -183,7 +190,7 @@ settings, security review and fixes, documentation.
 
 ## M6. Pets, parents and people
 
-- [ ] Not started.
+- [x] Finished 14 October 2026. Invitation links: D19.
 
 **Build**
 
@@ -205,7 +212,7 @@ settings, security review and fixes, documentation.
 
 ## M7. Reports and expenses
 
-- [ ] Not started.
+- [x] Finished 14 October 2026. The audit log viewer is called History of changes. Reports refuse staff (D20).
 
 **Build**
 
@@ -224,7 +231,8 @@ settings, security review and fixes, documentation.
 
 ## M8. Works anywhere, in any language
 
-- [ ] Not started.
+- [x] Finished 15 October 2026, with Hindi and Kannada as drafts until native speakers review them. Languages: D21.
+  Offline: D22 (Next.js's experimental offline retry is left off, because it would replay a booking).
 
 **Build**
 
@@ -256,6 +264,8 @@ settings, security review and fixes, documentation.
 4. Two-factor sign-in for owners.
 5. A documented backup and restore drill.
 6. A second independent security review. Log it in `05`.
+7. Vaccination certificate upload in the intake form (moved from M5): anonymous uploads under the submission's own
+   folder, at most one per pet, only within an hour of submitting, behind the same rate limits as item 2.
 
 ---
 

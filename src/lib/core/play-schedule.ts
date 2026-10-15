@@ -32,6 +32,12 @@ export interface PlayPlanInput {
   changeoverMinutes?: number;
   /** Minimum minutes between the end of a dog's session and its next one. */
   minGapMinutes?: number;
+  /**
+   * Sessions already on the timetable (planned earlier in the day, or moved by
+   * hand). They keep their slots, count towards each dog's sessions, and the
+   * new plan is fitted around them.
+   */
+  existing?: readonly PlannedSession[];
 }
 
 export interface PlannedSession {
@@ -110,14 +116,26 @@ export function planPlaySessions(input: PlayPlanInput): PlayPlan {
   }
   slots.sort((a, b) => a.start - b.start);
 
+  // What is already on the timetable blocks its yard (with the changeover)
+  // and its dog (with the gap), and counts towards that dog's sessions.
+  const existing = (input.existing ?? []).map((e) => ({ dogId: e.dogId, yardId: e.yardId, start: toMinutes(e.start), end: toMinutes(e.end) }));
+  for (const slot of slots) {
+    if (existing.some((e) => e.yardId === slot.yardId && slot.start < e.end + changeover && e.start < slot.end + changeover)) slot.taken = true;
+  }
+  const clashesWithExisting = (dogId: string, slot: Slot) =>
+    existing.some((e) => e.dogId === dogId && slot.start < e.end + minGap && e.start < slot.end + minGap);
+
   const sessions: PlannedSession[] = [];
   const lastEnd = new Map<string, number>();
-  const got = new Map<string, number>(input.dogs.map((d) => [d.id, 0]));
+  const already = new Map<string, number>(input.dogs.map((d) => [d.id, existing.filter((e) => e.dogId === d.id).length]));
+  const got = new Map<string, number>(already);
 
   for (let round = 0; round < sessionsPerDog; round++) {
     for (const dog of input.dogs) {
+      // Fair before full: nobody gets a session in this round ahead of a dog with fewer.
+      if (got.get(dog.id)! > round) continue;
       const earliest = lastEnd.has(dog.id) ? lastEnd.get(dog.id)! + minGap : 0;
-      const slot = slots.find((s) => !s.taken && s.start >= earliest);
+      const slot = slots.find((s) => !s.taken && s.start >= earliest && !clashesWithExisting(dog.id, s));
       if (!slot) continue;
       slot.taken = true;
       lastEnd.set(dog.id, slot.end);
@@ -133,6 +151,21 @@ export function planPlaySessions(input: PlayPlanInput): PlayPlan {
       .map((d) => ({ dogId: d.id, missing: sessionsPerDog - got.get(d.id)! }))
       .filter((s) => s.missing > 0),
     slotsAvailable: slots.length,
-    slotsNeeded: input.dogs.length * sessionsPerDog,
+    slotsNeeded: input.dogs.reduce((n, d) => n + Math.max(0, sessionsPerDog - already.get(d.id)!), 0),
   };
+}
+
+/**
+ * The play windows of a day: the yards' opening hours, split in two by an
+ * optional break (the midday heat, say). Accepts "HH:MM" or "HH:MM:SS".
+ */
+export function playWindows(dayStart: string, dayEnd: string, breakStart?: string | null, breakEnd?: string | null): PlayWindow[] {
+  const hm = (t: string) => t.slice(0, 5);
+  if (breakStart && breakEnd) {
+    return [
+      { start: hm(dayStart), end: hm(breakStart) },
+      { start: hm(breakEnd), end: hm(dayEnd) },
+    ];
+  }
+  return [{ start: hm(dayStart), end: hm(dayEnd) }];
 }

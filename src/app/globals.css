@@ -90,3 +90,26 @@ body {
     transition: none !important;
   }
 }
+
+/*
+ * Printing a bill. "Save as PDF" from the browser's print menu gives a clean
+ * A4 invoice: white page, no buttons, no navigation. (No PDF library: the
+ * browser prints. See docs/08-roadmap.md, M4.)
+ */
+@page {
+  size: A4;
+  margin: 14mm;
+}
+@media print {
+  html,
+  body {
+    background: var(--color-paper);
+  }
+  .no-print {
+    display: none !important;
+  }
+  .invoice li,
+  .invoice dl {
+    break-inside: avoid;
+  }
+}

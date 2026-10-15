@@ -43,7 +43,7 @@ describe("every table is locked down", () => {
     expect(res.rows).toEqual([]);
   });
 
-  it("lets the anonymous role run exactly the four public functions and nothing else", async () => {
+  it("lets the anonymous role run exactly the five public functions and nothing else", async () => {
     const res = await db.query<{ name: string }>(`
       select p.proname as name
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -53,6 +53,8 @@ describe("every table is locked down", () => {
       "get_public_intake_form",
       "get_public_invoice",
       "get_public_stay",
+      // Only reached through Storage, for photos on a stay page; see docs/05-security-and-privacy.md.
+      "stay_media_visible",
       "submit_intake",
     ]);
   });

@@ -1,14 +1,29 @@
 import Link from "next/link";
-import { buttonStyles } from "@/components/ui";
+import { HtmlLang } from "@/components/html-lang";
+import { Suspense } from "react";
+import { buttonStyles, Loading } from "@/components/ui";
+import { getVisitorI18n } from "@/lib/i18n-server";
 
 export default function NotFound() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-12">
-      <h1 className="text-3xl font-extrabold tracking-tight">This page does not exist</h1>
-      <p className="mt-3 text-lg text-slate">The link may be mistyped, or it may have been switched off. If a kennel sent it to you, ask them for a new one.</p>
-      <Link href="/" className={`${buttonStyles.secondary} mt-6`}>
-        Go to the start
-      </Link>
+      <Suspense fallback={<Loading />}>
+        <Words />
+      </Suspense>
     </main>
+  );
+}
+
+async function Words() {
+  const { m, language } = await getVisitorI18n();
+  return (
+    <>
+      <HtmlLang lang={language} />
+      <h1 className="text-3xl font-extrabold tracking-tight">{m.notFound.title}</h1>
+      <p className="mt-3 text-lg text-slate">{m.notFound.text}</p>
+      <Link href="/" className={`${buttonStyles.secondary} mt-6`}>
+        {m.notFound.start}
+      </Link>
+    </>
   );
 }

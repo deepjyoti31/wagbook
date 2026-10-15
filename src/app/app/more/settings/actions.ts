@@ -5,13 +5,15 @@ import { requireOrg } from "@/lib/auth";
 import { gstinStateCode, isGstStateCode, isValidGstin, isValidInvoicePrefix, isValidVpa, normalizePhone, parseMoney } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { isLanguage } from "@/lib/i18n";
+import { getAppI18n } from "@/lib/i18n-server";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /** Set (or clear) the usual price for boarding or day boarding on the rate card. */
-async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boarding" | "daycare", priceMinor: number | null) {
+async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boarding" | "daycare", priceMinor: number | null, name: string) {
   const existing = await supabase.from("services").select("id").eq("org_id", orgId).eq("kind", kind).eq("is_default", true).eq("is_active", true).maybeSingle();
   if (existing.error) return existing.error;
   if (priceMinor === null) return null; // An empty box leaves the current price alone.
@@ -22,7 +24,8 @@ async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boardi
     await supabase.from("services").insert({
       org_id: orgId,
       kind,
-      name: kind === "boarding" ? "Boarding" : "Day boarding",
+      // Stored as data on the price list, in the language of whoever set the price.
+      name,
       unit: kind === "boarding" ? "night" : "day",
       price_minor: priceMinor,
       is_default: true,
@@ -32,57 +35,75 @@ async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boardi
 
 export async function saveSettings(_state: FormState, form: FormData): Promise<FormState> {
   const { org, canManage } = await requireOrg();
-  if (!canManage) return { error: "Only an owner or manager can change settings." };
+  const t = await getAppI18n();
+  const e = t.m.settings.errors;
+  if (!canManage) return { error: t.m.settings.onlyManagers };
   const national = org.country_code === "IN" ? "IN" : null;
 
   const name = text(form, "name");
-  if (!name || name.length < 2 || name.length > 80) return { error: "Enter your kennel's name." };
+  if (!name || name.length < 2 || name.length > 80) return { error: e.name };
 
   const phones: Record<"phone" | "whatsapp_phone", string | null> = { phone: null, whatsapp_phone: null };
   for (const field of ["phone", "whatsapp_phone"] as const) {
     const typed = text(form, field);
     if (typed === null) continue;
     const normalized = normalizePhone(typed, national);
-    if (!normalized) return { error: `The ${field === "phone" ? "phone" : "WhatsApp"} number does not look right.` };
+    if (!normalized) return { error: field === "phone" ? e.phone : e.whatsapp };
     phones[field] = normalized;
   }
 
   const upi = text(form, "upi_vpa");
-  if (upi !== null && !isValidVpa(upi)) return { error: "That does not look like a UPI ID. It should look like name@bank." };
+  if (upi !== null && !isValidVpa(upi)) return { error: e.upi };
 
   const prefix = (text(form, "invoice_prefix") ?? "WB").toUpperCase();
-  if (!isValidInvoicePrefix(prefix)) return { error: "The invoice prefix is 1 to 4 capital letters or numbers, like WB." };
+  if (!isValidInvoicePrefix(prefix)) return { error: e.prefix };
 
   const taxMode = form.get("tax_mode");
-  if (taxMode !== "none" && taxMode !== "simple" && taxMode !== "gst_india") return { error: "Choose how you charge tax." };
+  if (taxMode !== "none" && taxMode !== "simple" && taxMode !== "gst_india") return { error: e.taxMode };
   const taxId = text(form, "tax_id")?.toUpperCase() ?? null;
   let gstState = text(form, "gst_state_code");
   if (taxMode === "gst_india") {
-    if (!taxId || !isValidGstin(taxId)) return { error: "Enter a valid 15 character GSTIN to switch GST on." };
+    if (!taxId || !isValidGstin(taxId)) return { error: e.gstin };
     gstState = gstState ?? gstinStateCode(taxId);
-    if (!gstState || !isGstStateCode(gstState)) return { error: "Choose your state." };
-    if (gstinStateCode(taxId) !== gstState) return { error: "The state does not match the first two digits of your GSTIN." };
+    if (!gstState || !isGstStateCode(gstState)) return { error: e.state };
+    if (gstinStateCode(taxId) !== gstState) return { error: e.stateMismatch };
   }
 
   const rateText = text(form, "tax_rate_percent");
   const ratePercent = rateText === null ? 0 : Number(rateText);
-  if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100) return { error: "Enter the tax rate as a percentage, like 18." };
+  if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100) return { error: e.rate };
 
   const prices: Record<"boarding" | "daycare", number | null> = { boarding: null, daycare: null };
   for (const kind of ["boarding", "daycare"] as const) {
     const typed = text(form, `price_${kind}`);
     if (typed === null) continue;
     const minor = parseMoney(typed);
-    if (minor === null || minor < 0) return { error: "Enter prices as numbers, like 1200 or 1200.50." };
+    if (minor === null || minor < 0) return { error: e.prices };
     prices[kind] = minor;
   }
 
-  const sessions = Number(text(form, "play_sessions_per_day") ?? 0);
-  const minutes = Number(text(form, "play_session_minutes") ?? 20);
-  if (!Number.isInteger(sessions) || sessions < 0 || sessions > 12) return { error: "Play sessions a day must be between 0 and 12." };
-  if (!Number.isInteger(minutes) || minutes < 5 || minutes > 240) return { error: "A play session is between 5 and 240 minutes." };
+  const timeZone = text(form, "time_zone") ?? org.time_zone;
+  const currency = (text(form, "currency") ?? org.currency).toUpperCase();
+  const locale = text(form, "locale") ?? org.locale;
+  const fiscalStart = Number(text(form, "fiscal_year_start_month") ?? org.fiscal_year_start_month);
+  if (!/^[A-Z]{3}$/.test(currency)) return { error: e.currency };
+  try {
+    new Intl.NumberFormat(locale, { style: "currency", currency }).format(1);
+  } catch {
+    return { error: e.locale };
+  }
+  if (!Number.isInteger(fiscalStart) || fiscalStart < 1 || fiscalStart > 12) return { error: e.fiscalStart };
+
+  // The language of the pages and messages parents see. The database checks it again.
+  const parentLanguage = form.get("parent_language") ?? org.parent_language;
+  if (!isLanguage(parentLanguage)) return { error: t.m.errors.codes.WB013 };
 
   const update: TablesUpdate<"organizations"> = {
+    time_zone: timeZone,
+    currency,
+    locale,
+    fiscal_year_start_month: fiscalStart,
+    round_invoice_totals: checked(form, "round_invoice_totals"),
     name,
     legal_name: text(form, "legal_name"),
     ...phones,
@@ -104,20 +125,19 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     invoice_prefix: prefix,
     intake_enabled: checked(form, "intake_enabled"),
     intake_notice: text(form, "intake_notice"),
-    play_sessions_per_day: sessions,
-    play_session_minutes: minutes,
+    parent_language: parentLanguage,
   };
 
   const supabase = await createClient();
   const { data, error } = await supabase.from("organizations").update(update).eq("id", org.id).select("id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "Only an owner or manager can change settings." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.settings.onlyManagers };
 
   for (const kind of ["boarding", "daycare"] as const) {
-    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind]);
-    if (priceError) return { error: friendlyError(priceError) };
+    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], t.m.labels.bookingKind[kind]);
+    if (priceError) return { error: friendlyError(priceError, t) };
   }
 
   revalidatePath("/app", "layout");
-  return { ok: "Settings saved." };
+  return { ok: t.m.settings.saved };
 }

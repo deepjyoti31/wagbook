@@ -68,8 +68,12 @@ src/
       layout.tsx               Kennel name and navigation
       page.tsx actions.ts      Today; check in, check out, switch kennel
       bookings/ dogs/ more/    One folder per area; page.tsx plus actions.ts
+      more/reports/download/   route.ts: CSV downloads (the one signed-in Route Handler)
     i/[slug]/                  Public intake form
     s/[token]/                 Public stay page
+  messages/
+    en.ts en/<area>.ts         Every word on screen, in English, one file per area (D21)
+    hi.ts hi/ kn.ts kn/        The same shape in Hindi and Kannada; messages.test.ts keeps them in step
   components/
     ui.tsx                     Every shared visual piece
     action-form.tsx            ActionForm and SubmitButton (client)
@@ -85,9 +89,14 @@ src/
     errors.ts                  friendlyError()
     forms.ts                   FormState, text(), checked()
     safe-redirect.ts           safeDestination(): keeps redirects on this site
+    i18n.ts                    Languages, fill(), plural(), splitMessage() (pure)
+    i18n-server.ts             getAppI18n(), getVisitorI18n(), parentI18n(): which language a page speaks
+    offline-ticks.ts           Care ticks kept on the phone while offline (D22)
     intake.ts                  zod schema of the public intake payload
     pets.ts                    Warning flags offered for a pet
     queries.ts                 Shared read queries (bookingCards)
+    reports.ts                 Expense words, download kinds, fetchAll() past the 1,000 row page
+    history.ts                 The audit log in words, for History of changes
     site.ts                    siteOrigin(): the public address for links
 tests/db/
   supabase-shim.sql            Stand-in for Supabase's roles, auth and storage schemas
@@ -170,8 +179,9 @@ Points to copy:
 
 ### Public pages
 
-`/i/{slug}` and `/s/{token}` use `createAnonClient()`, which has no session, and call one of the four public database
-functions. Those functions return only what the page shows. Public pages never query a table.
+`/i/{slug}`, `/s/{token}` and `/inv/{token}` use `createAnonClient()`, which has no session, and call one of the public
+database functions. Those functions return only what the page shows. Public pages never query a table. The stay page
+also asks Storage for signed photo links with `createAnonClient({ stayToken })`; see `05`, "Photos on the stay page".
 
 ## The database
 
@@ -223,8 +233,9 @@ Docker or a live project.
 ## Testing
 
 ```
-npm run test:unit    40 tests   pure logic, under a second
-npm run test:db      96 tests   real Postgres in-process, about 40 seconds
+npm run test:unit    60 tests   pure logic, under a second
+npm run test:db     142 tests   real Postgres in-process, about 40 seconds
+npm run test:e2e     22 tests   a real browser against the built app and a local Supabase (needs Docker)
 ```
 
 ### How the database tests work
@@ -252,8 +263,13 @@ What each file covers:
 | File | Covers |
 | --- | --- |
 | `smoke.test.ts` | The migrations apply. |
-| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but four functions; tenants are isolated in every table; role limits. |
-| `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps. |
+| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but five functions; tenants are isolated in every table; role limits. |
+| `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps, the price rule, extras, families, requests, overstays, the check-in checklist. |
+| `care.test.ts` | Medicines need a reason to be skipped, a double tap keeps the first stamp, the stay page counts what was ticked, play hours, moving a play session. |
+| `seed.test.ts` | `supabase/seed.sql` applies on top of the migrations and builds the demo kennel. |
+| `bills.test.ts` | `computeInvoice()` against `issue_invoice()` over awkward cases in all three tax modes; staff issue only what the booking says; one live bill per booking; advances; saving drafts. |
+| `people.test.ts` | Invitation links (who can make them, single use, expiry, withdrawal, nobody writes them directly), merging parents (what moves, issued bills keep their buyer, who may), suspending and restoring members. |
+| `media.test.ts` | Photos on a stay page reach only the holder of that stay's token; stored paths stay in their kennel; another kennel cannot read a file. |
 | `billing.test.ts` | Numbering, freezing, voiding, tax checks, payments, balances. |
 | `intake.test.ts` | The public form, hostile payloads, accepting, the stay page. |
 | `hardening.test.ts` | Regression tests for the findings of the security reviews. Read [05](05-security-and-privacy.md) before touching. |
@@ -263,11 +279,25 @@ These tests have been checked by breaking the database on purpose (switching off
 constraint, granting anon a table, dropping the invoice guard). Each break made tests fail. When you add a rule, do the
 same once: remove the rule, see your test fail, put it back.
 
+### The end-to-end tests
+
+`e2e/walk.spec.ts` walks a kennel's day in Chromium at 360 pixels wide: sign in, check in with the checklist, a double
+booking refused, a family request confirmed, an overstay extended, the care round, play, a cancellation, a parent's
+intake form accepted, the stay page in a private window, a manager's price change and extra, the calendar, and a new
+person creating a kennel and inviting a colleague who joins and switches.
+
+```bash
+npx -y supabase@2.120.0 start     # once; needs Docker. Applies migrations and supabase/seed.sql
+npm run test:e2e                  # resets the database to the seed, builds the app, runs the walk
+E2E_BASE_URL=http://localhost:3000 npx playwright test    # against a dev server you already run
+```
+
+The tests share one database and run in order. `scripts/e2e.mjs` resets it first, so a run always starts from the seed.
+
 ### What is not tested automatically
 
-The screens. There are no browser tests yet, and PGlite is not Supabase: it has no PostgREST, no real Auth, no real
-Storage. Milestone M1 adds an end-to-end smoke test against a real project. Until then, a screen is "verified" only
-when someone has used it against a real Supabase project, and `HANDOFF.md` records which have been.
+A hosted Supabase project (the local stack is the same software, but email, settings screens and network differ),
+real phones, and WhatsApp itself (Wagbook only builds the link). `HANDOFF.md` records what has been checked by hand.
 
 ## Design system
 

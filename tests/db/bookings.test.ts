@@ -176,8 +176,11 @@ describe("daily care", () => {
       expect(first.rows[0].n).toBe(4); // 3 meals + this pet's tablet; nothing for the pet not in house
       const again = await db.query<{ n: number }>("select public.generate_care_tasks($1, '2027-04-15') as n", [k.org]);
       expect(again.rows[0].n).toBe(0);
-      const outside = await db.query<{ n: number }>("select public.generate_care_tasks($1, '2027-04-18') as n", [k.org]);
-      expect(outside.rows[0].n).toBe(0);
+      const before = await db.query<{ n: number }>("select public.generate_care_tasks($1, '2027-04-13') as n", [k.org]);
+      expect(before.rows[0].n).toBe(0);
+      // Still checked in after the end date (an overstay): the pet is still fed.
+      const overstay = await db.query<{ n: number }>("select public.generate_care_tasks($1, '2027-04-18') as n", [k.org]);
+      expect(overstay.rows[0].n).toBe(4);
 
       const tasks = await db.query<{ label: string }>(
         "select label from public.care_tasks where booking_id = $1 and task_date = '2027-04-15' order by due_time, label",
@@ -242,5 +245,177 @@ describe("solo play", () => {
       db.query("update public.play_sessions set status = 'skipped' where pet_id = $1 and starts_at = '07:00'", [k.pets[0]]),
     );
     await add(yards[0], b1, k.pets[0], "07:00", 15);
+  });
+});
+
+describe("only owners and managers decide what a stay costs", () => {
+  let k: Kennel;
+  let staff: string;
+  let manager: string;
+  let extra: string;
+  beforeAll(async () => {
+    k = await seedKennel(db, { kennels: 4, pets: 4 });
+    staff = await addMember(db, k, "staff");
+    manager = await addMember(db, k, "manager");
+    extra = await as(db, user(k.owner), async () => {
+      await db.query("insert into public.services (org_id, kind, name, unit, price_minor, is_default) values ($1, 'boarding', 'Boarding', 'night', 120000, true)", [k.org]);
+      await db.query("insert into public.services (org_id, kind, name, unit, price_minor, is_default) values ($1, 'daycare', 'Day boarding', 'day', 72000, true)", [k.org]);
+      const r = await db.query<{ id: string }>("insert into public.services (org_id, kind, name, price_minor) values ($1, 'addon', 'Grooming', 200000) returning id", [k.org]);
+      return r.rows[0].id;
+    });
+  });
+
+  it("lets staff book at the price on the price list", async () => {
+    await book(db, k, { pet: k.pets[0], start: "2027-10-01", end: "2027-10-03", rate: 120000 }, staff);
+    await book(db, k, { pet: k.pets[1], start: "2027-10-01", end: "2027-10-01", kind: "daycare", rate: 72000 }, staff);
+  });
+
+  it("refuses staff a price that is not on the price list, or a discount", async () => {
+    const e = await errorOf(() => book(db, k, { pet: k.pets[2], start: "2027-10-01", end: "2027-10-03", rate: 100000 }, staff));
+    expect(e.message).toContain("WB023");
+    const d = await errorOf(() =>
+      as(db, user(staff), () =>
+        db.query(
+          `insert into public.bookings (org_id, client_id, pet_id, start_date, end_date, rate_minor, discount_minor)
+           values ($1, $2, $3, '2027-10-05', '2027-10-07', 120000, 10000)`,
+          [k.org, k.client, k.pets[2]],
+        ),
+      ),
+    );
+    expect(d.message).toContain("WB023");
+  });
+
+  it("refuses staff changing the price, discount, tax or kind of a booking, but not its dates or notes", async () => {
+    const id = await book(db, k, { pet: k.pets[3], start: "2027-10-10", end: "2027-10-12" }, staff);
+    for (const change of ["rate_minor = 1", "discount_minor = 100", "tax_rate_bp = 1800", "sac_code = '9986'", "kind = 'daycare'"]) {
+      const e = await errorOf(() => as(db, user(staff), () => db.query(`update public.bookings set ${change} where id = $1`, [id])));
+      expect(e.message, change).toContain("WB022");
+    }
+    await as(db, user(staff), () => db.query("update public.bookings set end_date = '2027-10-13', notes = 'Likes the radio' where id = $1", [id]));
+    const row = await db.query<{ rate_minor: string; end_date: string }>("select rate_minor, end_date::text from public.bookings where id = $1", [id]);
+    expect(Number(row.rows[0].rate_minor)).toBe(120000);
+    expect(row.rows[0].end_date).toBe("2027-10-13");
+  });
+
+  it("lets a manager set any price and discount, and records the change in the audit log", async () => {
+    const id = await book(db, k, { pet: k.pets[2], start: "2027-11-01", end: "2027-11-04", rate: 99900 }, manager);
+    await as(db, user(manager), () => db.query("update public.bookings set rate_minor = 110000, discount_minor = 5000 where id = $1", [id]));
+    await as(db, user(k.owner), async () => {
+      const log = await db.query<{ old_data: Record<string, unknown>; new_data: Record<string, unknown>; actor: string }>(
+        "select old_data, new_data, actor from public.audit_log where table_name = 'bookings' and row_id = $1 and action = 'update'",
+        [id],
+      );
+      expect(log.rows[0].actor).toBe(manager);
+      expect(Number(log.rows[0].old_data.rate_minor)).toBe(99900);
+      expect(Number(log.rows[0].new_data.rate_minor)).toBe(110000);
+    });
+  });
+
+  it("lets staff add an extra at its listed price, or a one-off item, and nothing cheaper", async () => {
+    const id = await book(db, k, { pet: k.pets[0], start: "2027-12-01", end: "2027-12-03" }, staff);
+    const add = (service: string | null, price: number, actor = staff) =>
+      as(db, user(actor), () =>
+        db.query<{ id: string }>(
+          "insert into public.booking_items (org_id, booking_id, service_id, description, unit_price_minor) values ($1, $2, $3, 'Extra', $4) returning id",
+          [k.org, id, service, price],
+        ),
+      );
+    const listed = (await add(extra, 200000)).rows[0].id;
+    await add(null, 150000); // a vet bill paid for the parent
+    expect((await errorOf(() => add(extra, 100000))).message).toContain("WB023");
+    expect((await errorOf(() => as(db, user(staff), () => db.query("update public.booking_items set unit_price_minor = 1 where id = $1", [listed])))).message).toContain("WB025");
+    expect((await errorOf(() => as(db, user(staff), () => db.query("update public.booking_items set quantity = 0.5 where id = $1", [listed])))).message).toContain("WB025");
+    // Removing an extra is for managers.
+    await as(db, user(staff), () => db.query("delete from public.booking_items where id = $1", [listed]));
+    const still = await db.query<{ n: number }>("select count(*)::int as n from public.booking_items where id = $1", [listed]);
+    expect(still.rows[0].n).toBe(1);
+    await add(extra, 1, manager);
+  });
+
+  it("adds up the extras on a booking", async () => {
+    const id = await book(db, k, { pet: k.pets[1], start: "2028-01-10", end: "2028-01-13" }, staff);
+    await as(db, user(staff), async () => {
+      await db.query(
+        "insert into public.booking_items (org_id, booking_id, service_id, description, unit_price_minor, quantity) values ($1, $2, $3, 'Grooming', 200000, 2)",
+        [k.org, id, extra],
+      );
+      await db.query("insert into public.booking_items (org_id, booking_id, description, unit_price_minor) values ($1, $2, 'Pick-up', 50000)", [k.org, id]);
+      const sum = await db.query<{ total: string }>(
+        "select sum(round(quantity * unit_price_minor))::bigint as total from public.booking_items where org_id = $1 and booking_id = $2",
+        [k.org, id],
+      );
+      expect(Number(sum.rows[0].total)).toBe(450000);
+    });
+  });
+});
+
+describe("families, requests and overstays", () => {
+  let k: Kennel;
+  beforeAll(async () => {
+    k = await seedKennel(db, { kennels: 2, pets: 3 });
+  });
+
+  it("books several pets of one parent together, and refuses another parent's pet in the group", async () => {
+    const group = "00000000-0000-4000-8000-000000000001";
+    await as(db, user(k.owner), () =>
+      db.query(
+        `insert into public.bookings (org_id, client_id, pet_id, start_date, end_date, rate_minor, group_id)
+         values ($1, $2, $3, '2027-06-01', '2027-06-04', 120000, $5), ($1, $2, $4, '2027-06-01', '2027-06-04', 120000, $5)`,
+        [k.org, k.client, k.pets[0], k.pets[1], group],
+      ),
+    );
+    const together = await db.query<{ n: number }>("select count(*)::int as n from public.bookings where group_id = $1", [group]);
+    expect(together.rows[0].n).toBe(2);
+
+    const otherParent = await as(db, user(k.owner), async () => {
+      const c = await db.query<{ id: string }>("insert into public.clients (org_id, full_name, phone) values ($1, 'Someone else', '+919222200000') returning id", [k.org]);
+      const p = await db.query<{ id: string }>("insert into public.pets (org_id, client_id, name) values ($1, $2, 'Stranger') returning id", [k.org, c.rows[0].id]);
+      return { client: c.rows[0].id, pet: p.rows[0].id };
+    });
+    const e = await errorOf(() =>
+      as(db, user(k.owner), () =>
+        db.query(
+          `insert into public.bookings (org_id, client_id, pet_id, start_date, end_date, rate_minor, group_id)
+           values ($1, $2, $3, '2027-07-01', '2027-07-04', 120000, $4)`,
+          [k.org, otherParent.client, otherParent.pet, group],
+        ),
+      ),
+    );
+    expect(e.message).toContain("WB024");
+  });
+
+  it("lets a request sit in a taken kennel without holding it, and refuses to confirm it there", async () => {
+    await book(db, k, { pet: k.pets[0], start: "2027-08-01", end: "2027-08-05", kennel: k.kennels[0] });
+    const request = await book(db, k, { pet: k.pets[1], start: "2027-08-02", end: "2027-08-04", kennel: k.kennels[0], status: "requested" });
+    // The request does not hold space: the other kennel can still take a confirmed booking for those nights.
+    await book(db, k, { pet: k.pets[2], start: "2027-08-02", end: "2027-08-04", kennel: k.kennels[1] });
+    const e = await errorOf(() => as(db, user(k.owner), () => db.query("update public.bookings set status = 'confirmed' where id = $1", [request])));
+    expect(e.code).toBe("23P01");
+  });
+
+  it("extends an overstaying pet to today, unless its kennel is promised to someone else", async () => {
+    const stay = await book(db, k, { pet: k.pets[0], start: "2027-09-01", end: "2027-09-03", kennel: k.kennels[0], status: "checked_in" });
+    await book(db, k, { pet: k.pets[1], start: "2027-09-05", end: "2027-09-07", kennel: k.kennels[0] });
+    // Two days late, the kennel is free until the 5th: fine.
+    await as(db, user(k.owner), () => db.query("update public.bookings set end_date = '2027-09-05' where id = $1", [stay]));
+    // One more day runs into the next pet's stay: refused, and nothing changes.
+    const e = await errorOf(() => as(db, user(k.owner), () => db.query("update public.bookings set end_date = '2027-09-06' where id = $1", [stay])));
+    expect(e.message).toContain("bookings_no_kennel_overlap");
+    const row = await db.query<{ end_date: string }>("select end_date::text from public.bookings where id = $1", [stay]);
+    expect(row.rows[0].end_date).toBe("2027-09-05");
+  });
+
+  it("stamps who confirmed the vaccinations at check-in, whatever the app sends", async () => {
+    const staff = await addMember(db, k, "staff");
+    const id = await book(db, k, { pet: k.pets[2], start: "2027-10-01", end: "2027-10-03" });
+    await as(db, user(staff), () =>
+      db.query(
+        "update public.bookings set status = 'checked_in', vaccinations_checked_at = '2000-01-01', gate_notes = 'New food', belongings = 'Bed' where id = $1",
+        [id],
+      ),
+    );
+    const row = await db.query<{ by: string; at: string }>("select vaccinations_checked_by as by, vaccinations_checked_at::text as at from public.bookings where id = $1", [id]);
+    expect(row.rows[0].by).toBe(staff);
+    expect(row.rows[0].at.startsWith("2000")).toBe(false);
   });
 });

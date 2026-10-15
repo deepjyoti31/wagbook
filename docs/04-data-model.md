@@ -169,7 +169,13 @@ Covered properly in [06-billing-and-gst.md](06-billing-and-gst.md). In short:
 - **payments** are money moving: `direction` is `in` for money received and `out` for a refund. `amount_minor` is
   always positive. Optionally tied to an invoice.
 - **invoice_balances** is a view: total, paid and due for each invoice.
-- **expenses** are what the kennel spent.
+- **expenses** are what the kennel spent, with an optional receipt file. Owners and managers only.
+
+## Reports
+
+No tables. Four functions, `report_occupancy`, `report_money`, `report_tax` and `report_extras`, each taking a kennel
+and a period of up to 400 days, run as the caller and refuse anyone who is not an owner or manager (D20). What each
+counts is in its comment, and so in [reference/schema.md](reference/schema.md).
 
 ## Intake
 
@@ -186,7 +192,7 @@ the table.
 **audit_log** gets one row for every insert, update and delete on the tables where history matters: bookings, booking
 items, invoices, payments, expenses, services, incidents, organisations and memberships. It stores who, when, which
 row, and only the columns that changed. Nobody can write to it through the API; a trigger does. Owners and managers
-can read it.
+can read it, on the History of changes screen.
 
 ## Storage
 

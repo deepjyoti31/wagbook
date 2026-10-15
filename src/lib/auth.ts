@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
+import { isLanguage, type Language } from "./i18n";
 import type { Enums, Tables } from "./supabase/database.types";
 import { isSupabaseConfigured } from "./supabase/env";
 import { createClient } from "./supabase/server";
@@ -25,6 +26,8 @@ export interface OrgContext {
   org: Tables<"organizations">;
   role: Enums<"member_role">;
   displayName: string;
+  /** The language this person chose to read Wagbook in. */
+  language: Language;
   /** True for owners and managers. */
   canManage: boolean;
 }
@@ -45,6 +48,9 @@ export const getUser = cache(async (): Promise<SessionUser | null> => {
 });
 
 export async function requireUser(): Promise<SessionUser> {
+  // Per request, always, even when the answer is the setup page: a page that
+  // asks who is signed in must never be saved at build time.
+  await connection();
   if (!isSupabaseConfigured()) redirect("/setup");
   const user = await getUser();
   if (!user) redirect("/login");
@@ -57,7 +63,7 @@ export const getMemberships = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("memberships")
-    .select("role, display_name, created_at, organizations(*)")
+    .select("role, display_name, language, created_at, organizations(*)")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .order("created_at");
@@ -81,6 +87,7 @@ export const requireOrg = cache(async (): Promise<OrgContext> => {
     org: chosen.organizations!,
     role: chosen.role,
     displayName: chosen.display_name,
+    language: isLanguage(chosen.language) ? chosen.language : "en",
     canManage: chosen.role === "owner" || chosen.role === "manager",
   };
 });

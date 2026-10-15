@@ -44,3 +44,11 @@ next-env.d.ts
 # supabase cli
 /supabase/.temp
 /supabase/.branches
+
+# end-to-end test output
+/test-results/
+/playwright-report/
+/e2e/.screens/
+
+# Working copies made by Claude Code helpers
+/.claude/worktrees/

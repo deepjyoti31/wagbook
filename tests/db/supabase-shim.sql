@@ -16,10 +16,38 @@ create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
 
+-- Supabase installs pgcrypto in the extensions schema; supabase/seed.sql uses it.
+create extension if not exists pgcrypto with schema extensions;
+
+-- The columns of Supabase Auth's users table that supabase/seed.sql writes.
 create table auth.users (
+  instance_id uuid,
   id uuid primary key default gen_random_uuid(),
+  aud text,
+  role text,
   email text unique,
-  created_at timestamptz not null default now()
+  encrypted_password text,
+  email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb,
+  raw_user_meta_data jsonb,
+  confirmation_token text,
+  email_change text,
+  email_change_token_new text,
+  recovery_token text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
+);
+
+create table auth.identities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  provider_id text not null,
+  identity_data jsonb not null,
+  provider text not null,
+  last_sign_in_at timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz,
+  unique (provider_id, provider)
 );
 
 -- Supabase reads the signed-in user's id from the request's JWT claims.
@@ -51,7 +79,8 @@ alter table storage.objects enable row level security;
 
 grant usage on schema public, extensions, auth, storage to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
-grant select, insert, update, delete on storage.objects to authenticated;
+-- As on Supabase: both API roles reach storage.objects, and the policies decide.
+grant select, insert, update, delete on storage.objects to anon, authenticated;
 
 -- Supabase's defaults hand new objects in public to every API role. Recreate
 -- that here so the tests prove our migrations really take it back.

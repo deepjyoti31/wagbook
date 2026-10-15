@@ -179,7 +179,7 @@ zone bugs.
 **Cost.** A little more code written by hand.
 
 **Runtime dependencies today:** `next`, `react`, `react-dom`, `@supabase/ssr`, `@supabase/supabase-js`, `zod`,
-`server-only`. Adding one needs an entry here.
+`server-only`, `qrcode-generator` (D17). Adding one needs an entry here.
 
 ---
 
@@ -238,3 +238,187 @@ server and runs anywhere Node does; the self-hosting guide in M10 covers Docker.
 
 **Cost.** Two vendors' free plans have limits and terms that can change. Vercel's free plan is for non-commercial
 use; a kennel running its business on it should read the terms and may need the paid plan or another host.
+
+---
+
+## D15. Only owners and managers decide what a stay costs
+
+**Status:** Decided by the owner, 13 October 2026 (milestone M2).
+
+**Situation.** Staff run the day and make most bookings. A booking's price could be changed by anyone, recorded only
+in the audit log. A dishonest worker could lower a price and pocket the difference.
+
+**Decision.** Staff book at the price on the price list and cannot change it. Owners and managers set any price and
+discount. In detail, enforced by triggers in `20261008000300_kennels_and_bookings.sql`:
+
+- A new booking by staff must have a rate, tax rate and SAC code exactly as an active price list row of its kind gives
+  them, and no discount (`WB023`).
+- Staff cannot change an existing booking's rate, discount, tax rate, SAC code or kind (`WB022`).
+- Staff add extras from the price list only at the listed price (`WB023`), may add a one-off item with no price list
+  entry at any price (a vet bill paid for the parent; it only ever adds to the bill), and cannot change what an extra
+  costs afterwards (`WB025`). Removing an extra was already manager only.
+
+**Why a trigger and not column grants.** The roadmap suggested column grants and a policy. Every member signs in as
+the same database role, `authenticated`, so a grant cannot tell a manager from staff, and an update policy cannot
+compare old and new values. A `before` trigger can, using `my_org_ids_with_role()`.
+
+**Cost.** A kennel with no usual price set cannot be booked by staff until a manager sets one. The screen says so.
+
+**Extended in M4 (14 October 2026).** Staff may make and change draft bills, but `issue_invoice()` lets staff issue
+only a bill whose lines are exactly what its booking says: the stay at the booked rate, discount and tax, and each extra
+at its own price (`invoice_expected_lines()`, `WB050`). An edited bill is issued by an owner or manager. The screen
+offers line editing to owners and managers only.
+
+---
+
+## D16. Playwright for the end-to-end tests, and the Supabase CLI through npx
+
+**Status:** Decided, 13 October 2026 (milestone M1).
+
+**Decision.** `@playwright/test` is a development dependency. The Supabase CLI is run with `npx -y supabase@2.120.0`
+(pinned in `scripts/e2e.mjs` and the CI workflow) rather than installed as a dependency.
+
+**Why.** The roadmap asks for browser tests of the whole day against a local Supabase. Playwright drives a real
+Chromium at phone width, waits for the page by itself, and records a trace on failure. Installing the Supabase CLI as
+a package would download a binary on every `npm ci`, for everyone, including cloud sessions that never run Docker.
+
+**Cost.** One large development dependency. The tests need Docker and are kept out of `npm run check`.
+
+---
+
+## D17. QR codes drawn by qrcode-generator, checked by jsqr
+
+**Status:** Decided, 14 October 2026 (milestone M4).
+
+**Situation.** A bill shows a UPI QR code. `07-whatsapp-and-upi.md` rules out third-party QR image services (they
+would see every bill's payment details) and allows a dependency with no dependencies of its own, or a short encoder.
+
+**Decision.** `qrcode-generator` (MIT, no dependencies) builds the QR matrix; `src/lib/core/qr.ts` turns it into one
+SVG path drawn on the server. `jsqr` (Apache-2.0, no dependencies) is a development dependency used only by
+`qr.test.ts`, which decodes the drawn code and checks it gives back the exact UPI link.
+
+**Why not write the encoder.** A QR code is Reed-Solomon codes, masks and version tables. A parent scans it to pay; a
+long-used library is less likely to be wrong than a new one, and the decode test catches either.
+
+**Cost.** Two small packages. If one is abandoned, the other still checks a replacement.
+
+---
+
+## D18. Photos for parents through Storage, with the stay token in a header
+
+**Status:** Decided, 14 October 2026 (milestone M5).
+
+**Situation.** The stay page must show photos to a parent who has no account. Files are private. The service role key
+is never used, Postgres cannot sign Storage links, and Wagbook holds no other secret.
+
+**Decision.** The stay page asks Storage for signed links (an hour) as the anonymous role and sends the stay token in an
+`x-wagbook-stay` header. Storage passes request headers to Postgres, and a policy on `storage.objects` calls
+`stay_media_visible(name)`, which allows the read only for that live stay's pet photo and the photos on its updates shown
+to the parent. Tested in PGlite (`media.test.ts`) and through the real Storage in the end-to-end walk.
+
+**Why.** The rule lives in the database like every other rule, no secret is added, and a parent's link opens their own
+photos only. A route handler streaming files would still have needed some credential to read them.
+
+**Cost.** A fifth function the anonymous role can run (pinned in `security.test.ts`). It depends on Storage passing
+`request.headers` to Postgres, which Supabase's Storage does today; if it stopped, photos on stay pages would stop
+showing (safely: nothing would be exposed). The end-to-end test would fail first.
+
+**Photos are stored twice.** The photo (long edge 1,600 pixels) and a small copy (480 pixels, `name.small.jpg`) for
+lists and slow connections, both made in the browser. Supabase's image resizing is a paid feature and is not used.
+
+---
+
+## D19. Invitation links that work for whoever holds them, once
+
+**Status:** Decided, 14 October 2026 (milestone M6).
+
+**Situation.** Kennel staff often have no email they check, and the person adding them is on WhatsApp. The email
+invitation (D7) needs an account first and reveals whether an email has one.
+
+**Decision.** An owner or manager makes a link for a name and a role. It works once, for seven days, and can be
+withdrawn. It is not tied to an email or phone: whoever opens it signs up or signs in and joins. The link carries a
+64-character token; the join page says nothing about the kennel until the visitor is signed in.
+
+**Why.** It fits how kennels hire (a message on WhatsApp), needs no lookup of accounts, and the person still has to act
+to join, as D7 requires. Binding it to an email would bring back the email problem; binding it to a phone number would
+need phone sign-in, which Wagbook does not have.
+
+**Cost.** A forwarded link lets someone else join, once, in that role. The new member appears on People at once and can
+be suspended or removed. See `05`, known limitations.
+
+## D20. Reports are database functions that refuse staff; downloads are CSV
+
+**Status:** Decided, 14 October 2026 (milestone M7).
+
+**Situation.** The roadmap asks for reports as views or functions that obey row level security. Staff can already
+read bookings, bills and payments one by one (they run the day), but expenses are for owners and managers, and a
+kennel's takings in one number are the owner's business.
+
+**Decision.** Each report is a `security invoker` function taking the kennel and a period. Before anything else it
+calls `check_report_access()`, which raises `WB060` unless the caller is an owner or manager of that kennel, and
+`WB061` for a period over 400 days. Charts are plain HTML and CSS. Downloads are CSV files built by
+`src/lib/core/csv.ts`, with a byte order mark for Excel and formula-looking text defused; no spreadsheet library.
+
+**Why.** Invoker functions keep row level security in force, so a mistake in a report cannot show another kennel's
+rows. The explicit refusal makes "staff do not see reports" a database rule with a test, rather than a hidden menu
+item, and it means staff get a clear sentence rather than a page of zeros (they cannot see expenses, so their numbers
+would be wrong, not just private). CSV opens everywhere an accountant works and needs no dependency.
+
+**Cost.** Staff cannot see even how full the kennel was last month; the calendar shows the days ahead. A view with
+`security_invoker` would have been simpler to query from PostgREST, but could not take a period or refuse anyone.
+
+
+## D21. Languages: plain message files, chosen by the person, no locale in the address
+
+**Status:** Decided, 15 October 2026 (milestone M8).
+
+**Situation.** Staff should read Wagbook in their own language, and parents in the language their kennel chooses. The
+Next.js guide (`node_modules/next/dist/docs/01-app/02-guides/internationalization.md`) describes putting the locale in
+the address (`/hi/app`) with dictionaries loaded on the server, and leaves the translation mechanism to the app.
+
+**Decision.** No locale in the address and no library. Every word lives in `src/messages/en.ts` (assembled from one
+file per area in `src/messages/en/`); `hi.ts` and `kn.ts` have exactly the same shape, which TypeScript checks, and
+`src/messages/messages.test.ts` checks that each translation keeps the same `{placeholders}` and leaves nothing
+empty. `src/lib/i18n.ts` fills placeholders, picks plural forms with `Intl.PluralRules`, and cuts a message for a bold
+value or a link (`<Rich>`). The server chooses the language (`src/lib/i18n-server.ts`): on signed-in screens the
+person's own choice (`memberships.language`, set by `set_my_language()` for all their kennels); on pages for parents
+the kennel's `parent_language`, which the public functions return; elsewhere a cookie set when a person chooses or
+signs in, then the browser's `Accept-Language`, then English. Dates and money are formatted in the person's language
+and the kennel's region (`hi-IN`). Client components get their words as props, so browsers never download whole
+dictionaries. Database error sentences stay English; the app shows a translation per `WBnnn` code, carrying values
+such as dates across. The static shell of each page holds no words, because it is drawn before the language is known:
+the loading state is three dots, and titles sit inside the suspended part.
+
+**Why.** The same address works for everyone on a shared phone, links sent on WhatsApp do not depend on the sender's
+language, and the language follows the person rather than the device. Typed message objects catch a missing key at
+build time, which a library with string keys would only catch at run time. The whole mechanism is about a hundred
+lines.
+
+**Cost.** Words stored as data stay in the language they were written in: routine names, bill line descriptions,
+notes, and the amount in words on a bill (English, as on most Indian invoices). The history of changes names fields
+by their column names. The Hindi and Kannada files are drafts until native speakers review them.
+
+## D22. Offline: a service worker for Today and Care, and ticks saved on the phone
+
+**Status:** Decided, 15 October 2026 (milestone M8).
+
+**Situation.** Kennel connections drop. The roadmap asks that Today and Care open offline and that ticking a task
+offline is kept and sent later, and forbids queueing anything that could conflict, such as a booking. Next.js 16 has
+an experimental `useOffline` option that keeps every failed Server Action pending and replays it when the connection
+returns.
+
+**Decision.** `useOffline` stays off: it would replay a booking or a payment made while offline. Instead:
+`public/sw.js` keeps the newest copy of `/app` and `/app/care` and the app's own hashed scripts and styles, serves those
+copies only when the network fails, and shows a small three-language offline page for anything else. The Done button
+on a care task (`TickButton`) saves the task id in the phone's local storage when there is no connection, or when the
+request does not get through, and `OfflineSync` in the signed-in layout sends the saved ticks to `/app/care/sync`
+whenever the connection is there. That endpoint can only turn a pending task to done, which is safe to repeat. The
+copies and saved ticks are removed when the sign-in page opens.
+
+**Why.** Ticking is the one write that is safe to send twice (the database keeps the first who and when), so it is
+the only one that waits on the phone. Everything else fails plainly while offline, which is the honest outcome for a
+booking that might clash.
+
+**Cost.** A task ticked offline is recorded as done at the time it reached the database, not the time of the tap.
+Copies of Today and Care, with pet and parent names, stay on the phone until someone opens the sign-in page or the
+next copy replaces them. The service worker runs only in production builds.

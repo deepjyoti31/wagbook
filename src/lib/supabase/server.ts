@@ -34,9 +34,14 @@ export async function createClient() {
 /**
  * Supabase client with no session, for the public pages (/i, /s, /inv).
  * It can only call the functions granted to the anonymous role.
+ *
+ * With `stayToken`, every request carries the stay's secret in the
+ * x-wagbook-stay header. Storage passes it to the database, where
+ * stay_media_visible() lets that one stay's shared photos be read.
  */
-export function createAnonClient() {
+export function createAnonClient(opts: { stayToken?: string } = {}) {
   return createPlainClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: opts.stayToken ? { headers: { "x-wagbook-stay": opts.stayToken } } : undefined,
   });
 }

@@ -1,35 +1,38 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { buttonStyles, Ledger, Loading, PageTitle } from "@/components/ui";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Select } from "@/components/ui";
 import { switchOrganisation } from "@/app/app/actions";
 import { getMemberships, requireOrg } from "@/lib/auth";
+import { fill, LANGUAGE_NAMES, LANGUAGES, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
+import { setMyLanguage } from "./actions";
 
-export const metadata: Metadata = { title: "More" };
+export const generateMetadata = () => appTitle((m) => m.more.title);
 
 const LINKS = [
-  { href: "/app/more/intake", title: "Forms from parents", about: "Review what parents sent, and share your intake link." },
-  { href: "/app/more/kennels", title: "Kennels", about: "Add kennels and take them in or out of service." },
-  { href: "/app/more/people", title: "People", about: "See who works here and invite your team." },
-  { href: "/app/more/settings", title: "Settings", about: "Kennel details, prices, tax and UPI." },
+  { href: "/app/bills", key: "bills" },
+  { href: "/app/more/reports", key: "reports" },
+  { href: "/app/more/expenses", key: "expenses" },
+  { href: "/app/more/intake", key: "intake" },
+  { href: "/app/more/kennels", key: "kennels" },
+  { href: "/app/more/people", key: "people" },
+  { href: "/app/more/routines", key: "routines" },
+  { href: "/app/more/play", key: "play" },
+  { href: "/app/more/extras", key: "extras" },
+  { href: "/app/more/peak", key: "peak" },
+  { href: "/app/more/settings", key: "settings" },
+  { href: "/app/more/history", key: "history" },
 ] as const;
 
-export default function MorePage() {
+export default function MorePage({ searchParams }: PageProps<"/app/more">) {
   return (
     <>
-      <PageTitle title="More" />
-      <Ledger>
-        {LINKS.map((l) => (
-          <li key={l.href}>
-            <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
-              <span className="block text-lg font-bold">{l.title}</span>
-              <span className="block text-slate">{l.about}</span>
-            </Link>
-          </li>
-        ))}
-      </Ledger>
+      <Suspense fallback={<Loading />}>
+        <Menu searchParams={searchParams} />
+      </Suspense>
       <div className="mt-8">
         <Suspense fallback={<Loading />}>
           <Account />
@@ -39,40 +42,79 @@ export default function MorePage() {
   );
 }
 
+async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams">) {
+  const done = (await searchParams).done;
+  const { m } = await getAppI18n();
+  return (
+    <>
+      <PageTitle title={m.more.title} />
+      {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
+      <Ledger>
+        {LINKS.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
+              <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>
+              <span className="block text-slate">{m.more.links[l.key].about}</span>
+            </Link>
+          </li>
+        ))}
+      </Ledger>
+    </>
+  );
+}
+
 async function Account() {
   const { user, org, role, displayName } = await requireOrg();
+  const { m, language } = await getAppI18n();
   const invitations = (await (await createClient()).rpc("my_invitations")).data ?? [];
-  const others = (await getMemberships()).filter((m) => m.organizations!.id !== org.id);
+  const others = (await getMemberships()).filter((x) => x.organizations!.id !== org.id);
   return (
     <>
       <p className="text-slate">
-        Signed in as {displayName} ({user.email ?? "no email"}), {role} at {org.name}.
+        {fill(m.more.signedInAs, { name: displayName, email: user.email ?? m.more.noEmail, role: m.more.roleInSentence[role], kennel: org.name })}
       </p>
       {invitations.length > 0 ? (
         <p className="mt-4">
           <Link href="/onboarding" className="font-semibold underline underline-offset-4">
-            You have {invitations.length === 1 ? "an invitation" : `${invitations.length} invitations`} to another kennel
+            {plural(language, invitations.length, m.more.invitations)}
           </Link>
         </p>
       ) : null}
       {others.length > 0 ? (
         <div className="mt-4">
-          <p className="mb-2 font-semibold">You also work at</p>
+          <p className="mb-2 font-semibold">{m.more.alsoWorkAt}</p>
           <div className="flex flex-wrap gap-2">
-            {others.map((m) => (
-              <form key={m.organizations!.id} action={switchOrganisation}>
-                <input type="hidden" name="orgId" value={m.organizations!.id} />
+            {others.map((x) => (
+              <form key={x.organizations!.id} action={switchOrganisation}>
+                <input type="hidden" name="orgId" value={x.organizations!.id} />
                 <button type="submit" className={buttonStyles.secondary}>
-                  Switch to {m.organizations!.name}
+                  {fill(m.more.switchTo, { kennel: x.organizations!.name })}
                 </button>
               </form>
             ))}
           </div>
         </div>
       ) : null}
-      <form action={signOut} className="mt-3">
+      <ActionForm action={setMyLanguage} className="mt-6 flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Field label={m.language.yours} hint={m.language.yoursHint}>
+            <Select name="language" defaultValue={language}>
+              {LANGUAGES.map((l) => (
+                <option key={l} value={l} lang={l}>
+                  {LANGUAGE_NAMES[l]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+          {m.common.save}
+        </SubmitButton>
+      </ActionForm>
+      {language === "en" ? null : <p className="mt-2 text-sm text-slate">{m.language.draftNote}</p>}
+      <form action={signOut} className="mt-6">
         <button type="submit" className={buttonStyles.secondary}>
-          Sign out
+          {m.more.signOut}
         </button>
       </form>
     </>

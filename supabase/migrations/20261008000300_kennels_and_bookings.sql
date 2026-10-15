@@ -145,6 +145,9 @@ create table public.bookings (
   cancelled_at timestamptz,
   cancel_reason text,
   belongings text,
+  gate_notes text,
+  vaccinations_checked_at timestamptz,
+  vaccinations_checked_by uuid references auth.users (id) on delete set null,
   notes text,
   source text not null default 'staff' check (source in ('staff', 'intake')),
   group_id uuid,
@@ -157,7 +160,8 @@ create table public.bookings (
   unique (org_id, id, pet_id),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   -- The pet must belong to the client on the booking.
-  foreign key (org_id, client_id, pet_id) references public.pets (org_id, client_id, id) on delete restrict,
+  -- When two parents are merged a pet moves to the other parent; its bookings move with it.
+  foreign key (org_id, client_id, pet_id) references public.pets (org_id, client_id, id) on update cascade on delete restrict,
   foreign key (org_id, kennel_id) references public.kennels (org_id, id) on delete set null (kennel_id),
   constraint bookings_dates_in_order check (end_date >= start_date),
   constraint bookings_boarding_has_a_night check (kind <> 'boarding' or end_date > start_date),
@@ -187,6 +191,10 @@ comment on column public.bookings.discount_minor is 'Discount on the stay itself
 comment on column public.bookings.tax_rate_bp is 'Tax rate for the stay, copied when booked.';
 comment on column public.bookings.expected_arrival is 'When the parent said they would drop off. For planning the day; not enforced.';
 comment on column public.bookings.belongings is 'What came with the pet (bed, leash, food, medicines) so it all goes home again.';
+comment on column public.bookings.gate_notes is 'Anything the parent said at drop-off: a change of food, a recent illness, who will collect.';
+comment on column public.bookings.vaccinations_checked_at is
+  'When a staff member confirmed at check-in that they had seen the pet''s vaccination certificates. Stamped by the database.';
+comment on column public.bookings.vaccinations_checked_by is 'Who confirmed the vaccinations at check-in. Stamped by the database.';
 comment on column public.bookings.source is 'staff: entered by the kennel. intake: started from the public intake form.';
 comment on column public.bookings.group_id is 'Shared by bookings made together, e.g. two dogs from one family.';
 comment on column public.bookings.public_token is 'Secret in the parent''s stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else.';
@@ -259,6 +267,85 @@ comment on function public.bookings_stamp_status() is
 create trigger bookings_stamp_status
   before insert or update on public.bookings
   for each row execute function public.bookings_stamp_status();
+
+create trigger bookings_stamp_vaccinations_checked
+  before insert or update on public.bookings
+  for each row execute function public.stamp_when_set('vaccinations_checked_at', 'vaccinations_checked_by');
+
+-- Price guard. Staff run the day, but the price of a stay is the business's
+-- decision. Every member signs in as the same database role, so column grants
+-- cannot tell a manager from staff; this trigger does. A database session with
+-- no signed-in user (migrations, the seed) is not a member and is let through.
+create function public.bookings_guard_price()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null
+     or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+  then
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if new.rate_minor is distinct from old.rate_minor
+       or new.discount_minor is distinct from old.discount_minor
+       or new.tax_rate_bp is distinct from old.tax_rate_bp
+       or new.sac_code is distinct from old.sac_code
+       or new.kind is distinct from old.kind
+    then
+      raise exception 'WB022: only an owner or manager can change the price or the kind of stay' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  -- A new booking by staff must be priced exactly as the price list says.
+  if new.discount_minor <> 0 or not exists (
+    select 1
+    from public.services s
+    join public.organizations o on o.id = s.org_id
+    where s.org_id = new.org_id
+      and s.is_active
+      and s.kind::text = new.kind::text
+      and s.price_minor = new.rate_minor
+      and new.tax_rate_bp = case when o.tax_mode = 'none' then 0 else coalesce(s.tax_rate_bp, o.default_tax_rate_bp) end
+      and new.sac_code is not distinct from s.sac_code
+  ) then
+    raise exception 'WB023: only an owner or manager can book at a price that is not on your price list' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.bookings_guard_price() is
+  'Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list, with no discount, and cannot change the price, discount, tax or kind of an existing booking.';
+
+create trigger bookings_guard_price
+  before insert or update on public.bookings
+  for each row execute function public.bookings_guard_price();
+
+-- Bookings made together (a family of pets) belong to one parent, so they can
+-- be shown, confirmed and billed together.
+create function public.bookings_check_group()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.group_id is not null and exists (
+    select 1 from public.bookings b
+    where b.org_id = new.org_id and b.group_id = new.group_id and b.client_id <> new.client_id
+  ) then
+    raise exception 'WB024: bookings made together must all be for one parent' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.bookings_check_group() is 'Trigger: every booking sharing a group_id has the same client.';
+
+create trigger bookings_check_group
+  before insert or update of group_id, client_id on public.bookings
+  for each row execute function public.bookings_check_group();
 
 -- Capacity guard. The kennel-overlap constraint above only protects bookings
 -- that already have a kennel. This protects the house as a whole: more pets
@@ -366,6 +453,55 @@ create trigger booking_items_set_updated_at
 create trigger booking_items_stamp_actor
   before insert or update on public.booking_items
   for each row execute function public.stamp_actor('created_by');
+
+-- The same price rule for extras. Staff may add an extra from the price list
+-- at its listed price, or a one-off item such as a vet bill paid for the
+-- parent, which only ever adds to the bill. Changing what an extra costs is for
+-- owners and managers. Removing one is already manager only (policy).
+create function public.booking_items_guard_price()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null
+     or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+  then
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if new.unit_price_minor is distinct from old.unit_price_minor
+       or new.quantity is distinct from old.quantity
+       or new.tax_rate_bp is distinct from old.tax_rate_bp
+       or new.service_id is distinct from old.service_id
+    then
+      raise exception 'WB025: only an owner or manager can change what an extra costs' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if new.service_id is not null and not exists (
+    select 1
+    from public.services s
+    join public.organizations o on o.id = s.org_id
+    where s.org_id = new.org_id
+      and s.id = new.service_id
+      and s.is_active
+      and s.price_minor = new.unit_price_minor
+      and new.tax_rate_bp = case when o.tax_mode = 'none' then 0 else coalesce(s.tax_rate_bp, o.default_tax_rate_bp) end
+  ) then
+    raise exception 'WB023: only an owner or manager can book at a price that is not on your price list' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.booking_items_guard_price() is
+  'Trigger: staff add extras from the price list at the listed price (or one-off items with no price list entry) and cannot change what an extra costs afterwards.';
+
+create trigger booking_items_guard_price
+  before insert or update on public.booking_items
+  for each row execute function public.booking_items_guard_price();
 
 -- ---------------------------------------------------------------------------
 -- Reading occupancy. SECURITY INVOKER (the default), so row level security

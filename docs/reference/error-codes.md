@@ -15,20 +15,30 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB020 to WB029 | Bookings and capacity |
 | WB030 to WB039 | Invoices |
 | WB040 to WB049 | The public intake form |
+| WB050 to WB059 | Bills and payments (continued) |
+| WB060 to WB069 | Reports and expenses |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
 | `WB003` | invoice not found<br>submission not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB010` | unknown time zone "%" | `20261008000100_foundation.sql` |
 | `WB011` | a kennel must keep at least one active owner | `20261008000100_foundation.sql` |
 | `WB012` | you already own the maximum number of kennels | `20261008000100_foundation.sql` |
+| `WB013` | that language is not offered yet. | `20261008000100_foundation.sql` |
 | `WB014` | enter the person's name | `20261008000100_foundation.sql` |
 | `WB015` | that invitation is no longer open | `20261008000100_foundation.sql` |
+| `WB016` | that invitation link has expired or was already used. Ask for a new one. | `20261008000100_foundation.sql` |
+| `WB017` | you already work at this kennel | `20261008000100_foundation.sql` |
+| `WB018` | choose two different parents of this kennel | `20261008000500_billing.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
+| `WB022` | only an owner or manager can change the price or the kind of stay | `20261008000300_kennels_and_bookings.sql` |
+| `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
+| `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
+| `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql` |
 | `WB030` | an issued invoice cannot be deleted. Void it instead. | `20261008000500_billing.sql` |
 | `WB031` | a void invoice cannot be changed | `20261008000500_billing.sql` |
 | `WB032` | an issued invoice cannot be edited. Void it and issue a new one.<br>lines of an issued invoice cannot be changed<br>a line cannot be moved to another invoice | `20261008000500_billing.sql` |
@@ -49,3 +59,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB047` | the stay dates are not valid<br>check-out is before check-in | `20261008000600_intake_and_public_pages.sql` |
 | `WB048` | too many submissions right now. Please try again in a while.<br>we already have your form. The kennel will be in touch. | `20261008000600_intake_and_public_pages.sql` |
 | `WB049` | this form has already been dealt with<br>this form was declined and cannot be accepted | `20261008000600_intake_and_public_pages.sql` |
+| `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
+| `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
+| `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
+| `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |

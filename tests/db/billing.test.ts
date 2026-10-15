@@ -7,16 +7,21 @@ import { anon, as, createTestDb, errorOf, user } from "./harness";
 let db: PGlite;
 let k: Kennel;
 let staff: string;
+let manager: string;
 
 beforeAll(async () => {
   db = await createTestDb();
   k = await seedKennel(db);
   staff = await addMember(db, k, "staff");
+  manager = await addMember(db, k, "manager");
 });
 afterAll(() => db.close());
 
-/** Write a draft invoice the way the app does: numbers come from src/lib/core/tax.ts. */
-async function draft(totals: InvoiceTotals, actor: string = staff, booking: string | null = null): Promise<string> {
+/**
+ * Write a draft invoice the way the app does: numbers come from src/lib/core/tax.ts.
+ * By a manager unless said otherwise: staff may only issue a bill that matches its booking.
+ */
+async function draft(totals: InvoiceTotals, actor: string = manager, booking: string | null = null): Promise<string> {
   return as(db, user(actor), async () => {
     const inv = await db.query<{ id: string }>(
       `insert into public.invoices (org_id, client_id, booking_id, subtotal_minor, discount_minor, taxable_minor,
@@ -50,7 +55,7 @@ describe("issuing invoices", () => {
     const first = await draft(threeNights());
     const second = await draft(threeNights());
 
-    const issued = await as(db, user(staff), async () => {
+    const issued = await as(db, user(manager), async () => {
       const a = await db.query<{ number: string; seq: number; fiscal_year: string; status: string; issued_on: string; issued_by: string; seller: { trade_name: string }; buyer: { phone: string }; is_tax_invoice: boolean }>(
         "select number, seq, fiscal_year, status, issued_on::text, issued_by, seller, buyer, is_tax_invoice from public.issue_invoice($1)",
         [first],
@@ -64,7 +69,7 @@ describe("issuing invoices", () => {
     expect(issued[0].status).toBe("issued");
     expect(issued[0].fiscal_year).toBe(fy);
     expect(issued[0].issued_on).toBe(today);
-    expect(issued[0].issued_by).toBe(staff);
+    expect(issued[0].issued_by).toBe(manager);
     expect(issued[0].is_tax_invoice).toBe(false);
     expect(issued[0].seller.trade_name).toContain("Test Kennel");
     expect(issued[0].buyer.phone).toMatch(/^\+91/);
@@ -77,22 +82,22 @@ describe("issuing invoices", () => {
   it("refuses an invoice whose totals do not match its lines", async () => {
     const good = threeNights();
     const id = await draft({ ...good, totalMinor: good.totalMinor - 10000 });
-    const e = await errorOf(() => as(db, user(staff), () => db.query("select public.issue_invoice($1)", [id])));
+    const e = await errorOf(() => as(db, user(manager), () => db.query("select public.issue_invoice($1)", [id])));
     expect(e.message).toContain("WB037");
     // A failed attempt must not burn a number.
     const ok = await draft(good);
     const before = (await db.query<{ last_seq: number }>("select last_seq from public.invoice_counters where org_id = $1", [k.org])).rows[0].last_seq;
-    await as(db, user(staff), () => db.query("select public.issue_invoice($1)", [ok]));
+    await as(db, user(manager), () => db.query("select public.issue_invoice($1)", [ok]));
     const after = (await db.query<{ last_seq: number }>("select last_seq from public.invoice_counters where org_id = $1", [k.org])).rows[0].last_seq;
     expect(after).toBe(before + 1);
   });
 
   it("refuses an empty invoice and a second issue of the same invoice", async () => {
     const empty = await draft({ ...threeNights(), lines: [], taxableMinor: 0, subtotalMinor: 0, totalMinor: 0 });
-    expect((await errorOf(() => as(db, user(staff), () => db.query("select public.issue_invoice($1)", [empty])))).message).toContain("WB036");
+    expect((await errorOf(() => as(db, user(manager), () => db.query("select public.issue_invoice($1)", [empty])))).message).toContain("WB036");
     const id = await draft(threeNights());
-    await as(db, user(staff), () => db.query("select public.issue_invoice($1)", [id]));
-    expect((await errorOf(() => as(db, user(staff), () => db.query("select public.issue_invoice($1)", [id])))).message).toContain("WB035");
+    await as(db, user(manager), () => db.query("select public.issue_invoice($1)", [id]));
+    expect((await errorOf(() => as(db, user(manager), () => db.query("select public.issue_invoice($1)", [id])))).message).toContain("WB035");
   });
 
   it("cannot be bypassed by writing the status, number or sequence directly", async () => {
@@ -123,12 +128,12 @@ describe("issuing invoices", () => {
     // Ten nights billed as if they cost five rupees.
     const cheat = { ...good, lines: [{ ...good.lines[0], quantity: 10, taxableMinor: 500, totalMinor: 500 }], taxableMinor: 500, totalMinor: 500, subtotalMinor: 500 };
     const cheatId = await draft(cheat);
-    const e1 = await errorOf(() => as(db, user(staff), () => db.query("select public.issue_invoice($1)", [cheatId])));
+    const e1 = await errorOf(() => as(db, user(manager), () => db.query("select public.issue_invoice($1)", [cheatId])));
     expect(e1.message).toContain("WB037");
     // A round off that the rounding rule does not produce.
     const shaved = { ...good, roundOffMinor: -99, totalMinor: good.totalMinor - 99 };
     const shavedId = await draft(shaved);
-    const e2 = await errorOf(() => as(db, user(staff), () => db.query("select public.issue_invoice($1)", [shavedId])));
+    const e2 = await errorOf(() => as(db, user(manager), () => db.query("select public.issue_invoice($1)", [shavedId])));
     expect(e2.message).toContain("WB037");
   });
 
@@ -180,7 +185,7 @@ describe("issued invoices are frozen", () => {
   let id: string;
   beforeAll(async () => {
     id = await draft(threeNights());
-    await as(db, user(staff), () => db.query("select public.issue_invoice($1)", [id]));
+    await as(db, user(manager), () => db.query("select public.issue_invoice($1)", [id]));
   });
 
   it("cannot be edited, have lines changed, or be deleted", async () => {

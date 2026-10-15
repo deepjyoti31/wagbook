@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 9. Tables: 23. Views: 1. Functions: 36.
+Migrations applied: 10. Tables: 24. Views: 1. Functions: 53.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
 - Views: [invoice_balances](#invoice_balances)
 - [Functions](#functions)
 
@@ -110,6 +110,7 @@ Add-ons charged on top of the stay: grooming, pick-up and drop, a vet bill paid 
 
 - `booking_items_audit` (after insert or delete or update) runs `audit_row()`
 - `booking_items_forbid_org_change` (before update) runs `forbid_org_change()`
+- `booking_items_guard_price` (before insert or update) runs `booking_items_guard_price()`
 - `booking_items_set_updated_at` (before update) runs `set_updated_at()`
 - `booking_items_stamp_actor` (before insert or update) runs `stamp_actor()`
 
@@ -149,6 +150,9 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 | `cancelled_at` | `timestamp with time zone` |  |  |  |
 | `cancel_reason` | `text` |  |  |  |
 | `belongings` | `text` |  |  | What came with the pet (bed, leash, food, medicines) so it all goes home again. |
+| `gate_notes` | `text` |  |  | Anything the parent said at drop-off: a change of food, a recent illness, who will collect. |
+| `vaccinations_checked_at` | `timestamp with time zone` |  |  | When a staff member confirmed at check-in that they had seen the pet's vaccination certificates. Stamped by the database. |
+| `vaccinations_checked_by` | `uuid` |  |  | Who confirmed the vaccinations at check-in. Stamped by the database. |
 | `notes` | `text` |  |  |  |
 | `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. |
 | `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. |
@@ -167,9 +171,10 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 - Foreign key `bookings_checked_out_by_fkey`: `FOREIGN KEY (checked_out_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `bookings_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `bookings_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE RESTRICT`
-- Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON DELETE RESTRICT`
+- Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
+- Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
 - Check `bookings_at_most_a_year`: `CHECK (((end_date - start_date) <= 366))`
@@ -192,9 +197,12 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
+- `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
+- `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
 - `bookings_set_updated_at` (before update) runs `set_updated_at()`
 - `bookings_stamp_status` (before insert or update) runs `bookings_stamp_status()`
+- `bookings_stamp_vaccinations_checked` (before insert or update) runs `stamp_when_set()`
 
 **Access**
 
@@ -282,6 +290,8 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 - Foreign key `care_tasks_org_id_care_item_id_fkey`: `FOREIGN KEY (org_id, care_item_id) REFERENCES care_items(org_id, id) ON DELETE SET NULL (care_item_id)`
 - Foreign key `care_tasks_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `care_tasks_label_check`: `CHECK (((char_length(label) >= 1) AND (char_length(label) <= 80)))`
+- Check `care_tasks_photo_in_org`: `CHECK (paths_in_org(ARRAY[photo_path], org_id))`
+- Check `care_tasks_skipped_medication_needs_note`: `CHECK (((kind <> 'medication'::care_kind) OR (status <> 'skipped'::task_status) OR (char_length(btrim(COALESCE(note, ''::text))) > 0)))`
 
 **Indexes**
 
@@ -369,14 +379,14 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
 | `spent_on` | `date` | yes |  |  |
-| `category` | `text` | yes |  |  |
+| `category` | `text` | yes |  | What it was for, in the kennel's own words: Food, Staff, Rent. Reports total by this. |
 | `vendor` | `text` |  |  |  |
 | `description` | `text` |  |  |  |
 | `amount_minor` | `bigint` | yes |  |  |
 | `method` | `payment_method` |  |  |  |
 | `booking_id` | `uuid` |  |  | Set when the expense was for one pet's stay, e.g. a vet visit. |
 | `is_reimbursable` | `boolean` | yes | `false` | True when the parent should pay this back; add it to the booking as an item. |
-| `receipt_path` | `text` |  |  |  |
+| `receipt_path` | `text` |  |  | Photo or PDF of the receipt in storage, under {org_id}/expenses/. Only owners and managers can open it. |
 | `recorded_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -389,6 +399,9 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 - Foreign key `expenses_recorded_by_fkey`: `FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Check `expenses_amount_minor_check`: `CHECK ((amount_minor > 0))`
 - Check `expenses_category_check`: `CHECK (((char_length(category) >= 1) AND (char_length(category) <= 60)))`
+- Check `expenses_description_check`: `CHECK (((description IS NULL) OR (char_length(description) <= 500)))`
+- Check `expenses_receipt_in_org`: `CHECK (paths_in_org(ARRAY[receipt_path], org_id))`
+- Check `expenses_vendor_check`: `CHECK (((vendor IS NULL) OR (char_length(vendor) <= 120)))`
 
 **Indexes**
 
@@ -507,6 +520,48 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 - `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `intake_submissions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `intake_submissions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### invitation_links
+
+A one-time link that lets someone with no account yet join an organisation in a given role. Made by create_invitation_link(), used by accept_invitation_link().
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `token` | `text` | yes | `new_token()` | The secret in the link (/join/{token}). Anyone holding it can use it once, so it expires and can be withdrawn. |
+| `role` | `member_role` | yes |  |  |
+| `display_name` | `text` | yes |  | The name the person will be shown under, as the inviter typed it. |
+| `created_by` | `uuid` |  |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `expires_at` | `timestamp with time zone` | yes | `(now() + '7 days'::interval)` |  |
+| `used_at` | `timestamp with time zone` |  |  |  |
+| `used_by` | `uuid` |  |  |  |
+| `revoked_at` | `timestamp with time zone` |  |  | Set when a manager withdraws the link. A withdrawn link cannot be used. |
+
+**Constraints**
+
+- Primary key `invitation_links_pkey`: `PRIMARY KEY (id)`
+- Unique `invitation_links_token_key`: `UNIQUE (token)`
+- Foreign key `invitation_links_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `invitation_links_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `invitation_links_used_by_fkey`: `FOREIGN KEY (used_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `invitation_links_display_name_check`: `CHECK (((char_length(display_name) >= 1) AND (char_length(display_name) <= 80)))`
+- Check `invitation_links_used_together`: `CHECK (((used_at IS NULL) = (used_by IS NULL)))`
+
+**Indexes**
+
+- `CREATE INDEX invitation_links_org_idx ON public.invitation_links USING btree (org_id, created_at DESC)`
+
+**Triggers**
+
+- `invitation_links_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `invitation_links_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `invitation_links_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### invoice_counters
 
@@ -666,6 +721,7 @@ END)`
 
 **Indexes**
 
+- `CREATE UNIQUE INDEX invoices_one_live_per_booking ON public.invoices USING btree (org_id, booking_id) WHERE ((booking_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE INDEX invoices_org_booking_idx ON public.invoices USING btree (org_id, booking_id)`
 - `CREATE INDEX invoices_org_client_idx ON public.invoices USING btree (org_id, client_id)`
 - `CREATE INDEX invoices_org_issued_idx ON public.invoices USING btree (org_id, issued_on DESC)`
@@ -735,6 +791,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 | `role` | `member_role` | yes | `'staff'::member_role` |  |
 | `display_name` | `text` | yes |  | Name shown next to this person's actions, e.g. "Ravi". |
 | `phone` | `text` |  |  |  |
+| `language` | `text` | yes | `'en'::text` | The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once. |
 | `is_active` | `boolean` | yes | `false` | Whether this person can use the organisation right now. False while an invitation is pending, and set false again to cut off access at once without losing the history of who did what. |
 | `accepted_at` | `timestamp with time zone` |  |  | When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it. |
 | `invited_by` | `uuid` |  |  | Who sent the invitation. |
@@ -749,6 +806,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 - Foreign key `memberships_user_id_fkey`: `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE`
 - Check `memberships_active_needs_acceptance`: `CHECK (((NOT is_active) OR (accepted_at IS NOT NULL)))`
 - Check `memberships_display_name_check`: `CHECK (((char_length(display_name) >= 1) AND (char_length(display_name) <= 80)))`
+- Check `memberships_language_check`: `CHECK ((language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `memberships_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 
 **Indexes**
@@ -808,8 +866,14 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `allow_overbooking` | `boolean` | yes | `false` | When false, the database refuses a booking that would put more pets in house than there are active kennels. |
 | `play_sessions_per_day` | `smallint` | yes | `0` | Solo play sessions each boarded pet should get per day. 0 turns play scheduling off. |
 | `play_session_minutes` | `smallint` | yes | `20` | Normal length of one play session. Peak periods can override it. |
+| `play_changeover_minutes` | `smallint` | yes | `0` | Minutes a yard stands empty between two pets, to walk one out and the next in. |
+| `play_day_start` | `time without time zone` | yes | `'08:00:00'::time without time zone` | When the play yards open. Local clock time at the kennel. |
+| `play_day_end` | `time without time zone` | yes | `'18:00:00'::time without time zone` | When the play yards close. No session runs past this. |
+| `play_break_start` | `time without time zone` |  |  | Start of an optional break in play, such as the midday heat. Empty for no break. |
+| `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
-| `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default is used when empty. |
+| `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
+| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page, bill and WhatsApp messages. en, hi or kn. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -825,7 +889,11 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
 - Check `organizations_invoice_prefix_check`: `CHECK ((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
+- Check `organizations_parent_language_check`: `CHECK ((parent_language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
+- Check `organizations_play_break_inside_day`: `CHECK ((((play_break_start IS NULL) AND (play_break_end IS NULL)) OR ((play_break_start IS NOT NULL) AND (play_break_end IS NOT NULL) AND (play_break_start > play_day_start) AND (play_break_end < play_day_end) AND (play_break_end > play_break_start))))`
+- Check `organizations_play_changeover_minutes_check`: `CHECK (((play_changeover_minutes >= 0) AND (play_changeover_minutes <= 60)))`
+- Check `organizations_play_hours_in_order`: `CHECK ((play_day_end > play_day_start))`
 - Check `organizations_play_session_minutes_check`: `CHECK (((play_session_minutes >= 5) AND (play_session_minutes <= 240)))`
 - Check `organizations_play_sessions_per_day_check`: `CHECK (((play_sessions_per_day >= 0) AND (play_sessions_per_day <= 12)))`
 - Check `organizations_slug_check`: `CHECK ((slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'::text))`
@@ -978,6 +1046,7 @@ An animal in the kennel's care. Belongs to one client.
 - Foreign key `pets_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE CASCADE`
 - Foreign key `pets_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `pets_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `pets_photo_in_org`: `CHECK (paths_in_org(ARRAY[photo_path], org_id))`
 - Check `pets_species_check`: `CHECK ((species = ANY (ARRAY['dog'::text, 'cat'::text, 'other'::text])))`
 - Check `pets_weight_kg_check`: `CHECK (((weight_kg IS NULL) OR ((weight_kg > (0)::numeric) AND (weight_kg < (200)::numeric))))`
 
@@ -1158,7 +1227,9 @@ A note about how a pet is doing, usually with photos. Doubles as the shift hando
 - Foreign key `stay_updates_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `stay_updates_org_id_booking_id_pet_id_fkey`: `FOREIGN KEY (org_id, booking_id, pet_id) REFERENCES bookings(org_id, id, pet_id) ON DELETE CASCADE`
 - Foreign key `stay_updates_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `stay_updates_at_most_six_photos`: `CHECK ((cardinality(media_paths) <= 6))`
 - Check `stay_updates_body_check`: `CHECK (((char_length(body) >= 1) AND (char_length(body) <= 2000)))`
+- Check `stay_updates_media_in_org`: `CHECK (paths_in_org(media_paths, org_id))`
 
 **Indexes**
 
@@ -1203,6 +1274,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 - Foreign key `vaccinations_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `vaccinations_org_id_pet_id_fkey`: `FOREIGN KEY (org_id, pet_id) REFERENCES pets(org_id, id) ON DELETE CASCADE`
 - Foreign key `vaccinations_verified_by_fkey`: `FOREIGN KEY (verified_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `vaccinations_certificate_in_org`: `CHECK (paths_in_org(ARRAY[certificate_path], org_id))`
 - Check `vaccinations_check`: `CHECK (((valid_until IS NULL) OR (given_on IS NULL) OR (valid_until >= given_on)))`
 - Check `vaccinations_vaccine_check`: `CHECK (((char_length(vaccine) >= 1) AND (char_length(vaccine) <= 60)))`
 
@@ -1260,6 +1332,18 @@ accept_intake(p_submission uuid) returns uuid
 
 Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added. Returns the client id. Creating the booking is a separate step.
 
+### accept_invitation_link
+
+```
+accept_invitation_link(p_token text) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Joins the signed-in person to the organisation of an invitation link, in its role. Works once; refuses an expired or withdrawn link and someone who is already a member.
+
 ### audit_row
 
 ```
@@ -1284,6 +1368,18 @@ available_kennels(p_org uuid, p_kind booking_kind, p_start date, p_end date) ret
 
 Active kennels with no booking holding them at any point in the given stay. Used to offer kennels when booking or checking in.
 
+### booking_items_guard_price
+
+```
+booking_items_guard_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: staff add extras from the price list at the listed price (or one-off items with no price list entry) and cannot change what an extra costs afterwards.
+
 ### bookings_check_capacity
 
 ```
@@ -1296,6 +1392,30 @@ bookings_check_capacity() returns trigger
 
 Trigger: refuses a booking that would put more pets in house than there are active kennels on any day of the stay, and refuses a kennel that is out of service.
 
+### bookings_check_group
+
+```
+bookings_check_group() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: every booking sharing a group_id has the same client.
+
+### bookings_guard_price
+
+```
+bookings_guard_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list, with no discount, and cannot change the price, discount, tax or kind of an existing booking.
+
 ### bookings_stamp_status
 
 ```
@@ -1307,6 +1427,30 @@ bookings_stamp_status() returns trigger
 - Volatility: volatile
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
+
+### check_report_access
+
+```
+check_report_access(p_org uuid, p_from date, p_to date) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Raises unless the caller is an owner or manager of the organisation and the period runs forwards for at most 400 days. Every report calls it first.
+
+### create_invitation_link
+
+```
+create_invitation_link(p_org uuid, p_role member_role, p_display_name text) returns text
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Makes an invitation link for someone with no account yet. Owner or manager; only owners can invite owners. Returns the secret token.
 
 ### create_organization
 
@@ -1323,14 +1467,14 @@ Creates an organisation and makes the signed-in user its owner. The only way an 
 ### default_intake_notice
 
 ```
-default_intake_notice(p_org_name text) returns text
+default_intake_notice(p_org_name text, p_language text) returns text
 ```
 
 - Who may call: internal
 - Runs as: the caller (row level security applies)
 - Volatility: immutable
 
-Consent wording used when an organisation has not written its own.
+Consent wording used when an organisation has not written its own, in the parent pages' language (en, hi or kn; anything else gives English).
 
 ### fiscal_year_label
 
@@ -1366,7 +1510,19 @@ generate_care_tasks(p_org uuid, p_date date) returns integer
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Creates the day's tasks for every pet in house from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.
+Creates the day's tasks for every pet in house (checked in, on or after its first day) from the house and per-pet routines. Safe to call repeatedly; returns how many tasks were new.
+
+### get_invitation_link
+
+```
+get_invitation_link(p_token text) returns TABLE(org_name text, role member_role, display_name text, usable boolean, already_member boolean)
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+What an invitation link is for (kennel name, role, name), for a signed-in person holding it, and whether it can still be used.
 
 ### get_public_intake_form
 
@@ -1402,7 +1558,7 @@ get_public_stay(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name, dates, status, parent-visible updates and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out.
+PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).
 
 ### intake_submissions_stamp_review
 
@@ -1427,6 +1583,18 @@ invite_member_by_email(p_org uuid, p_email text, p_role member_role, p_display_n
 - Volatility: volatile
 
 Invites an existing account to an organisation, or corrects an invitation that has not been answered yet. Someone who is already a member is left unchanged. The person becomes a member only when they accept. Owner or manager only; only owners can invite or change owners. Returns nothing in every case.
+
+### invoice_expected_lines
+
+```
+invoice_expected_lines(p_booking uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The lines a bill for a booking should have, as quantity, unit price, discount and tax rate: the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
 
 ### invoice_lines_guard
 
@@ -1474,7 +1642,19 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Any member may issue.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.
+
+### merge_clients
+
+```
+merge_clients(p_keep uuid, p_merge uuid) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
 
 ### my_invitations
 
@@ -1536,6 +1716,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 
 Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.
 
+### paths_in_org
+
+```
+paths_in_org(p_paths text[], p_org uuid) returns boolean
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+True when every path that is set is inside the given organisation's folder. Empty paths are allowed.
+
 ### protect_last_owner
 
 ```
@@ -1547,6 +1739,54 @@ protect_last_owner() returns trigger
 - Volatility: volatile
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
+
+### report_extras
+
+```
+report_extras(p_org uuid, p_from date, p_to date) returns TABLE(name text, stays integer, quantity numeric, amount_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The extras sold on stays that start in the period, biggest first (at most 20): how many stays had each, how many in all, and their value at the price charged, before discount and tax. Extras from the price list are grouped by its current name; one-off items by their description. Owners and managers only.
+
+### report_money
+
+```
+report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+For each month in the period: what was billed (issued bills by bill date; cancelled bills left out) and the tax in it, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
+
+### report_occupancy
+
+```
+report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boarding integer, day_boarding integer, capacity integer)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+For each day: pets staying the night (boarding), pets in for the day (day boarding), and kennels in service today. Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
+
+### report_tax
+
+```
+report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Tax on issued bills in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST). Bills are counted by bill date; cancelled bills are left out. Owners and managers only.
 
 ### respond_to_invitation
 
@@ -1571,6 +1811,30 @@ safe_date(p_text text) returns date
 - Volatility: immutable
 
 Reads a YYYY-MM-DD string as a date, or returns null if it is anything else. For text that arrived from the public internet.
+
+### save_invoice_draft
+
+```
+save_invoice_draft(p_invoice uuid, p_totals jsonb, p_lines jsonb) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Replaces a draft invoice's lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.
+
+### set_my_language
+
+```
+set_my_language(p_language text) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Sets the signed-in person's language (en, hi or kn) in every kennel they belong to. Changes nothing else.
 
 ### set_updated_at
 
@@ -1619,6 +1883,18 @@ stamp_when_set() returns trigger
 - Volatility: volatile
 
 Trigger for a pair of "when" and "who" columns (named in the two trigger arguments) that record a one-off confirmation, such as a certificate being checked. Sending any time marks it; the database then records the real time and the signed-in user, and later edits cannot change them. Sending null clears both.
+
+### stay_media_visible
+
+```
+stay_media_visible(p_name text) returns boolean
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+PUBLIC, through Storage only. True when the request carries a live stay's token (x-wagbook-stay header) and the file is that stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one). SECURITY DEFINER because the anonymous role can read no table.
 
 ### stay_range
 

@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { Rich } from "@/components/rich";
 import { Field, Input, Loading } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
+import { getVisitorI18n, type I18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { createOrganization, respondToInvitation } from "./actions";
 
-export const metadata: Metadata = { title: "Set up your kennel" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getVisitorI18n()).m.onboarding.title };
+}
 
 export default function OnboardingPage() {
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
-      <h1 className="mb-2 text-3xl font-extrabold tracking-tight">Set up your kennel</h1>
-      <p className="mb-6 text-slate">Three details now. Everything else can wait until you need it.</p>
       <Suspense fallback={<Loading />}>
         <OnboardingForm />
       </Suspense>
@@ -22,58 +25,64 @@ export default function OnboardingPage() {
 
 async function OnboardingForm() {
   await requireUser();
+  const { m, language } = await getVisitorI18n();
+  const o = m.onboarding;
   const supabase = await createClient();
   const { data: invitations } = await supabase.rpc("my_invitations");
   return (
     <>
+      <HtmlLang lang={language} />
+      <h1 className="mb-2 text-3xl font-extrabold tracking-tight">{o.title}</h1>
+      <p className="mb-6 text-slate">{o.intro}</p>
       {invitations && invitations.length > 0 ? (
         <div className="mb-8 rounded-xl border-2 border-marigold bg-paper p-4">
-          <p className="mb-3 text-lg font-bold">You have been invited</p>
+          <p className="mb-3 text-lg font-bold">{o.invited}</p>
           <ul className="space-y-4">
             {invitations.map((inv) => (
               <li key={inv.org_id}>
                 <p>
-                  Join <strong>{inv.org_name}</strong> as {inv.role === "owner" ? "an owner" : inv.role === "manager" ? "a manager" : "staff"}.
+                  <Rich text={o.joinAs[inv.role]} parts={{ kennel: <strong>{inv.org_name}</strong> }} />
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <ActionForm action={respondToInvitation} className="contents">
                     <input type="hidden" name="orgId" value={inv.org_id} />
                     <input type="hidden" name="accept" value="true" />
-                    <SubmitButton pendingLabel="Joining">Join</SubmitButton>
+                    <SubmitButton pendingLabel={o.joining}>{o.join}</SubmitButton>
                   </ActionForm>
                   <ActionForm action={respondToInvitation} className="contents">
                     <input type="hidden" name="orgId" value={inv.org_id} />
                     <input type="hidden" name="accept" value="false" />
-                    <SubmitButton variant="quiet" pendingLabel="Declining">
-                      Decline
+                    <SubmitButton variant="quiet" pendingLabel={o.declining}>
+                      {o.decline}
                     </SubmitButton>
                   </ActionForm>
                 </div>
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-slate">Or set up a kennel of your own below.</p>
+          <p className="mt-4 text-slate">{o.orOwn}</p>
         </div>
       ) : null}
-      <CreateForm />
+      <CreateForm m={m} />
     </>
   );
 }
 
-function CreateForm() {
+function CreateForm({ m }: { m: I18n["m"] }) {
+  const o = m.onboarding;
   return (
     <ActionForm action={createOrganization}>
-      <Field label="Kennel name" hint="As parents know it.">
+      <Field label={o.kennelName} hint={o.kennelNameHint}>
         <Input name="name" required minLength={2} maxLength={80} autoComplete="organization" />
       </Field>
-      <Field label="Link name" hint="Used in the link you send to parents, like yoursite/i/happy-tails. Lower case letters, numbers and hyphens.">
+      <Field label={o.linkName} hint={o.linkNameHint}>
         <Input name="slug" required pattern="[a-z0-9][a-z0-9\-]{1,38}[a-z0-9]" autoCapitalize="none" spellCheck={false} />
       </Field>
-      <Field label="Your name" hint="Shown next to things you do, like check-ins.">
+      <Field label={o.yourName} hint={o.yourNameHint}>
         <Input name="displayName" required maxLength={80} autoComplete="name" />
       </Field>
-      <SubmitButton pendingLabel="Creating" className="w-full">
-        Create kennel
+      <SubmitButton pendingLabel={o.creating} className="w-full">
+        {o.create}
       </SubmitButton>
     </ActionForm>
   );
