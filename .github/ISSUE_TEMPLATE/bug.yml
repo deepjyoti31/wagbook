@@ -1,0 +1,33 @@
+name: Something does not work
+description: A screen, a rule or a number that is wrong.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. If this lets someone see or change another kennel's data, a parent's details, or an issued bill,
+        **do not report it here**: see SECURITY.md and use private reporting.
+        Please do not paste real parents' names, phone numbers or addresses.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, step by step, and what you saw. A screenshot at phone width helps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The page address (without any secret link), your phone and browser, and the Wagbook version or commit.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Signed in as
+      options: ["Owner", "Manager", "Staff", "Not signed in (a parent's page)"]

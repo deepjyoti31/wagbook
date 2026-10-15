@@ -1,0 +1,19 @@
+# Caddy in front of Wagbook and Supabase (deploy/compose.yml).
+# With real domain names it gets HTTPS certificates by itself. For a trial on
+# one computer, use http://wagbook.localhost and http://api.wagbook.localhost.
+
+{$WAGBOOK_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy wagbook:3000 {
+		# The rate limits count visitors by these (src/lib/rate-limit.ts).
+		# Caddy sets them from the connection and drops whatever the visitor sent.
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+	}
+}
+
+{$SUPABASE_DOMAIN} {
+	reverse_proxy {$SUPABASE_UPSTREAM} {
+		header_up X-Real-IP {remote_host}
+	}
+}

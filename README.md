@@ -8,20 +8,29 @@ built for India first (UPI, GST, WhatsApp, lakh and crore) and works anywhere.
 
 It is built by a kennel for its own daily use, so it has to work on a cheap phone, in a noisy yard, with one hand.
 
-> Status: early. The database, its rules and the first screens are built and tested. Read
-> [docs/HANDOFF.md](docs/HANDOFF.md) for exactly what works today and what does not.
+> Status: every planned feature is built and tested, in a real browser at phone width against a local Supabase. It
+> has not yet run on a hosted Supabase project or on a real phone. Read [docs/HANDOFF.md](docs/HANDOFF.md) for exactly
+> what is verified and what is not.
 
-## What it does today
+## What it does
 
-- A kennel signs up, adds its kennels, sets its prices, and invites its team.
-- Bookings for overnight boarding and day boarding. Two pets can never be put in the same kennel on the same night, and a
-  kennel can never take more pets than it has kennels. The database enforces both, so no screen can get it wrong.
-- A Today screen: arrivals to check in, pets in house, check-out.
-- A link each kennel sends to parents so they fill in food, health and vaccination details themselves.
-- A private page per stay that a parent can open from WhatsApp, no account needed.
-- Messages and pay links that open in the kennel's own WhatsApp and the parent's own UPI app. No gateway, no fees, no API keys.
-- Underneath, ready for screens that are not built yet: daily care tasks, solo play scheduling, GST invoices with
-  consecutive numbers, payments, expenses, incident log, and a full audit trail.
+- **Bookings** for boarding and day boarding. Two pets can never share a kennel on the same night, and a kennel never
+  takes more pets than it has kennels. The database enforces both, so no screen can get it wrong. Families, requests,
+  peak periods, a calendar.
+- **Today**: who arrives, who is in, who goes home, what care is still to do. Check-in with a checklist.
+- **The care round**: meals, medicines, cleaning and walks in one tap each, safe to tap twice, and kept on the phone
+  when the connection drops. Solo play planned yard by yard.
+- **Parents never need an account.** A form they fill in themselves (food, health, vaccination card), a private page
+  per stay with updates and photos, and messages and pay links that open in the kennel's own WhatsApp and the parent's
+  own UPI app. No gateway, no fees, no API keys.
+- **Money**: bills with GST or no tax and numbers that follow on, a UPI QR code, payments and advances, expenses with
+  receipts, reports and downloads for the accountant.
+- **People**: invite the team by link, owners, managers and staff, and a history of who changed what.
+- **Privacy and safety**: download or erase a parent's details on request, two-step sign-in enforced by the database,
+  rate limits, and a strict Content Security Policy.
+- **English, Hindi and Kannada**, each person choosing their own.
+
+[The guide for kennel owners](docs/17-guide-for-kennel-owners.md) shows it with pictures.
 
 ## What it is built with
 
@@ -35,7 +44,8 @@ It is built by a kennel for its own daily use, so it has to work on a cheap phon
 ## Run it
 
 You need Node.js 22 or newer and a free Supabase project. The full walk-through, with every click, is
-[docs/10-setup-and-deploy.md](docs/10-setup-and-deploy.md). The short version:
+[docs/10-setup-and-deploy.md](docs/10-setup-and-deploy.md); to run everything on your own server with Docker, see
+[docs/14-self-hosting.md](docs/14-self-hosting.md). The short version:
 
 ```bash
 npm install
@@ -48,7 +58,7 @@ Without the Supabase values the app still starts; signing in then takes you to a
 To check everything without any account at all:
 
 ```bash
-npm run check                   # lint, types, 136 tests, production build
+npm run check                   # lint, types, every unit and database test, production build
 ```
 
 ## Find your way around
@@ -62,7 +72,8 @@ npm run check                   # lint, types, 136 tests, production build
 | Understand the data | [docs/04-data-model.md](docs/04-data-model.md) and [docs/reference/schema.md](docs/reference/schema.md) |
 | Pick up the next piece of work | [docs/08-roadmap.md](docs/08-roadmap.md) |
 | Work on it with Claude Code | [CLAUDE.md](CLAUDE.md) and [docs/11-working-with-claude-code.md](docs/11-working-with-claude-code.md) |
-| Contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Run it for a kennel | [docs/17-guide-for-kennel-owners.md](docs/17-guide-for-kennel-owners.md), [docs/15-backup-and-restore.md](docs/15-backup-and-restore.md), [docs/16-releasing.md](docs/16-releasing.md) |
+| Contribute | [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [CHANGELOG.md](CHANGELOG.md) |
 
 ## Licence
 

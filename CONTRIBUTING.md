@@ -49,8 +49,15 @@ what Wagbook promises, so you can tell a bug from a known limitation.
 
 ## Translations
 
-Wagbook's words are plain on purpose so they translate well. Translation support is on the roadmap (milestone M8). Until
-it lands, please do not send translated copies of screens.
+Wagbook's words are plain on purpose so they translate well. Every word on screen is in `src/messages` (English, Hindi,
+Kannada; decision D21). The Hindi and Kannada are drafts: corrections from native speakers, especially people who work
+at kennels, are the most useful contribution there is. Change the word in `src/messages/hi/` or `src/messages/kn/`
+and say in the pull request where you saw it.
+
+## Releases and conduct
+
+How versions are made is in [docs/16-releasing.md](docs/16-releasing.md); add a line to `CHANGELOG.md` under "Not
+released yet" with your change. Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Licence of contributions
 

@@ -1,0 +1,62 @@
+# Wagbook and its web server, on your own machine. See docs/14-self-hosting.md.
+#
+# Supabase runs beside it, from Supabase's own self-hosting setup, on the
+# Docker network named in SUPABASE_NETWORK. Caddy answers on ports 80 and 443
+# for two addresses: the app (WAGBOOK_DOMAIN) and Supabase (SUPABASE_DOMAIN),
+# and gets HTTPS certificates for both by itself.
+#
+#   cp deploy/.env.example deploy/.env      # then fill it in
+#   docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build
+
+name: wagbook
+
+services:
+  wagbook:
+    build:
+      context: ..
+      args:
+        # Built into the app: the browser loads photos from this address, and
+        # the server talks to Supabase at it too (through Caddy, see the alias).
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_SITE_URL: ${WAGBOOK_PUBLIC_URL}
+        NEXT_PUBLIC_WAGBOOK_DEMO: ${WAGBOOK_DEMO:-}
+    restart: unless-stopped
+    # Not published: only Caddy talks to it.
+    expose:
+      - "3000"
+    networks:
+      - wagbook
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      WAGBOOK_DOMAIN: ${WAGBOOK_DOMAIN}
+      SUPABASE_DOMAIN: ${SUPABASE_DOMAIN}
+      SUPABASE_UPSTREAM: ${SUPABASE_UPSTREAM:-kong:8000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      wagbook:
+        # So that the app server reaches Supabase at the same public address
+        # the browser uses, without leaving the machine.
+        aliases:
+          - ${SUPABASE_DOMAIN_HOST}
+      supabase: {}
+
+networks:
+  wagbook: {}
+  supabase:
+    name: ${SUPABASE_NETWORK:-supabase_default}
+    external: true
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

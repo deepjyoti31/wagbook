@@ -253,33 +253,44 @@ settings, security review and fixes, documentation.
 
 ## M9. Hardening and privacy tools
 
-- [ ] Not started.
+- [x] Finished 15 October 2026. Item 6 was an adversarial pass by Claude Code, not an independent person; one is
+  still recommended before a public instance (see `05`, review log, and `HANDOFF.md`).
 
 **Build**
 
-1. Script-src Content Security Policy with nonces.
-2. Rate limiting for the intake form and sign-in at the edge, or a privacy-respecting challenge on the intake form.
-3. Export everything about one parent as a file. Erase a parent on request, keeping issued invoices with the buyer
-   details the law requires.
-4. Two-factor sign-in for owners.
-5. A documented backup and restore drill.
-6. A second independent security review. Log it in `05`.
-7. Vaccination certificate upload in the intake form (moved from M5): anonymous uploads under the submission's own
-   folder, at most one per pet, only within an hour of submitting, behind the same rate limits as item 2.
+1. [x] Script-src Content Security Policy with nonces (D23: nonces, plus hashes for the prerendered shell).
+2. [x] Rate limiting for the intake form and sign-in at the edge (D26: the app's proxy, per address; posts over 1 MB
+   refused outside uploads).
+3. [x] Export everything about one parent as a file. Erase a parent on request, keeping issued invoices with the buyer
+   details the law requires (D25, `export_client`, `erase_client`).
+4. [x] Two-factor sign-in for owners (D24: any person may turn it on; the database enforces it).
+5. [x] A documented backup and restore drill ([15-backup-and-restore.md](15-backup-and-restore.md),
+   `scripts/backup-drill.sh`, run locally; the hosted round trip waits for the owner).
+6. [x] A second security review, logged in `05` (with races 6 and 16 staged on real Postgres, `scripts/race-checks.sh`).
+7. [x] Vaccination certificate upload in the intake form (moved from M5): anonymous uploads under the submission's own
+   folder, at most one per pet, only within an hour of submitting, behind the same rate limits as item 2
+   (`intake_upload_allowed`).
 
 ---
 
 ## M10. Ready for the world
 
-- [ ] Not started.
+- [ ] Built 15 October 2026, except item 5, which is the owner's decision. The public demo is ready to run but has no
+  server yet.
 
 **Build**
 
-1. A self-hosting guide with Docker Compose (self-hosted Supabase plus the app).
-2. A public demo with seeded, invented data that resets nightly.
-3. Issue and pull request templates, a code of conduct, a release process and changelog.
-4. A short guide for a kennel owner, with screenshots, written for someone who has never used such software.
-5. Confirm the licence decision (see `09-decisions.md`, D2) before the first public announcement.
+1. [x] A self-hosting guide with Docker Compose (self-hosted Supabase plus the app): [14-self-hosting.md](14-self-hosting.md),
+   `Dockerfile`, `deploy/`. Verified on one computer against the CLI's Supabase; Supabase's own self-hosting stack not
+   tried.
+2. [x] A public demo with seeded, invented data that resets nightly: `NEXT_PUBLIC_WAGBOOK_DEMO=1` and
+   `deploy/demo-reset.sh`. Needs a server to run on.
+3. [x] Issue and pull request templates, a code of conduct, a release process and changelog (`.github/`,
+   `CODE_OF_CONDUCT.md`, [16-releasing.md](16-releasing.md), `CHANGELOG.md`).
+4. [x] A short guide for a kennel owner, with screenshots: [17-guide-for-kennel-owners.md](17-guide-for-kennel-owners.md)
+   (`scripts/guide-screenshots.mjs` takes the pictures again).
+5. [ ] Confirm the licence decision (see `09-decisions.md`, D2) before the first public announcement. **Waiting for the
+   owner.**
 
 ---
 
