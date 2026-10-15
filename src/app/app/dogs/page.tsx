@@ -1,28 +1,23 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Input, Ledger, LedgerRow, Loading, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
+import { flagText } from "@/lib/bookings";
 import { formatPhone } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import type { QueryData } from "@supabase/supabase-js";
 import { PetAvatar } from "@/components/pet-avatar";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Pets" };
+export const generateMetadata = () => appTitle((m) => m.pets.title);
 
 export default function PetsPage({ searchParams }: PageProps<"/app/dogs">) {
   return (
-    <>
-      <PageTitle title="Pets">
-        <Link href="/app/dogs/new" className={buttonStyles.primary}>
-          Add a pet
-        </Link>
-      </PageTitle>
-      <Suspense fallback={<Loading label="Loading pets" />}>
-        <Pets searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Pets searchParams={searchParams} />
+    </Suspense>
   );
 }
 
@@ -30,6 +25,7 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 60) : "";
   const { org } = await requireOrg();
+  const { m } = await getAppI18n();
   const supabase = await createClient();
 
   const PET = "id, name, breed, species, weight_kg, flags, photo_path, clients(id, full_name, phone)" as const;
@@ -59,17 +55,22 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
 
   return (
     <>
+      <PageTitle title={m.pets.title}>
+        <Link href="/app/dogs/new" className={buttonStyles.primary}>
+          {m.pets.add}
+        </Link>
+      </PageTitle>
       <form className="mb-4 flex gap-2" role="search">
         <label className="flex-1">
-          <span className="sr-only">Search by pet name, parent name or phone number</span>
-          <Input name="q" type="search" defaultValue={q} placeholder="Pet, parent or phone" />
+          <span className="sr-only">{m.pets.searchLabel}</span>
+          <Input name="q" type="search" defaultValue={q} placeholder={m.pets.searchPlaceholder} />
         </label>
         <button type="submit" className={buttonStyles.secondary}>
-          Search
+          {m.pets.search}
         </button>
       </form>
       {data.length === 0 ? (
-        <Empty>{q ? `Nothing found for "${q}".` : "No pets yet. Add one, or send parents your intake form from More."}</Empty>
+        <Empty>{q ? fill(m.pets.nothingFound, { q }) : m.pets.none}</Empty>
       ) : (
         <Ledger>
           {data.map((p) => (
@@ -80,11 +81,11 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
                   <Link href={`/app/dogs/${p.id}`} className="text-lg font-bold underline-offset-4 hover:underline">
                     {p.name}
                   </Link>
-                  <span className="text-slate">{[p.breed, p.weight_kg ? `${p.weight_kg} kg` : null].filter(Boolean).join(", ")}</span>
-                  {p.species !== "dog" ? <Badge>{p.species}</Badge> : null}
+                  <span className="text-slate">{[p.breed, p.weight_kg ? fill(m.pet.weight, { kg: p.weight_kg }) : null].filter(Boolean).join(", ")}</span>
+                  {p.species !== "dog" ? <Badge>{(m.pet.speciesInLine as Record<string, string>)[p.species] ?? p.species}</Badge> : null}
                   {p.flags.map((f) => (
                     <Badge key={f} tone="alert">
-                      {f.replaceAll("_", " ")}
+                      {flagText(m, f)}
                     </Badge>
                   ))}
                 </p>
@@ -101,7 +102,7 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
                 ) : null}
               </div>
               <Link href={`/app/bookings/new?pet=${p.id}`} className={buttonStyles.secondary}>
-                Book a stay
+                {m.pets.bookStay}
               </Link>
             </LedgerRow>
           ))}

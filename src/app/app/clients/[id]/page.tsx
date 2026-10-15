@@ -1,23 +1,24 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PetAvatar } from "@/components/pet-avatar";
+import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { INVOICE_STATUS_LABEL } from "@/lib/billing";
-import { flagText, STATUS_LABEL, stayText } from "@/lib/bookings";
+import { flagText, stayText } from "@/lib/bookings";
 import { formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, whatsappLink } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { mergeClient, updateClient } from "../actions";
 
-export const metadata: Metadata = { title: "Parent" };
+export const generateMetadata = () => appTitle((m) => m.parent.title);
 
 export default function ParentPage({ params, searchParams }: PageProps<"/app/clients/[id]">) {
   return (
-    <Suspense fallback={<Loading label="Loading the parent" />}>
+    <Suspense fallback={<Loading />}>
       <Parent params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -28,6 +29,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   const query = await searchParams;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const p = m.parent;
   const supabase = await createClient();
 
   const res = await supabase
@@ -51,7 +55,8 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   const due = new Map((balances.data ?? []).map((b) => [b.invoice_id, b.due_minor ?? 0]));
   const owed = [...due.values()].reduce((n, d) => n + Math.max(d, 0), 0);
   const photos = await signedUrls(supabase, pets.data.map((p) => p.photo_path), { small: true });
-  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: org.locale, trimZeros: true });
+  const f = p.fields;
+  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true });
 
   // Merging: find the duplicate by phone number first, then confirm.
   const lookFor = typeof query.same === "string" ? normalizePhone(query.same, org.country_code === "IN" ? "IN" : null) : null;
@@ -63,29 +68,29 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   return (
     <>
       <PageTitle title={c.full_name}>
-        <a href={whatsappLink(`Hi ${c.full_name}, `, c.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
-          WhatsApp
+        <a href={whatsappLink(fill(parentI18n(org.parent_language, org.locale).m.whatsapp.greeting, { name: c.full_name }), c.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
+          {m.common.whatsapp}
         </a>
       </PageTitle>
       <p className="mb-5 text-lg">
         <a href={`tel:${c.phone}`} className="underline underline-offset-4">
           {formatPhone(c.phone)}
         </a>
-        {c.alt_phone ? <span className="text-slate">, also {formatPhone(c.alt_phone)}</span> : null}
+        {c.alt_phone ? <span className="text-slate">{fill(p.alsoPhone, { phone: formatPhone(c.alt_phone) })}</span> : null}
         {owed > 0 ? (
           <>
             {" "}
-            <Badge tone="attention">{money(owed)} owed</Badge>
+            <Badge tone="attention">{fill(p.owed, { amount: money(owed) })}</Badge>
           </>
         ) : null}
       </p>
 
-      {query.done === "merged" ? <Notice tone="ok">Merged. Everything from the other record is here now.</Notice> : null}
-      {c.consent_at ? null : <Notice tone="info">No consent on record to keep these details. Ask, and tick it below.</Notice>}
+      {query.done === "merged" ? <Notice tone="ok">{p.merged}</Notice> : null}
+      {c.consent_at ? null : <Notice tone="info">{p.noConsent}</Notice>}
 
-      <Section title="Pets" count={pets.data.length}>
+      <Section title={p.pets} count={pets.data.length}>
         {pets.data.length === 0 ? (
-          <Empty>No pets.</Empty>
+          <Empty>{p.noPets}</Empty>
         ) : (
           <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
             {pets.data.map((p) => (
@@ -97,7 +102,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                     {p.breed ? <span className="text-slate">{p.breed}</span> : null}
                     {p.flags.map((f) => (
                       <Badge key={f} tone="alert">
-                        {flagText(f)}
+                        {flagText(m, f)}
                       </Badge>
                     ))}
                   </span>
@@ -108,17 +113,17 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
         )}
       </Section>
 
-      <Section title="Stays" count={stays.data.length}>
+      <Section title={p.stays} count={stays.data.length}>
         {stays.data.length === 0 ? (
-          <Empty>No stays yet.</Empty>
+          <Empty>{p.noStays}</Empty>
         ) : (
           <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
             {stays.data.map((s) => (
               <li key={s.id}>
                 <Link href={`/app/bookings/${s.id}`} className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-3 hover:bg-ground">
                   <span className="font-semibold">{s.pets?.name}</span>
-                  <span className="flex-1 text-slate">{stayText(s.kind, s.start_date, s.end_date)}</span>
-                  <Badge tone={s.status === "checked_in" ? "good" : "neutral"}>{STATUS_LABEL[s.status]}</Badge>
+                  <span className="flex-1 text-slate">{stayText(t, s.kind, s.start_date, s.end_date)}</span>
+                  <Badge tone={s.status === "checked_in" ? "good" : "neutral"}>{m.labels.bookingStatus[s.status]}</Badge>
                 </Link>
               </li>
             ))}
@@ -126,9 +131,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
         )}
       </Section>
 
-      <Section title="Bills" count={bills.data.length}>
+      <Section title={p.bills} count={bills.data.length}>
         {bills.data.length === 0 ? (
-          <Empty>No bills yet.</Empty>
+          <Empty>{p.noBills}</Empty>
         ) : (
           <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
             {bills.data.map((b) => {
@@ -136,10 +141,10 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
               return (
                 <li key={b.id}>
                   <Link href={`/app/bills/${b.id}`} className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-3 hover:bg-ground">
-                    <span className="font-semibold">{b.number ?? "Draft"}</span>
-                    <span className="flex-1 text-slate">{b.issued_on ? formatDate(b.issued_on) : ""}</span>
-                    {b.status === "void" ? <Badge tone="alert">{INVOICE_STATUS_LABEL.void}</Badge> : null}
-                    {b.status === "issued" ? d > 0 ? <Badge tone="attention">{money(d)} due</Badge> : <Badge tone="good">Paid</Badge> : null}
+                    <span className="font-semibold">{b.number ?? m.labels.invoiceStatus.draft}</span>
+                    <span className="flex-1 text-slate">{b.issued_on ? formatDate(b.issued_on, t.locale) : ""}</span>
+                    {b.status === "void" ? <Badge tone="alert">{m.labels.invoiceStatus.void}</Badge> : null}
+                    {b.status === "issued" ? d > 0 ? <Badge tone="attention">{fill(p.due, { amount: money(d) })}</Badge> : <Badge tone="good">{p.paid}</Badge> : null}
                     <span className="tabular-nums">{money(b.total_minor)}</span>
                   </Link>
                 </li>
@@ -149,45 +154,45 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
         )}
       </Section>
 
-      <Section title="Details">
+      <Section title={p.details}>
         <ActionForm action={updateClient} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <input type="hidden" name="clientId" value={c.id} />
-          <Field label="Name">
+          <Field label={f.name}>
             <Input name="full_name" required maxLength={120} defaultValue={c.full_name} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Mobile number" hint="Also how WhatsApp reaches them.">
+            <Field label={f.mobile} hint={f.mobileHint}>
               <Input name="phone" type="tel" required defaultValue={c.phone} />
             </Field>
-            <Field label="Another number">
+            <Field label={f.altPhone}>
               <Input name="alt_phone" type="tel" defaultValue={c.alt_phone ?? ""} />
             </Field>
-            <Field label="Email">
+            <Field label={f.email}>
               <Input name="email" type="email" defaultValue={c.email ?? ""} />
             </Field>
-            <Field label="City">
+            <Field label={f.city}>
               <Input name="city" defaultValue={c.city ?? ""} />
             </Field>
           </div>
-          <Field label="Address">
+          <Field label={f.address}>
             <Textarea name="address" rows={2} maxLength={500} defaultValue={c.address ?? ""} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="PIN code">
+            <Field label={f.postalCode}>
               <Input name="postal_code" maxLength={12} defaultValue={c.postal_code ?? ""} />
             </Field>
-            <Field label="Someone else we can call">
+            <Field label={f.emergencyName}>
               <Input name="emergency_name" maxLength={120} defaultValue={c.emergency_name ?? ""} />
             </Field>
-            <Field label="Their number">
+            <Field label={f.emergencyPhone}>
               <Input name="emergency_phone" type="tel" defaultValue={c.emergency_phone ?? ""} />
             </Field>
-            <Field label="GSTIN" hint="Only for a business that wants it on the bill.">
+            <Field label={f.gstin} hint={f.gstinHint}>
               <Input name="tax_id" maxLength={15} autoCapitalize="characters" defaultValue={c.tax_id ?? ""} />
             </Field>
-            <Field label="State, for GST">
+            <Field label={f.gstState}>
               <Select name="gst_state_code" defaultValue={c.gst_state_code ?? ""}>
-                <option value="">Take it from the GSTIN</option>
+                <option value="">{f.gstStateFromGstin}</option>
                 {Object.entries(GST_STATES).map(([code, state]) => (
                   <option key={code} value={code}>
                     {code} {state}
@@ -196,49 +201,54 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
               </Select>
             </Field>
           </div>
-          <Field label="Notes for staff">
+          <Field label={f.notes}>
             <Textarea name="notes" maxLength={2000} defaultValue={c.notes ?? ""} />
           </Field>
           {c.consent_at ? (
             <p className="text-sm text-slate">
-              Agreed to the kennel keeping these details on {formatDate(c.consent_at.slice(0, 10))}
-              {c.consent_source === "intake_form" ? ", on the intake form." : ", told to staff."}
+              {fill(c.consent_source === "intake_form" ? p.consentFromIntake : p.consentToStaff, { date: formatDate(c.consent_at.slice(0, 10), t.locale) })}
             </p>
           ) : (
             <label className="flex min-h-12 items-start gap-3">
               <input type="checkbox" name="consent" className="mt-1 size-5" />
-              <span>The parent agreed to us keeping these details</span>
+              <span>{p.consentTick}</span>
             </label>
           )}
-          <SubmitButton>Save details</SubmitButton>
+          <SubmitButton pendingLabel={m.common.saving}>{m.common.saveDetails}</SubmitButton>
         </ActionForm>
       </Section>
 
       {canManage ? (
-        <Section title="Same person as another parent?">
+        <Section title={p.merge.title}>
           <div className="space-y-3 rounded-xl border border-rule bg-paper p-4">
-            <p className="text-slate">If this parent is on the list twice, find the other record by its phone number and merge it into this one.</p>
+            <p className="text-slate">{p.merge.intro}</p>
             <form method="get" className="flex flex-wrap items-end gap-2">
               <div className="min-w-48 flex-1">
-                <Field label="The other record's phone number">
+                <Field label={p.merge.otherPhone}>
                   <Input name="same" type="tel" defaultValue={typeof query.same === "string" ? query.same : ""} />
                 </Field>
               </div>
               <button type="submit" className={buttonStyles.secondary}>
-                Find
+                {m.common.find}
               </button>
             </form>
-            {lookFor && !candidate ? <p className="text-slate">No other parent has that number.</p> : null}
+            {lookFor && !candidate ? <p className="text-slate">{p.merge.noMatch}</p> : null}
             {candidate ? (
               <ActionForm action={mergeClient} className="space-y-3 rounded-lg bg-marigold-soft p-3">
                 <input type="hidden" name="keepId" value={c.id} />
                 <input type="hidden" name="mergeId" value={candidate.id} />
                 <p>
-                  Merge <strong>{candidate.full_name}</strong> ({formatPhone(candidate.phone)}
-                  {candidate.pets.length > 0 ? `, ${candidate.pets.map((p) => p.name).join(", ")}` : ""}) into {c.full_name}? Their pets, stays, bills and
-                  payments move here, and the other record disappears from lists. This cannot be undone from the screen.
+                  <Rich
+                    text={candidate.pets.length > 0 ? p.merge.confirmWithPets : p.merge.confirm}
+                    parts={{
+                      other: <strong>{candidate.full_name}</strong>,
+                      phone: formatPhone(candidate.phone),
+                      pets: candidate.pets.map((pet) => pet.name).join(", "),
+                      name: c.full_name,
+                    }}
+                  />
                 </p>
-                <SubmitButton pendingLabel="Merging">Merge into {c.full_name}</SubmitButton>
+                <SubmitButton pendingLabel={p.merge.merging}>{fill(p.merge.button, { name: c.full_name })}</SubmitButton>
               </ActionForm>
             ) : null}
           </div>

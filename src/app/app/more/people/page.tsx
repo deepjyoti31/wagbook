@@ -1,33 +1,31 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, whatsappLink } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { createInviteLink, inviteMember, removeMember, revokeInviteLink, setMemberActive, updateMember } from "./actions";
 
-export const metadata: Metadata = { title: "People" };
-
-const ROLE_LABEL = { owner: "Owner", manager: "Manager", staff: "Staff" } as const;
-const ROLE_ABOUT = "Staff run the day: bookings, check-in, care and payments. Managers also change kennels, prices and settings. Owners can do everything, including managing other owners.";
+export const generateMetadata = () => appTitle((m) => m.people.title);
 
 export default function PeoplePage({ searchParams }: PageProps<"/app/more/people">) {
   return (
-    <>
-      <PageTitle title="People" />
-      <Suspense fallback={<Loading label="Loading people" />}>
-        <People searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <People searchParams={searchParams} />
+    </Suspense>
   );
 }
 
 async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "searchParams">) {
   const made = (await searchParams).made === "1";
   const { org, user, role, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const w = m.people;
   const supabase = await createClient();
   const [members, links, origin] = await Promise.all([
     supabase.from("memberships").select("user_id, role, display_name, accepted_at, is_active").eq("org_id", org.id).order("created_at"),
@@ -51,53 +49,56 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
 
   return (
     <>
-      <Section title={`Who works at ${org.name}`} count={members.data.length}>
+      <PageTitle title={w.title} />
+      <Section title={fill(w.whoWorks, { kennel: org.name })} count={members.data.length}>
         <ul className="space-y-3">
-          {members.data.map((m) => (
-            <li key={m.user_id} className={`rounded-xl border bg-paper p-4 ${m.is_active || !m.accepted_at ? "border-rule" : "border-alert"}`}>
+          {members.data.map((mm) => (
+            <li key={mm.user_id} className={`rounded-xl border bg-paper p-4 ${mm.is_active || !mm.accepted_at ? "border-rule" : "border-alert"}`}>
               <p className="text-lg font-bold">
-                {m.display_name} {m.user_id === user.id ? <span className="font-normal text-slate">(you)</span> : null}
+                {mm.display_name} {mm.user_id === user.id ? <span className="font-normal text-slate">{m.common.you}</span> : null}
               </p>
               <p className="flex flex-wrap items-center gap-2 text-slate">
-                {ROLE_LABEL[m.role]}
-                {!m.accepted_at ? <Badge tone="attention">Invited, not yet accepted</Badge> : null}
-                {m.accepted_at && !m.is_active ? <Badge tone="alert">Suspended</Badge> : null}
+                {m.labels.role[mm.role]}
+                {!mm.accepted_at ? <Badge tone="attention">{w.invited}</Badge> : null}
+                {mm.accepted_at && !mm.is_active ? <Badge tone="alert">{w.suspended}</Badge> : null}
               </p>
-              {canChange(m) ? (
+              {canChange(mm) ? (
                 <details className="mt-2">
-                  <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">Change</summary>
+                  <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.common.change}</summary>
                   <ActionForm action={updateMember} className="mt-2 grid gap-3 sm:grid-cols-3">
-                    <input type="hidden" name="userId" value={m.user_id} />
-                    <Field label="Name">
-                      <Input name="displayName" required maxLength={80} defaultValue={m.display_name} />
+                    <input type="hidden" name="userId" value={mm.user_id} />
+                    <Field label={w.name}>
+                      <Input name="displayName" required maxLength={80} defaultValue={mm.display_name} />
                     </Field>
-                    <Field label="Role">
-                      <Select name="role" defaultValue={m.role}>
+                    <Field label={w.role}>
+                      <Select name="role" defaultValue={mm.role}>
                         {roles.map((r) => (
                           <option key={r} value={r}>
-                            {ROLE_LABEL[r]}
+                            {m.labels.role[r]}
                           </option>
                         ))}
                       </Select>
                     </Field>
                     <div className="flex items-end">
-                      <SubmitButton variant="secondary">Save</SubmitButton>
+                      <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+                        {m.common.save}
+                      </SubmitButton>
                     </div>
                   </ActionForm>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {m.accepted_at ? (
+                    {mm.accepted_at ? (
                       <ActionForm action={setMemberActive} className="contents">
-                        <input type="hidden" name="userId" value={m.user_id} />
-                        <input type="hidden" name="active" value={m.is_active ? "false" : "true"} />
-                        <SubmitButton variant="secondary" pendingLabel="Saving">
-                          {m.is_active ? "Suspend" : "Restore"}
+                        <input type="hidden" name="userId" value={mm.user_id} />
+                        <input type="hidden" name="active" value={mm.is_active ? "false" : "true"} />
+                        <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+                          {mm.is_active ? w.suspend : w.restore}
                         </SubmitButton>
                       </ActionForm>
                     ) : null}
                     <ActionForm action={removeMember} className="contents">
-                      <input type="hidden" name="userId" value={m.user_id} />
-                      <SubmitButton variant="quiet" pendingLabel="Removing">
-                        {m.accepted_at ? "Remove" : "Withdraw invitation"}
+                      <input type="hidden" name="userId" value={mm.user_id} />
+                      <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
+                        {mm.accepted_at ? m.common.remove : w.withdrawInvitation}
                       </SubmitButton>
                     </ActionForm>
                   </div>
@@ -110,9 +111,11 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
 
       {canManage ? (
         <>
-          <Section title="Invite with a link" count={links.data.length}>
-            <p className="mb-3 text-slate">For someone who does not use Wagbook yet. Send them the link on WhatsApp. It works once, for seven days. {ROLE_ABOUT}</p>
-            {made ? <Notice tone="ok">Link made. Send it to them below.</Notice> : null}
+          <Section title={w.byLink.title} count={links.data.length}>
+            <p className="mb-3 text-slate">
+              {w.byLink.intro} {w.rolesAbout}
+            </p>
+            {made ? <Notice tone="ok">{w.byLink.made}</Notice> : null}
             {links.data.length > 0 ? (
               <ul className="mb-4 space-y-3">
                 {links.data.map((l) => {
@@ -120,23 +123,23 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                   return (
                     <li key={l.id} className="rounded-xl border border-rule bg-paper p-4">
                       <p className="font-bold">
-                        {l.display_name}, {ROLE_LABEL[l.role].toLowerCase()}
+                        {fill(w.byLink.who, { name: l.display_name, role: w.roleInLine[l.role] })}
                       </p>
-                      <p className="text-sm text-slate">Works until {formatDate(l.expires_at.slice(0, 10))}.</p>
+                      <p className="text-sm text-slate">{fill(w.byLink.worksUntil, { date: formatDate(l.expires_at.slice(0, 10), t.locale) })}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <a
-                          href={whatsappLink(`Hi ${l.display_name}, join ${org.name} on Wagbook with this link: ${url}`)}
+                          href={whatsappLink(fill(m.whatsapp.joinInvite, { name: l.display_name, kennel: org.name, url }))}
                           target="_blank"
                           rel="noreferrer"
                           className={buttonStyles.whatsapp}
                         >
-                          Send on WhatsApp
+                          {m.common.sendOnWhatsapp}
                         </a>
-                        <CopyButton text={url} />
+                        <CopyButton text={url} words={m.copy} />
                         <ActionForm action={revokeInviteLink} className="contents">
                           <input type="hidden" name="linkId" value={l.id} />
-                          <SubmitButton variant="quiet" pendingLabel="Withdrawing">
-                            Withdraw
+                          <SubmitButton variant="quiet" pendingLabel={w.byLink.withdrawing}>
+                            {w.byLink.withdraw}
                           </SubmitButton>
                         </ActionForm>
                       </div>
@@ -146,44 +149,44 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
               </ul>
             ) : null}
             <ActionForm action={createInviteLink} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
-              <Field label="Their name">
+              <Field label={w.theirName}>
                 <Input name="displayName" required maxLength={80} autoComplete="off" />
               </Field>
-              <Field label="Role">
+              <Field label={w.role}>
                 <Select name="role" defaultValue="staff">
                   {roles.map((r) => (
                     <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
+                      {m.labels.role[r]}
                     </option>
                   ))}
                 </Select>
               </Field>
               <div className="flex items-end">
-                <SubmitButton pendingLabel="Making the link">Make a link</SubmitButton>
+                <SubmitButton pendingLabel={w.byLink.making}>{w.byLink.make}</SubmitButton>
               </div>
             </ActionForm>
           </Section>
 
-          <Section title="Invite someone who already has an account">
-            <p className="mb-3 text-slate">Enter the email they use for Wagbook. They see the invitation the next time they sign in.</p>
+          <Section title={w.byEmail.title}>
+            <p className="mb-3 text-slate">{w.byEmail.intro}</p>
             <ActionForm action={inviteMember} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-              <Field label="Their name">
+              <Field label={w.theirName}>
                 <Input name="displayName" required maxLength={80} autoComplete="off" />
               </Field>
-              <Field label="Their email">
+              <Field label={w.byEmail.email}>
                 <Input name="email" type="email" required maxLength={254} autoComplete="off" autoCapitalize="none" />
               </Field>
-              <Field label="Role">
+              <Field label={w.role}>
                 <Select name="role" defaultValue="staff">
                   {roles.map((r) => (
                     <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
+                      {m.labels.role[r]}
                     </option>
                   ))}
                 </Select>
               </Field>
               <div className="flex items-end">
-                <SubmitButton pendingLabel="Inviting">Invite</SubmitButton>
+                <SubmitButton pendingLabel={w.byEmail.inviting}>{w.byEmail.invite}</SubmitButton>
               </div>
             </ActionForm>
           </Section>

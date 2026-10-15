@@ -7,16 +7,19 @@ import { requireOrg } from "@/lib/auth";
 import { isISODate, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { getAppI18n } from "@/lib/i18n-server";
+import type { Messages } from "@/messages";
 import { INCIDENT_CATEGORIES, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
 
-const NewPet = z.object({
-  parentName: z.string().min(1, "Enter the parent's name.").max(120),
-  petName: z.string().min(1, "Enter the pet's name.").max(80),
-  species: z.enum(["dog", "cat", "other"]),
-  sex: z.enum(["male", "female", "unknown"]),
-  weightKg: z.number().positive().lt(200).nullable(),
-});
+const newPet = (m: Messages) =>
+  z.object({
+    parentName: z.string().min(1, m.newPet.errors.parentName).max(120),
+    petName: z.string().min(1, m.pet.errors.petName).max(80),
+    species: z.enum(["dog", "cat", "other"]),
+    sex: z.enum(["male", "female", "unknown"]),
+    weightKg: z.number().positive().lt(200).nullable(),
+  });
 
 /**
  * Add a pet. The parent is found by phone number if the kennel already knows
@@ -25,27 +28,29 @@ const NewPet = z.object({
  */
 export async function createPet(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
 
   const phone = normalizePhone(text(form, "parentPhone") ?? "", org.country_code === "IN" ? "IN" : null);
   if (!phone) {
-    return { error: org.country_code === "IN" ? "Enter a valid 10 digit mobile number." : "Enter the phone number with its country code, like +14155552671." };
+    return { error: org.country_code === "IN" ? m.newPet.errors.phoneIndia : m.newPet.errors.phoneElsewhere };
   }
   const weightText = text(form, "weightKg");
-  const parsed = NewPet.safeParse({
+  const parsed = newPet(m).safeParse({
     parentName: text(form, "parentName") ?? "",
     petName: text(form, "petName") ?? "",
     species: form.get("species"),
     sex: form.get("sex"),
     weightKg: weightText === null ? null : Number(weightText),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? "Enter the weight in kilograms, like 34.5." : parsed.error.issues[0].message };
+  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? m.pet.errors.weight : parsed.error.issues[0].message };
   const p = parsed.data;
 
   const supabase = await createClient();
 
   let clientId: string;
   const existing = await supabase.from("clients").select("id").eq("org_id", org.id).eq("phone", phone).is("deleted_at", null).maybeSingle();
-  if (existing.error) return { error: friendlyError(existing.error) };
+  if (existing.error) return { error: friendlyError(existing.error, t) };
   if (existing.data) {
     clientId = existing.data.id;
   } else {
@@ -54,7 +59,7 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
       .insert({ org_id: org.id, full_name: p.parentName, phone, consent_at: checked(form, "consent") ? new Date().toISOString() : null, consent_source: checked(form, "consent") ? "staff" : null })
       .select("id")
       .single();
-    if (created.error) return { error: friendlyError(created.error) };
+    if (created.error) return { error: friendlyError(created.error, t) };
     clientId = created.data.id;
   }
 
@@ -74,39 +79,43 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
     behaviour_notes: text(form, "behaviourNotes"),
     flags: PET_FLAGS.filter((f) => checked(form, `flag_${f}`)),
   });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
 
   revalidatePath("/app", "layout");
   redirect("/app/dogs");
 }
 
 const Id = z.uuid();
-const long = z.string().max(2000, "Keep notes under 2,000 characters.").nullable();
 
-const PetDetails = z.object({
-  name: z.string().min(1, "Enter the pet's name.").max(80),
-  species: z.enum(["dog", "cat", "other"]),
-  sex: z.enum(["male", "female", "unknown"]),
-  breed: z.string().max(80).nullable(),
-  color: z.string().max(80).nullable(),
-  microchip: z.string().max(40).nullable(),
-  dateOfBirth: z.string().refine(isISODate, "Enter the date of birth as a date.").nullable(),
-  weightKg: z.number().positive().lt(200).nullable(),
-  foodNotes: long,
-  medicalNotes: long,
-  allergies: long,
-  behaviourNotes: long,
-  vetName: z.string().max(120).nullable(),
-  vetPhone: z.string().max(40).nullable(),
-});
+const petDetails = (m: Messages) => {
+  const long = z.string().max(2000, m.pet.errors.notesTooLong).nullable();
+  return z.object({
+    name: z.string().min(1, m.pet.errors.petName).max(80),
+    species: z.enum(["dog", "cat", "other"]),
+    sex: z.enum(["male", "female", "unknown"]),
+    breed: z.string().max(80).nullable(),
+    color: z.string().max(80).nullable(),
+    microchip: z.string().max(40).nullable(),
+    dateOfBirth: z.string().refine(isISODate, m.pet.errors.dateOfBirth).nullable(),
+    weightKg: z.number().positive().lt(200).nullable(),
+    foodNotes: long,
+    medicalNotes: long,
+    allergies: long,
+    behaviourNotes: long,
+    vetName: z.string().max(120).nullable(),
+    vetPhone: z.string().max(40).nullable(),
+  });
+};
 
 /** Change anything about a pet. Any member: details change at the gate, not only in the office. */
 export async function updatePet(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
   const petId = Id.safeParse(form.get("petId"));
-  if (!petId.success) return { error: "That pet could not be found." };
+  if (!petId.success) return { error: m.errors.petNotFound };
   const weight = text(form, "weightKg");
-  const parsed = PetDetails.safeParse({
+  const parsed = petDetails(m).safeParse({
     name: text(form, "name") ?? "",
     species: form.get("species"),
     sex: form.get("sex"),
@@ -122,7 +131,7 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
     vetName: text(form, "vetName"),
     vetPhone: text(form, "vetPhone"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? "Enter the weight in kilograms, like 34.5." : parsed.error.issues[0].message };
+  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? m.pet.errors.weight : parsed.error.issues[0].message };
   const p = parsed.data;
   const neutered = form.get("isNeutered");
 
@@ -150,25 +159,27 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
     .eq("org_id", org.id)
     .eq("id", petId.data)
     .select("id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "That pet could not be found." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: m.errors.petNotFound };
   revalidatePath("/app", "layout");
-  return { ok: "Saved." };
+  return { ok: m.common.saved };
 }
 
-const Incident = z.object({
-  category: z.enum(INCIDENT_CATEGORIES, "Choose what happened."),
-  severity: z.enum(["low", "medium", "high"], "Choose how serious it is."),
-  description: z.string().min(1, "Say what happened.").max(4000, "Keep it under 4,000 characters."),
-  actionTaken: z.string().max(4000).nullable(),
-});
+const incident = (m: Messages) =>
+  z.object({
+    category: z.enum(INCIDENT_CATEGORIES, m.incident.errors.category),
+    severity: z.enum(["low", "medium", "high"], m.incident.errors.severity),
+    description: z.string().min(1, m.incident.errors.description).max(4000, m.incident.errors.tooLong),
+    actionTaken: z.string().max(4000).nullable(),
+  });
 
 /** Write down something out of the ordinary, while it is fresh. */
 export async function addIncident(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
   const petId = Id.safeParse(form.get("petId"));
-  if (!petId.success) return { error: "That pet could not be found." };
-  const parsed = Incident.safeParse({
+  if (!petId.success) return { error: t.m.errors.petNotFound };
+  const parsed = incident(t.m).safeParse({
     category: form.get("category"),
     severity: form.get("severity"),
     description: text(form, "description") ?? "",
@@ -192,7 +203,7 @@ export async function addIncident(_state: FormState, form: FormData): Promise<Fo
     // The database stamps the real time and who; any value marks it.
     parent_notified_at: checked(form, "parentTold") ? new Date().toISOString() : null,
   });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/dogs/${petId.data}?done=incident`);
 }
@@ -200,15 +211,17 @@ export async function addIncident(_state: FormState, form: FormData): Promise<Fo
 /** Mark that the parent was told, or that the incident is over. */
 export async function updateIncident(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const notFound = t.m.incident.errors.notFound;
   const id = Id.safeParse(form.get("incidentId"));
-  if (!id.success) return { error: "That incident could not be found." };
+  if (!id.success) return { error: notFound };
   const what = form.get("what");
   const change = what === "told" ? { parent_notified_at: new Date().toISOString() } : what === "resolved" ? { resolved_at: new Date().toISOString() } : null;
-  if (!change) return { error: "That incident could not be found." };
+  if (!change) return { error: notFound };
   const supabase = await createClient();
   const { data, error } = await supabase.from("incidents").update(change).eq("org_id", org.id).eq("id", id.data).select("id, pet_id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "That incident could not be found." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: notFound };
   revalidatePath("/app", "layout");
   // The button that was pressed goes away, and its message with it: say so on the page.
   redirect(`/app/dogs/${data[0].pet_id}?done=${what}`);
