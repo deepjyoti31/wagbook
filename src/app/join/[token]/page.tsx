@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -36,10 +37,11 @@ async function Join({ params }: Pick<PageProps<"/join/[token]">, "params">) {
   const { token } = await params;
   if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) notFound();
   const here = encodeURIComponent(`/join/${token}`);
-  const { m } = await getVisitorI18n();
+  const { m, language } = await getVisitorI18n();
   const j = m.join;
   return (
     <>
+      <HtmlLang lang={language} />
       <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{j.title}</h1>
       <JoinBody token={token} here={here} j={j} />
     </>

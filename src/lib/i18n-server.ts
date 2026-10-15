@@ -17,6 +17,17 @@ import { formatLocale, isLanguage, pickLanguage, type Language } from "./i18n";
 /** Remembers a person's language on this browser, for the sign-in page and the like. */
 export const LANGUAGE_COOKIE = "wb_lang";
 
+/** Remember a language on this browser. Only from a Server Action or Route Handler. A preference, not a permission. */
+export async function rememberLanguage(language: Language): Promise<void> {
+  (await cookies()).set(LANGUAGE_COOKIE, language, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
 export function i18nFor(language: Language, kennelLocale = "en-IN") {
   return { language, m: MESSAGES[language], locale: formatLocale(language, kennelLocale) };
 }

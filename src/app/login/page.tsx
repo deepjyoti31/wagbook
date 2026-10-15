@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ForgetOfflineCopies } from "@/components/forget-offline-copies";
+import { HtmlLang } from "@/components/html-lang";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -23,7 +25,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
 async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchParams">) {
   const params = await searchParams;
-  const { m } = await getVisitorI18n();
+  const { m, language } = await getVisitorI18n();
   const a = m.auth;
   const signup = params.mode === "signup";
   // Where to go afterwards, such as an invitation link. Checked again on the server (safeDestination).
@@ -31,6 +33,8 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
   const keep = next ? `&next=${encodeURIComponent(next)}` : "";
   return (
     <>
+      <HtmlLang lang={language} />
+      <ForgetOfflineCopies />
       <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{signup ? a.signUpHeading : a.signInHeading}</h1>
       {params.error === "link" ? (
         <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">

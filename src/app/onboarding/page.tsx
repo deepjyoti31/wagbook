@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
@@ -24,12 +25,13 @@ export default function OnboardingPage() {
 
 async function OnboardingForm() {
   await requireUser();
-  const { m } = await getVisitorI18n();
+  const { m, language } = await getVisitorI18n();
   const o = m.onboarding;
   const supabase = await createClient();
   const { data: invitations } = await supabase.rpc("my_invitations");
   return (
     <>
+      <HtmlLang lang={language} />
       <h1 className="mb-2 text-3xl font-extrabold tracking-tight">{o.title}</h1>
       <p className="mb-6 text-slate">{o.intro}</p>
       {invitations && invitations.length > 0 ? (

@@ -1,11 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { text, type FormState } from "@/lib/forms";
 import { isLanguage } from "@/lib/i18n";
-import { getVisitorI18n, LANGUAGE_COOKIE, type I18n } from "@/lib/i18n-server";
+import { getVisitorI18n, rememberLanguage, type I18n } from "@/lib/i18n-server";
 import { safeDestination } from "@/lib/safe-redirect";
 import { siteOrigin } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -54,13 +53,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
     .limit(1)
     .maybeSingle();
   if (isLanguage(membership.data?.language)) {
-    (await cookies()).set(LANGUAGE_COOKIE, membership.data.language, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    await rememberLanguage(membership.data.language);
   }
 
   // Back to where they were going, such as an invitation link. Only ever a page on this site.

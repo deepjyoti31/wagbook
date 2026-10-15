@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HtmlLang } from "@/components/html-lang";
 import { Suspense } from "react";
 import { buttonStyles, DoorTag, Loading } from "@/components/ui";
 import { getVisitorI18n } from "@/lib/i18n-server";
@@ -15,10 +16,11 @@ export default function HomePage() {
 }
 
 async function Home() {
-  const { m } = await getVisitorI18n();
+  const { m, language } = await getVisitorI18n();
   const l = m.landing;
   return (
     <>
+      <HtmlLang lang={language} />
       <p className="mb-6">
         <DoorTag name={m.common.appName} empty={m.common.appName} />
       </p>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Rich } from "@/components/rich";
@@ -22,12 +23,13 @@ export default function SetupPage() {
 }
 
 async function Setup() {
-  const { m } = await getVisitorI18n();
+  const { m, language } = await getVisitorI18n();
   const s = m.setup;
   const ready = isSupabaseConfigured();
   const code = (name: string) => <code className="font-semibold">{name}</code>;
   return (
     <>
+      <HtmlLang lang={language} />
       <h1 className="text-3xl font-extrabold tracking-tight">{ready ? s.readyTitle : s.title}</h1>
       {ready ? (
         <>

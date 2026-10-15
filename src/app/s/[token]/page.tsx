@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { Badge, buttonStyles, Loading, Section } from "@/components/ui";
@@ -89,6 +90,7 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
 
   return (
     <>
+      <HtmlLang lang={t.language} />
       {stay.pet.photo && links.get(stay.pet.photo)?.small ? (
         // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file
         <img src={links.get(stay.pet.photo)?.small} alt={stay.pet.name} className="mb-3 size-24 rounded-full object-cover" />

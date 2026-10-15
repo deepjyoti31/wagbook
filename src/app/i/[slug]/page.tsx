@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HtmlLang } from "@/components/html-lang";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { Loading } from "@/components/ui";
@@ -54,6 +55,7 @@ async function Intake({ params }: Pick<PageProps<"/i/[slug]">, "params">) {
 
   return (
     <div lang={language}>
+      <HtmlLang lang={language} />
       <h1 className="text-3xl font-extrabold tracking-tight">{kennel.name}</h1>
       <p className="mb-6 mt-2 text-lg text-slate">{w.intro}</p>
       {kennel.intake_enabled ? (
