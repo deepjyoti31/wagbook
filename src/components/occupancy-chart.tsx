@@ -1,24 +1,41 @@
 import { formatDate, type OccupancyDay } from "@/lib/core";
+import { fill, plural, type Language } from "@/lib/i18n";
+import type { Messages } from "@/messages";
 
 /**
  * Pets in each day of a month as plain HTML bars, one per day. The top of the
  * chart is every kennel full. A day with more pets than kennels (pets booked
  * with no kennel) is drawn full and in red. Each bar says its numbers when
  * pointed at, and the same numbers are in a table below for anyone who
- * cannot see the bars.
+ * cannot see the bars. `words` is m.reports.chart.
  */
-export function OccupancyChart({ days, locale }: { days: readonly OccupancyDay[]; locale: string }) {
+export function OccupancyChart({
+  days,
+  locale,
+  language,
+  words,
+}: {
+  days: readonly OccupancyDay[];
+  locale: string;
+  language: Language;
+  words: Messages["reports"]["chart"];
+}) {
   const capacity = Math.max(0, ...days.map((d) => d.capacity));
   const top = Math.max(capacity, ...days.map((d) => d.boarding + d.dayBoarding), 1);
   const text = (d: OccupancyDay) => {
-    const pets = d.boarding + d.dayBoarding;
-    const kinds = d.dayBoarding > 0 ? ` (${d.boarding} overnight, ${d.dayBoarding} for the day)` : "";
-    return `${formatDate(d.day, locale)}: ${pets} ${pets === 1 ? "pet" : "pets"}${kinds}, ${d.capacity} kennels`;
+    const vars = {
+      date: formatDate(d.day, locale),
+      pets: plural(language, d.boarding + d.dayBoarding, words.pets),
+      overnight: d.boarding,
+      forTheDay: d.dayBoarding,
+      kennels: d.capacity,
+    };
+    return fill(d.dayBoarding > 0 ? words.dayWithKinds : words.day, vars);
   };
 
   return (
     <figure className="rounded-xl border border-rule bg-paper p-4">
-      <figcaption className="mb-2 text-sm text-slate">Pets in each day. The top line is all {capacity} kennels full.</figcaption>
+      <figcaption className="mb-2 text-sm text-slate">{fill(words.caption, { n: capacity })}</figcaption>
       <div aria-hidden="true" className="relative h-40 border-t-2 border-dashed border-slate/60">
         <div className="flex h-full items-end gap-[2px] border-b border-rule">
           {days.map((d) => {
@@ -43,14 +60,14 @@ export function OccupancyChart({ days, locale }: { days: readonly OccupancyDay[]
         ))}
       </div>
       <details className="mt-3">
-        <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">See each day</summary>
+        <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{words.seeEachDay}</summary>
         <table className="mt-2 w-full text-left text-sm">
           <thead>
             <tr className="border-b border-rule text-slate">
-              <th className="py-1 font-semibold">Day</th>
-              <th className="py-1 text-right font-semibold">Overnight</th>
-              <th className="py-1 text-right font-semibold">For the day</th>
-              <th className="py-1 text-right font-semibold">Kennels</th>
+              <th className="py-1 font-semibold">{words.dayColumn}</th>
+              <th className="py-1 text-right font-semibold">{words.overnight}</th>
+              <th className="py-1 text-right font-semibold">{words.forTheDay}</th>
+              <th className="py-1 text-right font-semibold">{words.kennels}</th>
             </tr>
           </thead>
           <tbody>

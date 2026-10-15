@@ -1,33 +1,41 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Rich } from "@/components/rich";
 import { buttonStyles, Empty, Field, Loading, PageTitle, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatMoney } from "@/lib/core";
-import { describeEntry, historyLink, HISTORY_TABLES, idsIn, type HistoryFormat } from "@/lib/history";
+import { describeEntry, historyLink, HISTORY_TABLES, idsIn, isHistoryTable, type HistoryFormat } from "@/lib/history";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "History of changes" };
+export const generateMetadata = () => appTitle((m) => m.history.title);
 
 const PAGE = 50;
 
 export default function HistoryPage({ searchParams }: PageProps<"/app/more/history">) {
   return (
-    <>
-      <PageTitle title="History of changes" />
-      <Suspense fallback={<Loading label="Loading the history" />}>
-        <History searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <History searchParams={searchParams} />
+    </Suspense>
   );
 }
 
 async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "searchParams">) {
   const query = await searchParams;
   const { org, canManage } = await requireOrg();
-  if (!canManage) return <Empty>The history of changes is for owners and managers.</Empty>;
+  const { m, language, locale } = await getAppI18n();
+  const h = m.history;
+  const title = <PageTitle title={h.title} />;
+  if (!canManage)
+    return (
+      <>
+        {title}
+        <Empty>{h.managersOnly}</Empty>
+      </>
+    );
 
-  const table = typeof query.table === "string" && query.table in HISTORY_TABLES ? query.table : "";
+  const table = isHistoryTable(query.table) ? query.table : "";
   const person = typeof query.person === "string" && /^[0-9a-f-]{36}$/.test(query.person) ? query.person : "";
   const before = typeof query.before === "string" && /^\d{1,18}$/.test(query.before) ? Number(query.before) : null;
 
@@ -56,15 +64,16 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
       ])
     : [];
   const names = new Map<string, string>([
-    ...members.data.map((m) => [m.user_id, m.display_name] as const),
+    ...members.data.map((x) => [x.user_id, x.display_name] as const),
     ...(pets?.data ?? []).map((p) => [p.id, p.name] as const),
     ...(clients?.data ?? []).map((c) => [c.id, c.full_name] as const),
-    ...(kennels?.data ?? []).map((k) => [k.id, `kennel ${k.name}`] as const),
+    ...(kennels?.data ?? []).map((k) => [k.id, fill(h.kennel, { name: k.name })] as const),
     ...(services?.data ?? []).map((x) => [x.id, x.name] as const),
   ]);
-  const when = new Intl.DateTimeFormat(org.locale, { timeZone: org.time_zone, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const when = new Intl.DateTimeFormat(locale, { timeZone: org.time_zone, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
   const fmt: HistoryFormat = {
-    money: (minor) => formatMoney(minor, { currency: org.currency, locale: org.locale, trimZeros: true }),
+    words: h.log,
+    money: (minor) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true }),
     time: (iso) => when.format(new Date(iso)),
     name: (id) => names.get(id),
   };
@@ -72,43 +81,44 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
 
   return (
     <>
-      <p className="mb-4 text-slate">Every change to bookings, money, the price list, incidents, settings and people, newest first. Nobody can edit or remove it.</p>
+      {title}
+      <p className="mb-4 text-slate">{h.intro}</p>
       <form method="get" className="mb-5 grid gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
-        <Field label="What">
+        <Field label={h.what}>
           <Select name="table" defaultValue={table}>
-            <option value="">Everything</option>
-            {Object.entries(HISTORY_TABLES).map(([key, label]) => (
+            <option value="">{h.everything}</option>
+            {HISTORY_TABLES.map((key) => (
               <option key={key} value={key}>
-                {label}
+                {h.log.tables[key]}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Who">
+        <Field label={h.who}>
           <Select name="person" defaultValue={person}>
-            <option value="">Everyone</option>
-            {members.data.map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {m.display_name}
+            <option value="">{h.everyone}</option>
+            {members.data.map((x) => (
+              <option key={x.user_id} value={x.user_id}>
+                {x.display_name}
               </option>
             ))}
           </Select>
         </Field>
         <div className="flex items-end">
           <button type="submit" className={buttonStyles.secondary}>
-            Show
+            {m.common.show}
           </button>
         </div>
       </form>
 
       {shown.length === 0 ? (
-        <Empty>No changes {table || person ? "match" : "yet"}.</Empty>
+        <Empty>{table || person ? h.noneMatch : h.noneYet}</Empty>
       ) : (
         <ul className="space-y-3">
           {shown.map((e) => {
             const d = describeEntry(e, fmt);
             const link = historyLink(e);
-            const who = e.actor ? (names.get(e.actor) ?? "Someone who no longer works here") : "Wagbook";
+            const who = e.actor ? (names.get(e.actor) ?? h.someoneGone) : m.common.appName;
             return (
               <li key={e.id} className="rounded-xl border border-rule bg-paper p-4">
                 <p className="font-bold">
@@ -117,31 +127,23 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
                     <>
                       {" "}
                       <Link href={link} className="font-semibold underline underline-offset-4">
-                        Open
+                        {m.common.open}
                       </Link>
                     </>
                   ) : null}
                 </p>
-                <p className="text-sm text-slate">
-                  {who}, {when.format(new Date(e.at))}
-                </p>
+                <p className="text-sm text-slate">{fill(h.whoWhen, { who, when: when.format(new Date(e.at)) })}</p>
                 {d.fields.length > 0 ? (
                   <details className="mt-1" open={e.action === "update"}>
                     <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">
-                      {d.fields.length === 1 ? "1 detail" : `${d.fields.length} details`}
+                      {plural(language, d.fields.length, h.details)}
                     </summary>
                     <dl className="space-y-1 text-sm">
                       {d.fields.map((f) => (
                         <div key={f.label} className="break-words">
-                          <dt className="inline font-semibold">{f.label}: </dt>
+                          <dt className="inline font-semibold">{fill(h.field, { label: f.label })}</dt>
                           <dd className="inline">
-                            {f.was !== null && f.now !== null ? (
-                              <>
-                                was {f.was}, now <strong>{f.now}</strong>
-                              </>
-                            ) : (
-                              (f.now ?? f.was)
-                            )}
+                            {f.was !== null && f.now !== null ? <Rich text={h.wasNow} parts={{ was: f.was, now: <strong>{f.now}</strong> }} /> : (f.now ?? f.was)}
                           </dd>
                         </div>
                       ))}
@@ -156,7 +158,7 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
       {more ? (
         <p className="mt-4">
           <Link href={`/app/more/history?${new URLSearchParams({ ...Object.fromEntries(filters), before: String(more) })}`} className={buttonStyles.secondary}>
-            Older changes
+            {h.older}
           </Link>
         </p>
       ) : null}

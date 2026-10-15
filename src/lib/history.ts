@@ -1,21 +1,34 @@
+import type { Messages } from "@/messages";
+import { fill } from "./i18n";
+
 /**
  * The audit log, in words a manager can read: who added, changed or removed
  * what, and for a change, each field as it was and as it is now.
- * Pure, so it is unit tested (history.test.ts).
+ * Pure, so it is unit tested (history.test.ts). The words come in with the
+ * format (m.history.log), in the reader's language. Field names are made from
+ * the column names and stay in English.
  */
 
-export const HISTORY_TABLES = {
-  bookings: "Booking",
-  booking_items: "Extra on a booking",
-  invoices: "Bill",
-  payments: "Payment",
-  expenses: "Expense",
-  services: "Price list",
-  incidents: "Incident",
-  organizations: "Kennel settings",
-  memberships: "Person",
-} as const;
-export type HistoryTable = keyof typeof HISTORY_TABLES;
+/** The words inside each change: m.history.log. */
+export type HistoryWords = Messages["history"]["log"];
+
+/** The tables a manager can filter the history by, in the order offered. Their names are in m.history.log.tables. */
+export const HISTORY_TABLES = [
+  "bookings",
+  "booking_items",
+  "invoices",
+  "payments",
+  "expenses",
+  "services",
+  "incidents",
+  "organizations",
+  "memberships",
+] as const satisfies readonly (keyof HistoryWords["tables"])[];
+export type HistoryTable = (typeof HISTORY_TABLES)[number];
+
+export function isHistoryTable(value: unknown): value is HistoryTable {
+  return typeof value === "string" && (HISTORY_TABLES as readonly string[]).includes(value);
+}
 
 const ACTION = { insert: "added", update: "changed", delete: "removed" } as const;
 
@@ -42,8 +55,10 @@ export function fieldLabel(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** How to show money, moments and the records an id points at. */
+/** How to show money, moments and the records an id points at, and the words to use. */
 export interface HistoryFormat {
+  /** m.history.log */
+  words: HistoryWords;
   /** Amounts in minor units. */
   money: (minor: number) => string;
   /** A moment, on the kennel's clock. */
@@ -57,13 +72,14 @@ const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
 /** A stored value as a person reads it. */
 export function valueText(key: string, value: unknown, fmt: HistoryFormat): string {
-  if (value === null || value === undefined || value === "") return "empty";
-  if (typeof value === "boolean") return value ? "yes" : "no";
+  const w = fmt.words;
+  if (value === null || value === undefined || value === "") return w.empty;
+  if (typeof value === "boolean") return value ? w.yes : w.no;
   if (typeof value === "number" && key.endsWith("_minor")) return fmt.money(value);
-  if (typeof value === "string" && UUID.test(value)) return fmt.name(value) ?? "a record no longer here";
+  if (typeof value === "string" && UUID.test(value)) return fmt.name(value) ?? w.gone;
   if (typeof value === "string" && MOMENT.test(value)) return fmt.time(value);
   if (typeof value === "number" && key.endsWith("_bp")) return `${value / 100}%`;
-  if (Array.isArray(value)) return value.length === 0 ? "empty" : value.map((v) => (typeof v === "string" ? v.replace(/_/g, " ") : JSON.stringify(v))).join(", ");
+  if (Array.isArray(value)) return value.length === 0 ? w.empty : value.map((v) => (typeof v === "string" ? v.replace(/_/g, " ") : JSON.stringify(v))).join(", ");
   const text = typeof value === "string" ? value : JSON.stringify(value);
   return text.length > 160 ? `${text.slice(0, 157)}...` : text;
 }
@@ -74,8 +90,9 @@ function record(value: unknown): Record<string, unknown> {
 
 /** "Booking changed", with the fields that matter. */
 export function describeEntry(entry: HistoryEntry, fmt: HistoryFormat): { title: string; fields: HistoryField[] } {
-  const table = HISTORY_TABLES[entry.table_name as HistoryTable] ?? fieldLabel(entry.table_name);
-  const action = ACTION[entry.action as keyof typeof ACTION] ?? entry.action;
+  const w = fmt.words;
+  const table = isHistoryTable(entry.table_name) ? w.tables[entry.table_name] : fieldLabel(entry.table_name);
+  const action = ACTION[entry.action as keyof typeof ACTION] as (typeof ACTION)[keyof typeof ACTION] | undefined;
   const was = record(entry.old_data);
   const now = record(entry.new_data);
   const keys = [...new Set([...Object.keys(entry.action === "delete" ? was : now), ...Object.keys(was)])].filter((k) => !HIDDEN.has(k));
@@ -86,8 +103,9 @@ export function describeEntry(entry: HistoryEntry, fmt: HistoryFormat): { title:
       now: entry.action === "delete" ? null : valueText(key, now[key], fmt),
     }))
     // An added or removed row lists only what it had in it.
-    .filter((f) => entry.action === "update" || (f.was ?? f.now) !== "empty");
-  return { title: `${table} ${action}`, fields };
+    .filter((f) => entry.action === "update" || (f.was ?? f.now) !== w.empty);
+  // The log only holds insert, update and delete; anything else is shown as stored.
+  return { title: action ? fill(w[action], { what: table }) : `${table} ${entry.action}`, fields };
 }
 
 /** Every id an entry mentions, to look up names for. */

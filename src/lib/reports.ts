@@ -5,16 +5,20 @@ import "server-only";
  * "use server" files, which may export only async functions.
  */
 
-/** Offered when adding an expense. Any other word is fine too. */
-export const EXPENSE_CATEGORIES = ["Food", "Staff wages", "Rent", "Electricity and water", "Vet and medicines", "Cleaning", "Repairs", "Other"] as const;
+/**
+ * Offered when adding an expense, in this order. The words are in
+ * m.expenses.categories; the one chosen is saved as typed, so any other word
+ * is fine too.
+ */
+export const EXPENSE_CATEGORIES = ["food", "staffWages", "rent", "power", "vet", "cleaning", "repairs", "other"] as const;
 
-export const DOWNLOADS = {
-  bookings: "Bookings (by first day)",
-  bills: "Bills (by bill date)",
-  payments: "Payments (by date paid)",
-  expenses: "Expenses (by date spent)",
-} as const;
-export type Download = keyof typeof DOWNLOADS;
+/** What can be downloaded, in the order offered. The names are in m.downloads.kinds. */
+export const DOWNLOADS = ["bookings", "bills", "payments", "expenses"] as const;
+export type Download = (typeof DOWNLOADS)[number];
+
+export function isDownload(value: unknown): value is Download {
+  return typeof value === "string" && (DOWNLOADS as readonly string[]).includes(value);
+}
 
 /** The most rows one download holds. Ten years of a busy kennel is well under this. */
 export const DOWNLOAD_MAX_ROWS = 20_000;
