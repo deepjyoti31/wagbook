@@ -1,22 +1,20 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { playWindows, toMinutes, yardsNeeded } from "@/lib/core";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n, type I18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { addYard, savePlayHours, setYardActive } from "./actions";
 
-export const metadata: Metadata = { title: "Play yards" };
+export const generateMetadata = () => appTitle((m) => m.yards.title);
 
 export default function PlayYardsPage({ searchParams }: PageProps<"/app/more/play">) {
   return (
-    <>
-      <PageTitle title="Play yards" />
-      <Suspense fallback={<Loading label="Loading play settings" />}>
-        <PlayYards searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <PlayYards searchParams={searchParams} />
+    </Suspense>
   );
 }
 
@@ -25,6 +23,9 @@ const hm = (t: string | null) => (t ? t.slice(0, 5) : "");
 async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "searchParams">) {
   const params = await searchParams;
   const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const y = m.yards;
   const supabase = await createClient();
   const [yards, kennels] = await Promise.all([
     supabase.from("play_yards").select("id, name, is_active").eq("org_id", org.id).order("sort_order").order("name"),
@@ -35,25 +36,28 @@ async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "se
 
   return (
     <>
-      <p className="mb-5 text-slate">For kennels where every pet gets a yard to itself. One pet in a yard at a time; Wagbook refuses anything else.</p>
-      {canManage ? null : <Notice tone="info">Only an owner or manager can change play settings.</Notice>}
+      <PageTitle title={y.title} />
+      <p className="mb-5 text-slate">{y.intro}</p>
+      {canManage ? null : <Notice tone="info">{y.onlyManagers}</Notice>}
 
-      <Section title="Yards" count={yards.data.length}>
+      <Section title={y.yards} count={yards.data.length}>
         {yards.data.length === 0 ? (
-          <Empty>No yards yet.</Empty>
+          <Empty>{y.none}</Empty>
         ) : (
           <Ledger>
-            {yards.data.map((y) => (
-              <LedgerRow key={y.id}>
+            {yards.data.map((yard) => (
+              <LedgerRow key={yard.id}>
                 <span className="flex flex-1 items-center gap-2 font-bold">
-                  {y.name}
-                  {y.is_active ? null : <Badge tone="alert">Out of use</Badge>}
+                  {yard.name}
+                  {yard.is_active ? null : <Badge tone="alert">{y.outOfUse}</Badge>}
                 </span>
                 {canManage ? (
                   <ActionForm action={setYardActive} className="contents">
-                    <input type="hidden" name="yardId" value={y.id} />
-                    <input type="hidden" name="active" value={y.is_active ? "false" : "true"} />
-                    <SubmitButton variant="quiet">{y.is_active ? "Take out of use" : "Put back in use"}</SubmitButton>
+                    <input type="hidden" name="yardId" value={yard.id} />
+                    <input type="hidden" name="active" value={yard.is_active ? "false" : "true"} />
+                    <SubmitButton variant="quiet" pendingLabel={m.common.saving}>
+                      {yard.is_active ? y.takeOut : y.putBack}
+                    </SubmitButton>
                   </ActionForm>
                 ) : null}
               </LedgerRow>
@@ -63,47 +67,48 @@ async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "se
         {canManage ? (
           <ActionForm action={addYard} className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-rule bg-paper p-4">
             <div className="min-w-48 flex-1">
-              <Field label="Yard name">
-                <Input name="name" required maxLength={40} defaultValue={`Yard ${String.fromCharCode(65 + Math.min(yards.data.length, 25))}`} />
+              <Field label={y.name}>
+                <Input name="name" required maxLength={40} defaultValue={fill(y.defaultName, { letter: String.fromCharCode(65 + Math.min(yards.data.length, 25)) })} />
               </Field>
             </div>
-            <SubmitButton>Add yard</SubmitButton>
+            <SubmitButton pendingLabel={m.common.adding}>{y.add}</SubmitButton>
           </ActionForm>
         ) : null}
       </Section>
 
-      <Section title="How play works">
+      <Section title={y.howPlayWorks}>
         <ActionForm action={savePlayHours} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Sessions for each pet, per day" hint="0 turns play planning off.">
+            <Field label={y.sessions} hint={y.sessionsHint}>
               <Input name="sessions" type="number" min={0} max={12} defaultValue={org.play_sessions_per_day} />
             </Field>
-            <Field label="Minutes per session" hint="Peak periods can shorten this.">
+            <Field label={y.minutes} hint={y.minutesHint}>
               <Input name="minutes" type="number" min={5} max={240} defaultValue={org.play_session_minutes} />
             </Field>
-            <Field label="Minutes between pets" hint="To walk one out and the next in.">
+            <Field label={y.changeover} hint={y.changeoverHint}>
               <Input name="changeover" type="number" min={0} max={60} defaultValue={org.play_changeover_minutes} />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Yards open">
+            <Field label={y.open}>
               <Input name="dayStart" type="time" required defaultValue={hm(org.play_day_start)} />
             </Field>
-            <Field label="Yards close">
+            <Field label={y.close}>
               <Input name="dayEnd" type="time" required defaultValue={hm(org.play_day_end)} />
             </Field>
-            <Field label="Break starts" hint="Optional, for the midday heat.">
+            <Field label={y.breakStarts} hint={y.breakStartsHint}>
               <Input name="breakStart" type="time" defaultValue={hm(org.play_break_start)} />
             </Field>
-            <Field label="Break ends">
+            <Field label={y.breakEnds}>
               <Input name="breakEnd" type="time" defaultValue={hm(org.play_break_end)} />
             </Field>
           </div>
-          {canManage ? <SubmitButton>Save play settings</SubmitButton> : null}
+          {canManage ? <SubmitButton pendingLabel={m.common.saving}>{y.save}</SubmitButton> : null}
         </ActionForm>
       </Section>
 
       <Calculator
+        t={t}
         params={params}
         defaults={{
           dogs: kennels.count ?? 0,
@@ -124,7 +129,18 @@ async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "se
 type Inputs = { dogs: number; sessions: number; minutes: number; changeover: number; dayStart: string; dayEnd: string; breakStart: string; breakEnd: string };
 
 /** "What do I need": a plain GET form, so it works without JavaScript and the answer can be shared as a link. */
-function Calculator({ params, defaults, yardsYouHave }: { params: Record<string, string | string[] | undefined>; defaults: Inputs; yardsYouHave: number }) {
+function Calculator({
+  t,
+  params,
+  defaults,
+  yardsYouHave,
+}: {
+  t: I18n;
+  params: Record<string, string | string[] | undefined>;
+  defaults: Inputs;
+  yardsYouHave: number;
+}) {
+  const c = t.m.yards.calculator;
   const str = (k: keyof Inputs) => (typeof params[k] === "string" ? (params[k] as string) : String(defaults[k]));
   const num = (k: keyof Inputs, lo: number, hi: number) => {
     const n = Number(str(k));
@@ -148,50 +164,50 @@ function Calculator({ params, defaults, yardsYouHave }: { params: Record<string,
     for (const w of windows) if (toMinutes(w.end) <= toMinutes(w.start)) throw new RangeError("order");
     const need = yardsNeeded({ dogCount: v.dogs, sessionsPerDog: v.sessions, sessionMinutes: v.minutes, changeoverMinutes: v.changeover, windows });
     const hours = Math.round((v.dogs * v.sessions * (v.minutes + v.changeover)) / 6) / 10;
-    if (need === null) answer = { tone: "error", text: "A session does not fit in those hours. Open the yards for longer or shorten the sessions." };
+    if (need === null) answer = { tone: "error", text: c.noFit };
     else
       answer = {
         tone: need <= yardsYouHave ? "ok" : "info",
-        text: `${v.dogs} pets need ${hours} yard-hours a day: ${need} ${need === 1 ? "yard" : "yards"} in use the whole time. You have ${yardsYouHave} in use.`,
+        text: plural(t.language, need, c.answer, { pets: v.dogs, hours, have: yardsYouHave }),
       };
   } catch {
-    answer = { tone: "error", text: "Check the numbers and times: the yards must close after they open, and any break must be inside those hours." };
+    answer = { tone: "error", text: c.checkNumbers };
   }
 
   return (
-    <Section title="How many yards do I need?">
+    <Section title={c.title}>
       <form method="get" className="space-y-4 rounded-xl border border-rule bg-paper p-4">
         <Notice tone={answer.tone}>{answer.text}</Notice>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Field label="Pets">
+          <Field label={c.pets}>
             <Input name="dogs" type="number" min={0} max={2000} defaultValue={str("dogs")} />
           </Field>
-          <Field label="Sessions each">
+          <Field label={c.sessions}>
             <Input name="sessions" type="number" min={1} max={12} defaultValue={str("sessions")} />
           </Field>
-          <Field label="Minutes">
+          <Field label={c.minutes}>
             <Input name="minutes" type="number" min={5} max={240} defaultValue={str("minutes")} />
           </Field>
-          <Field label="Between pets">
+          <Field label={c.changeover}>
             <Input name="changeover" type="number" min={0} max={60} defaultValue={str("changeover")} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Field label="Open">
+          <Field label={c.open}>
             <Input name="dayStart" type="time" defaultValue={str("dayStart")} />
           </Field>
-          <Field label="Close">
+          <Field label={c.close}>
             <Input name="dayEnd" type="time" defaultValue={str("dayEnd")} />
           </Field>
-          <Field label="Break from">
+          <Field label={c.breakFrom}>
             <Input name="breakStart" type="time" defaultValue={str("breakStart")} />
           </Field>
-          <Field label="Break to">
+          <Field label={c.breakTo}>
             <Input name="breakEnd" type="time" defaultValue={str("breakEnd")} />
           </Field>
         </div>
         <button type="submit" className={buttonStyles.secondary}>
-          Work it out
+          {c.workItOut}
         </button>
       </form>
     </Section>

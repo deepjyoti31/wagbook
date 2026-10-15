@@ -1,35 +1,38 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
+import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { formatDate, todayIn, toClock, toMinutes } from "@/lib/core";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { PetAvatar } from "@/components/pet-avatar";
 import { clearPlan, moveSession, planToday, sessionDone, sessionSkip, sessionUndo } from "./actions";
 
-export const metadata: Metadata = { title: "Play" };
+export const generateMetadata = () => appTitle((m) => m.play.title);
 
 export default function PlayPage() {
   return (
-    <>
-      <PageTitle title="Play">
-        <Link href="/app/care" className={buttonStyles.secondary}>
-          Care
-        </Link>
-      </PageTitle>
-      <Suspense fallback={<Loading label="Loading the play timetable" />}>
-        <Play />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Play />
+    </Suspense>
   );
 }
 
 async function Play() {
   const { org, canManage } = await requireOrg();
+  const { m, language, locale } = await getAppI18n();
+  const title = (
+    <PageTitle title={m.play.title}>
+      <Link href="/app/care" className={buttonStyles.secondary}>
+        {m.care.title}
+      </Link>
+    </PageTitle>
+  );
   const today = todayIn(org.time_zone);
   const supabase = await createClient();
 
@@ -47,12 +50,15 @@ async function Play() {
 
   if (org.play_sessions_per_day === 0) {
     return (
-      <Empty>
-        Play planning is off.{" "}
-        <Link href="/app/more/play" className="font-semibold text-ink underline underline-offset-4">
-          Set it up on Play yards
-        </Link>
-      </Empty>
+      <>
+        {title}
+        <Empty>
+          {m.play.off}{" "}
+          <Link href="/app/more/play" className="font-semibold text-ink underline underline-offset-4">
+            {m.play.setUp}
+          </Link>
+        </Empty>
+      </>
     );
   }
 
@@ -63,20 +69,27 @@ async function Play() {
   const short = (inHouse.data ?? []).filter((b) => (perPet.get(b.pet_id) ?? 0) < org.play_sessions_per_day).length;
   const done = sessions.data.filter((s) => s.status === "done").length;
 
+  // {done} and {total} are left in place by plural() so that Rich can draw them in bold.
+  const summary = plural(language, live.length, m.play.sessionsDone, { date: formatDate(today, locale), done: "{done}", total: "{total}" });
+
   return (
     <>
+      {title}
       <p className="mb-4 text-lg">
-        {formatDate(today)}. <strong className="font-extrabold">{done}</strong> of <strong className="font-extrabold">{live.length}</strong> sessions done.
-        {short > 0 ? ` ${short} ${short === 1 ? "pet is" : "pets are"} not fully planned.` : ""}
+        <Rich
+          text={summary}
+          parts={{ done: <strong className="font-extrabold">{done}</strong>, total: <strong className="font-extrabold">{live.length}</strong> }}
+        />
+        {short > 0 ? ` ${plural(language, short, m.play.notFullyPlanned)}` : ""}
       </p>
       <div className="mb-6 flex flex-wrap gap-2">
         <ActionForm action={planToday} className="w-full space-y-2">
-          <SubmitButton pendingLabel="Planning">{live.length === 0 ? "Plan today" : "Plan the rest"}</SubmitButton>
+          <SubmitButton pendingLabel={m.play.planning}>{live.length === 0 ? m.play.planToday : m.play.planRest}</SubmitButton>
         </ActionForm>
         {canManage && sessions.data.some((s) => s.status === "pending") ? (
           <ActionForm action={clearPlan} className="contents">
-            <SubmitButton variant="quiet" pendingLabel="Clearing">
-              Clear the plan
+            <SubmitButton variant="quiet" pendingLabel={m.play.clearing}>
+              {m.play.clear}
             </SubmitButton>
           </ActionForm>
         ) : null}
@@ -84,9 +97,9 @@ async function Play() {
 
       {yards.data.length === 0 ? (
         <Empty>
-          No play yards yet.{" "}
+          {m.play.noYards}{" "}
           <Link href="/app/more/play" className="font-semibold text-ink underline underline-offset-4">
-            Add a yard
+            {m.play.addYard}
           </Link>
         </Empty>
       ) : (
@@ -95,7 +108,7 @@ async function Play() {
           return (
             <Section key={y.id} title={y.name} count={list.filter((s) => s.status === "pending").length}>
               {list.length === 0 ? (
-                <Empty>Nothing planned in this yard.</Empty>
+                <Empty>{m.play.nothingInYard}</Empty>
               ) : (
                 <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
                   {list.map((s) => {
@@ -108,49 +121,47 @@ async function Play() {
                           <PetAvatar name={pet?.name ?? "?"} url={pet?.photo_path ? photos.get(pet.photo_path) : null} />
                           <div className="min-w-0 flex-1 basis-48">
                             <p className="flex flex-wrap items-center gap-2">
-                              <span className="font-extrabold">
-                                {start} to {end}
-                              </span>
-                              <DoorTag name={s.bookings?.kennels?.name} />
-                              <span className="text-lg font-bold">{pet?.name ?? "Pet"}</span>
-                              {s.status === "done" ? <Badge tone="good">Done</Badge> : null}
-                              {s.status === "skipped" ? <Badge tone="attention">Skipped</Badge> : null}
+                              <span className="font-extrabold">{fill(m.play.times, { start, end })}</span>
+                              <DoorTag name={s.bookings?.kennels?.name} empty={m.common.noKennel} />
+                              <span className="text-lg font-bold">{pet?.name ?? m.care.pet}</span>
+                              {s.status === "done" ? <Badge tone="good">{m.labels.taskStatus.done}</Badge> : null}
+                              {s.status === "skipped" ? <Badge tone="attention">{m.labels.taskStatus.skipped}</Badge> : null}
                               {(pet?.flags ?? []).map((f) => (
                                 <Badge key={f} tone="alert">
-                                  {flagText(f)}
+                                  {flagText(m, f)}
                                 </Badge>
                               ))}
                             </p>
-                            {s.note ? <p className="mt-1">Note: {s.note}</p> : null}
+                            {s.note ? <p className="mt-1">{fill(m.care.note, { note: s.note })}</p> : null}
                           </div>
                           {s.status === "pending" ? (
                             <ActionForm action={sessionDone} className="contents">
                               <input type="hidden" name="sessionId" value={s.id} />
-                              <SubmitButton pendingLabel="Saving" className="min-w-28">
-                                Done
+                              <SubmitButton pendingLabel={m.common.saving} className="min-w-28">
+                                {m.care.markDone}
                               </SubmitButton>
                             </ActionForm>
                           ) : (
                             <ActionForm action={sessionUndo} className="contents">
                               <input type="hidden" name="sessionId" value={s.id} />
-                              <SubmitButton variant="quiet" pendingLabel="Undoing">
-                                Undo
+                              <SubmitButton variant="quiet" pendingLabel={m.care.undoing}>
+                                {m.care.undo}
                               </SubmitButton>
                             </ActionForm>
                           )}
                         </div>
                         {s.status === "pending" ? (
                           <details className="mt-2">
-                            <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">Move or skip</summary>
+                            <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">{m.play.moveOrSkip}</summary>
                             <ActionForm action={moveSession} className="mt-2 flex flex-wrap items-end gap-3">
                               <input type="hidden" name="sessionId" value={s.id} />
                               <div className="w-32">
-                                <Field label="Time">
+                                <Field label={m.play.time}>
                                   <Input name="startsAt" type="time" required defaultValue={start} />
                                 </Field>
                               </div>
                               <div className="min-w-36 flex-1">
-                                <Field label="Yard">
+                                <Field label={m.play.yard}>
                                   <Select name="yardId" defaultValue={y.id}>
                                     {yards.data.map((o) => (
                                       <option key={o.id} value={o.id}>
@@ -160,19 +171,19 @@ async function Play() {
                                   </Select>
                                 </Field>
                               </div>
-                              <SubmitButton variant="secondary" pendingLabel="Moving">
-                                Move
+                              <SubmitButton variant="secondary" pendingLabel={m.play.moving}>
+                                {m.play.move}
                               </SubmitButton>
                             </ActionForm>
                             <ActionForm action={sessionSkip} className="mt-3 flex flex-wrap items-end gap-3">
                               <input type="hidden" name="sessionId" value={s.id} />
                               <div className="min-w-48 flex-1">
-                                <Field label="Why skip? (optional)">
+                                <Field label={m.play.whySkip}>
                                   <Input name="note" maxLength={500} />
                                 </Field>
                               </div>
-                              <SubmitButton variant="quiet" pendingLabel="Skipping">
-                                Skip session
+                              <SubmitButton variant="quiet" pendingLabel={m.care.skipping}>
+                                {m.play.skipSession}
                               </SubmitButton>
                             </ActionForm>
                           </details>

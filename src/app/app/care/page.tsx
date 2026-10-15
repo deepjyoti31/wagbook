@@ -1,32 +1,28 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, DoorTag, Empty, Loading, PageTitle, Section, Textarea } from "@/components/ui";
+import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
-import { CARE_KIND_LABEL, CARE_KIND_PLURAL, CARE_KINDS, clockText } from "@/lib/care";
+import { CARE_KINDS, clockText } from "@/lib/care";
 import { formatDate, todayIn } from "@/lib/core";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import type { Enums } from "@/lib/supabase/database.types";
+import type { Messages } from "@/messages";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { PetAvatar } from "@/components/pet-avatar";
 import { markDone, skipTask, undoTask } from "./actions";
 
-export const metadata: Metadata = { title: "Care" };
+export const generateMetadata = () => appTitle((m) => m.care.title);
 
 export default function CarePage({ searchParams }: PageProps<"/app/care">) {
   return (
-    <>
-      <PageTitle title="Care">
-        <Link href="/app/play" className={buttonStyles.secondary}>
-          Play
-        </Link>
-      </PageTitle>
-      <Suspense fallback={<Loading label="Loading today's care" />}>
-        <Care searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Care searchParams={searchParams} />
+    </Suspense>
   );
 }
 
@@ -40,6 +36,8 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
   const pendingOnly = params.show === "pending";
 
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m, language, locale } = t;
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
 
@@ -67,7 +65,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
 
   const groups = new Map<string, typeof shown>();
   for (const t of shown) {
-    const key = clockText(t.due_time);
+    const key = clockText(m, t.due_time);
     groups.set(key, [...(groups.get(key) ?? []), t]);
   }
 
@@ -81,43 +79,59 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
   const chip = (active: boolean) =>
     `inline-flex min-h-12 items-center rounded-lg px-4 font-semibold ${active ? "bg-ink text-paper" : "border border-rule bg-paper text-ink"}`;
 
+  // {n} is left in place by plural() so that Rich can draw it in bold.
+  const summary = plural(language, pending, kind ? m.care.stillToDoOfKind : m.care.stillToDo, {
+    n: "{n}",
+    date: formatDate(today, locale),
+    kind: kind ? m.labels.careKindPlural[kind].toLowerCase() : "",
+  });
+
   return (
     <>
+      <PageTitle title={m.care.title}>
+        <Link href="/app/play" className={buttonStyles.secondary}>
+          {m.play.title}
+        </Link>
+      </PageTitle>
       <p className="mb-4 text-lg">
-        {formatDate(today)}. <strong className="font-extrabold">{pending}</strong> {pending === 1 ? "task" : "tasks"} still to do
-        {kind ? ` (${CARE_KIND_PLURAL[kind].toLowerCase()})` : ""}.
+        <Rich text={summary} parts={{ n: <strong className="font-extrabold">{pending}</strong> }} />
       </p>
 
-      <nav aria-label="Show" className="mb-5 flex flex-wrap gap-2">
+      <nav aria-label={m.common.show} className="mb-5 flex flex-wrap gap-2">
         <Link href={filter(kind, !pendingOnly)} className={chip(pendingOnly)} aria-pressed={pendingOnly}>
-          Still to do
+          {m.care.showStillToDo}
         </Link>
         <Link href={filter(null, pendingOnly)} className={chip(kind === null)}>
-          Everything
+          {m.care.showEverything}
         </Link>
         {CARE_KINDS.filter((k) => data.some((t) => t.kind === k) || k === kind).map((k) => (
           <Link key={k} href={filter(k, pendingOnly)} className={chip(kind === k)}>
-            {CARE_KIND_PLURAL[k]}
+            {m.labels.careKindPlural[k]}
           </Link>
         ))}
       </nav>
 
       {tasks.length === 0 ? (
         <Empty>
-          Nothing to do yet. Tasks come from your{" "}
-          <Link href="/app/more/routines" className="font-semibold text-ink underline underline-offset-4">
-            daily routines
-          </Link>{" "}
-          for every pet checked in.
+          <Rich
+            text={m.care.nothingYet}
+            parts={{
+              link: (
+                <Link href="/app/more/routines" className="font-semibold text-ink underline underline-offset-4">
+                  {m.care.dailyRoutines}
+                </Link>
+              ),
+            }}
+          />
         </Empty>
       ) : shown.length === 0 ? (
-        <Empty>All done.</Empty>
+        <Empty>{m.care.allDone}</Empty>
       ) : (
         [...groups.entries()].map(([time, list]) => (
           <Section key={time} title={time} count={list.filter((t) => t.status === "pending").length}>
             <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
               {list.map((t) => (
-                <TaskRow key={t.id} task={t} photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null} />
+                <TaskRow key={t.id} m={m} task={t} photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null} />
               ))}
             </ul>
           </Section>
@@ -137,7 +151,7 @@ type Task = {
   bookings: { id: string; kennels: { name: string } | null; pets: { name: string; flags: string[]; photo_path: string | null } | null } | null;
 };
 
-function TaskRow({ task: t, photo }: { task: Task; photo?: string | null }) {
+function TaskRow({ m, task: t, photo }: { m: Messages; task: Task; photo?: string | null }) {
   const medicine = t.kind === "medication";
   const pet = t.bookings?.pets;
   return (
@@ -146,49 +160,49 @@ function TaskRow({ task: t, photo }: { task: Task; photo?: string | null }) {
         <PetAvatar name={pet?.name ?? "?"} url={photo} />
         <div className="min-w-0 flex-1 basis-48">
           <p className="flex flex-wrap items-center gap-2">
-            <DoorTag name={t.bookings?.kennels?.name} />
-            <span className="text-lg font-bold">{pet?.name ?? "Pet"}</span>
+            <DoorTag name={t.bookings?.kennels?.name} empty={m.common.noKennel} />
+            <span className="text-lg font-bold">{pet?.name ?? m.care.pet}</span>
             <span className={medicine ? "font-bold text-alert" : "font-semibold"}>{t.label}</span>
-            {medicine ? <Badge tone="alert">{CARE_KIND_LABEL.medication}</Badge> : null}
-            {t.status === "done" ? <Badge tone="good">Done</Badge> : null}
-            {t.status === "skipped" ? <Badge tone="attention">Skipped</Badge> : null}
+            {medicine ? <Badge tone="alert">{m.labels.careKind.medication}</Badge> : null}
+            {t.status === "done" ? <Badge tone="good">{m.labels.taskStatus.done}</Badge> : null}
+            {t.status === "skipped" ? <Badge tone="attention">{m.labels.taskStatus.skipped}</Badge> : null}
             {(pet?.flags ?? []).map((f) => (
               <Badge key={f} tone="alert">
-                {flagText(f)}
+                {flagText(m, f)}
               </Badge>
             ))}
           </p>
           {t.details ? <p className="mt-1">{t.details}</p> : null}
-          {t.note ? <p className="mt-1 text-slate">Note: {t.note}</p> : null}
+          {t.note ? <p className="mt-1 text-slate">{fill(m.care.note, { note: t.note })}</p> : null}
         </div>
         {t.status === "pending" ? (
           <ActionForm action={markDone} className="contents">
             <input type="hidden" name="taskId" value={t.id} />
-            <SubmitButton pendingLabel="Saving" className="min-w-28">
-              Done
+            <SubmitButton pendingLabel={m.common.saving} className="min-w-28">
+              {m.care.markDone}
             </SubmitButton>
           </ActionForm>
         ) : (
           <ActionForm action={undoTask} className="contents">
             <input type="hidden" name="taskId" value={t.id} />
-            <SubmitButton variant="quiet" pendingLabel="Undoing">
-              Undo
+            <SubmitButton variant="quiet" pendingLabel={m.care.undoing}>
+              {m.care.undo}
             </SubmitButton>
           </ActionForm>
         )}
       </div>
       {t.status === "pending" ? (
         <details className="mt-2">
-          <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">Skip</summary>
+          <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">{m.care.skip}</summary>
           <ActionForm action={skipTask} className="mt-2 space-y-2">
             <input type="hidden" name="taskId" value={t.id} />
             <input type="hidden" name="kind" value={t.kind} />
             <label className="block">
-              <span className="mb-1 block font-semibold">{medicine ? "Why was it not given?" : "Why? (optional)"}</span>
+              <span className="mb-1 block font-semibold">{medicine ? m.care.whyNotGiven : m.care.whyOptional}</span>
               <Textarea name="note" rows={2} maxLength={500} required={medicine} />
             </label>
-            <SubmitButton variant="secondary" pendingLabel="Skipping">
-              Skip {t.label.toLowerCase()}
+            <SubmitButton variant="secondary" pendingLabel={m.care.skipping}>
+              {fill(m.care.skipTask, { task: t.label.toLowerCase() })}
             </SubmitButton>
           </ActionForm>
         </details>
