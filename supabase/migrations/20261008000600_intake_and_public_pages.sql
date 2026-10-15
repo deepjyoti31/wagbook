@@ -402,6 +402,7 @@ set search_path = ''
 as $$
   select jsonb_build_object(
     'language', o.parent_language,
+    'locale', o.locale,
     'number', i.number,
     'status', i.status,
     'issued_on', i.issued_on,

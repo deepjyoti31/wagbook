@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /** Set (or clear) the usual price for boarding or day boarding on the rate card. */
-async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boarding" | "daycare", priceMinor: number | null) {
+async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boarding" | "daycare", priceMinor: number | null, name: string) {
   const existing = await supabase.from("services").select("id").eq("org_id", orgId).eq("kind", kind).eq("is_default", true).eq("is_active", true).maybeSingle();
   if (existing.error) return existing.error;
   if (priceMinor === null) return null; // An empty box leaves the current price alone.
@@ -24,8 +24,8 @@ async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boardi
     await supabase.from("services").insert({
       org_id: orgId,
       kind,
-      // Stored as data on the price list, in English like the rest of the starter data.
-      name: kind === "boarding" ? "Boarding" : "Day boarding",
+      // Stored as data on the price list, in the language of whoever set the price.
+      name,
       unit: kind === "boarding" ? "night" : "day",
       price_minor: priceMinor,
       is_default: true,
@@ -134,7 +134,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   if (data.length === 0) return { error: t.m.settings.onlyManagers };
 
   for (const kind of ["boarding", "daycare"] as const) {
-    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind]);
+    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], t.m.labels.bookingKind[kind]);
     if (priceError) return { error: friendlyError(priceError, t) };
   }
 

@@ -29,6 +29,8 @@ interface PublicLine {
 interface PublicInvoice {
   /** The kennel's language for parents. */
   language: string;
+  /** The kennel's locale, such as en-IN: its region formats amounts and dates. */
+  locale: string | null;
   number: string;
   status: "issued" | "void";
   issued_on: ISODate;
@@ -97,8 +99,8 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
   const { token } = await params;
   const inv = await loadInvoice(token);
   if (!inv) notFound();
-  // In the kennel's language for parents. The function does not return the kennel's locale, so amounts and dates use India's.
-  const { m, locale } = parentI18n(inv.language);
+  // In the kennel's language for parents, with amounts and dates in the kennel's region.
+  const { m, locale } = parentI18n(inv.language, inv.locale);
   const w = m.invoice;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale });

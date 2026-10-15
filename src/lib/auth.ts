@@ -48,6 +48,9 @@ export const getUser = cache(async (): Promise<SessionUser | null> => {
 });
 
 export async function requireUser(): Promise<SessionUser> {
+  // Per request, always, even when the answer is the setup page: a page that
+  // asks who is signed in must never be saved at build time.
+  await connection();
   if (!isSupabaseConfigured()) redirect("/setup");
   const user = await getUser();
   if (!user) redirect("/login");

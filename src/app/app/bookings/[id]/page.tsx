@@ -371,7 +371,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               })}
             </ul>
           ) : null}
-          {bill.data?.status !== "issued" ? <PaymentForm words={m.payments} bookingId={b.id} defaultAmount="" today={today} canRefund={false} /> : null}
+          {bill.data?.status !== "issued" ? <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} /> : null}
         </Section>
       ) : null}
 
