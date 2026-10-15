@@ -334,6 +334,7 @@ grant execute on function public.respond_to_invitation(uuid, boolean) to authent
 grant execute on function public.create_invitation_link(uuid, public.member_role, text) to authenticated;
 grant execute on function public.get_invitation_link(text) to authenticated;
 grant execute on function public.accept_invitation_link(text) to authenticated;
+grant execute on function public.set_my_language(text) to authenticated;
 grant execute on function public.merge_clients(uuid, uuid) to authenticated;
 grant execute on function public.occupancy_by_day(uuid, date, date) to authenticated;
 grant execute on function public.available_kennels(uuid, public.booking_kind, date, date) to authenticated;

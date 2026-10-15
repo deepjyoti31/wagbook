@@ -1013,6 +1013,7 @@ export type Database = {
           role: Database["public"]["Enums"]["member_role"];
           display_name: string;
           phone: string | null;
+          language: string;
           is_active: boolean;
           accepted_at: string | null;
           invited_by: string | null;
@@ -1025,6 +1026,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["member_role"];
           display_name: string;
           phone?: string | null;
+          language?: string;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -1037,6 +1039,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["member_role"];
           display_name?: string;
           phone?: string | null;
+          language?: string;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -1094,6 +1097,7 @@ export type Database = {
           play_break_end: string | null;
           intake_enabled: boolean;
           intake_notice: string | null;
+          parent_language: string;
           created_at: string;
           updated_at: string;
         };
@@ -1137,6 +1141,7 @@ export type Database = {
           play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
+          parent_language?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1180,6 +1185,7 @@ export type Database = {
           play_break_end?: string | null;
           intake_enabled?: boolean;
           intake_notice?: string | null;
+          parent_language?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1733,7 +1739,7 @@ export type Database = {
         Returns: string;
       };
       default_intake_notice: {
-        Args: { p_org_name: string };
+        Args: { p_org_name: string; p_language: string };
         Returns: string;
       };
       fiscal_year_label: {
@@ -1826,6 +1832,10 @@ export type Database = {
       };
       save_invoice_draft: {
         Args: { p_invoice: string; p_totals: Json; p_lines: Json };
+        Returns: undefined;
+      };
+      set_my_language: {
+        Args: { p_language: string };
         Returns: undefined;
       };
       stay_media_visible: {

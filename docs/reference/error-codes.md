@@ -27,6 +27,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB010` | unknown time zone "%" | `20261008000100_foundation.sql` |
 | `WB011` | a kennel must keep at least one active owner | `20261008000100_foundation.sql` |
 | `WB012` | you already own the maximum number of kennels | `20261008000100_foundation.sql` |
+| `WB013` | that language is not offered yet. | `20261008000100_foundation.sql` |
 | `WB014` | enter the person's name | `20261008000100_foundation.sql` |
 | `WB015` | that invitation is no longer open | `20261008000100_foundation.sql` |
 | `WB016` | that invitation link has expired or was already used. Ask for a new one. | `20261008000100_foundation.sql` |

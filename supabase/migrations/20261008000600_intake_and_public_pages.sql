@@ -93,17 +93,32 @@ $$;
 comment on function public.safe_date(text) is
   'Reads a YYYY-MM-DD string as a date, or returns null if it is anything else. For text that arrived from the public internet.';
 
-create function public.default_intake_notice(p_org_name text)
+create function public.default_intake_notice(p_org_name text, p_language text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $$
-  select 'I agree that ' || p_org_name || ' may store and use the details in this form to care for my pet, '
+  -- The parent agrees to the words they read, so the words stored with their
+  -- consent are the ones shown, in the same language. The Hindi and Kannada
+  -- versions are drafts until a native speaker has checked them (docs/HANDOFF.md).
+  select case p_language
+    when 'hi' then
+      'मैं सहमत हूँ कि ' || p_org_name || ' इस फ़ॉर्म में दी गई जानकारी को मेरे पालतू जानवर की देखभाल के लिए, '
+      || 'ठहरने के बारे में मुझसे संपर्क करने के लिए, और क़ानून के अनुसार ज़रूरी रिकॉर्ड रखने के लिए सहेज और इस्तेमाल कर सकता है। '
+      || 'मैं कभी भी ' || p_org_name || ' से अपनी जानकारी ठीक करने या हटाने के लिए कह सकता या सकती हूँ।'
+    when 'kn' then
+      'ನನ್ನ ಸಾಕುಪ್ರಾಣಿಯನ್ನು ನೋಡಿಕೊಳ್ಳಲು, ವಾಸ್ತವ್ಯದ ಬಗ್ಗೆ ನನ್ನನ್ನು ಸಂಪರ್ಕಿಸಲು ಮತ್ತು ಕಾನೂನು ಕೇಳುವ ದಾಖಲೆಗಳನ್ನು ಇಡಲು '
+      || 'ಈ ಫಾರ್ಮ್‌ನಲ್ಲಿರುವ ವಿವರಗಳನ್ನು ' || p_org_name || ' ಉಳಿಸಿಕೊಳ್ಳಲು ಮತ್ತು ಬಳಸಲು ನಾನು ಒಪ್ಪುತ್ತೇನೆ. '
+      || 'ನನ್ನ ವಿವರಗಳನ್ನು ಸರಿಪಡಿಸಲು ಅಥವಾ ಅಳಿಸಲು ನಾನು ಯಾವಾಗ ಬೇಕಾದರೂ ' || p_org_name || ' ಅನ್ನು ಕೇಳಬಹುದು.'
+    else
+      'I agree that ' || p_org_name || ' may store and use the details in this form to care for my pet, '
       || 'to contact me about the stay, and to keep the records the law requires. '
-      || 'I can ask ' || p_org_name || ' to correct or delete my details at any time.';
+      || 'I can ask ' || p_org_name || ' to correct or delete my details at any time.'
+  end;
 $$;
-comment on function public.default_intake_notice(text) is 'Consent wording used when an organisation has not written its own.';
+comment on function public.default_intake_notice(text, text) is
+  'Consent wording used when an organisation has not written its own, in the parent pages'' language (en, hi or kn; anything else gives English).';
 
 create function public.get_public_intake_form(p_slug text)
 returns jsonb
@@ -119,7 +134,8 @@ as $$
     'check_in_time', to_char(o.check_in_time, 'HH24:MI'),
     'check_out_time', to_char(o.check_out_time, 'HH24:MI'),
     'intake_enabled', o.intake_enabled,
-    'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name))
+    'language', o.parent_language,
+    'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language))
   )
   from public.organizations o
   where o.slug = lower(btrim(p_slug));
@@ -197,7 +213,7 @@ begin
     (org_id, parent_name, parent_phone, requested_start, requested_end, payload, consent_at, consent_text)
   values
     (v_org.id, v_name, v_phone, v_start, v_end, p_payload, now(),
-     coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name)));
+     coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name, v_org.parent_language)));
 
   return true;
 end;
@@ -329,7 +345,8 @@ as $$
       'check_in_time', to_char(o.check_in_time, 'HH24:MI'),
       'check_out_time', to_char(o.check_out_time, 'HH24:MI'),
       'time_zone', o.time_zone,
-      'locale', o.locale
+      'locale', o.locale,
+      'language', o.parent_language
     ),
     'pet', jsonb_build_object('name', p.name, 'species', p.species, 'breed', p.breed, 'photo', p.photo_path),
     'booking', jsonb_build_object(
@@ -384,6 +401,7 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
+    'language', o.parent_language,
     'number', i.number,
     'status', i.status,
     'issued_on', i.issued_on,
@@ -422,6 +440,7 @@ as $$
     ), '[]'::jsonb)
   )
   from public.invoices i
+  join public.organizations o on o.id = i.org_id
   where char_length(p_token) = 64
     and i.public_token = p_token
     and i.status in ('issued', 'void');

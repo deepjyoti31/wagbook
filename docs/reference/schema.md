@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 10. Tables: 24. Views: 1. Functions: 52.
+Migrations applied: 10. Tables: 24. Views: 1. Functions: 53.
 
 ## Contents
 
@@ -791,6 +791,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 | `role` | `member_role` | yes | `'staff'::member_role` |  |
 | `display_name` | `text` | yes |  | Name shown next to this person's actions, e.g. "Ravi". |
 | `phone` | `text` |  |  |  |
+| `language` | `text` | yes | `'en'::text` | The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once. |
 | `is_active` | `boolean` | yes | `false` | Whether this person can use the organisation right now. False while an invitation is pending, and set false again to cut off access at once without losing the history of who did what. |
 | `accepted_at` | `timestamp with time zone` |  |  | When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it. |
 | `invited_by` | `uuid` |  |  | Who sent the invitation. |
@@ -805,6 +806,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 - Foreign key `memberships_user_id_fkey`: `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE`
 - Check `memberships_active_needs_acceptance`: `CHECK (((NOT is_active) OR (accepted_at IS NOT NULL)))`
 - Check `memberships_display_name_check`: `CHECK (((char_length(display_name) >= 1) AND (char_length(display_name) <= 80)))`
+- Check `memberships_language_check`: `CHECK ((language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `memberships_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 
 **Indexes**
@@ -870,7 +872,8 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `play_break_start` | `time without time zone` |  |  | Start of an optional break in play, such as the midday heat. Empty for no break. |
 | `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
-| `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default is used when empty. |
+| `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
+| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page, bill and WhatsApp messages. en, hi or kn. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -886,6 +889,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
 - Check `organizations_invoice_prefix_check`: `CHECK ((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
+- Check `organizations_parent_language_check`: `CHECK ((parent_language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 - Check `organizations_play_break_inside_day`: `CHECK ((((play_break_start IS NULL) AND (play_break_end IS NULL)) OR ((play_break_start IS NOT NULL) AND (play_break_end IS NOT NULL) AND (play_break_start > play_day_start) AND (play_break_end < play_day_end) AND (play_break_end > play_break_start))))`
 - Check `organizations_play_changeover_minutes_check`: `CHECK (((play_changeover_minutes >= 0) AND (play_changeover_minutes <= 60)))`
@@ -1463,14 +1467,14 @@ Creates an organisation and makes the signed-in user its owner. The only way an 
 ### default_intake_notice
 
 ```
-default_intake_notice(p_org_name text) returns text
+default_intake_notice(p_org_name text, p_language text) returns text
 ```
 
 - Who may call: internal
 - Runs as: the caller (row level security applies)
 - Volatility: immutable
 
-Consent wording used when an organisation has not written its own.
+Consent wording used when an organisation has not written its own, in the parent pages' language (en, hi or kn; anything else gives English).
 
 ### fiscal_year_label
 
@@ -1819,6 +1823,18 @@ save_invoice_draft(p_invoice uuid, p_totals jsonb, p_lines jsonb) returns void
 - Volatility: volatile
 
 Replaces a draft invoice's lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.
+
+### set_my_language
+
+```
+set_my_language(p_language text) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Sets the signed-in person's language (en, hi or kn) in every kennel they belong to. Changes nothing else.
 
 ### set_updated_at
 

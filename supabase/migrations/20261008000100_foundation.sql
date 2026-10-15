@@ -173,6 +173,7 @@ create table public.organizations (
   play_break_end time,
   intake_enabled boolean not null default true,
   intake_notice text,
+  parent_language text not null default 'en' check (parent_language in ('en', 'hi', 'kn')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint organizations_gst_needs_registration
@@ -213,7 +214,8 @@ comment on column public.organizations.play_day_end is 'When the play yards clos
 comment on column public.organizations.play_break_start is 'Start of an optional break in play, such as the midday heat. Empty for no break.';
 comment on column public.organizations.play_break_end is 'End of the optional break in play.';
 comment on column public.organizations.intake_enabled is 'Whether the public intake form at /i/{slug} accepts submissions.';
-comment on column public.organizations.intake_notice is 'Privacy and consent text shown on the intake form, in the kennel''s own words. A default is used when empty.';
+comment on column public.organizations.intake_notice is 'Privacy and consent text shown on the intake form, in the kennel''s own words. A default, in the parent pages'' language, is used when empty.';
+comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page, bill and WhatsApp messages. en, hi or kn.';
 
 create trigger organizations_set_updated_at
   before update on public.organizations
@@ -247,6 +249,7 @@ create table public.memberships (
   role public.member_role not null default 'staff',
   display_name text not null check (char_length(display_name) between 1 and 80),
   phone text check (phone is null or phone ~ '^\+[1-9][0-9]{7,14}$'),
+  language text not null default 'en' check (language in ('en', 'hi', 'kn')),
   is_active boolean not null default false,
   accepted_at timestamptz,
   invited_by uuid references auth.users (id) on delete set null,
@@ -265,6 +268,7 @@ comment on column public.memberships.is_active is
 comment on column public.memberships.accepted_at is
   'When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it.';
 comment on column public.memberships.invited_by is 'Who sent the invitation.';
+comment on column public.memberships.language is 'The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once.';
 
 create index memberships_user_id_idx on public.memberships (user_id);
 
@@ -602,3 +606,29 @@ end;
 $$;
 comment on function public.accept_invitation_link(text) is
   'Joins the signed-in person to the organisation of an invitation link, in its role. Works once; refuses an expired or withdrawn link and someone who is already a member.';
+
+-- ---------------------------------------------------------------------------
+-- The language a person reads Wagbook in.
+-- ---------------------------------------------------------------------------
+
+create function public.set_my_language(p_language text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- SECURITY DEFINER: only owners and managers may update membership rows
+  -- (memberships_update), but everyone chooses their own language. This
+  -- touches only the caller's own rows, and only the language column.
+  if (select auth.uid()) is null then
+    raise exception 'WB001: sign in first' using errcode = '28000';
+  end if;
+  if p_language is null or p_language not in ('en', 'hi', 'kn') then
+    raise exception 'WB013: that language is not offered yet.' using errcode = '22023';
+  end if;
+  update public.memberships m set language = p_language where m.user_id = (select auth.uid());
+end;
+$$;
+comment on function public.set_my_language(text) is
+  'Sets the signed-in person''s language (en, hi or kn) in every kennel they belong to. Changes nothing else.';
