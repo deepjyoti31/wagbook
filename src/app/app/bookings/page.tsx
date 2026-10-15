@@ -1,38 +1,31 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Badge, buttonStyles, DoorTag, Empty, Ledger, Loading, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { STATUS_LABEL, stayText } from "@/lib/bookings";
+import { stayText } from "@/lib/bookings";
 import { addDays, formatMoney, peaksTouching, todayIn } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { bookingCards, peakPeriods, toPeak } from "@/lib/queries";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { PetAvatar } from "@/components/pet-avatar";
 
-export const metadata: Metadata = { title: "Bookings" };
+export const generateMetadata = () => appTitle((m) => m.bookings.title);
 
 export default function BookingsPage({ searchParams }: PageProps<"/app/bookings">) {
   return (
-    <>
-      <PageTitle title="Bookings">
-        <Link href="/app/calendar" className={buttonStyles.secondary}>
-          Calendar
-        </Link>
-        <Link href="/app/bookings/new" className={buttonStyles.primary}>
-          New booking
-        </Link>
-      </PageTitle>
-      <Suspense fallback={<Loading label="Loading bookings" />}>
-        <Bookings searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Bookings searchParams={searchParams} />
+    </Suspense>
   );
 }
 
 async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "searchParams">) {
   const past = (await searchParams).show === "past";
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m, locale } = t;
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
 
@@ -49,17 +42,25 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
 
   return (
     <>
+      <PageTitle title={m.bookings.title}>
+        <Link href="/app/calendar" className={buttonStyles.secondary}>
+          {m.bookings.calendar}
+        </Link>
+        <Link href="/app/bookings/new" className={buttonStyles.primary}>
+          {m.bookings.newBooking}
+        </Link>
+      </PageTitle>
       <div className="mb-4 flex gap-2">
         <Link href="/app/bookings" className={tab(!past)} aria-current={!past ? "page" : undefined}>
-          Current and upcoming
+          {m.bookings.current}
         </Link>
         <Link href="/app/bookings?show=past" className={tab(past)} aria-current={past ? "page" : undefined}>
-          Past
+          {m.bookings.past}
         </Link>
       </div>
 
       {data.length === 0 ? (
-        <Empty>{past ? "No past bookings yet." : "No bookings yet. Add the first one with New booking."}</Empty>
+        <Empty>{past ? m.bookings.noPast : m.bookings.none}</Empty>
       ) : (
         <Ledger>
           {data.map((b) => {
@@ -70,17 +71,17 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
                   <PetAvatar name={b.pets?.name ?? "?"} url={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
                   <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2">
-                    <DoorTag name={b.kennels?.name} />
-                    <span className="text-lg font-bold">{b.pets?.name ?? "Unknown pet"}</span>
+                    <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
+                    <span className="text-lg font-bold">{b.pets?.name ?? m.bookings.unknownPet}</span>
                     <Badge
                       tone={
                         b.status === "checked_in" ? "good" : b.status === "requested" || (b.status === "confirmed" && b.start_date <= today) ? "attention" : "neutral"
                       }
                     >
-                      {STATUS_LABEL[b.status]}
+                      {m.labels.bookingStatus[b.status]}
                     </Badge>
-                    {b.kind === "daycare" ? <Badge>Day boarding</Badge> : null}
-                    {b.group_id ? <Badge>Family</Badge> : null}
+                    {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+                    {b.group_id ? <Badge>{m.bookings.family}</Badge> : null}
                     {touching.map((p) => (
                       <Badge key={p.name} tone="attention">
                         {p.name}
@@ -88,8 +89,11 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
                     ))}
                   </p>
                   <p className="mt-1 text-slate">
-                    {b.clients?.full_name}. {stayText(b.kind, b.start_date, b.end_date)} at{" "}
-                    {formatMoney(b.rate_minor, { currency: org.currency, locale: org.locale, trimZeros: true })}.
+                    {fill(m.bookings.summary, {
+                      parent: b.clients?.full_name ?? "",
+                      stay: stayText(t, b.kind, b.start_date, b.end_date),
+                      price: formatMoney(b.rate_minor, { currency: org.currency, locale, trimZeros: true }),
+                    })}
                   </p>
                   </div>
                 </Link>

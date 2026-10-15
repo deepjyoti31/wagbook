@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -9,11 +8,13 @@ import { buttonStyles, Field, Loading, Notice, PageTitle, Textarea } from "@/com
 import { createUpdate } from "@/app/app/media/actions";
 import { requireOrg } from "@/lib/auth";
 import { dailyUpdateMessage, whatsappLink } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Write an update" };
+export const generateMetadata = () => appTitle((m) => m.update.title);
 
 export default function UpdatePage({ params, searchParams }: PageProps<"/app/bookings/[id]/update">) {
   return (
@@ -28,6 +29,8 @@ async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[i
   const saved = (await searchParams).saved;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org } = await requireOrg();
+  const { m } = await getAppI18n();
+  const w = m.update;
   const supabase = await createClient();
   const b = await supabase
     .from("bookings")
@@ -45,12 +48,14 @@ async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[i
       ? (await supabase.from("stay_updates").select("id, body, media_paths, is_visible_to_parent").eq("org_id", org.id).eq("id", saved).maybeSingle()).data
       : null;
   const urls = await signedUrls(supabase, [pet?.photo_path, ...(update?.media_paths ?? [])], { small: true });
+  // The WhatsApp message goes to the parent, so it is in the kennel's language for parents.
+  const toParent = parentI18n(org.parent_language, org.locale).m.whatsapp;
 
   return (
     <>
-      <PageTitle title={update ? "Update saved" : `Update for ${pet?.name ?? "the parent"}`}>
+      <PageTitle title={update ? w.saved : pet?.name ? fill(w.for, { pet: pet.name }) : w.forParent}>
         <Link href={`/app/bookings/${id}`} className={buttonStyles.quiet}>
-          Back to the booking
+          {w.back}
         </Link>
       </PageTitle>
 
@@ -61,9 +66,7 @@ async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[i
 
       {update ? (
         <div className="space-y-4">
-          <Notice tone="ok">
-            {update.is_visible_to_parent ? "Saved. It is on the parent's stay page now." : "Saved as a note for the team. The parent does not see it."}
-          </Notice>
+          <Notice tone="ok">{update.is_visible_to_parent ? w.savedVisible : w.savedTeam}</Notice>
           <p className="whitespace-pre-line rounded-xl border border-rule bg-paper p-4">{update.body}</p>
           {update.media_paths.length > 0 ? (
             <div className="flex flex-wrap gap-2">
@@ -78,34 +81,32 @@ async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[i
           {update.is_visible_to_parent && b.data.clients ? (
             <>
               <a
-                href={whatsappLink(dailyUpdateMessage({ petName: pet?.name ?? "Your pet", note: update.body, stayUrl }), b.data.clients.phone)}
+                href={whatsappLink(dailyUpdateMessage(toParent, { petName: pet?.name ?? toParent.yourPet, note: update.body, stayUrl }), b.data.clients.phone)}
                 target="_blank"
                 rel="noreferrer"
                 className={`${buttonStyles.whatsapp} w-full`}
               >
-                Send on WhatsApp
+                {m.common.sendOnWhatsapp}
               </a>
-              <p className="text-sm text-slate">
-                The message has the stay link, where the parent sees the photos. To send a photo in the chat as well, attach it in WhatsApp.
-              </p>
+              <p className="text-sm text-slate">{w.whatsappNote}</p>
             </>
           ) : null}
           <Link href={`/app/bookings/${id}/update`} className={buttonStyles.secondary}>
-            Write another
+            {w.another}
           </Link>
         </div>
       ) : (
         <ActionForm action={createUpdate}>
           <input type="hidden" name="bookingId" value={id} />
-          <Field label="How is the pet doing?">
-            <Textarea name="body" required maxLength={2000} rows={4} placeholder="Ate all his breakfast and had a long run in Yard A." />
+          <Field label={w.how}>
+            <Textarea name="body" required maxLength={2000} rows={4} placeholder={w.placeholder} />
           </Field>
-          <PhotoInput name="photos" label="Photos" multiple max={4} />
+          <PhotoInput name="photos" label={w.photos} words={m.photos} multiple max={4} />
           <label className="flex min-h-12 items-center gap-3">
             <input type="checkbox" name="visible" defaultChecked className="size-5" />
-            <span>Show to the parent</span>
+            <span>{w.showToParent}</span>
           </label>
-          <SubmitButton pendingLabel="Saving">Save update</SubmitButton>
+          <SubmitButton pendingLabel={m.common.saving}>{w.save}</SubmitButton>
         </ActionForm>
       )}
     </>
