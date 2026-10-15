@@ -1,48 +1,77 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { text, type FormState } from "@/lib/forms";
+import { isLanguage } from "@/lib/i18n";
+import { getVisitorI18n, LANGUAGE_COOKIE, type I18n } from "@/lib/i18n-server";
 import { safeDestination } from "@/lib/safe-redirect";
 import { siteOrigin } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
-const Credentials = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")),
-  password: z.string().min(8, "Use a password of at least 8 characters.").max(72, "That password is too long."),
-});
-
-const UNREACHABLE = "Could not reach the server. Check your connection and try again.";
+/** An email and password, with each refusal in the reader's language. */
+function credentials(m: I18n["m"]) {
+  const e = m.auth.errors;
+  return z.object({
+    email: z.string().trim().toLowerCase().pipe(z.email(e.email)),
+    password: z.string().min(8, e.passwordShort).max(72, e.passwordLong),
+  });
+}
 
 /** True when the request never got an answer, as opposed to being refused. */
 function isUnreachable(error: { name: string; status?: number }): boolean {
   return error.name === "AuthRetryableFetchError" || error.status === 0 || (error.status ?? 0) >= 500;
 }
 
-function parse(form: FormData) {
-  return Credentials.safeParse({ email: form.get("email"), password: form.get("password") });
+function parse(form: FormData, m: I18n["m"]) {
+  return credentials(m).safeParse({ email: form.get("email"), password: form.get("password") });
 }
 
 export async function signIn(_state: FormState, form: FormData): Promise<FormState> {
   if (!isSupabaseConfigured()) redirect("/setup");
-  const parsed = parse(form);
+  const { m } = await getVisitorI18n();
+  const e = m.auth.errors;
+  const parsed = parse(form, m);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
-    if (isUnreachable(error)) return { error: UNREACHABLE };
+    if (isUnreachable(error)) return { error: e.unreachable };
     // Deliberately the same message for a wrong email and a wrong password.
-    return { error: error.code === "email_not_confirmed" ? "Confirm your email first. Check your inbox for the link." : "That email and password do not match." };
+    return { error: error.code === "email_not_confirmed" ? e.confirmEmail : e.noMatch };
   }
+
+  // Remember the language this person chose, so the sign-in page speaks it next time too.
+  const membership = await supabase
+    .from("memberships")
+    .select("language")
+    .eq("user_id", data.user.id)
+    .eq("is_active", true)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (isLanguage(membership.data?.language)) {
+    (await cookies()).set(LANGUAGE_COOKIE, membership.data.language, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
   // Back to where they were going, such as an invitation link. Only ever a page on this site.
   redirect(safeDestination(text(form, "next"), await siteOrigin(), "/app"));
 }
 
 export async function signUp(_state: FormState, form: FormData): Promise<FormState> {
   if (!isSupabaseConfigured()) redirect("/setup");
-  const parsed = parse(form);
+  const { m } = await getVisitorI18n();
+  const e = m.auth.errors;
+  const parsed = parse(form, m);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const origin = await siteOrigin();
@@ -53,14 +82,14 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
     options: { emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(destination)}` },
   });
   if (error) {
-    if (isUnreachable(error)) return { error: UNREACHABLE };
-    if (error.code === "weak_password") return { error: "That password is too easy to guess. Try a longer one." };
-    if (error.code === "over_email_send_rate_limit") return { error: "Too many attempts. Wait a minute and try again." };
+    if (isUnreachable(error)) return { error: e.unreachable };
+    if (error.code === "weak_password") return { error: e.weakPassword };
+    if (error.code === "over_email_send_rate_limit") return { error: e.tooMany };
     console.error("signUp failed", error.code, error.message);
-    return { error: "Could not create the account. Please try again." };
+    return { error: e.couldNotCreate };
   }
   // With email confirmation on, there is no session yet.
-  if (!data.session) return { ok: "Almost there. Open the link we just emailed you to confirm your address." };
+  if (!data.session) return { ok: m.auth.checkEmail };
   redirect(destination);
 }
 

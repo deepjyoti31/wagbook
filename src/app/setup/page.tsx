@@ -1,44 +1,59 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { buttonStyles } from "@/components/ui";
+import { Suspense } from "react";
+import { Rich } from "@/components/rich";
+import { buttonStyles, Loading } from "@/components/ui";
+import { getVisitorI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-export const metadata: Metadata = { title: "Connect a database" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getVisitorI18n()).m.setup.title };
+}
 
 /** Shown when the app has no database settings yet, instead of a crash. */
 export default function SetupPage() {
-  const ready = isSupabaseConfigured();
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-12">
-      <h1 className="text-3xl font-extrabold tracking-tight">{ready ? "Database settings are in place" : "Connect a database"}</h1>
+      <Suspense fallback={<Loading />}>
+        <Setup />
+      </Suspense>
+    </main>
+  );
+}
+
+async function Setup() {
+  const { m } = await getVisitorI18n();
+  const s = m.setup;
+  const ready = isSupabaseConfigured();
+  const code = (name: string) => <code className="font-semibold">{name}</code>;
+  return (
+    <>
+      <h1 className="text-3xl font-extrabold tracking-tight">{ready ? s.readyTitle : s.title}</h1>
       {ready ? (
         <>
-          <p className="mt-4 text-lg text-slate">This copy of Wagbook knows where its Supabase project is. Try signing in; if that fails, check the URL and key in your environment settings.</p>
+          <p className="mt-4 text-lg text-slate">{s.ready}</p>
           <Link href="/login" className={`${buttonStyles.primary} mt-6`}>
-            Sign in
+            {m.auth.signIn}
           </Link>
         </>
       ) : (
         <>
-          <p className="mt-4 max-w-prose text-lg text-slate">
-            Wagbook stores everything in a Supabase project that you own. This copy has not been told where that project is yet.
-          </p>
+          <p className="mt-4 max-w-prose text-lg text-slate">{s.intro}</p>
           <ol className="mt-6 max-w-prose list-decimal space-y-3 pl-6 text-lg">
-            <li>Create a free project at supabase.com. Choose the Mumbai region if your kennel is in India.</li>
+            <li>{s.step1}</li>
             <li>
-              Apply the database migrations in <code className="font-semibold">supabase/migrations</code>.
+              <Rich text={s.step2} parts={{ path: code("supabase/migrations") }} />
             </li>
             <li>
-              Copy <code className="font-semibold">.env.example</code> to <code className="font-semibold">.env.local</code> and fill in the
-              project URL and publishable key.
+              <Rich text={s.step3} parts={{ example: code(".env.example"), local: code(".env.local") }} />
             </li>
-            <li>Restart the app.</li>
+            <li>{s.step4}</li>
           </ol>
           <p className="mt-6 max-w-prose text-slate">
-            The full walkthrough is in <code className="font-semibold">docs/10-setup-and-deploy.md</code>.
+            <Rich text={s.walkthrough} parts={{ path: code("docs/10-setup-and-deploy.md") }} />
           </p>
         </>
       )}
-    </main>
+    </>
   );
 }

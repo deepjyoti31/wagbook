@@ -1,15 +1,20 @@
-import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, Input, Loading, Notice, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { GST_STATES, toDecimalString } from "@/lib/core";
+import { LANGUAGE_NAMES, LANGUAGES } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { saveSettings } from "./actions";
 
-export const metadata: Metadata = { title: "Settings" };
+export const generateMetadata = () => appTitle((m) => m.settings.title);
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+/** The twelve month names in the reader's language. */
+function monthNames(locale: string): string[] {
+  const format = new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, i) => format.format(new Date(Date.UTC(2000, i, 1))));
+}
 
 /** Every time zone the runtime knows, with the kennel's own first if it is unusual. */
 function timeZones(current: string): string[] {
@@ -19,12 +24,9 @@ function timeZones(current: string): string[] {
 
 export default function SettingsPage() {
   return (
-    <>
-      <PageTitle title="Settings" />
-      <Suspense fallback={<Loading label="Loading settings" />}>
-        <Settings />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Settings />
+    </Suspense>
   );
 }
 
@@ -40,94 +42,97 @@ function Group({ title, about, children }: { title: string; about?: string; chil
 
 async function Settings() {
   const { org, canManage } = await requireOrg();
+  const { m, locale } = await getAppI18n();
+  const s = m.settings;
   const supabase = await createClient();
   const services = await supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true);
   if (services.error) throw new Error("Could not load prices.");
   const price = (kind: string) => {
-    const s = services.data.find((x) => x.kind === kind);
-    return s ? toDecimalString(s.price_minor).replace(/\.00$/, "") : "";
+    const found = services.data.find((x) => x.kind === kind);
+    return found ? toDecimalString(found.price_minor).replace(/\.00$/, "") : "";
   };
 
   return (
     <>
-      {canManage ? null : <Notice tone="info">You can look, but only an owner or manager can change settings.</Notice>}
+      <PageTitle title={s.title} />
+      {canManage ? null : <Notice tone="info">{s.viewOnly}</Notice>}
       <ActionForm action={saveSettings} className="space-y-6">
-        <Group title="Your kennel">
-          <Field label="Kennel name">
+        <Group title={s.kennel.title}>
+          <Field label={s.kennel.name}>
             <Input name="name" defaultValue={org.name} required maxLength={80} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Phone">
+            <Field label={s.kennel.phone}>
               <Input name="phone" type="tel" defaultValue={org.phone ?? ""} />
             </Field>
-            <Field label="WhatsApp number" hint="Shown to parents on their stay page.">
+            <Field label={s.kennel.whatsapp} hint={s.kennel.whatsappHint}>
               <Input name="whatsapp_phone" type="tel" defaultValue={org.whatsapp_phone ?? ""} />
             </Field>
           </div>
-          <Field label="Email">
+          <Field label={s.kennel.email}>
             <Input name="email" type="email" defaultValue={org.email ?? ""} />
           </Field>
-          <Field label="Address">
+          <Field label={s.kennel.address}>
             <Input name="address_line1" defaultValue={org.address_line1 ?? ""} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="City">
+            <Field label={s.kennel.city}>
               <Input name="city" defaultValue={org.city ?? ""} />
             </Field>
-            <Field label="State">
+            <Field label={s.kennel.state}>
               <Input name="state" defaultValue={org.state ?? ""} />
             </Field>
-            <Field label="PIN code">
+            <Field label={s.kennel.pin}>
               <Input name="postal_code" defaultValue={org.postal_code ?? ""} />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Earliest drop-off">
+            <Field label={s.kennel.dropOff}>
               <Input name="check_in_time" type="time" defaultValue={org.check_in_time.slice(0, 5)} />
             </Field>
-            <Field label="Latest pick-up">
+            <Field label={s.kennel.pickUp}>
               <Input name="check_out_time" type="time" defaultValue={org.check_out_time.slice(0, 5)} />
             </Field>
           </div>
         </Group>
 
-        <Group title="Prices" about="Filled in for you on every new booking. You can still change the price on any one booking.">
+        <Group title={s.prices.title} about={s.prices.about}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Boarding, per night">
+            <Field label={s.prices.boarding}>
               <Input name="price_boarding" inputMode="decimal" defaultValue={price("boarding")} />
             </Field>
-            <Field label="Day boarding, per day">
+            <Field label={s.prices.daycare}>
               <Input name="price_daycare" inputMode="decimal" defaultValue={price("daycare")} />
             </Field>
           </div>
         </Group>
 
-        <Group title="Getting paid" about="Wagbook puts your UPI ID into a pay link on every bill. The money goes straight to your bank; Wagbook never touches it.">
+        <Group title={s.paid.title} about={s.paid.about}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="UPI ID" hint="Like name@bank.">
+            <Field label={s.paid.upi} hint={s.paid.upiHint}>
               <Input name="upi_vpa" defaultValue={org.upi_vpa ?? ""} autoCapitalize="none" spellCheck={false} />
             </Field>
-            <Field label="Name shown to the payer">
+            <Field label={s.paid.payee}>
               <Input name="upi_payee_name" defaultValue={org.upi_payee_name ?? ""} />
             </Field>
           </div>
         </Group>
 
-        <Group title="Tax and invoices" about="Ask your accountant before changing these. Until you are registered for tax, leave tax off.">
-          <Field label="Tax">
+        <Group title={s.tax.title} about={s.tax.about}>
+          <Field label={s.tax.mode}>
             <Select name="tax_mode" defaultValue={org.tax_mode}>
-              <option value="none">I do not charge tax</option>
-              <option value="gst_india">India GST (CGST and SGST, or IGST)</option>
-              <option value="simple">One tax at one rate (VAT or sales tax)</option>
+              <option value="none">{s.tax.none}</option>
+              <option value="gst_india">{s.tax.gst}</option>
+              <option value="simple">{s.tax.simple}</option>
             </Select>
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="GSTIN or tax number">
+            <Field label={s.tax.taxId}>
               <Input name="tax_id" defaultValue={org.tax_id ?? ""} autoCapitalize="characters" spellCheck={false} />
             </Field>
-            <Field label="State, for GST">
+            <Field label={s.tax.gstState}>
               <Select name="gst_state_code" defaultValue={org.gst_state_code ?? ""}>
-                <option value="">Take it from the GSTIN</option>
+                <option value="">{s.tax.fromGstin}</option>
                 {Object.entries(GST_STATES).map(([code, state]) => (
                   <option key={code} value={code}>
                     {code} {state}
@@ -135,28 +140,28 @@ async function Settings() {
                 ))}
               </Select>
             </Field>
-            <Field label="Tax rate, percent">
+            <Field label={s.tax.rate}>
               <Input name="tax_rate_percent" inputMode="decimal" defaultValue={String(org.default_tax_rate_bp / 100)} />
             </Field>
-            <Field label="Name of the tax" hint="Only for the one-rate option, like VAT.">
+            <Field label={s.tax.label} hint={s.tax.labelHint}>
               <Input name="tax_label" defaultValue={org.tax_label ?? ""} />
             </Field>
-            <Field label="Legal name" hint="Printed on invoices if different from the kennel name.">
+            <Field label={s.tax.legalName} hint={s.tax.legalNameHint}>
               <Input name="legal_name" defaultValue={org.legal_name ?? ""} />
             </Field>
-            <Field label="Invoice prefix" hint="WB gives invoice numbers like WB/27-28/0001.">
+            <Field label={s.tax.prefix} hint={s.tax.prefixHint}>
               <Input name="invoice_prefix" defaultValue={org.invoice_prefix} maxLength={4} autoCapitalize="characters" />
             </Field>
           </div>
           <label className="flex items-start gap-3">
             <input type="checkbox" name="prices_include_tax" defaultChecked={org.prices_include_tax} className="mt-1 size-5" />
-            <span>My prices already include tax</span>
+            <span>{s.tax.includesTax}</span>
           </label>
         </Group>
 
-        <Group title="Region" about="What dates, times, money and bills follow. Changing the currency does not convert prices already set.">
+        <Group title={s.region.title} about={s.region.about}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Time zone" hint="Decides what today is for arrivals, care and bills.">
+            <Field label={s.region.timeZone} hint={s.region.timeZoneHint}>
               <Select name="time_zone" defaultValue={org.time_zone}>
                 {timeZones(org.time_zone).map((z) => (
                   <option key={z} value={z}>
@@ -165,17 +170,17 @@ async function Settings() {
                 ))}
               </Select>
             </Field>
-            <Field label="Currency" hint="Three letters, like INR.">
+            <Field label={s.region.currency} hint={s.region.currencyHint}>
               <Input name="currency" defaultValue={org.currency} maxLength={3} autoCapitalize="characters" />
             </Field>
-            <Field label="Number and date style" hint="Like en-IN, which writes 1,20,000.">
+            <Field label={s.region.locale} hint={s.region.localeHint}>
               <Input name="locale" defaultValue={org.locale} maxLength={20} autoCapitalize="none" spellCheck={false} />
             </Field>
-            <Field label="Financial year starts in" hint="April in India. Bill numbers start again from 1 each year.">
+            <Field label={s.region.fiscalStart} hint={s.region.fiscalStartHint}>
               <Select name="fiscal_year_start_month" defaultValue={String(org.fiscal_year_start_month)}>
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={String(i + 1)}>
-                    {m}
+                {monthNames(locale).map((month, i) => (
+                  <option key={i} value={String(i + 1)}>
+                    {month}
                   </option>
                 ))}
               </Select>
@@ -183,21 +188,36 @@ async function Settings() {
           </div>
           <label className="flex min-h-12 items-start gap-3">
             <input type="checkbox" name="round_invoice_totals" defaultChecked={org.round_invoice_totals} className="mt-1 size-5" />
-            <span>Round bill totals to a whole rupee (or unit), with the difference shown as round off</span>
+            <span>{s.region.round}</span>
           </label>
         </Group>
 
-        <Group title="Intake form">
+        {canManage ? (
+          <Group title={m.language.title}>
+            <Field label={m.language.parents} hint={m.language.parentsHint}>
+              <Select name="parent_language" defaultValue={org.parent_language}>
+                {LANGUAGES.map((l) => (
+                  <option key={l} value={l} lang={l}>
+                    {LANGUAGE_NAMES[l]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            {org.parent_language === "en" ? null : <p className="text-sm text-slate">{m.language.draftNote}</p>}
+          </Group>
+        ) : null}
+
+        <Group title={s.intake.title}>
           <label className="flex items-start gap-3">
             <input type="checkbox" name="intake_enabled" defaultChecked={org.intake_enabled} className="mt-1 size-5" />
-            <span>Parents can send me their pet&apos;s details through my intake link</span>
+            <span>{s.intake.enabled}</span>
           </label>
-          <Field label="Consent wording" hint="What parents agree to when they submit the form. Leave empty to use Wagbook's standard wording.">
+          <Field label={s.intake.notice} hint={s.intake.noticeHint}>
             <Textarea name="intake_notice" defaultValue={org.intake_notice ?? ""} maxLength={1500} />
           </Field>
         </Group>
 
-        {canManage ? <SubmitButton>Save settings</SubmitButton> : null}
+        {canManage ? <SubmitButton pendingLabel={m.common.saving}>{s.save}</SubmitButton> : null}
       </ActionForm>
     </>
   );
