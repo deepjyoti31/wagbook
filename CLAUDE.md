@@ -37,7 +37,9 @@ src/lib/supabase/      Clients, session refresh, generated types.
 src/lib/auth.ts        requireUser() and requireOrg(). The only place the session is read.
 src/lib/errors.ts      Database error to plain sentence.
 src/app/               Pages and Server Actions. /app is signed in; /i and /s are public.
-src/components/        ui.tsx (all shared building blocks), action-form.tsx, nav.tsx.
+src/components/        ui.tsx (all shared building blocks), action-form.tsx, nav.tsx, rich.tsx.
+src/messages/          Every word on screen: en.ts (from en/<area>.ts), hi.ts, kn.ts. See D21.
+src/lib/i18n.ts        fill(), plural(), languages. i18n-server.ts picks the reader's language.
 tests/db/              Database tests and the PGlite harness.
 scripts/gen-db.mts     The generator behind npm run gen:db.
 docs/                  Numbered guides, plus reference/ (generated, do not edit).
@@ -70,7 +72,8 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 10. **Every table, column that is not obvious, enum and function gets a `comment on`.** The schema reference is
     generated from those comments.
 11. **Errors raised on purpose start with a code**, `WBnnn: plain sentence`. Take the next free number in the range
-    (see `docs/reference/error-codes.md`). Never reuse or renumber a code.
+    (see `docs/reference/error-codes.md`), and give it a sentence in `errors.codes` in every message file (a test
+    checks). Never reuse or renumber a code.
 12. **Migrations.** Until the first production deployment (see `docs/HANDOFF.md`, "Migration freeze"), edit the existing
     files in place. After it, never edit an applied migration; add a new timestamped file.
 13. **After any migration change run `npm run gen:db`** and commit the regenerated files. A test fails if you forget.
@@ -93,7 +96,8 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 
 ### Writing and design
 
-20. **Plain words.** The reader is a kennel worker on a phone. "Pets in house", not "active occupancy". Sentence case.
+20. **Plain words, from the message files.** Every word on screen comes from `src/messages` (D21): add it to the
+    English area file, then to `hi` and `kn` (the message test fails until all three match). The reader is a kennel worker on a phone. "Pets in house", not "active occupancy". Sentence case.
     Buttons say what happens: "Check in", "Add kennels".
 21. **Never use the em dash character** anywhere: code, comments, copy, docs, commit messages. Use a full stop, a comma,
     a colon or brackets. (The one in `AGENTS.md` is put there by Next.js; leave it.)

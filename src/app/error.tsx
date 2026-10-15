@@ -7,12 +7,12 @@ import { isLanguage, type Language } from "@/lib/i18n";
 /**
  * This page cannot read the message files (it runs in the browser and must
  * work when everything else has failed), so it keeps its own three sentences.
- * TODO(M8): Hindi and Kannada are English until they are translated.
+ * Hindi and Kannada are drafts, like the message files.
  */
 const WORDS: Record<Language, { title: string; text: string; retry: string }> = {
   en: { title: "That did not load", text: "Nothing was changed. Check your connection and try again.", retry: "Try again" },
-  hi: { title: "That did not load", text: "Nothing was changed. Check your connection and try again.", retry: "Try again" },
-  kn: { title: "That did not load", text: "Nothing was changed. Check your connection and try again.", retry: "Try again" },
+  hi: { title: "यह खुल नहीं पाया", text: "कुछ भी नहीं बदला। इंटरनेट देखें और फिर से कोशिश करें।", retry: "फिर से कोशिश करें" },
+  kn: { title: "ಇದು ತೆರೆಯಲಿಲ್ಲ", text: "ಏನೂ ಬದಲಾಗಿಲ್ಲ. ಸಂಪರ್ಕ ನೋಡಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.", retry: "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" },
 };
 
 /** The language the page around it was drawn in (the signed-in screens set it), or English. */

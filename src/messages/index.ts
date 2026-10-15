@@ -1,5 +1,7 @@
 import type { Language } from "@/lib/i18n";
 import { en, type Messages } from "./en";
+import { hi } from "./hi";
+import { kn } from "./kn";
 
 /**
  * The message files by language. Imported by server code, which passes the
@@ -8,8 +10,8 @@ import { en, type Messages } from "./en";
  */
 export const MESSAGES: Record<Language, Messages> = {
   en,
-  hi: en,
-  kn: en,
+  hi,
+  kn,
 };
 
 export type { Messages };

@@ -71,6 +71,9 @@ src/
       more/reports/download/   route.ts: CSV downloads (the one signed-in Route Handler)
     i/[slug]/                  Public intake form
     s/[token]/                 Public stay page
+  messages/
+    en.ts en/<area>.ts         Every word on screen, in English, one file per area (D21)
+    hi.ts hi/ kn.ts kn/        The same shape in Hindi and Kannada; messages.test.ts keeps them in step
   components/
     ui.tsx                     Every shared visual piece
     action-form.tsx            ActionForm and SubmitButton (client)
@@ -86,6 +89,9 @@ src/
     errors.ts                  friendlyError()
     forms.ts                   FormState, text(), checked()
     safe-redirect.ts           safeDestination(): keeps redirects on this site
+    i18n.ts                    Languages, fill(), plural(), splitMessage() (pure)
+    i18n-server.ts             getAppI18n(), getVisitorI18n(), parentI18n(): which language a page speaks
+    offline-ticks.ts           Care ticks kept on the phone while offline (D22)
     intake.ts                  zod schema of the public intake payload
     pets.ts                    Warning flags offered for a pet
     queries.ts                 Shared read queries (bookingCards)

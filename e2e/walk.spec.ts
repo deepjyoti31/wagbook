@@ -1,4 +1,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { en } from "../src/messages/en";
+import { hi } from "../src/messages/hi";
+import { kn } from "../src/messages/kn";
 
 /**
  * The whole day at a kennel, in a real browser at phone width, against a
@@ -526,4 +529,62 @@ test("the history of changes says who changed a price", async ({ page }) => {
   await expect(page.getByText(/^Ravi, /).first()).toBeVisible();
   await expect(page.getByText(/^Rate: was ₹1,200, now/).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test("a care task ticked with no connection is kept on the phone and sent when it is back", async ({ page, context }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/care");
+  const done = page.getByRole("button", { name: en.care.markDone, exact: true }).first();
+  await expect(done).toBeVisible();
+  await context.setOffline(true);
+  await done.click();
+  await expect(page.getByText(en.offline.doneNotSent).first()).toBeVisible();
+  await expect(page.getByText(en.offline.youAreOffline)).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.getByText("Sent 1 tick made offline.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(en.offline.doneNotSent)).toHaveCount(0);
+});
+
+test("the owner sends tomorrow's summary to themselves on WhatsApp", async ({ page }) => {
+  await signIn(page, "owner");
+  const link = page.getByRole("link", { name: en.summary.button });
+  const href = decodeURIComponent((await link.getAttribute("href"))!);
+  expect(href).toMatch(/^https:\/\/wa\.me\/\?text=Wagbook Demo Kennel, /);
+  expect(href).toMatch(/Arriving \(\d+\):|Nobody arriving\./);
+});
+
+test("a person reads Wagbook in Hindi, and parents read the kennel's pages in Kannada", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await page.locator("select[name=language]").selectOption("hi");
+  await page.locator("select[name=language]").locator("xpath=ancestor::form").getByRole("button").click();
+  await expect(page.getByText(hi.language.saved)).toBeVisible();
+  await expect(page.getByRole("navigation", { name: hi.nav.label }).getByRole("link", { name: hi.nav.today })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe("hi");
+  await page.goto("/app");
+  await expect(page.getByRole("link", { name: hi.today.newBooking })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  // Parents' pages in Kannada.
+  await page.goto("/app/more/settings");
+  await page.locator("select[name=parent_language]").selectOption("kn");
+  await page.getByRole("button", { name: hi.settings.save }).click();
+  await expect(page.getByText(hi.settings.saved)).toBeVisible();
+  await openBooking(page, "Biscuit", hi.labels.bookingStatus.checked_in);
+  const link = await page.getByText(/\/s\/[0-9a-f]{64}/).first().innerText();
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link.trim());
+  await expect(parent.page.getByText(kn.stayPage.status.checked_in)).toBeVisible();
+  expect(await parent.page.evaluate(() => document.documentElement.lang)).toBe("kn");
+  await parent.context.close();
+
+  // Back to English for whoever runs next.
+  await page.goto("/app/more/settings");
+  await page.locator("select[name=parent_language]").selectOption("en");
+  await page.getByRole("button", { name: hi.settings.save }).click();
+  await expect(page.getByText(hi.settings.saved)).toBeVisible();
+  await page.goto("/app/more");
+  await page.locator("select[name=language]").selectOption("en");
+  await page.locator("select[name=language]").locator("xpath=ancestor::form").getByRole("button").click();
+  await expect(page.getByText(en.language.saved)).toBeVisible();
 });

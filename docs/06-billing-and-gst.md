@@ -192,6 +192,9 @@ Write the answers in your own records, not in this repository.
 7. What must I keep, and for how long?
 8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. Is that
    the figure my return needs, or should a cancellation count in the month it happened?
+9. When the parent's bill is shown in Hindi or Kannada, it says "Tax invoice" in English with the translation in
+   brackets, and the place of supply and tax lines in that language. Is a bill in Hindi or Kannada acceptable, and must
+   "Tax invoice" and the other required details also appear in English?
 
 ## Not built
 

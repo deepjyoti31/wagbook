@@ -238,6 +238,19 @@ refused; a member of both kennels sees only the one asked about; staff cannot ad
 check and the receipt rule each removed once to see the tests fail; `src/lib/core/reports.test.ts` for the CSV
 escaping; the end-to-end walk checks that staff get the refusal sentence and a 403 from the download.
 
+### 15 October 2026: languages, offline ticks and the service worker
+
+What changed: `memberships.language`, written only through `set_my_language()` (security definer, because staff may
+not update membership rows; it touches only the caller's own rows and only that column, `WB013` for anything not
+offered), and `organizations.parent_language` for owners and managers. The public functions return the kennel's
+parent language, and the bill its locale; nothing else became public. The intake form's default consent wording is
+stored in the language the parent read. A service worker (`public/sw.js`) keeps the last copy of Today and Care, which
+hold pet and parent names and phone numbers, on the phone for offline use; the sign-in page asks it to forget them,
+and with them any ticks not yet sent. `/app/care/sync` takes ticks made offline: it requires a signed-in member, a
+same-origin request and a JSON body of task ids, and can only turn this kennel's pending tasks to done. Checked:
+`tests/db/languages.test.ts` (the own-rows rule removed once to see its test fail), `src/lib/offline-ticks.test.ts`,
+and the end-to-end walk ticks a task offline, comes back online, and sees it sent.
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -259,6 +272,8 @@ These are real. Do not describe Wagbook as free of them.
 | Two race fixes have no automated test | See the review log, numbers 6 and 16 | M1: stage them against real Postgres with two connections |
 | No two-factor sign-in | A stolen password is enough | Supabase supports it; M9 |
 | Links can be forwarded | Whoever has a stay link can see that stay | By design; kept minimal and expiring |
+| Copies of Today and Care stay on a phone for offline use | Whoever holds the phone, still signed in or not, can open the last copy (pet names, parents' phone numbers) with no connection | The copy is replaced on every visit and forgotten when the sign-in page opens. A shared phone should sign out at the end of a shift. |
+| A care task ticked offline is recorded at the time it reached the database | The history shows the sync time, not the time of the tap | By design: the database stamps who and when, and a phone's clock is not trusted |
 | Backups are whatever the Supabase plan provides | The free plan has no automatic backups | See [10-setup-and-deploy.md](10-setup-and-deploy.md) |
 
 ## Checklist for any change that touches data

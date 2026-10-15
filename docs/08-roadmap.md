@@ -231,7 +231,8 @@ settings, security review and fixes, documentation.
 
 ## M8. Works anywhere, in any language
 
-- [ ] Not started.
+- [x] Finished 15 October 2026, with Hindi and Kannada as drafts until native speakers review them. Languages: D21.
+  Offline: D22 (Next.js's experimental offline retry is left off, because it would replay a booking).
 
 **Build**
 
