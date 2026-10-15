@@ -1,27 +1,21 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { buttonStyles, Empty, Loading, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, calendarDays, calendarGrid, isISODate, isOverstaying, todayIn, type ISODate } from "@/lib/core";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Calendar" };
+export const generateMetadata = () => appTitle((m) => m.calendar.title);
 
 const DAYS = 14;
 
 export default function CalendarPage({ searchParams }: PageProps<"/app/calendar">) {
   return (
-    <>
-      <PageTitle title="Calendar">
-        <Link href="/app/bookings/new" className={buttonStyles.primary}>
-          New booking
-        </Link>
-      </PageTitle>
-      <Suspense fallback={<Loading label="Loading the calendar" />}>
-        <Calendar searchParams={searchParams} />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Calendar searchParams={searchParams} />
+    </Suspense>
   );
 }
 
@@ -36,6 +30,8 @@ function dayLabel(date: ISODate, locale: string) {
 async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "searchParams">) {
   const params = await searchParams;
   const { org } = await requireOrg();
+  const { m, language, locale } = await getAppI18n();
+  const w = m.calendar;
   const today = todayIn(org.time_zone);
   const from = typeof params.from === "string" && isISODate(params.from) ? params.from : today;
   const days = calendarDays(from, DAYS);
@@ -70,12 +66,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
       // A pet still here after its check-out date is in its kennel today, even though the booking no longer holds it.
       endDate: s.status === "checked_in" && s.end_date <= today ? (s.kind === "daycare" ? today : addDays(today, 1)) : s.end_date,
       kennelId: s.kennel_id,
-      pet: s.pets?.name ?? "Pet",
+      pet: s.pets?.name ?? w.pet,
       overstay: isOverstaying({ status: s.status, endDate: s.end_date }, today),
     })),
     days,
   );
-  const labels = days.map((d) => dayLabel(d, org.locale));
+  const labels = days.map((d) => dayLabel(d, locale));
   const nav = (date: ISODate, label: string) => (
     <Link href={date === today ? "/app/calendar" : `/app/calendar?from=${date}`} className={buttonStyles.secondary}>
       {label}
@@ -84,33 +80,38 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
 
   return (
     <>
+      <PageTitle title={w.title}>
+        <Link href="/app/bookings/new" className={buttonStyles.primary}>
+          {w.newBooking}
+        </Link>
+      </PageTitle>
       <div className="mb-4 flex flex-wrap gap-2">
-        {nav(addDays(from, -DAYS), "Earlier")}
-        {from !== today ? nav(today, "Today") : null}
-        {nav(addDays(from, DAYS), "Later")}
+        {nav(addDays(from, -DAYS), w.earlier)}
+        {from !== today ? nav(today, w.today) : null}
+        {nav(addDays(from, DAYS), w.later)}
       </div>
       {(requests.count ?? 0) > 0 ? (
         <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">
-          {requests.count === 1 ? "One request in these days holds no space and is not shown." : `${requests.count} requests in these days hold no space and are not shown.`}{" "}
+          {plural(language, requests.count ?? 0, w.requests)}{" "}
           <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
-            See bookings
+            {w.seeBookings}
           </Link>
         </p>
       ) : null}
       {rows.length === 0 ? (
         <Empty>
-          Add your kennels to see the calendar.{" "}
+          {w.noKennels}{" "}
           <Link href="/app/more/kennels" className="font-semibold text-ink underline underline-offset-4">
-            Add kennels
+            {w.addKennels}
           </Link>
         </Empty>
       ) : (
-        <div className="relative overflow-x-auto rounded-xl border border-rule bg-paper" role="region" aria-label="Kennels by day" tabIndex={0}>
+        <div className="relative overflow-x-auto rounded-xl border border-rule bg-paper" role="region" aria-label={w.region} tabIndex={0}>
           <table className="border-collapse text-sm">
             <thead>
               <tr>
                 <th scope="col" className="sticky left-0 z-10 min-w-16 border-b border-r border-rule bg-paper px-2 py-2 text-left">
-                  Kennel
+                  {w.kennel}
                 </th>
                 {days.map((d, i) => (
                   <th key={d} scope="col" className={`min-w-16 border-b border-rule px-1 py-2 text-center font-semibold ${d === today ? "bg-marigold-soft" : ""}`}>
@@ -123,7 +124,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
             <tbody>
               <tr>
                 <th scope="row" className="sticky left-0 z-10 border-b border-r border-rule bg-ground px-2 py-2 text-left">
-                  In house
+                  {w.inHouse}
                 </th>
                 {(occupancy.data ?? []).map((o) => (
                   <td
@@ -166,9 +167,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                             className="flex h-12 items-center justify-center text-slate/60 hover:bg-marigold-soft hover:text-ink"
                           >
                             <span aria-hidden="true">+</span>
-                            <span className="sr-only">
-                              Book {k.name} from {labels[i].day}
-                            </span>
+                            <span className="sr-only">{fill(w.bookFrom, { kennel: k.name, day: labels[i].day })}</span>
                           </Link>
                         ) : null}
                       </td>
@@ -179,7 +178,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
               {grid.unassigned.some((d) => d.length > 0) ? (
                 <tr>
                   <th scope="row" className="sticky left-0 z-10 border-r border-rule bg-paper px-2 py-2 text-left font-semibold">
-                    No kennel yet
+                    {w.noKennelYet}
                   </th>
                   {grid.unassigned.map((list, i) => (
                     <td key={days[i]} className="px-1 py-2 text-center font-semibold" title={list.map((s) => s.pet).join(", ")}>
@@ -192,7 +191,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
           </table>
         </div>
       )}
-      <p className="mt-3 text-sm text-slate">Green: in house. Grey: booked. Red: still here after the check-out date. Tap a booking to open it, or an empty square to book that kennel from that day.</p>
+      <p className="mt-3 text-sm text-slate">{w.key}</p>
     </>
   );
 }
