@@ -367,3 +367,58 @@ would be wrong, not just private). CSV opens everywhere an accountant works and 
 **Cost.** Staff cannot see even how full the kennel was last month; the calendar shows the days ahead. A view with
 `security_invoker` would have been simpler to query from PostgREST, but could not take a period or refuse anyone.
 
+
+## D21. Languages: plain message files, chosen by the person, no locale in the address
+
+**Status:** Decided, 15 October 2026 (milestone M8).
+
+**Situation.** Staff should read Wagbook in their own language, and parents in the language their kennel chooses. The
+Next.js guide (`node_modules/next/dist/docs/01-app/02-guides/internationalization.md`) describes putting the locale in
+the address (`/hi/app`) with dictionaries loaded on the server, and leaves the translation mechanism to the app.
+
+**Decision.** No locale in the address and no library. Every word lives in `src/messages/en.ts` (assembled from one
+file per area in `src/messages/en/`); `hi.ts` and `kn.ts` have exactly the same shape, which TypeScript checks, and
+`src/messages/messages.test.ts` checks that each translation keeps the same `{placeholders}` and leaves nothing
+empty. `src/lib/i18n.ts` fills placeholders, picks plural forms with `Intl.PluralRules`, and cuts a message for a bold
+value or a link (`<Rich>`). The server chooses the language (`src/lib/i18n-server.ts`): on signed-in screens the
+person's own choice (`memberships.language`, set by `set_my_language()` for all their kennels); on pages for parents
+the kennel's `parent_language`, which the public functions return; elsewhere a cookie set when a person chooses or
+signs in, then the browser's `Accept-Language`, then English. Dates and money are formatted in the person's language
+and the kennel's region (`hi-IN`). Client components get their words as props, so browsers never download whole
+dictionaries. Database error sentences stay English; the app shows a translation per `WBnnn` code, carrying values
+such as dates across. The static shell of each page holds no words, because it is drawn before the language is known:
+the loading state is three dots, and titles sit inside the suspended part.
+
+**Why.** The same address works for everyone on a shared phone, links sent on WhatsApp do not depend on the sender's
+language, and the language follows the person rather than the device. Typed message objects catch a missing key at
+build time, which a library with string keys would only catch at run time. The whole mechanism is about a hundred
+lines.
+
+**Cost.** Words stored as data stay in the language they were written in: routine names, bill line descriptions,
+notes, and the amount in words on a bill (English, as on most Indian invoices). The history of changes names fields
+by their column names. The Hindi and Kannada files are drafts until native speakers review them.
+
+## D22. Offline: a service worker for Today and Care, and ticks saved on the phone
+
+**Status:** Decided, 15 October 2026 (milestone M8).
+
+**Situation.** Kennel connections drop. The roadmap asks that Today and Care open offline and that ticking a task
+offline is kept and sent later, and forbids queueing anything that could conflict, such as a booking. Next.js 16 has
+an experimental `useOffline` option that keeps every failed Server Action pending and replays it when the connection
+returns.
+
+**Decision.** `useOffline` stays off: it would replay a booking or a payment made while offline. Instead:
+`public/sw.js` keeps the newest copy of `/app` and `/app/care` and the app's own hashed scripts and styles, serves those
+copies only when the network fails, and shows a small three-language offline page for anything else. The Done button
+on a care task (`TickButton`) saves the task id in the phone's local storage when there is no connection, or when the
+request does not get through, and `OfflineSync` in the signed-in layout sends the saved ticks to `/app/care/sync`
+whenever the connection is there. That endpoint can only turn a pending task to done, which is safe to repeat. The
+copies and saved ticks are removed when the sign-in page opens.
+
+**Why.** Ticking is the one write that is safe to send twice (the database keeps the first who and when), so it is
+the only one that waits on the phone. Everything else fails plainly while offline, which is the honest outcome for a
+booking that might clash.
+
+**Cost.** A task ticked offline is recorded as done at the time it reached the database, not the time of the tap.
+Copies of Today and Care, with pet and parent names, stay on the phone until someone opens the sign-in page or the
+next copy replaces them. The service worker runs only in production builds.
