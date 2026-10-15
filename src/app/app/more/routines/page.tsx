@@ -1,28 +1,28 @@
-import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { RoutineForm } from "@/components/routine-form";
 import { Badge, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { addStarterRoutines, stopRoutine } from "@/app/app/care/actions";
 import { requireOrg } from "@/lib/auth";
-import { CARE_KIND_LABEL, clockText, STARTER_ROUTINES } from "@/lib/care";
+import { clockText, starterRoutines } from "@/lib/care";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Daily routines" };
+export const generateMetadata = () => appTitle((m) => m.routines.title);
 
 export default function RoutinesPage() {
   return (
-    <>
-      <PageTitle title="Daily routines" />
-      <Suspense fallback={<Loading label="Loading routines" />}>
-        <Routines />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Routines />
+    </Suspense>
   );
 }
 
 async function Routines() {
   const { org, canManage } = await requireOrg();
+  const { m } = await getAppI18n();
+  const r = m.routines;
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("care_items")
@@ -34,40 +34,41 @@ async function Routines() {
     .order("sort_order");
   if (error) throw new Error("Could not load routines.");
 
+  const starters = starterRoutines(m)
+    .map((s) => fill(r.starterItem, { label: s.label.toLowerCase(), time: s.due_time }))
+    .join(r.listJoin);
+
   return (
     <>
-      <p className="mb-5 text-slate">
-        House routines happen every day for every pet in house. Each one becomes a task on the Care screen. A pet&apos;s own medicines and meals are added from
-        its booking.
-      </p>
-      {canManage ? null : <Notice tone="info">Only an owner or manager can change the house routines.</Notice>}
+      <PageTitle title={r.title} />
+      <p className="mb-5 text-slate">{r.intro}</p>
+      {canManage ? null : <Notice tone="info">{r.onlyManagers}</Notice>}
 
-      <Section title="Every day" count={data.length}>
+      <Section title={r.everyDay} count={data.length}>
         {data.length === 0 ? (
           <>
-            <Empty>No house routines yet, so the Care screen is empty.</Empty>
+            <Empty>{r.none}</Empty>
             {canManage ? (
               <ActionForm action={addStarterRoutines} className="mt-4 space-y-3">
-                <p>
-                  Start with {STARTER_ROUTINES.map((r) => `${r.label.toLowerCase()} at ${r.due_time}`).join(", ")}. You can change them afterwards.
-                </p>
-                <SubmitButton pendingLabel="Adding">Add the starter routines</SubmitButton>
+                <p>{fill(r.startWith, { list: starters })}</p>
+                <SubmitButton pendingLabel={m.common.adding}>{r.addStarter}</SubmitButton>
               </ActionForm>
             ) : null}
           </>
         ) : (
           <Ledger>
-            {data.map((r) => (
-              <LedgerRow key={r.id}>
+            {data.map((item) => (
+              <LedgerRow key={item.id}>
                 <span className="min-w-0 flex-1">
-                  <span className="font-bold">{clockText(r.due_time)}</span> {r.label} <Badge tone={r.kind === "medication" ? "alert" : "neutral"}>{CARE_KIND_LABEL[r.kind]}</Badge>
-                  {r.details ? <span className="block text-slate">{r.details}</span> : null}
+                  <span className="font-bold">{clockText(m, item.due_time)}</span> {item.label}{" "}
+                  <Badge tone={item.kind === "medication" ? "alert" : "neutral"}>{m.labels.careKind[item.kind]}</Badge>
+                  {item.details ? <span className="block text-slate">{item.details}</span> : null}
                 </span>
                 {canManage ? (
                   <ActionForm action={stopRoutine} className="contents">
-                    <input type="hidden" name="routineId" value={r.id} />
-                    <SubmitButton variant="quiet" pendingLabel="Stopping">
-                      Stop
+                    <input type="hidden" name="routineId" value={item.id} />
+                    <SubmitButton variant="quiet" pendingLabel={r.stopping}>
+                      {r.stop}
                     </SubmitButton>
                   </ActionForm>
                 ) : null}
