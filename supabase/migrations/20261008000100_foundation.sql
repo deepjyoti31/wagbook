@@ -316,6 +316,27 @@ create trigger memberships_protect_last_owner
 -- the memberships policies (which would loop).
 -- ---------------------------------------------------------------------------
 
+-- Two-step sign-in (roadmap M9). Someone who has turned it on is not fully
+-- signed in until they have also given the code from their authenticator app:
+-- Supabase Auth then issues a session at assurance level aal2. Until then,
+-- with only a password, they reach nothing of any kennel. So a stolen password
+-- alone is useless, whatever the app does.
+create function public.session_meets_mfa()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select auth.jwt()) ->> 'aal', 'aal1') = 'aal2'
+      or not exists (
+        select 1 from auth.mfa_factors f
+        where f.user_id = (select auth.uid()) and f.status = 'verified'
+      );
+$$;
+comment on function public.session_meets_mfa() is
+  'True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1). SECURITY DEFINER because only it may read auth.mfa_factors.';
+
 create function public.my_org_ids()
 returns setof uuid
 language sql
@@ -325,9 +346,10 @@ set search_path = ''
 as $$
   select m.org_id
   from public.memberships m
-  where m.user_id = (select auth.uid()) and m.is_active;
+  where m.user_id = (select auth.uid()) and m.is_active and public.session_meets_mfa();
 $$;
-comment on function public.my_org_ids() is 'Organisations the signed-in user is an active member of. The basis of tenant isolation.';
+comment on function public.my_org_ids() is
+  'Organisations the signed-in user is an active member of. The basis of tenant isolation. Empty for a session that still owes its two-step code.';
 
 create function public.my_org_ids_with_role(p_roles public.member_role[])
 returns setof uuid
@@ -338,7 +360,7 @@ set search_path = ''
 as $$
   select m.org_id
   from public.memberships m
-  where m.user_id = (select auth.uid()) and m.is_active and m.role = any (p_roles);
+  where m.user_id = (select auth.uid()) and m.is_active and m.role = any (p_roles) and public.session_meets_mfa();
 $$;
 comment on function public.my_org_ids_with_role(public.member_role[]) is
   'Organisations where the signed-in user holds one of the given roles.';
@@ -359,6 +381,9 @@ declare
 begin
   if v_user is null then
     raise exception 'WB001: sign in first' using errcode = '28000';
+  end if;
+  if not public.session_meets_mfa() then
+    raise exception 'WB005: enter the code from your authenticator app first' using errcode = '28000';
   end if;
 
   -- One at a time per person, so the limit below cannot be raced past.
@@ -450,7 +475,7 @@ as $$
   select m.org_id, o.name, m.role, m.created_at
   from public.memberships m
   join public.organizations o on o.id = m.org_id
-  where m.user_id = (select auth.uid()) and m.accepted_at is null
+  where m.user_id = (select auth.uid()) and m.accepted_at is null and public.session_meets_mfa()
   order by m.created_at;
 $$;
 comment on function public.my_invitations() is
@@ -467,6 +492,9 @@ declare
 begin
   if v_user is null then
     raise exception 'WB001: sign in first' using errcode = '28000';
+  end if;
+  if not public.session_meets_mfa() then
+    raise exception 'WB005: enter the code from your authenticator app first' using errcode = '28000';
   end if;
 
   if p_accept then
@@ -582,6 +610,9 @@ begin
   if v_user is null then
     raise exception 'WB001: sign in first' using errcode = '28000';
   end if;
+  if not public.session_meets_mfa() then
+    raise exception 'WB005: enter the code from your authenticator app first' using errcode = '28000';
+  end if;
   select * into v_link from public.invitation_links l where char_length(p_token) = 64 and l.token = p_token for update;
   if v_link.id is null or v_link.used_at is not null or v_link.revoked_at is not null or v_link.expires_at <= now() then
     raise exception 'WB016: that invitation link has expired or was already used. Ask for a new one.' using errcode = 'P0002';
@@ -623,6 +654,9 @@ begin
   -- touches only the caller's own rows, and only the language column.
   if (select auth.uid()) is null then
     raise exception 'WB001: sign in first' using errcode = '28000';
+  end if;
+  if not public.session_meets_mfa() then
+    raise exception 'WB005: enter the code from your authenticator app first' using errcode = '28000';
   end if;
   if p_language is null or p_language not in ('en', 'hi', 'kn') then
     raise exception 'WB013: that language is not offered yet.' using errcode = '22023';

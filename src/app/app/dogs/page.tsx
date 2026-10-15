@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Badge, buttonStyles, Empty, Input, Ledger, LedgerRow, Loading, PageTitle } from "@/components/ui";
+import { Badge, buttonStyles, Empty, Input, Ledger, LedgerRow, Loading, Notice, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { formatPhone } from "@/lib/core";
@@ -60,6 +60,8 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
           {m.pets.add}
         </Link>
       </PageTitle>
+      {params.done === "erased" ? <Notice tone="ok">{m.parent.privacy.erased}</Notice> : null}
+      {params.done === "erased-files-left" ? <Notice tone="error">{m.parent.privacy.erasedFilesLeft}</Notice> : null}
       <form className="mb-4 flex gap-2" role="search">
         <label className="flex-1">
           <span className="sr-only">{m.pets.searchLabel}</span>

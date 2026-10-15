@@ -8,6 +8,7 @@ import { isGstStateCode, isValidGstin, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { getAppI18n } from "@/lib/i18n-server";
+import { BUCKET } from "@/lib/media";
 import type { Messages } from "@/messages";
 import { createClient } from "@/lib/supabase/server";
 
@@ -104,4 +105,35 @@ export async function mergeClient(_state: FormState, form: FormData): Promise<Fo
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/clients/${keep.data}?done=merged`);
+}
+
+/**
+ * Erase a parent's details on their request (erase_client). Owners and
+ * managers only; the database refuses anyone else, and refuses while a pet is
+ * in house or a stay is still to come. Then the files go from storage.
+ */
+export async function eraseClient(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const w = t.m.parent.privacy;
+  if (!canManage) return { error: w.onlyManagers };
+  const clientId = Id.safeParse(form.get("clientId"));
+  if (!clientId.success) return { error: t.m.errors.parentNotFound };
+  if (!checked(form, "confirm")) return { error: w.confirmFirst };
+
+  const supabase = await createClient();
+  // The files this person can see now, before the rows that name them go.
+  const before = await supabase.rpc("client_file_paths", { p_client: clientId.data });
+  const { data, error } = await supabase.rpc("erase_client", { p_client: clientId.data });
+  if (error) return { error: friendlyError(error, t) };
+
+  const paths = [...new Set([...(before.data ?? []), ...(data ?? [])])].filter((p) => p.startsWith(`${org.id}/`));
+  let filesLeft = false;
+  for (let i = 0; i < paths.length; i += 100) {
+    const removed = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100));
+    if (removed.error) filesLeft = true;
+  }
+  if (filesLeft) console.error("eraseClient: some files were not removed", clientId.data);
+  revalidatePath("/app", "layout");
+  redirect(`/app/dogs?done=${filesLeft ? "erased-files-left" : "erased"}`);
 }

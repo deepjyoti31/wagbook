@@ -68,6 +68,8 @@ async function Account() {
   const { m, language } = await getAppI18n();
   const invitations = (await (await createClient()).rpc("my_invitations")).data ?? [];
   const others = (await getMemberships()).filter((x) => x.organizations!.id !== org.id);
+  const level = await (await createClient()).auth.mfa.getAuthenticatorAssuranceLevel();
+  const twoStepOn = level.data?.nextLevel === "aal2";
   return (
     <>
       <p className="text-slate">
@@ -95,6 +97,16 @@ async function Account() {
           </div>
         </div>
       ) : null}
+      {role === "owner" && !twoStepOn ? (
+        <div className="mt-4">
+          <Notice tone="info">{m.more.ownerNudge}</Notice>
+        </div>
+      ) : null}
+      <p className="mt-4">
+        <Link href="/app/more/two-step" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+          {m.more.twoStepLink}: {twoStepOn ? m.more.twoStepOn : m.more.twoStepOff}
+        </Link>
+      </p>
       <ActionForm action={setMyLanguage} className="mt-6 flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <Field label={m.language.yours} hint={m.language.yoursHint}>

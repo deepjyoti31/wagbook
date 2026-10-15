@@ -8,7 +8,9 @@
         |  HTML, forms
         v
  Next.js app (Vercel or any Node host)
-   src/proxy.ts            refreshes the session cookie, bounces signed-out visitors
+   src/proxy.ts            refreshes the session cookie, bounces signed-out visitors, sets the
+                           Content-Security-Policy with a fresh nonce (D23), counts posts per
+                           address and refuses oversized ones (D26)
    src/app/**/page.tsx     Server Components: read with the user's own session
    src/app/**/actions.ts   Server Actions: validate, write, return a sentence
         |
@@ -263,7 +265,7 @@ What each file covers:
 | File | Covers |
 | --- | --- |
 | `smoke.test.ts` | The migrations apply. |
-| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but five functions; tenants are isolated in every table; role limits. |
+| `security.test.ts` | Every table has RLS and a policy; anon can touch nothing but six functions; tenants are isolated in every table; role limits. |
 | `bookings.test.ts` | No double booking, capacity, same-day turnover, day boarding, status stamps, the price rule, extras, families, requests, overstays, the check-in checklist. |
 | `care.test.ts` | Medicines need a reason to be skipped, a double tap keeps the first stamp, the stay page counts what was ticked, play hours, moving a play session. |
 | `seed.test.ts` | `supabase/seed.sql` applies on top of the migrations and builds the demo kennel. |

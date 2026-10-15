@@ -11,6 +11,12 @@ import { kn } from "../src/messages/kn";
 
 test.describe.configure({ mode: "serial" });
 
+// Each test is a different visitor to the app's rate limits (src/lib/rate-limit.ts),
+// as the kennel's staff on their own phones would be. One test below shares an address on purpose.
+test.beforeEach(async ({ context }) => {
+  await context.setExtraHTTPHeaders({ "x-real-ip": `198.51.100.${Math.floor(Math.random() * 250) + 1}` });
+});
+
 const PASSWORD = "wagbook-demo";
 
 /** The kennel's calendar date, plus some days. The demo kennel is in India. */
@@ -626,4 +632,196 @@ test("with no connection, Today and Care open from the phone's copy, and other p
   await page.goto("/app/care");
   await expect(page.getByRole("heading", { name: "You are offline" })).toBeVisible();
   await goOffline(context, base, false);
+});
+
+// ---------------------------------------------------------------------------
+// Roadmap M9: hardening and privacy tools.
+// ---------------------------------------------------------------------------
+
+test("pages run only their own scripts: an injected script is refused", async ({ page }) => {
+  const res = await page.goto("/login");
+  const policy = res!.headers()["content-security-policy"];
+  expect(policy).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'sha256-/);
+  expect((await page.request.get("/login")).headers()["content-security-policy"]).not.toBe(policy);
+
+  const refused: string[] = [];
+  page.on("console", (m) => {
+    if (/Content Security Policy/i.test(m.text())) refused.push(m.text());
+  });
+  await signIn(page, "owner");
+  for (const path of ["/app", "/app/care", "/app/bookings", "/app/more"]) await page.goto(path);
+  // The app's own scripts all ran: nothing was refused, and the page is interactive.
+  expect(refused).toEqual([]);
+  await page.getByRole("link", { name: "More", exact: true }).first().click();
+
+  const injected = await page.evaluate(
+    () =>
+      new Promise<string>((resolve) => {
+        document.addEventListener("securitypolicyviolation", () => resolve("refused"));
+        const s = document.createElement("script");
+        s.textContent = "window.__wagbookInjected = true";
+        document.body.append(s);
+        setTimeout(() => resolve((window as unknown as { __wagbookInjected?: boolean }).__wagbookInjected ? "ran" : "refused"), 1000);
+      }),
+  );
+  expect(injected).toBe("refused");
+});
+
+test("too many sign-in tries from one address are slowed down", async ({ page }) => {
+  await page.context().setExtraHTTPHeaders({ "x-real-ip": "203.0.113.77" });
+  await page.goto("/login");
+  // A short password is refused by the app before Supabase is asked, so only the app's limit is in play.
+  await page.locator("input[name=password]").evaluate((el) => el.removeAttribute("minlength"));
+  for (let i = 0; i < 20; i++) {
+    await page.getByLabel("Email").fill("someone@example.test");
+    await page.getByLabel("Password").fill("short");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText(en.auth.errors.passwordShort)).toBeVisible();
+  }
+  await page.getByLabel("Password").fill("short");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText(en.errors.slowDown)).toBeVisible();
+});
+
+/** The current code of an authenticator app for a base32 secret (RFC 6238: 30 seconds, 6 digits, SHA-1). */
+async function totp(secret: string, at = Date.now()): Promise<string> {
+  const { createHmac } = await import("node:crypto");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secret.replace(/=+$/, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / 30)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const o = h[h.length - 1] & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+/** A code that has not been used yet: waits for the next 30 seconds if need be. */
+async function freshCode(secret: string, used: Set<string>): Promise<string> {
+  for (;;) {
+    const code = await totp(secret);
+    if (!used.has(code)) {
+      used.add(code);
+      return code;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+test("an owner turns on two-step sign-in, and then a password alone is not enough", async ({ page }) => {
+  test.setTimeout(150_000);
+  const email = `twostep-${Date.now()}@example.test`;
+  await page.goto("/login?mode=signup");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByLabel("Kennel name").fill("Two Step Kennel");
+  await page.getByLabel("Link name").fill(`two-step-${Date.now() % 100000}`);
+  await page.getByLabel("Your name").fill("Tara");
+  await page.getByRole("button", { name: /Create/ }).click();
+  await page.waitForURL(/\/app\/more\/kennels/);
+
+  await page.goto("/app/more");
+  await expect(page.getByText(en.more.ownerNudge)).toBeVisible();
+  await page.getByRole("link", { name: new RegExp(en.more.twoStepLink) }).click();
+  await page.getByRole("button", { name: en.twoStep.start }).click();
+  await expect(page.getByRole("img", { name: en.twoStep.qrAlt })).toBeVisible();
+  const secret = (await page.locator("p.font-mono").innerText()).trim();
+  const used = new Set<string>();
+  await page.getByLabel(en.twoStep.code).fill("000000" === (await totp(secret)) ? "111111" : "000000");
+  await page.getByRole("button", { name: en.twoStep.confirm, exact: true }).click();
+  await expect(page.getByText(en.twoStep.wrong)).toBeVisible();
+  await page.getByLabel(en.twoStep.code).fill(await freshCode(secret, used));
+  await page.getByRole("button", { name: en.twoStep.confirm, exact: true }).click();
+  // The session cookie changes, so the page draws itself again in its "on" state.
+  await expect(page.getByText(en.twoStep.isOn)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  // Signing in again: the password leads to the code, and nothing else opens.
+  await page.goto("/app/more");
+  await page.getByRole("button", { name: en.more.signOut }).click();
+  await page.waitForURL(/\/login/);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(/\/login\/code/);
+  await page.goto("/app");
+  await page.waitForURL(/\/login\/code/);
+
+  // Someone with the password who skips the app and calls Supabase directly
+  // gets nothing either, and cannot add an authenticator of their own.
+  const { createClient } = await import("@supabase/supabase-js");
+  const thief = createClient(process.env.E2E_SUPABASE_URL ?? "http://127.0.0.1:54321", process.env.E2E_SUPABASE_KEY ?? "", {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  expect((await thief.auth.signInWithPassword({ email, password: PASSWORD })).error).toBeNull();
+  expect((await thief.from("organizations").select("id")).data).toEqual([]);
+  expect((await thief.from("memberships").select("org_id")).data).toEqual([]);
+  expect((await thief.auth.mfa.enroll({ factorType: "totp", friendlyName: "Thief" })).error).not.toBeNull();
+  await page.getByLabel(en.auth.code.label).fill(await freshCode(secret, used));
+  await page.getByRole("button", { name: en.auth.code.continue }).click();
+  await page.waitForURL(/\/app/);
+  await page.goto("/app/more");
+  await expect(page.getByRole("link", { name: `${en.more.twoStepLink}: ${en.more.twoStepOn}` })).toBeVisible();
+  await expect(page.getByText(en.more.ownerNudge)).toHaveCount(0);
+
+  // And off again.
+  await page.goto("/app/more/two-step");
+  await page.getByRole("button", { name: en.twoStep.turnOff }).click();
+  await expect(page.getByText(en.twoStep.turnedOff)).toBeVisible();
+});
+
+test("a parent sends a certificate with the form, then asks for their details and to be erased", async ({ page, browser }) => {
+  const phone = "9800000377";
+  const parent = await privateWindow(browser);
+  await parent.page.goto("/i/demo");
+  await parent.page.getByLabel("Your name").fill("Rhea Invented");
+  await parent.page.getByLabel("Mobile number").fill(phone);
+  await parent.page.getByLabel("Name", { exact: true }).fill("Mochi");
+  await parent.page.getByLabel(en.intakeForm.vaccine).fill("Rabies");
+  await parent.page.locator("input[name='pets.0.certificate']").setInputFiles({
+    name: "card.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%Wagbook test card\n%%EOF\n"),
+  });
+  await parent.page.getByRole("checkbox").check();
+  await parent.page.getByRole("button", { name: /Send to/ }).click();
+  await expect(parent.page.getByText(/Thank you/).first()).toBeVisible();
+  await expect(parent.page.getByText(/could not be sent/)).toHaveCount(0);
+  await parent.context.close();
+
+  await signIn(page, "owner");
+  await page.goto("/app/more/intake");
+  const card = page.getByRole("link", { name: "See the certificate for Mochi" });
+  await expect(card).toBeVisible();
+  const cardUrl = (await card.getAttribute("href"))!;
+  expect((await (await page.request.get(cardUrl)).body()).toString()).toContain("Wagbook test card");
+  await page.getByRole("listitem").filter({ hasText: "Rhea Invented" }).getByRole("button", { name: "Accept and book" }).click();
+  await page.waitForURL(/\/app\/bookings\/new/);
+
+  // The certificate is now on Mochi's vaccination.
+  await openPet(page, "Mochi");
+  await expect(page.getByRole("link", { name: "Certificate" })).toBeVisible();
+
+  // The parent asks what the kennel holds about them.
+  await page.goto(`/app/dogs?q=${phone}`);
+  await page.getByRole("link", { name: /Rhea Invented/ }).first().click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: en.parent.privacy.download }).click()]);
+  const exported = JSON.parse((await (await download.createReadStream()).toArray()).join(""));
+  expect(exported.parent.full_name).toBe("Rhea Invented");
+  expect(exported.pets[0].name).toBe("Mochi");
+  expect(exported.forms).toHaveLength(1);
+  expect(exported.files.some((f: string) => f.endsWith("/pet-1"))).toBe(true);
+
+  // And then to be erased.
+  await page.getByRole("button", { name: en.parent.privacy.eraseButton }).click();
+  await expect(page.getByText(en.parent.privacy.confirmFirst)).toBeVisible();
+  await page.getByLabel(en.parent.privacy.eraseConfirm).check();
+  await page.getByRole("button", { name: en.parent.privacy.eraseButton }).click();
+  await page.waitForURL(/\/app\/dogs\?done=erased$/);
+  await expect(page.getByText(en.parent.privacy.erased)).toBeVisible();
+  await page.goto(`/app/dogs?q=${phone}`);
+  await expect(page.getByRole("link", { name: /Rhea Invented|Mochi/ })).toHaveCount(0);
+  // The certificate file is gone from storage too.
+  expect((await page.request.get(cardUrl)).ok()).toBe(false);
 });

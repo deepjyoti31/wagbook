@@ -13,6 +13,8 @@ export const buttonStyles = {
   secondary: `${BUTTON_BASE} border-2 border-ink bg-paper text-ink hover:bg-ground`,
   quiet: `${BUTTON_BASE} text-ink underline underline-offset-4 hover:bg-ground`,
   whatsapp: `${BUTTON_BASE} bg-leaf text-paper hover:bg-leaf/90`,
+  /** For what cannot be undone, such as erasing a parent's details. */
+  danger: `${BUTTON_BASE} bg-alert text-paper hover:bg-alert/90`,
 } as const;
 
 export const inputStyles =

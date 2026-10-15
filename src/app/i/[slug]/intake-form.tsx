@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { SubmitButton } from "@/components/action-form";
+import { PhotoInput } from "@/components/photo-input";
 import { buttonStyles, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 import { EMPTY_FORM_STATE, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
@@ -15,6 +16,7 @@ export interface IntakeSharedWords {
   sex: Messages["labels"]["sex"];
   yes: string;
   no: string;
+  photos: Messages["photos"];
 }
 
 /**
@@ -45,6 +47,12 @@ export function IntakeForm({
       <div className="rounded-xl border border-rule bg-paper p-6">
         <h2 className="text-2xl font-extrabold tracking-tight">{fill(w.thanks, { kennel: kennelName })}</h2>
         <p className="mt-3 text-lg text-slate">{w.thanksNext}</p>
+        {/* Anything but "sent" is the sentence about a certificate that did not go. */}
+        {state.ok === "sent" ? null : (
+          <div className="mt-4">
+            <Notice tone="error">{state.ok}</Notice>
+          </div>
+        )}
       </div>
     );
   }
@@ -136,6 +144,10 @@ export function IntakeForm({
             <Field label={w.validUntil}>
               <Input name={`pets.${key}.vaccine_valid_until`} type="date" />
             </Field>
+            <div className="sm:col-span-2">
+              <PhotoInput name={`pets.${key}.certificate`} label={w.certificate} accept="image/*,application/pdf" words={shared.photos} />
+              <p className="mt-1 text-sm text-slate">{w.certificateHint}</p>
+            </div>
             <Field label={w.vet}>
               <Input name={`pets.${key}.vet_name`} maxLength={200} />
             </Field>

@@ -422,3 +422,91 @@ booking that might clash.
 **Cost.** A task ticked offline is recorded as done at the time it reached the database, not the time of the tap.
 Copies of Today and Care, with pet and parent names, stay on the phone until someone opens the sign-in page or the
 next copy replaces them. The service worker runs only in production builds.
+
+## D23. A script policy with nonces, and hashes for the prerendered shell
+
+**Status:** Decided, 15 October 2026 (milestone M9).
+
+**Situation.** The roadmap asks for a `script-src` Content Security Policy with nonces. Next.js puts a nonce on every
+script it writes at request time, read from the request's `Content-Security-Policy` header. But Wagbook uses cache
+components: each page's shell is prerendered at build time, when there is no request and no nonce. That shell holds
+`<script src>` tags for the app's own files and two small inline scripts: React's timing line
+(`requestAnimationFrame(function(){$RT=performance.now()})`) and Turbopack's list of chunks for the page. With the
+policy Next.js documents (`'nonce-…' 'strict-dynamic'`) every page stopped working.
+
+**Decision.** `src/proxy.ts` sends, for every request, `script-src 'self' 'nonce-<fresh>' 'sha256-…'`: scripts from
+files on this site, inline scripts that carry this request's nonce, and the shell's inline scripts by their SHA-256
+hash. The hashes are worked out once per server from the build's own `.next/build-manifest.json`, the same way Next.js
+writes those scripts (`src/lib/csp.ts`, `src/lib/csp-hashes.ts`); unit tests fail if an upgrade of React or Next.js
+changes how either is written. If the manifest cannot be read, the policy is sent without a `script-src` (as before
+M9) and the server logs it once, rather than breaking every page. Styles keep `'unsafe-inline'`, because React writes
+style attributes and a stylesheet cannot run code.
+
+**Why.** `'self'` is safe here because nothing a visitor sends is ever served from this origin as a script: uploads
+go to Supabase Storage, the only route handlers return CSV and JSON with `nosniff`. An injected `<script>` or `onclick`
+in stored text is refused by the browser, which the end-to-end walk checks. Turning cache components off to get
+per-request shells would make every page slower for every kennel.
+
+**Cost.** A file the build did not produce, served from the same origin, would be allowed. The policy depends on the
+two inline scripts staying as they are; the unit tests say when they change.
+
+## D24. Two-step sign-in is enforced by the database
+
+**Status:** Decided, 15 October 2026 (milestone M9).
+
+**Situation.** The roadmap asks for two-step sign-in for owners. Supabase Auth supports authenticator apps (TOTP): a
+session that has given the code is at assurance level `aal2`. Nothing stops a client with only the password (`aal1`)
+from calling the API directly, unless the database checks.
+
+**Decision.** `session_meets_mfa()` is true unless the person has a verified factor and the session is still at
+`aal1`. `my_org_ids()` and `my_org_ids_with_role()`, on which every policy rests, require it; so do the functions that
+act on a person's own memberships (`WB005`). The app sends a session that still owes its code to `/login/code`. Any
+person can turn it on for themselves under More; owners who have not see a reminder there. It is not forced on anyone.
+Recovery from a lost phone is an administrator removing the factor in Supabase (documented in
+[10-setup-and-deploy.md](10-setup-and-deploy.md)).
+
+**Why.** A stolen password then reaches nothing, whether the thief uses the app or the API. Forcing it on every owner
+from the first sign-in would lock out a kennel whose owner has no smartphone app yet; the reminder is the softer start.
+
+**Cost.** There are no recovery codes: losing the phone means asking whoever runs the installation. A person who turns
+it on in one browser is asked for the code in the others when the database next refuses them (`requireOrg()` checks).
+
+## D25. Erasing a parent keeps the bills, empties everything else
+
+**Status:** Decided, 15 October 2026 (milestone M9). Check with an accountant and a lawyer.
+
+**Situation.** India's DPDP Act lets a parent ask a kennel to erase their details. GST law requires a business to keep
+its tax invoices, with the buyer's name, for years. Bills, payments and reports rest on the parent, pet and stay rows.
+
+**Decision.** `erase_client()` (owners and managers) keeps the parent and pet rows, empty and named "Erased", and the
+stays' dates, kennels and prices, so that bills and reports still add up; issued and cancelled bills keep the buyer
+details frozen on them when they were issued, and payments stay. Everything else about the parent goes: contact
+details, consent, notes, pets' details, vaccinations, routines, incidents, updates, care tasks, play, intake forms,
+draft bills, files, and the personal text the history of changes had copied. It is refused while a pet is in house or a
+stay is still to come. `export_client()` gives the parent everything first, as JSON.
+
+**Why.** It is the least that tax law makes the kennel keep. Keeping empty rows instead of deleting them means no bill
+or report ever points at nothing.
+
+**Cost.** A duplicate record merged into this parent earlier (`merge_clients`) keeps its own details, hidden; erase it
+as well if it is found. Payment notes and references are kept as they were typed. Whether this is exactly what the law
+asks is a question for a lawyer (`HANDOFF.md`, Open questions).
+
+## D26. Rate limits in the app's proxy, counted in memory
+
+**Status:** Decided, 15 October 2026 (milestone M9).
+
+**Situation.** The roadmap asks for rate limiting of the intake form and sign-in "at the edge, or a privacy-respecting
+challenge". A shared store (Redis, a database table) would be a new service or a new table written by strangers. A
+challenge (a puzzle, a captcha service) either sends visitors to a third party or costs a real attacker nothing.
+
+**Decision.** `src/proxy.ts` counts posts per visitor address in the server's memory and marks those over the limit;
+the action answers with a sentence instead of calling the database (`src/lib/rate-limit.ts`). It also refuses posts
+over 1 MB except where photos are sent. The database's own limits on the intake form (`WB048`) and Supabase
+Auth's own limits stay as the backstop for anyone who calls Supabase directly. Hosts with many copies of the app add
+their own edge rule ([10-setup-and-deploy.md](10-setup-and-deploy.md)).
+
+**Why.** No new service, no new dependency, nothing sent to a third party. On one server (the self-hosting setup) it
+is exact.
+
+**Cost.** On Vercel each copy of the app counts on its own. Whoever calls Supabase directly is not counted by the app.

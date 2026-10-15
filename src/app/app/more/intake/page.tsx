@@ -7,6 +7,7 @@ import { formatDate, formatPhone, intakeInviteMessage, isISODate, whatsappLink }
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { IntakePayload } from "@/lib/intake";
+import { signedUrls } from "@/lib/media";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { acceptSubmission, rejectSubmission } from "./actions";
@@ -41,6 +42,14 @@ async function Intake() {
   if (error) throw new Error("Could not load forms.");
 
   const intakeUrl = `${origin}/i/${org.slug}`;
+
+  // Certificates parents sent with their forms: {org}/intake/{form}/pet-N.
+  // Only those that exist come back with a link.
+  const certificatePath = (submission: string, i: number) => `${org.id}/intake/${submission}/pet-${i + 1}`;
+  const certificates = await signedUrls(
+    supabase,
+    data.flatMap((s) => (Array.isArray((s.payload as { pets?: unknown }).pets) ? ((s.payload as { pets: unknown[] }).pets.map((_, i) => certificatePath(s.id, i))) : [])),
+  );
 
   // Which of these parents is already a client? Accepting adds their new pets
   // to the existing client and never rewrites the client's own details.
@@ -141,6 +150,11 @@ async function Intake() {
                         ) : (
                           <p className="text-slate">{k.noVaccines}</p>
                         )}
+                        {certificates.get(certificatePath(s.id, i)) ? (
+                          <a href={certificates.get(certificatePath(s.id, i))} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center underline underline-offset-4">
+                            {fill(k.certificate, { pet: p.name })}
+                          </a>
+                        ) : null}
                       </li>
                     ))}
                   </ul>

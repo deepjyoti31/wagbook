@@ -169,7 +169,9 @@ npm run start      # listens on port 3000
 ```
 
 Put it behind HTTPS. Set `NEXT_PUBLIC_SITE_URL`; without it, production refuses to build links for parents rather
-than guess the address.
+than guess the address. The proxy in front must set `X-Real-IP` (or `X-Forwarded-For`) to the visitor's address and
+overwrite whatever the visitor sent, or the rate limits can be dodged. To run everything, Supabase included, on your
+own server, see [14-self-hosting.md](14-self-hosting.md).
 
 ### 3.3 Install it on phones
 
@@ -190,17 +192,33 @@ and no pausing, and is worth it.
 
 ### Backups
 
-Whatever plan you are on, take your own copy now and then:
+Whatever plan you are on, take your own copies of the database and of the `pet-media` bucket, and practise restoring
+them. [15-backup-and-restore.md](15-backup-and-restore.md) has the commands and the drill.
+
+### Rate limits
+
+The app limits how often one address may sign in, send the intake form or join (`src/lib/rate-limit.ts`). Supabase Auth
+has its own limits, which also hold for anyone who skips the app. In the dashboard, Authentication, Rate Limits, check
+that sign-ins and sign-ups are at most 30 per 5 minutes per address, and token verifications (two-step codes) at most
+30 per 5 minutes. On Vercel, where each copy of the app counts on its own, add a Firewall rate limit rule for `POST`
+requests to `/login` and `/i/` as well.
+
+### Two-step sign-in
+
+Supabase turns authenticator apps (TOTP) on by default; check under Authentication, Sign In / Providers, Multi-Factor.
+Each person turns it on for themselves in Wagbook under More. If someone loses their phone, an administrator removes
+their factor: in the dashboard, Authentication, Users, open the person, and delete the factor under "Multi-factor
+authentication". They can then sign in with the password and set it up again. Do this only after checking it really
+is them (a call on a number you already have).
+
+### Check the browser protections after deploying
 
 ```bash
-npx supabase db dump --linked -f backup-$(date +%F).sql
-npx supabase db dump --linked --data-only -f data-$(date +%F).sql
+curl -sI https://YOUR-DOMAIN/login | grep -i content-security-policy
 ```
 
-Keep the files somewhere safe and private: they contain parents' details. Photos are in Storage and are not in a
-database dump; download the `pet-media` bucket separately if they matter to you.
-
-Practise restoring to a spare project once, before you need to.
+The answer must contain `script-src 'self' 'nonce-` followed by `'sha256-`. If it has no `script-src`, the server could
+not read `.next/build-manifest.json` and says so in its log (D23); pages still work, with weaker protection.
 
 ### Updating Wagbook
 

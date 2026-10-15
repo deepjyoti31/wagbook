@@ -60,11 +60,11 @@ async function Intake({ params }: Pick<PageProps<"/i/[slug]">, "params">) {
       <p className="mb-6 mt-2 text-lg text-slate">{w.intro}</p>
       {kennel.intake_enabled ? (
         <IntakeForm
-          action={submitIntake.bind(null, slug.toLowerCase(), language)}
+          action={submitIntake.bind(null, slug.toLowerCase(), kennel.name, language)}
           kennelName={kennel.name}
           notice={kennel.notice}
           words={w}
-          shared={{ species: m.labels.species, sex: m.labels.sex, yes: m.common.yes, no: m.common.no }}
+          shared={{ species: m.labels.species, sex: m.labels.sex, yes: m.common.yes, no: m.common.no, photos: m.photos }}
         />
       ) : (
         <p className="rounded-xl border border-rule bg-paper p-6 text-lg">{fill(w.closed, { kennel: kennel.name })}</p>

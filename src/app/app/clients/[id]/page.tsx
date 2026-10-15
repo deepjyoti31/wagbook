@@ -12,7 +12,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
-import { mergeClient, updateClient } from "../actions";
+import { eraseClient, mergeClient, updateClient } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.parent.title);
 
@@ -251,6 +251,29 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                 <SubmitButton pendingLabel={p.merge.merging}>{fill(p.merge.button, { name: c.full_name })}</SubmitButton>
               </ActionForm>
             ) : null}
+          </div>
+        </Section>
+      ) : null}
+
+      {canManage ? (
+        <Section title={p.privacy.title}>
+          <div className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+            <p className="text-slate">{p.privacy.intro}</p>
+            <a href={`/app/clients/${c.id}/export`} download className={buttonStyles.secondary}>
+              {p.privacy.download}
+            </a>
+            <ActionForm action={eraseClient} className="space-y-3 rounded-lg bg-alert-soft p-3">
+              <input type="hidden" name="clientId" value={c.id} />
+              <p className="font-bold">{p.privacy.eraseTitle}</p>
+              <p>{p.privacy.eraseIntro}</p>
+              <label className="flex min-h-12 items-start gap-3">
+                <input type="checkbox" name="confirm" className="mt-1 size-5" />
+                <span>{p.privacy.eraseConfirm}</span>
+              </label>
+              <SubmitButton variant="danger" pendingLabel={p.privacy.erasing}>
+                {p.privacy.eraseButton}
+              </SubmitButton>
+            </ActionForm>
           </div>
         </Section>
       ) : null}

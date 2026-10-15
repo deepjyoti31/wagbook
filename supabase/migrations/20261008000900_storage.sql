@@ -8,6 +8,7 @@
 --     {org_id}/vaccinations/{vaccination_id}.pdf
 --     {org_id}/updates/{update_id}/1.jpg
 --     {org_id}/expenses/{expense_id}.jpg     (owners and managers only)
+--     {org_id}/intake/{submission_id}/pet-1  (a certificate sent with an intake form)
 -- The first folder decides who can see the file. Nothing is public; pages
 -- that show a photo ask for a short-lived signed link.
 -- =============================================================================
@@ -157,3 +158,61 @@ grant execute on function public.stay_media_visible(text) to anon;
 
 create policy pet_media_select_for_stay on storage.objects for select to anon
   using (bucket_id = 'pet-media' and public.stay_media_visible(name));
+
+-- ---------------------------------------------------------------------------
+-- Certificates sent with the public intake form (roadmap M9).
+--
+-- Whoever sent a form gets its secret upload token back from submit_intake().
+-- With it, in the x-wagbook-intake request header, the anonymous role may add
+-- one file per pet on the form, named {org_id}/intake/{submission_id}/pet-N,
+-- within an hour of sending, while the form is still waiting for staff. Only
+-- adding: anon has no select, update or delete policy, so a file cannot be
+-- read back, replaced (the name is unique) or removed. The bucket limits size
+-- and type (10 MB; photos and PDF).
+-- ---------------------------------------------------------------------------
+
+create function public.intake_upload_allowed(p_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_token text;
+  v_parts text[];
+begin
+  begin
+    v_token := nullif(current_setting('request.headers', true), '')::json ->> 'x-wagbook-intake';
+  exception when others then
+    return false;
+  end;
+  if v_token is null or char_length(v_token) <> 64 then
+    return false;
+  end if;
+  v_parts := regexp_match(
+    p_name,
+    '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/intake/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/pet-([1-6])$'
+  );
+  if v_parts is null then
+    return false;
+  end if;
+  return exists (
+    select 1
+    from public.intake_submissions s
+    where s.id = v_parts[2]::uuid
+      and s.org_id = v_parts[1]::uuid
+      and s.upload_token = v_token
+      and s.status = 'new'
+      and s.created_at > now() - interval '1 hour'
+      and v_parts[3]::integer <= jsonb_array_length(s.payload -> 'pets')
+  );
+end;
+$$;
+comment on function public.intake_upload_allowed(text) is
+  'PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N for one of the form''s pets. SECURITY DEFINER because the anonymous role can read no table.';
+revoke all on function public.intake_upload_allowed(text) from public, anon;
+grant execute on function public.intake_upload_allowed(text) to anon;
+
+create policy pet_media_insert_for_intake on storage.objects for insert to anon
+  with check (bucket_id = 'pet-media' and public.intake_upload_allowed(name));

@@ -87,7 +87,7 @@ grant select, delete on public.memberships to authenticated;
 grant update (role, display_name, phone, is_active) on public.memberships to authenticated;
 
 create policy memberships_select on public.memberships for select to authenticated
-  using (org_id in (select public.my_org_ids()) or user_id = (select auth.uid()));
+  using (org_id in (select public.my_org_ids()) or (user_id = (select auth.uid()) and (select public.session_meets_mfa())));
 create policy memberships_update on public.memberships for update to authenticated
   using (
     org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[]))
@@ -147,6 +147,17 @@ begin
   end loop;
 end;
 $$;
+
+-- Clients: only erase_client() marks a parent as erased. (org_id and
+-- created_by stay writable so that their triggers, forbid_org_change and
+-- stamp_actor, give their own answer.)
+revoke insert, update on public.clients from authenticated;
+grant insert (org_id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
+              emergency_name, emergency_phone, notes, consent_at, consent_source, created_by, deleted_at)
+  on public.clients to authenticated;
+grant update (org_id, created_by, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
+              emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at)
+  on public.clients to authenticated;
 
 -- Bookings: the "who and when" stamps, the creator and the secret link token
 -- are written only by the database, so they are not in the list of columns a
@@ -321,6 +332,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 -- Needed to evaluate the policies and constraints above.
+grant execute on function public.session_meets_mfa() to authenticated;
 grant execute on function public.my_org_ids() to authenticated;
 grant execute on function public.my_org_ids_with_role(public.member_role[]) to authenticated;
 grant execute on function public.stay_range(public.booking_kind, date, date) to authenticated;

@@ -6,6 +6,8 @@ import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
 import { Field, Input, Loading } from "@/components/ui";
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, IS_DEMO } from "@/lib/demo";
+import { fill } from "@/lib/i18n";
 import { getVisitorI18n } from "@/lib/i18n-server";
 import { signIn, signUp } from "./actions";
 
@@ -36,6 +38,20 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
       <HtmlLang lang={language} />
       <ForgetOfflineCopies />
       <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{signup ? a.signUpHeading : a.signInHeading}</h1>
+      {IS_DEMO ? (
+        <div className="mb-6 space-y-2 rounded-xl border border-rule bg-marigold-soft p-4">
+          <p className="font-semibold">{m.demo.banner}</p>
+          <p>{m.demo.tryAs}</p>
+          <ul className="space-y-1">
+            {DEMO_ACCOUNTS.map((d) => (
+              <li key={d.email}>
+                <span className="font-mono select-all">{d.email}</span> ({m.more.roleInSentence[d.role]})
+              </li>
+            ))}
+          </ul>
+          <p>{fill(m.demo.password, { password: DEMO_PASSWORD })}</p>
+        </div>
+      ) : null}
       {params.error === "link" ? (
         <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">
           {a.linkExpired}
