@@ -14,6 +14,7 @@ import type { Messages } from "@/messages";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { PetAvatar } from "@/components/pet-avatar";
+import { TickButton } from "@/components/tick-button";
 import { markDone, skipTask, undoTask } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.care.title);
@@ -176,12 +177,8 @@ function TaskRow({ m, task: t, photo }: { m: Messages; task: Task; photo?: strin
           {t.note ? <p className="mt-1 text-slate">{fill(m.care.note, { note: t.note })}</p> : null}
         </div>
         {t.status === "pending" ? (
-          <ActionForm action={markDone} className="contents">
-            <input type="hidden" name="taskId" value={t.id} />
-            <SubmitButton pendingLabel={m.common.saving} className="min-w-28">
-              {m.care.markDone}
-            </SubmitButton>
-          </ActionForm>
+          // Saved on the phone when offline, and sent when the connection is back (D22).
+          <TickButton taskId={t.id} action={markDone} words={m.offline} label={m.care.markDone} pendingLabel={m.common.saving} />
         ) : (
           <ActionForm action={undoTask} className="contents">
             <input type="hidden" name="taskId" value={t.id} />
