@@ -7,42 +7,48 @@ import { requireOrg } from "@/lib/auth";
 import { isGstStateCode, isValidGstin, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { getAppI18n } from "@/lib/i18n-server";
+import type { Messages } from "@/messages";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
-const Details = z.object({
-  fullName: z.string().min(1, "Enter the parent's name.").max(120),
-  email: z.email("That email address does not look right.").max(254).nullable(),
-  address: z.string().max(500).nullable(),
-  city: z.string().max(80).nullable(),
-  postalCode: z.string().max(12).nullable(),
-  emergencyName: z.string().max(120).nullable(),
-  notes: z.string().max(2000, "Keep notes under 2,000 characters.").nullable(),
-});
+const details = (m: Messages) =>
+  z.object({
+    fullName: z.string().min(1, m.parent.errors.name).max(120),
+    email: z.email(m.parent.errors.email).max(254).nullable(),
+    address: z.string().max(500).nullable(),
+    city: z.string().max(80).nullable(),
+    postalCode: z.string().max(12).nullable(),
+    emergencyName: z.string().max(120).nullable(),
+    notes: z.string().max(2000, m.parent.errors.notesTooLong).nullable(),
+  });
 
 /** Change a parent's details. Phone numbers are checked and stored in one form so a returning parent is recognised. */
 export async function updateClient(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const e = m.parent.errors;
   const clientId = Id.safeParse(form.get("clientId"));
-  if (!clientId.success) return { error: "That parent could not be found." };
+  if (!clientId.success) return { error: m.errors.parentNotFound };
   const national = org.country_code === "IN" ? "IN" : null;
 
   const phone = normalizePhone(text(form, "phone") ?? "", national);
-  if (!phone) return { error: "Enter a valid mobile number." };
+  if (!phone) return { error: e.phone };
   const phones: Record<"alt_phone" | "emergency_phone", string | null> = { alt_phone: null, emergency_phone: null };
   for (const field of ["alt_phone", "emergency_phone"] as const) {
     const typed = text(form, field);
     if (typed === null) continue;
     const n = normalizePhone(typed, national);
-    if (!n) return { error: field === "alt_phone" ? "The other number does not look right." : "The emergency number does not look right." };
+    if (!n) return { error: field === "alt_phone" ? e.altPhone : e.emergencyPhone };
     phones[field] = n;
   }
   const taxId = text(form, "tax_id")?.toUpperCase() ?? null;
-  if (taxId && !isValidGstin(taxId)) return { error: "Enter a valid 15 character GSTIN, or leave it empty." };
+  if (taxId && !isValidGstin(taxId)) return { error: e.gstin };
   const gstState = text(form, "gst_state_code");
-  if (gstState && !isGstStateCode(gstState)) return { error: "Choose the state from the list." };
+  if (gstState && !isGstStateCode(gstState)) return { error: e.gstState };
 
-  const parsed = Details.safeParse({
+  const parsed = details(m).safeParse({
     fullName: text(form, "full_name") ?? "",
     email: text(form, "email"),
     address: text(form, "address"),
@@ -75,10 +81,10 @@ export async function updateClient(_state: FormState, form: FormData): Promise<F
     .eq("id", clientId.data)
     .is("deleted_at", null)
     .select("id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "That parent could not be found." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: m.errors.parentNotFound };
   revalidatePath("/app", "layout");
-  return { ok: "Saved." };
+  return { ok: m.common.saved };
 }
 
 /**
@@ -88,13 +94,14 @@ export async function updateClient(_state: FormState, form: FormData): Promise<F
  */
 export async function mergeClient(_state: FormState, form: FormData): Promise<FormState> {
   const { canManage } = await requireOrg();
-  if (!canManage) return { error: "Only an owner or manager can merge parents." };
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.parent.errors.onlyManagersMerge };
   const keep = Id.safeParse(form.get("keepId"));
   const merge = Id.safeParse(form.get("mergeId"));
-  if (!keep.success || !merge.success) return { error: "That parent could not be found." };
+  if (!keep.success || !merge.success) return { error: t.m.errors.parentNotFound };
   const supabase = await createClient();
   const { error } = await supabase.rpc("merge_clients", { p_keep: keep.data, p_merge: merge.data });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/clients/${keep.data}?done=merged`);
 }

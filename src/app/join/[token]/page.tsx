@@ -3,15 +3,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { Rich } from "@/components/rich";
 import { buttonStyles, Loading, Notice } from "@/components/ui";
 import { getUser } from "@/lib/auth";
+import { fill } from "@/lib/i18n";
+import { getVisitorI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import type { Messages } from "@/messages";
 import { joinWithLink } from "./actions";
 
-export const metadata: Metadata = { title: "Join a kennel", robots: { index: false } };
-
-const ROLE = { owner: "an owner", manager: "a manager", staff: "staff" } as const;
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getVisitorI18n()).m.join.title, robots: { index: false } };
+}
 
 /**
  * Where an invitation link lands. Someone not signed in is asked to create an
@@ -21,7 +25,6 @@ const ROLE = { owner: "an owner", manager: "a manager", staff: "staff" } as cons
 export default function JoinPage({ params }: PageProps<"/join/[token]">) {
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
-      <h1 className="mb-6 text-3xl font-extrabold tracking-tight">Join a kennel</h1>
       <Suspense fallback={<Loading />}>
         <Join params={params} />
       </Suspense>
@@ -33,17 +36,27 @@ async function Join({ params }: Pick<PageProps<"/join/[token]">, "params">) {
   const { token } = await params;
   if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) notFound();
   const here = encodeURIComponent(`/join/${token}`);
+  const { m } = await getVisitorI18n();
+  const j = m.join;
+  return (
+    <>
+      <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{j.title}</h1>
+      <JoinBody token={token} here={here} j={j} />
+    </>
+  );
+}
 
+async function JoinBody({ token, here, j }: { token: string; here: string; j: Messages["join"] }) {
   const user = await getUser();
   if (!user) {
     return (
       <div className="space-y-4">
-        <p className="text-lg">You have been invited to work at a kennel that uses Wagbook.</p>
+        <p className="text-lg">{j.invited}</p>
         <Link href={`/login?mode=signup&next=${here}`} className={`${buttonStyles.primary} w-full`}>
-          Create an account
+          {j.createAccount}
         </Link>
         <Link href={`/login?next=${here}`} className={`${buttonStyles.secondary} w-full`}>
-          I already have an account
+          {j.haveAccount}
         </Link>
       </div>
     );
@@ -53,14 +66,14 @@ async function Join({ params }: Pick<PageProps<"/join/[token]">, "params">) {
   const { data } = await supabase.rpc("get_invitation_link", { p_token: token });
   const link = data?.[0];
   if (!link || !link.usable) {
-    return <Notice tone="error">This invitation link has expired, was already used, or was withdrawn. Ask the kennel for a new one.</Notice>;
+    return <Notice tone="error">{j.expired}</Notice>;
   }
   if (link.already_member) {
     return (
       <div className="space-y-4">
-        <Notice tone="info">You already work at {link.org_name}.</Notice>
+        <Notice tone="info">{fill(j.alreadyMember, { kennel: link.org_name })}</Notice>
         <Link href="/app" className={buttonStyles.primary}>
-          Go to Wagbook
+          {j.goToApp}
         </Link>
       </div>
     );
@@ -69,11 +82,11 @@ async function Join({ params }: Pick<PageProps<"/join/[token]">, "params">) {
     <ActionForm action={joinWithLink}>
       <input type="hidden" name="token" value={token} />
       <p className="text-lg">
-        Join <strong>{link.org_name}</strong> as {ROLE[link.role]}, under the name {link.display_name}?
+        <Rich text={j.confirm[link.role]} parts={{ kennel: <strong>{link.org_name}</strong>, name: link.display_name }} />
       </p>
-      <p className="text-slate">Signed in as {user.email ?? "you"}.</p>
-      <SubmitButton pendingLabel="Joining" className="w-full">
-        Join {link.org_name}
+      <p className="text-slate">{fill(j.signedInAs, { email: user.email ?? j.you })}</p>
+      <SubmitButton pendingLabel={j.joining} className="w-full">
+        {fill(j.join, { kennel: link.org_name })}
       </SubmitButton>
     </ActionForm>
   );

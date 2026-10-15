@@ -7,23 +7,26 @@ import { requireOrg } from "@/lib/auth";
 import { isISODate } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { fill } from "@/lib/i18n";
+import { getAppI18n } from "@/lib/i18n-server";
 import { readUpload, smallPath, store, type Upload } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
+import type { Messages } from "@/messages";
 
 const Id = z.uuid();
 const MAX_PHOTOS = 4;
 
 /** The photos chosen in a PhotoInput, with their small copies when the browser made them. */
-async function readPhotos(form: FormData, name: string, max: number): Promise<{ photos: { full: Upload; small: Upload | null }[] } | { error: string }> {
+async function readPhotos(form: FormData, name: string, max: number, m: Messages): Promise<{ photos: { full: Upload; small: Upload | null }[] } | { error: string }> {
   const fulls = form.getAll(name).filter((v) => v instanceof File && v.size > 0);
   const smalls = form.getAll(`${name}_small`).filter((v) => v instanceof File && v.size > 0);
-  if (fulls.length > max) return { error: `Choose at most ${max} photos.` };
+  if (fulls.length > max) return { error: fill(m.media.tooMany, { n: max }) };
   const photos: { full: Upload; small: Upload | null }[] = [];
   for (const [i, f] of fulls.entries()) {
-    const full = await readUpload(f);
+    const full = await readUpload(f, m);
     if (full && "error" in full) return { error: full.error };
     if (!full) continue;
-    const s = smalls[i] ? await readUpload(smalls[i]) : null;
+    const s = smalls[i] ? await readUpload(smalls[i], m) : null;
     photos.push({ full, small: s && !("error" in s) ? s : null });
   }
   return { photos };
@@ -36,17 +39,19 @@ async function readPhotos(form: FormData, name: string, max: number): Promise<{ 
  */
 export async function createUpdate(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
   const bookingId = Id.safeParse(form.get("bookingId"));
-  if (!bookingId.success) return { error: "That booking could not be found." };
+  if (!bookingId.success) return { error: m.errors.bookingNotFound };
   const body = text(form, "body");
-  if (!body) return { error: "Write a line about how the pet is doing." };
-  if (body.length > 2000) return { error: "Keep the update under 2,000 characters." };
+  if (!body) return { error: m.media.update.body };
+  if (body.length > 2000) return { error: m.media.update.tooLong };
 
   const supabase = await createClient();
   const booking = await supabase.from("bookings").select("id, pet_id, status").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
-  if (booking.error || !booking.data) return { error: "That booking could not be found." };
+  if (booking.error || !booking.data) return { error: m.errors.bookingNotFound };
 
-  const read = await readPhotos(form, "photos", MAX_PHOTOS);
+  const read = await readPhotos(form, "photos", MAX_PHOTOS, m);
   if ("error" in read) return { error: read.error };
 
   // Files first, under a new update id, then the update that names them.
@@ -55,7 +60,7 @@ export async function createUpdate(_state: FormState, form: FormData): Promise<F
   for (const [i, p] of read.photos.entries()) {
     const path = `${org.id}/updates/${updateId}/${i + 1}.jpg`;
     const failed = await store(supabase, path, p.full);
-    if (failed) return { error: "A photo could not be saved. Nothing was posted. Try again." };
+    if (failed) return { error: m.media.update.photoFailed };
     if (p.small) await store(supabase, smallPath(path), p.small);
     paths.push(path);
   }
@@ -69,7 +74,7 @@ export async function createUpdate(_state: FormState, form: FormData): Promise<F
     media_paths: paths,
     is_visible_to_parent: checked(form, "visible"),
   });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
 
   revalidatePath("/app", "layout");
   redirect(`/app/bookings/${booking.data.id}/update?saved=${updateId}`);
@@ -78,59 +83,66 @@ export async function createUpdate(_state: FormState, form: FormData): Promise<F
 /** Give a pet its photo, shown small on every row so staff know which dog is which. */
 export async function setPetPhoto(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
   const petId = Id.safeParse(form.get("petId"));
-  if (!petId.success) return { error: "That pet could not be found." };
-  const read = await readPhotos(form, "photo", 1);
+  if (!petId.success) return { error: m.errors.petNotFound };
+  const read = await readPhotos(form, "photo", 1, m);
   if ("error" in read) return { error: read.error };
-  if (read.photos.length === 0) return { error: "Choose a photo first." };
+  if (read.photos.length === 0) return { error: m.media.photo.choose };
 
   const supabase = await createClient();
   const pet = await supabase.from("pets").select("id").eq("org_id", org.id).eq("id", petId.data).maybeSingle();
-  if (pet.error || !pet.data) return { error: "That pet could not be found." };
+  if (pet.error || !pet.data) return { error: m.errors.petNotFound };
 
   // A new name every time: staff add files, they never overwrite one.
   const path = `${org.id}/pets/${petId.data}/${crypto.randomUUID()}.jpg`;
   const failed = await store(supabase, path, read.photos[0].full);
-  if (failed) return { error: "The photo could not be saved. Try again." };
+  if (failed) return { error: m.media.photo.failed };
   if (read.photos[0].small) await store(supabase, smallPath(path), read.photos[0].small);
 
   const { error } = await supabase.from("pets").update({ photo_path: path }).eq("org_id", org.id).eq("id", petId.data);
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
-  return { ok: "Photo saved." };
+  return { ok: m.media.photo.saved };
 }
 
-const Vaccination = z
-  .object({
-    vaccine: z.string().min(1, "Say which vaccine, like rabies.").max(60, "Keep the vaccine name under 60 characters."),
-    givenOn: z.string().refine(isISODate, "Choose a valid date.").nullable(),
-    validUntil: z.string().refine(isISODate, "Choose a valid date.").nullable(),
-  })
-  .refine((v) => !v.givenOn || !v.validUntil || v.validUntil >= v.givenOn, "Valid until cannot be before the date it was given.");
+const vaccination = (m: Messages) => {
+  const e = m.media.vaccination.errors;
+  return z
+    .object({
+      vaccine: z.string().min(1, e.vaccine).max(60, e.vaccineTooLong),
+      givenOn: z.string().refine(isISODate, e.date).nullable(),
+      validUntil: z.string().refine(isISODate, e.date).nullable(),
+    })
+    .refine((v) => !v.givenOn || !v.validUntil || v.validUntil >= v.givenOn, e.order);
+};
 
 /** Record a vaccination seen at the gate, with a photo or PDF of the certificate. */
 export async function addVaccination(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
   const petId = Id.safeParse(form.get("petId"));
-  if (!petId.success) return { error: "That pet could not be found." };
-  const parsed = Vaccination.safeParse({ vaccine: text(form, "vaccine") ?? "", givenOn: text(form, "givenOn"), validUntil: text(form, "validUntil") });
+  if (!petId.success) return { error: m.errors.petNotFound };
+  const parsed = vaccination(m).safeParse({ vaccine: text(form, "vaccine") ?? "", givenOn: text(form, "givenOn"), validUntil: text(form, "validUntil") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const certificate = await readUpload(form.get("certificate"), { allowPdf: true });
+  const certificate = await readUpload(form.get("certificate"), m, { allowPdf: true });
   if (certificate && "error" in certificate) return { error: certificate.error };
 
   const supabase = await createClient();
   const pet = await supabase.from("pets").select("id").eq("org_id", org.id).eq("id", petId.data).maybeSingle();
-  if (pet.error || !pet.data) return { error: "That pet could not be found." };
+  if (pet.error || !pet.data) return { error: m.errors.petNotFound };
 
   const id = crypto.randomUUID();
   let path: string | null = null;
   if (certificate) {
     path = `${org.id}/vaccinations/${id}.${certificate.extension}`;
     const failed = await store(supabase, path, certificate);
-    if (failed) return { error: "The certificate could not be saved. Try again." };
+    if (failed) return { error: m.media.vaccination.errors.certificateFailed };
     const small = form.get("certificate_small");
-    const smallUpload = certificate.extension === "jpg" ? await readUpload(small) : null;
+    const smallUpload = certificate.extension === "jpg" ? await readUpload(small, m) : null;
     if (smallUpload && !("error" in smallUpload)) await store(supabase, smallPath(path), smallUpload);
   }
 
@@ -145,7 +157,7 @@ export async function addVaccination(_state: FormState, form: FormData): Promise
     // Recording it from the certificate in hand is checking it; the database stamps who and when.
     verified_at: path ? new Date().toISOString() : null,
   });
-  if (error) return { error: friendlyError(error) };
+  if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
-  return { ok: `Recorded ${parsed.data.vaccine}.` };
+  return { ok: fill(m.media.vaccination.recorded, { vaccine: parsed.data.vaccine }) };
 }
