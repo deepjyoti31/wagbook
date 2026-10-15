@@ -195,7 +195,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
       {b.status === "requested" || b.status === "confirmed" ? (
-        <VaccinationWarnings warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
+        <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
       ) : null}
 
       {open ? (
@@ -497,7 +497,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         <Section title={fill(w.about.title, { pet: pet.name })}>
           <div className="mb-4 rounded-xl border border-rule bg-paper p-4">
             <p className="mb-2 font-bold">{w.about.vaccinations}</p>
-            <VaccinationList records={vaccinations.data} today={today} certificates={fullMedia} />
+            <VaccinationList t={t} records={vaccinations.data} today={today} certificates={fullMedia} />
           </div>
           <Link href={`/app/dogs/${pet.id}`} className={`${buttonStyles.secondary} mb-4`}>
             {fill(w.about.petPage, { pet: pet.name })}
