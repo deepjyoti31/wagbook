@@ -2,18 +2,21 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 14 October 2026, after milestone M7.
+Last updated: 15 October 2026, after milestone M8.
 
 ## In one paragraph
 
-The database for the whole product exists, with its rules enforced and tested (152 database tests, 76 unit tests).
+The database for the whole product exists, with its rules enforced and tested (159 database tests, 97 unit tests).
 Built: M2 (bookings), M3 (the care round and play), M4 (bills, payments, the parent's bill with a UPI QR code, printing),
 M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates), M6 (pet and parent
 pages, search by parent and phone, vaccination warnings, incidents, people with invitation links, merging parents) and
-M7 (reports, expenses with receipts, CSV downloads, the history of changes). The whole day, from booking to a paid bill
-and a photo the parent sees, plus a new colleague joining through a link and the owner reading the month's numbers, is
-walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 25 of 25 pass; the 22
-before M7 are also green in CI). What has still never happened is a **hosted** Supabase project:
+M7 (reports, expenses with receipts, CSV downloads, the history of changes) and M8 (every word in message files;
+English, Hindi and Kannada, each person choosing their own and each kennel choosing its parents'; Today and Care open
+offline and ticks made offline are sent later; a daily summary on WhatsApp). The whole day, from booking to a paid bill
+and a photo the parent sees, plus a new colleague joining through a link, the owner reading the month's numbers, a
+manager working in Hindi, a parent reading a stay in Kannada and a task ticked with no connection, is walked in a real
+browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 29 of 29 pass; also green in CI). **The
+Hindi and Kannada are first drafts** written without a native speaker; see "Translations waiting for a native speaker". What has still never happened is a **hosted** Supabase project:
 the setup guide, real sign-up email and production settings. That is what is left of M1.
 
 ## What is verified, and how
@@ -40,7 +43,15 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | CSV files: quoting, CRLF, byte order mark, formula-looking text defused; month arithmetic; the history in words | `src/lib/core/reports.test.ts`, `src/lib/history.test.ts` | High |
 | Generated types and reference docs match the migrations | `tests/db/generated.test.ts` | High |
 | The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate, search by phone and parent name, a pet's details changed and a high incident shown on Today until dealt with, a parent's details changed and a duplicate merged in, a new person joining through an invitation link then suspended and restored, an expense with a receipt (staff refused reports, expenses, history and downloads), the month's report and all four downloads, the history filtered to one person's booking changes | High for the local stack |
-| Every screen at 360 pixels wide, no sideways scroll, no browser errors | Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search, Reports, Expenses, History of changes | Medium: desktop Chromium at phone size, not a phone |
+| Every screen at 360 pixels wide, no sideways scroll, no browser errors | In English, Hindi and Kannada (M8). Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search, Reports, Expenses, History of changes | Medium: desktop Chromium at phone size, not a phone |
+| Each person's language is theirs alone, in every kennel they work at; parents' language set by owners and managers; the consent wording stored in the language the parent read | `tests/db/languages.test.ts`; the own-rows rule removed once to see its test fail | High |
+| Every message exists in all three languages with the same placeholders; every database error code has a sentence | `src/messages/messages.test.ts`, `src/lib/errors.test.ts` | High for completeness, none for quality (see below) |
+| Language plumbing: placeholders, plurals by each language's rule, Accept-Language, values in bold | `src/lib/i18n.test.ts` | High |
+| English screens unchanged by the move to message files | The 25 end-to-end tests from before M8 pass unchanged | High |
+| Hindi and Kannada on screen | End-to-end: a manager switches to Hindi (navigation, Today, Settings, a booking in Hindi), and the kennel's stay page reads in Kannada for a parent. Every main screen screenshotted in both at 360 pixels: none wider than the phone | Medium: looked at, not read by a native speaker |
+| Ticks made offline: kept once however often tapped, cleaned of junk, sent and forgotten | `src/lib/offline-ticks.test.ts`; end-to-end: tick with no connection, see "not sent yet", reconnect, see it sent | High |
+| Service worker: Today and Care open with no connection, scripts included; other pages show the offline page; the sign-in page forgets the copies | End-to-end, with every request to the site cut off | High in Chromium |
+| Daily summary text | `src/lib/core/core.test.ts`; end-to-end checks the WhatsApp link | High |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -65,8 +76,10 @@ the setup guide, real sign-up email and production settings. That is what is lef
 1. **Finish M1** (needs the owner): create a development Supabase project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
    email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job.
-2. **Then M8, works anywhere, in any language** ([08-roadmap.md](08-roadmap.md)). It starts by reading the Next.js docs
-   on internationalisation and recording the approach in `09`.
+2. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone. Fix words in
+   `src/messages/hi/` and `src/messages/kn/` (and the consent wording in `default_intake_notice()`, the offline page
+   `public/offline.html`, and the error page `src/app/error.tsx`). The list below is where the drafts were least sure.
+3. **Then M9, hardening and privacy tools** ([08-roadmap.md](08-roadmap.md)).
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -91,9 +104,26 @@ migration. Add new files."
 | Licence: AGPL-3.0-or-later, or something more permissive | [09-decisions.md](09-decisions.md), D2 | AGPL. Confirm before the first public release; changing later needs every contributor's consent. |
 | Should the reference kennel be named in `13-reference-deployment.md`? | That file | Unnamed. |
 | Where the public repository lives, and under which GitHub account or organisation | | Private for now |
+| Whether a bill may be in Hindi or Kannada (question 9 for the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md) | Bills say "Tax invoice" in English with the translation in brackets |
 | Invoice prefix and the GST questions | [06-billing-and-gst.md](06-billing-and-gst.md), "Questions to take to an accountant" | Tax off, prefix `WB` |
 
 Decided: only owners and managers set or change a price (D15), extended to bills in M4.
+
+## Translations waiting for a native speaker
+
+Hindi (`src/messages/hi/`) and Kannada (`src/messages/kn/`) were drafted without a native speaker. Every message is
+there, but the words need checking, starting with the screens staff use most (Today, Care, the booking page) and what
+parents see (intake form, stay page, bill, WhatsApp messages). The drafts were least sure of:
+
+- **Both:** "WhatsApp" is in Latin letters in most places and in the local script in a few; choose one. Pets of
+  unknown sex get masculine verbs in Hindi. Kannada avoids case endings on names ("{pet} ಬಗ್ಗೆ"); check it reads
+  naturally. The red warning tags (escape risk, bite history, dog reactive) must be short and unmistakable.
+- **Hindi:** confirm (पक्की करें), draft bill (कच्चा बिल), merge parents (जोड़ें, or विलय), suspend (रोकें),
+  invitation (न्योता), consent (इजाज़त), vet (पशु डॉक्टर or वेट), severity High (ज़्यादा or गंभीर), the official GST
+  terms (place of supply, taxable value), and the danda after numbers.
+- **Kannada:** tax words (ಟ್ಯಾಕ್ಸ್ or ತೆರಿಗೆ, used both ways), place of supply, issue a bill (ನೀಡು or ಇಶ್ಯೂ ಮಾಡು),
+  extend (ಹೆಚ್ಚಿಸಿ or ವಿಸ್ತರಿಸಿ), routine (ರೂಟೀನ್ or ದಿನಚರಿ), undo (ಹಿಂಪಡೆಯಿರಿ or ಅನ್‌ಡೂ), cash (ಕ್ಯಾಶ್ or ನಗದು),
+  decline (ತಿರಸ್ಕರಿಸಿ may be too formal), and "Pets" in the bottom bar, shortened to ಪ್ರಾಣಿಗಳು to fit.
 
 ## Open questions
 
@@ -122,6 +152,12 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
 - A person can own at most five kennels on one installation. Enough?
 - Forms from parents stay "new" until someone deals with them; there is no expiry.
+- Words stored as data stay in the language they were typed in: routine names, extras, kennel names, notes, the
+  default prices (named in the language of whoever set them), and expense categories. Is that right for a kennel
+  whose staff read different languages?
+- A care task ticked offline counts as done when it reaches the database. Should the screen show the time of the tap?
+- The daily summary is a button the owner presses. Should it be sent by itself each evening (it would need WhatsApp's
+  paid Business API, which `07` explains Wagbook does not use)?
 - Reports are for owners and managers only (D20), including how full the kennel was. Should staff see occupancy?
 - Tax by rate counts issued bills by their bill date and leaves cancelled ones out. A bill cancelled in a later month
   disappears from the earlier month's figure. Is that what the accountant wants for GST returns, or should a
@@ -149,6 +185,9 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Removing an expense leaves its receipt file in storage (see `05`, known limitations).
 - More lists Reports, Expenses and History of changes to staff too; staff who open them get a sentence saying they are
   for owners and managers.
+- History of changes names fields by their database column names, in English, in every language.
+- Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
+- The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
 - History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
   rows; other ids read "a record no longer here".
 
@@ -156,7 +195,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 228 tests, build
+npm run check        # dash check, lint, typecheck, 256 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e` (see
@@ -166,6 +205,9 @@ above).
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 15 October 2026. M8 (every word in message files, by five helpers working in parallel; Hindi and Kannada drafts
+  by six translators; each person's language and the parents' language; ticks saved offline; a service worker for
+  Today and Care; the daily summary); e2e walk extended to 29 tests.
 - 14 October 2026. M7 (reports as functions that refuse staff, expenses with receipts for managers only, CSV
   downloads, history of changes); e2e walk extended to 25 tests.
 - 14 October 2026. M6 (pet and parent pages, search, vaccination warnings, incidents, people, invitation links,

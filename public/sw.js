@@ -9,7 +9,7 @@
  * usual. The copies are thrown away when someone signs out (the sign-in page
  * asks for that) and when this file changes.
  */
-const VERSION = "wb-1";
+const VERSION = "wb-2";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 const KEPT = ["/app", "/app/care"];
@@ -67,10 +67,10 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       })
-      .catch(() =>
-        caches
-          .open(PAGES)
-          .then((c) => (kept ? c.match(url.pathname) : undefined).then((hit) => hit || c.match("/offline.html"))),
-      ),
+      .catch(async () => {
+        const cache = await caches.open(PAGES);
+        const hit = kept ? await cache.match(url.pathname) : undefined;
+        return hit || (await cache.match("/offline.html")) || Response.error();
+      }),
   );
 });

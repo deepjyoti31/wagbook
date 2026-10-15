@@ -588,3 +588,42 @@ test("a person reads Wagbook in Hindi, and parents read the kennel's pages in Ka
   await page.locator("select[name=language]").locator("xpath=ancestor::form").getByRole("button").click();
   await expect(page.getByText(en.language.saved)).toBeVisible();
 });
+
+/**
+ * No connection at all. setOffline alone does not reliably reach the service
+ * worker's own requests in Chromium, so every request to the site fails too.
+ */
+async function goOffline(context: import("@playwright/test").BrowserContext, base: string, on: boolean) {
+  await context.setOffline(on);
+  if (on) await context.route(`${base}/**`, (route) => route.abort("internetdisconnected"));
+  else await context.unrouteAll();
+}
+
+test("with no connection, Today and Care open from the phone's copy, and other pages say the phone is offline", async ({ page, context, baseURL }) => {
+  const base = baseURL!.replace(/\/$/, "");
+  await signIn(page, "staff");
+  // The service worker takes over from the next page load (production builds only).
+  await page.waitForFunction(async () => Boolean(await navigator.serviceWorker.ready));
+  await page.reload();
+  await page.goto("/app/care");
+  await expect(page.getByRole("heading", { level: 1, name: en.care.title })).toBeVisible();
+  await page.goto("/app");
+  await expect(page.getByRole("link", { name: en.today.newBooking })).toBeVisible();
+
+  await goOffline(context, base, true);
+  await page.goto("/app/care");
+  await expect(page.getByRole("heading", { level: 1, name: en.care.title })).toBeVisible();
+  await expect(page.getByText(en.offline.youAreOffline)).toBeVisible();
+  await page.goto("/app/dogs");
+  await expect(page.getByRole("heading", { name: "You are offline" })).toBeVisible();
+  await goOffline(context, base, false);
+
+  // Opening the sign-in page forgets the copies.
+  await page.goto("/login");
+  await expect(page.locator("input[name=email]")).toBeVisible();
+  await page.waitForTimeout(500);
+  await goOffline(context, base, true);
+  await page.goto("/app/care");
+  await expect(page.getByRole("heading", { name: "You are offline" })).toBeVisible();
+  await goOffline(context, base, false);
+});

@@ -45,7 +45,7 @@ export const core: typeof English = {
     today: "ಇಂದು",
     bookings: "ಬುಕಿಂಗ್‌ಗಳು",
     care: "ಆರೈಕೆ",
-    pets: "ಸಾಕುಪ್ರಾಣಿಗಳು",
+    pets: "ಪ್ರಾಣಿಗಳು",
     more: "ಇನ್ನಷ್ಟು",
   },
   language: {
