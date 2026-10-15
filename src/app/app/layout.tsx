@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Nav } from "@/components/nav";
 import { requireOrg } from "@/lib/auth";
+import { getAppI18n } from "@/lib/i18n-server";
 
 /**
  * The signed-in shell: kennel name, navigation, and the page.
@@ -20,7 +21,7 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
           </Link>
           <div className="flex-1 sm:flex-none">
             <Suspense fallback={<div className="min-h-12" />}>
-              <Nav />
+              <MainNav />
             </Suspense>
           </div>
         </div>
@@ -28,6 +29,11 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5 sm:pb-12">{children}</main>
     </div>
   );
+}
+
+async function MainNav() {
+  const { m, language } = await getAppI18n();
+  return <Nav words={m.nav} lang={language} />;
 }
 
 async function OrgName() {

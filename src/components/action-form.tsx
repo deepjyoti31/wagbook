@@ -68,14 +68,15 @@ function restoreFields(form: HTMLFormElement, values: FormData) {
 /** A submit button that disables itself and changes its label while the action runs. */
 export function SubmitButton({
   children,
-  pendingLabel = "Saving",
+  pendingLabel,
   variant = "primary",
   className = "",
   name,
   value,
 }: {
   children: ReactNode;
-  pendingLabel?: string;
+  /** What the button says while the action runs, like "Saving". */
+  pendingLabel: string;
   variant?: keyof typeof buttonStyles;
   className?: string;
   /** Sent with the form when this button is the one pressed, to tell two buttons apart. */

@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
-import { flagText } from "@/lib/bookings";
-import { CARE_KIND_PLURAL, CARE_KINDS } from "@/lib/care";
+import { datesText, flagText } from "@/lib/bookings";
+import { CARE_KINDS } from "@/lib/care";
 import { formatDate, formatPhone, isOverstaying, todayIn, vaccinationWarnings } from "@/lib/core";
-import { SEVERITY_SHORT } from "@/lib/pets";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n, type I18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
 import { bookingCards, type BookingCard } from "@/lib/queries";
@@ -15,30 +16,26 @@ import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
 import { extendToToday } from "./bookings/actions";
 
-export const metadata: Metadata = { title: "Today" };
+export const generateMetadata = () => appTitle((m) => m.today.title);
 
 export default function TodayPage({ searchParams }: PageProps<"/app">) {
   return (
-    <Suspense fallback={<Loading label="Loading today" />}>
+    <Suspense fallback={<Loading />}>
       <Today searchParams={searchParams} />
     </Suspense>
   );
 }
-
-/** What to say after a step that moves a pet off its list (the form that was pressed goes with it). */
-const DONE: Record<string, string> = {
-  checked_in: "Checked in.",
-  checked_out: "Checked out. The kennel is free for the next pet.",
-  extended: "Stay extended to today.",
-};
 
 async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) {
   const query = await searchParams;
   const doneKey = query.done;
   // After a check-out, the next job is the bill.
   const billFor = doneKey === "checked_out" && typeof query.booking === "string" && /^[0-9a-f-]{36}$/.test(query.booking) ? query.booking : null;
-  const done = typeof doneKey === "string" && doneKey in DONE ? DONE[doneKey] : null;
   const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m, language, locale } = t;
+  // What to say after a step that moves a pet off its list (the form that was pressed goes with it).
+  const done = typeof doneKey === "string" && doneKey in m.today.done ? m.today.done[doneKey as keyof typeof m.today.done] : null;
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
 
@@ -95,9 +92,9 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
 
   return (
     <>
-      <PageTitle title={formatDate(today)}>
+      <PageTitle title={formatDate(today, locale)}>
         <Link href="/app/bookings/new" className={buttonStyles.primary}>
-          New booking
+          {m.today.newBooking}
         </Link>
       </PageTitle>
 
@@ -108,7 +105,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
             <>
               {" "}
               <Link href={`/app/bookings/${billFor}`} className="underline underline-offset-4">
-                Make the bill
+                {m.today.makeBill}
               </Link>
             </>
           ) : null}
@@ -116,29 +113,26 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       ) : null}
 
       <p className="mb-6 text-lg">
-        <strong className="font-extrabold">{inHouse.length}</strong> in house
-        {capacity > 0 ? (
-          <>
-            {" "}
-            of <strong className="font-extrabold">{capacity}</strong> kennels
-          </>
-        ) : null}
-        . <strong className="font-extrabold">{arrivals.length}</strong> to arrive.
+        <Rich
+          text={capacity > 0 ? m.today.inHouseOf : m.today.inHouse}
+          parts={{ inHouse: <strong className="font-extrabold">{inHouse.length}</strong>, capacity: <strong className="font-extrabold">{capacity}</strong> }}
+        />{" "}
+        <Rich text={m.today.toArrive} parts={{ arrivals: <strong className="font-extrabold">{arrivals.length}</strong> }} />
       </p>
 
       {capacity === 0 ? (
         <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
-          You have not added any kennels yet, so Wagbook cannot stop you overbooking.{" "}
+          {m.today.noKennels}{" "}
           <Link href="/app/more/kennels" className="font-semibold underline underline-offset-4">
-            Add your kennels
+            {m.today.addKennels}
           </Link>
         </p>
       ) : null}
       {newForms > 0 ? (
         <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
-          {newForms === 1 ? "One new form from a parent is" : `${newForms} new forms from parents are`} waiting.{" "}
+          {plural(language, newForms, m.today.newForms)}{" "}
           <Link href="/app/more/intake" className="font-semibold underline underline-offset-4">
-            Review
+            {m.today.review}
           </Link>
         </p>
       ) : null}
@@ -153,22 +147,22 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                 c.done === c.total ? "border-leaf bg-leaf-soft text-leaf" : c.kind === "medication" ? "border-alert bg-alert-soft text-alert" : "border-rule bg-paper"
               }`}
             >
-              {CARE_KIND_PLURAL[c.kind]} {c.done} of {c.total}
+              {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
             </Link>
           ))}
         </div>
       ) : null}
 
       {incidents.length > 0 ? (
-        <Section title="Incidents to deal with" count={incidents.length}>
+        <Section title={m.today.incidents} count={incidents.length}>
           <ul className="space-y-2">
             {incidents.map((i) => (
               <li key={i.id}>
                 <Link href={`/app/dogs/${i.pets?.id}`} className="block rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
                   <span className="flex flex-wrap items-center gap-2 font-bold">
                     {i.pets?.name}
-                    <Badge tone="alert">{SEVERITY_SHORT[i.severity]}</Badge>
-                    {i.parent_notified_at ? null : <Badge tone="attention">Parent not told</Badge>}
+                    <Badge tone="alert">{m.labels.severityShort[i.severity]}</Badge>
+                    {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
                   </span>
                   <span className="mt-1 line-clamp-2 block">{i.description}</span>
                 </Link>
@@ -178,14 +172,15 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
-      <Section title="Arriving" count={arrivals.length}>
+      <Section title={m.today.arriving} count={arrivals.length}>
         {arrivals.length === 0 ? (
-          <Empty>Nobody is due to arrive today.</Empty>
+          <Empty>{m.today.nobodyArriving}</Empty>
         ) : (
           <Ledger>
             {arrivals.map((b, i) => (
               <LedgerRow key={b.id}>
                 <BookingSummary
+                  t={t}
                   booking={b}
                   today={today}
                   photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
@@ -195,9 +190,9 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                   <input type="hidden" name="bookingId" value={b.id} />
                     <input type="hidden" name="from" value="today" />
                   <label className="min-w-36 flex-1">
-                    <span className="sr-only">Kennel for {b.pets?.name}</span>
+                    <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
                     <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
-                      <option value="">No kennel yet</option>
+                      <option value="">{m.today.noKennelYet}</option>
                       {b.kennels ? <option value={b.kennels.id}>{b.kennels.name}</option> : null}
                       {freeKennels[i]
                         .filter((k) => k.id !== b.kennel_id)
@@ -208,7 +203,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                         ))}
                     </Select>
                   </label>
-                  <SubmitButton pendingLabel="Checking in">Check in</SubmitButton>
+                  <SubmitButton pendingLabel={m.today.checkingIn}>{m.today.checkIn}</SubmitButton>
                 </ActionForm>
               </LedgerRow>
             ))}
@@ -216,37 +211,37 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         )}
       </Section>
 
-      <Section title="In house" count={inHouse.length}>
+      <Section title={m.today.inHouseTitle} count={inHouse.length}>
         {inHouse.length === 0 ? (
-          <Empty>No pets are checked in.</Empty>
+          <Empty>{m.today.noneInHouse}</Empty>
         ) : (
           <Ledger>
             {inHouse.map((b) => (
               <LedgerRow key={b.id}>
-                <BookingSummary booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
+                <BookingSummary t={t} booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
                 <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                   {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
                     <ActionForm action={extendToToday} className="contents">
                       <input type="hidden" name="bookingId" value={b.id} />
                     <input type="hidden" name="from" value="today" />
-                      <SubmitButton variant="secondary" pendingLabel="Extending">
-                        Extend to today
+                      <SubmitButton variant="secondary" pendingLabel={m.today.extending}>
+                        {m.today.extend}
                       </SubmitButton>
                     </ActionForm>
                   ) : null}
                   <Link href={`/app/bookings/${b.id}/update`} className={buttonStyles.whatsapp}>
-                    Write update
+                    {m.today.writeUpdate}
                   </Link>
                   {b.pets ? (
                     <Link href={`/app/dogs/${b.pets.id}/incident`} className={buttonStyles.quiet}>
-                      Incident
+                      {m.today.incident}
                     </Link>
                   ) : null}
                   <ActionForm action={checkOut} className="contents">
                     <input type="hidden" name="bookingId" value={b.id} />
                     <input type="hidden" name="from" value="today" />
-                    <SubmitButton pendingLabel="Checking out" variant={b.end_date <= today ? "primary" : "secondary"}>
-                      Check out
+                    <SubmitButton pendingLabel={m.today.checkingOut} variant={b.end_date <= today ? "primary" : "secondary"}>
+                      {m.today.checkOut}
                     </SubmitButton>
                   </ActionForm>
                 </div>
@@ -259,7 +254,8 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   );
 }
 
-function BookingSummary({ booking: b, today, photo, vaccineWarning }: { booking: BookingCard; today: string; photo?: string | null; vaccineWarning?: boolean }) {
+function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I18n; booking: BookingCard; today: string; photo?: string | null; vaccineWarning?: boolean }) {
+  const { m, locale } = t;
   const leavesToday = b.status === "checked_in" && b.end_date === today;
   const overdue = b.status === "checked_in" && b.end_date < today;
   const late = b.status === "confirmed" && b.start_date < today;
@@ -268,19 +264,19 @@ function BookingSummary({ booking: b, today, photo, vaccineWarning }: { booking:
       <PetAvatar name={b.pets?.name ?? "?"} url={photo} />
       <div className="min-w-0 flex-1">
       <p className="flex flex-wrap items-center gap-2">
-        <DoorTag name={b.kennels?.name} />
+        <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
         <Link href={`/app/bookings/${b.id}`} className="text-lg font-bold underline-offset-4 hover:underline">
-          {b.pets?.name ?? "Unknown pet"}
+          {b.pets?.name ?? m.today.unknownPet}
         </Link>
         {b.pets?.breed ? <span className="text-slate">{b.pets.breed}</span> : null}
-        {b.kind === "daycare" ? <Badge>Day boarding</Badge> : null}
-        {leavesToday ? <Badge tone="attention">Leaves today</Badge> : null}
-        {overdue ? <Badge tone="alert">Was due to leave {formatDate(b.end_date)}</Badge> : null}
-        {late ? <Badge tone="alert">Was due {formatDate(b.start_date)}</Badge> : null}
-        {vaccineWarning ? <Badge tone="attention">Check vaccinations</Badge> : null}
+        {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+        {leavesToday ? <Badge tone="attention">{m.today.leavesToday}</Badge> : null}
+        {overdue ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
+        {late ? <Badge tone="alert">{fill(m.today.wasDue, { date: formatDate(b.start_date, locale) })}</Badge> : null}
+        {vaccineWarning ? <Badge tone="attention">{m.today.checkVaccinations}</Badge> : null}
         {(b.pets?.flags ?? []).map((f) => (
           <Badge key={f} tone="alert">
-            {flagText(f)}
+            {flagText(m, f)}
           </Badge>
         ))}
       </p>
@@ -294,9 +290,7 @@ function BookingSummary({ booking: b, today, photo, vaccineWarning }: { booking:
             .{" "}
           </>
         ) : null}
-        {b.kind === "daycare" && b.start_date === b.end_date
-          ? formatDate(b.start_date)
-          : `${formatDate(b.start_date)} to ${formatDate(b.end_date)}`}
+        {datesText(t, b.start_date, b.end_date)}
       </p>
       </div>
     </div>

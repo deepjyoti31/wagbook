@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getMemberships, rememberOrg, requireOrg } from "@/lib/auth";
 import { todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { getAppI18n } from "@/lib/i18n-server";
 import { checked, text, type FormState } from "@/lib/forms";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -23,10 +24,11 @@ const Id = z.uuid();
  */
 export async function checkIn(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
   const bookingId = Id.safeParse(form.get("bookingId"));
   const kennel = form.get("kennelId");
   const kennelId = typeof kennel === "string" && kennel !== "" ? Id.safeParse(kennel) : null;
-  if (!bookingId.success || (kennelId && !kennelId.success)) return { error: "That booking could not be found." };
+  if (!bookingId.success || (kennelId && !kennelId.success)) return { error: t.m.errors.bookingNotFound };
 
   const checklist: TablesUpdate<"bookings"> = {};
   if (form.has("checklist")) {
@@ -44,8 +46,8 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
     .eq("id", bookingId.data)
     .eq("status", "confirmed")
     .select("id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "This booking is no longer waiting to be checked in. Refresh the page." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.errors.notWaitingForCheckIn };
 
   // Create today's care tasks for the new arrival. Safe to repeat.
   const tasks = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: todayIn(org.time_zone) });
@@ -55,14 +57,15 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
   // From the booking page, reopen it saying so: the check-in form is gone once the pet is in.
   if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_in`);
   if (form.get("from") === "today") redirect("/app?done=checked_in");
-  return { ok: "Checked in." };
+  return { ok: t.m.today.done.checked_in };
 }
 
 /** Check a pet out. The kennel becomes free for the next arrival. */
 export async function checkOut(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
+  const t = await getAppI18n();
   const bookingId = Id.safeParse(form.get("bookingId"));
-  if (!bookingId.success) return { error: "That booking could not be found." };
+  if (!bookingId.success) return { error: t.m.errors.bookingNotFound };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -72,13 +75,13 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
     .eq("id", bookingId.data)
     .eq("status", "checked_in")
     .select("id");
-  if (error) return { error: friendlyError(error) };
-  if (data.length === 0) return { error: "This pet is not checked in. Refresh the page." };
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.errors.notCheckedIn };
 
   revalidatePath("/app", "layout");
   if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_out`);
   if (form.get("from") === "today") redirect(`/app?done=checked_out&booking=${bookingId.data}`);
-  return { ok: "Checked out." };
+  return { ok: t.m.today.checkedOut };
 }
 
 /**

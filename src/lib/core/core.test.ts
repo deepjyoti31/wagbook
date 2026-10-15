@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { en } from "../../messages/en";
 import {
   addDays, amountInWords, billMessage, bookingConfirmedMessage, chargeableUnits, computeInvoice, computeLine,
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
@@ -205,14 +206,20 @@ describe("whatsapp", () => {
     expect(whatsappLink("Line 1\nLine 2 & more")).toBe("https://wa.me/?text=Line%201%0ALine%202%20%26%20more");
   });
   it("writes the booking and bill messages", () => {
-    const booking = bookingConfirmedMessage({
+    const booking = bookingConfirmedMessage(en.whatsapp, {
       kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno",
       startDate: "2027-04-14", endDate: "2027-04-17", nights: 3, totalMinor: 360000,
     });
+    expect(booking).toContain("Hi Asha, Bruno's stay at Happy Tails is confirmed.");
     expect(booking).toContain("14 Apr 2027");
     expect(booking).toContain("₹3,600");
-    const bill = billMessage({ kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", invoiceNumber: "WB/27-28/0001", dueMinor: 360000 });
+    const bill = billMessage(en.whatsapp, { kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", invoiceNumber: "WB/27-28/0001", dueMinor: 360000 });
     expect(bill).toContain("WB/27-28/0001");
+    // In the parent's language, with dates in it too.
+    const hindi = bookingConfirmedMessage({ ...en.whatsapp, checkIn: "चेक इन: {date}" }, {
+      kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-17", nights: 3,
+    }, "hi-IN");
+    expect(hindi).toContain("चेक इन: 14 अप्रैल 2027");
   });
 });
 

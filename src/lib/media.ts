@@ -1,6 +1,7 @@
 import "server-only";
 import { isJpeg, stripJpegMetadata } from "./core";
 import type { createClient } from "./supabase/server";
+import type { Messages } from "@/messages";
 
 /**
  * Files in the pet-media bucket: photos and certificates.
@@ -29,19 +30,24 @@ export interface Upload {
  * allowed) a PDF. Anything else is refused with a sentence for the person.
  * Returns null when no file was chosen.
  */
-export async function readUpload(value: FormDataEntryValue | null, opts: { allowPdf?: boolean } = {}): Promise<Upload | { error: string } | null> {
+export async function readUpload(
+  value: FormDataEntryValue | null,
+  m: Pick<Messages, "uploads">,
+  opts: { allowPdf?: boolean } = {},
+): Promise<Upload | { error: string } | null> {
+  const u = m.uploads;
   if (!(value instanceof File) || value.size === 0) return null;
-  if (value.size > MAX_FILE_BYTES) return { error: "That file is over 10 MB. Choose a smaller one." };
+  if (value.size > MAX_FILE_BYTES) return { error: u.tooBig };
   const bytes = new Uint8Array(await value.arrayBuffer());
   if (isJpeg(bytes)) {
     try {
       return { bytes: stripJpegMetadata(bytes), contentType: "image/jpeg", extension: "jpg" };
     } catch {
-      return { error: "That photo could not be read. Try taking it again." };
+      return { error: u.unreadable };
     }
   }
   if (opts.allowPdf && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-") return { bytes, contentType: "application/pdf", extension: "pdf" };
-  return { error: opts.allowPdf ? "Choose a photo or a PDF." : "Choose a photo. If your phone saves photos in another format, take it with the camera button." };
+  return { error: opts.allowPdf ? u.photoOrPdf : u.photoOnly };
 }
 
 /** Store a file. Staff may add files but never replace one, so every path is new. */

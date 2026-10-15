@@ -1,25 +1,12 @@
 import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type TaxContext } from "./core";
 import type { Enums, Tables } from "./supabase/database.types";
+import type { Messages } from "@/messages";
 
 /**
  * Bills, as screens need them. The arithmetic is src/lib/core/tax.ts; the
  * database checks it again when a bill is issued (issue_invoice()).
  * Kept out of the "use server" files, which may export only async functions.
  */
-
-export const INVOICE_STATUS_LABEL: Record<Enums<"invoice_status">, string> = {
-  draft: "Draft",
-  issued: "Issued",
-  void: "Cancelled",
-};
-
-export const PAYMENT_METHOD_LABEL: Record<Enums<"payment_method">, string> = {
-  upi: "UPI",
-  cash: "Cash",
-  card: "Card",
-  bank_transfer: "Bank transfer",
-  other: "Other",
-};
 
 export const PAYMENT_METHODS = ["upi", "cash", "card", "bank_transfer", "other"] as const satisfies readonly Enums<"payment_method">[];
 
@@ -110,8 +97,8 @@ export function draftPayload(t: InvoiceTotals) {
   };
 }
 
-/** The name of the tax on a bill: CGST and SGST, IGST, the kennel's own label, or plain "Tax". */
-export function taxLabel(mode: Enums<"tax_mode"> | string, label?: string | null): string {
-  if (mode === "simple") return label?.trim() || "Tax";
-  return "Tax";
+/** The name of the tax on a bill: the kennel's own label in simple mode, otherwise "Tax" in the reader's words. */
+export function taxLabel(m: Messages, mode: Enums<"tax_mode"> | string, label?: string | null): string {
+  if (mode === "simple") return label?.trim() || m.labels.tax;
+  return m.labels.tax;
 }

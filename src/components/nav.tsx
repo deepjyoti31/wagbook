@@ -2,21 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const ITEMS = [
-  { href: "/app", label: "Today" },
-  { href: "/app/bookings", label: "Bookings" },
-  { href: "/app/care", label: "Care" },
-  { href: "/app/dogs", label: "Pets" },
-  { href: "/app/more", label: "More" },
-] as const;
+import { useEffect } from "react";
+import type { Messages } from "@/messages";
 
 /**
  * Main navigation: a bar along the bottom on phones (within thumb reach),
- * along the top on wider screens.
+ * along the top on wider screens. The words come from the server, in the
+ * person's language.
  */
-export function Nav() {
+export function Nav({ words, lang }: { words: Messages["nav"]; lang: string }) {
   const pathname = usePathname();
+  // The root layout is drawn before the language is known; say it here.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+  const items = [
+    { href: "/app", label: words.today },
+    { href: "/app/bookings", label: words.bookings },
+    { href: "/app/care", label: words.care },
+    { href: "/app/dogs", label: words.pets },
+    { href: "/app/more", label: words.more },
+  ];
   // The calendar is part of bookings, play is part of the care round, bills live under More, and parents sit with their pets.
   const section = pathname.startsWith("/app/calendar")
     ? "/app/bookings"
@@ -29,8 +35,8 @@ export function Nav() {
           : pathname;
   const isActive = (href: string) => (href === "/app" ? section === "/app" : section.startsWith(href));
   return (
-    <nav aria-label="Main" className="flex justify-around gap-1 sm:justify-start">
-      {ITEMS.map((item) => (
+    <nav aria-label={words.label} className="flex justify-around gap-1 sm:justify-start">
+      {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}

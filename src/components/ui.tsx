@@ -52,11 +52,11 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-xl border border-dashed border-rule bg-paper px-4 py-6 text-slate">{children}</p>;
 }
 
-/** The kennel door tag. Pass nothing to show "No kennel". */
-export function DoorTag({ name }: { name?: string | null }) {
+/** The kennel door tag. With no name it shows `empty` (the words for "No kennel"). */
+export function DoorTag({ name, empty }: { name?: string | null; empty: string }) {
   return (
     <span className="door-tag" data-empty={name ? undefined : "true"}>
-      {name ?? "No kennel"}
+      {name ?? empty}
     </span>
   );
 }
@@ -95,11 +95,18 @@ export function Select(props: ComponentProps<"select">) {
   return <select {...props} className={`${inputStyles} ${props.className ?? ""}`} />;
 }
 
-export function Loading({ label = "Loading" }: { label?: string }) {
+/**
+ * Shown while a page loads. It is part of the static shell, drawn before
+ * anyone knows which language the reader uses, so it has no words: three dots
+ * that pulse, and aria-busy for screen readers.
+ */
+export function Loading() {
   return (
-    <p role="status" className="py-8 text-slate">
-      {label}…
-    </p>
+    <div role="status" aria-busy="true" className="flex gap-2 py-8" data-loading>
+      <span className="size-2 animate-pulse rounded-full bg-slate" />
+      <span className="size-2 animate-pulse rounded-full bg-slate [animation-delay:150ms]" />
+      <span className="size-2 animate-pulse rounded-full bg-slate [animation-delay:300ms]" />
+    </div>
   );
 }
 

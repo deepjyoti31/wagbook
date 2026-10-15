@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Messages } from "@/messages";
 
 const LONG_EDGE = 1600;
 const SMALL_EDGE = 480;
@@ -13,7 +14,22 @@ const SMALL_EDGE = 480;
  * hidden field (`{name}_small`). Without JavaScript the photo is sent as
  * taken, and the server still removes its hidden data.
  */
-export function PhotoInput({ name, label, multiple = false, max = 4, accept = "image/*" }: { name: string; label: string; multiple?: boolean; max?: number; accept?: string }) {
+export function PhotoInput({
+  name,
+  label,
+  words,
+  multiple = false,
+  max = 4,
+  accept = "image/*",
+}: {
+  name: string;
+  label: string;
+  /** m.photos */
+  words: Messages["photos"];
+  multiple?: boolean;
+  max?: number;
+  accept?: string;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const small = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -69,7 +85,7 @@ export function PhotoInput({ name, label, multiple = false, max = 4, accept = "i
       </label>
       <input ref={small} type="file" name={`${name}_small`} multiple hidden tabIndex={-1} aria-hidden="true" />
       <p aria-live="polite" className="mt-1 text-sm text-slate">
-        {status === "working" ? "Getting the photos ready…" : status === "error" ? "A photo could not be prepared. Try another, or take it with the camera." : multiple ? `Up to ${max}.` : ""}
+        {status === "working" ? words.working : status === "error" ? words.failed : multiple ? words.upTo.replace("{n}", String(max)) : ""}
       </p>
       {previews.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-2">
