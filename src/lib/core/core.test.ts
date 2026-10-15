@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "../../messages/en";
 import {
-  addDays, amountInWords, billMessage, bookingConfirmedMessage, chargeableUnits, computeInvoice, computeLine,
+  addDays, amountInWords, billMessage, bookingConfirmedMessage, dailySummaryMessage, chargeableUnits, computeInvoice, computeLine,
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
   isValidGstin, isValidVpa, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
   quoteStay, todayIn, toDecimalString, upiLink, whatsappLink, yardsNeeded,
@@ -220,6 +220,34 @@ describe("whatsapp", () => {
       kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-17", nights: 3,
     }, "hi-IN");
     expect(hindi).toContain("चेक इन: 14 अप्रैल 2027");
+  });
+});
+
+describe("daily summary", () => {
+  it("lists tomorrow's arrivals and departures, and vaccinations running out or already out", () => {
+    const text = dailySummaryMessage(en.summary, {
+      kennelName: "Happy Tails",
+      date: "2027-04-15",
+      arrivals: [{ pet: "Bruno", kennel: "K01" }, { pet: "Coco" }],
+      departures: [],
+      vaccinations: [
+        { pet: "Bruno", vaccine: "rabies", validUntil: "2027-04-20" },
+        { pet: "Mango", vaccine: "kennel_cough", validUntil: "2027-04-10" },
+      ],
+    });
+    expect(text.split("\n")).toEqual([
+      "Happy Tails, 15 Apr 2027",
+      "",
+      "Arriving (2):",
+      "- Bruno (K01)",
+      "- Coco",
+      "",
+      "Nobody going home.",
+      "",
+      "Vaccinations running out:",
+      "- Bruno: rabies runs out on 20 Apr 2027",
+      "- Mango: kennel cough ran out on 10 Apr 2027",
+    ]);
   });
 });
 

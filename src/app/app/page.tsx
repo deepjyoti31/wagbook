@@ -6,7 +6,7 @@ import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
-import { formatDate, formatPhone, isOverstaying, todayIn, vaccinationWarnings } from "@/lib/core";
+import { addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, todayIn, vaccinationWarnings, whatsappLink } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, type I18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
@@ -31,7 +31,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const doneKey = query.done;
   // After a check-out, the next job is the bill.
   const billFor = doneKey === "checked_out" && typeof query.booking === "string" && /^[0-9a-f-]{36}$/.test(query.booking) ? query.booking : null;
-  const { org } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
   const { m, language, locale } = t;
   // What to say after a step that moves a pet off its list (the form that was pressed goes with it).
@@ -250,7 +250,60 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           </Ledger>
         )}
       </Section>
+
+      {canManage ? (
+        <Suspense fallback={null}>
+          <TomorrowSummary t={t} today={today} />
+        </Suspense>
+      ) : null}
     </>
+  );
+}
+
+/** For owners and managers: tomorrow on one WhatsApp message, to send to themselves. */
+async function TomorrowSummary({ t, today }: { t: I18n; today: string }) {
+  const { org, user } = await requireOrg();
+  const supabase = await createClient();
+  const tomorrow = addDays(today, 1);
+  const [arriving, leaving, staying, me] = await Promise.all([
+    supabase.from("bookings").select("pets(name), kennels(name)").eq("org_id", org.id).eq("status", "confirmed").eq("start_date", tomorrow).order("created_at"),
+    supabase.from("bookings").select("pets(name), kennels(name)").eq("org_id", org.id).in("status", ["confirmed", "checked_in"]).eq("kind", "boarding").eq("end_date", tomorrow).order("created_at"),
+    // Pets in house, or arriving tomorrow: their vaccinations matter now.
+    supabase.from("bookings").select("pet_id").eq("org_id", org.id).or(`status.eq.checked_in,and(status.eq.confirmed,start_date.eq.${tomorrow})`),
+    supabase.from("memberships").select("phone").eq("org_id", org.id).eq("user_id", user.id).maybeSingle(),
+  ]);
+  if (arriving.error || leaving.error || staying.error) return null;
+  const petIds = [...new Set(staying.data.map((b) => b.pet_id))];
+  const vaccines = petIds.length
+    ? ((
+        await supabase
+          .from("vaccinations")
+          .select("vaccine, valid_until, pets(name)")
+          .eq("org_id", org.id)
+          .in("pet_id", petIds)
+          .not("valid_until", "is", null)
+          .lte("valid_until", addDays(tomorrow, EXPIRES_SOON_DAYS))
+          .order("valid_until")
+      ).data ?? [])
+    : [];
+  const text = dailySummaryMessage(
+    t.m.summary,
+    {
+      kennelName: org.name,
+      date: tomorrow,
+      arrivals: arriving.data.map((b) => ({ pet: b.pets?.name ?? "", kennel: b.kennels?.name })),
+      departures: leaving.data.map((b) => ({ pet: b.pets?.name ?? "", kennel: b.kennels?.name })),
+      vaccinations: vaccines.map((v) => ({ pet: v.pets?.name ?? "", vaccine: v.vaccine, validUntil: v.valid_until as string })),
+    },
+    t.locale,
+  );
+  return (
+    <div className="mb-7">
+      <a href={whatsappLink(text, me.data?.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
+        {t.m.summary.button}
+      </a>
+      <p className="mt-1 text-sm text-slate">{t.m.summary.hint}</p>
+    </div>
   );
 }
 

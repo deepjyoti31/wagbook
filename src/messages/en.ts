@@ -290,6 +290,26 @@ export const en = {
   ...moneyArea,
   ...petsArea,
   ...kennelArea,
+  offline: {
+    queued: "Saved on this phone. It will be sent when you are back online.",
+    doneNotSent: "Done, not sent yet",
+    waiting: { one: "{n} tick made offline is waiting to be sent.", other: "{n} ticks made offline are waiting to be sent." },
+    sent: { one: "Sent {n} tick made offline.", other: "Sent {n} ticks made offline." },
+    youAreOffline: "You are offline. Ticks are saved on this phone. Everything else waits for the connection.",
+  },
+  summary: {
+    title: "{kennel}, {date}",
+    arriving: "Arriving ({n}):",
+    leaving: "Going home ({n}):",
+    nobodyArriving: "Nobody arriving.",
+    nobodyLeaving: "Nobody going home.",
+    vaccinations: "Vaccinations running out:",
+    runsOut: "{pet}: {vaccine} runs out on {date}",
+    ranOut: "{pet}: {vaccine} ran out on {date}",
+    petInKennel: "{pet} ({kennel})",
+    button: "Send me tomorrow's summary",
+    hint: "Opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out. Send it to yourself or your team.",
+  },
 };
 
 export type Messages = typeof en;

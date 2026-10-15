@@ -120,3 +120,45 @@ export function billMessage(
 export function intakeInviteMessage(w: WhatsappWords, i: { kennelName: string; intakeUrl: string }): string {
   return [fillIn(w.intakeHello, { kennel: i.kennelName }), w.intakeAsk, i.intakeUrl].join("\n");
 }
+
+/** Words for the owner's daily summary (m.summary). */
+export interface SummaryWords {
+  title: string;
+  arriving: string;
+  leaving: string;
+  nobodyArriving: string;
+  nobodyLeaving: string;
+  vaccinations: string;
+  runsOut: string;
+  ranOut: string;
+  petInKennel: string;
+}
+
+export interface SummaryInput {
+  kennelName: string;
+  /** The day the summary is about, usually tomorrow. */
+  date: ISODate;
+  arrivals: { pet: string; kennel?: string | null }[];
+  departures: { pet: string; kennel?: string | null }[];
+  vaccinations: { pet: string; vaccine: string; validUntil: ISODate }[];
+}
+
+/**
+ * The summary an owner sends to themselves on WhatsApp the evening before:
+ * who arrives and who goes home that day, and vaccinations that run out soon
+ * (or already have) for pets staying. In the owner's own language.
+ */
+export function dailySummaryMessage(w: SummaryWords, i: SummaryInput, locale = "en-IN"): string {
+  const pet = (p: { pet: string; kennel?: string | null }) => `- ${p.kennel ? fillIn(w.petInKennel, { pet: p.pet, kennel: p.kennel }) : p.pet}`;
+  const lines = [fillIn(w.title, { kennel: i.kennelName, date: formatDate(i.date, locale) }), ""];
+  lines.push(i.arrivals.length ? fillIn(w.arriving, { n: i.arrivals.length }) : w.nobodyArriving, ...i.arrivals.map(pet), "");
+  lines.push(i.departures.length ? fillIn(w.leaving, { n: i.departures.length }) : w.nobodyLeaving, ...i.departures.map(pet));
+  if (i.vaccinations.length) {
+    lines.push("", w.vaccinations);
+    for (const v of i.vaccinations) {
+      const vars = { pet: v.pet, vaccine: v.vaccine.replaceAll("_", " "), date: formatDate(v.validUntil, locale) };
+      lines.push(`- ${fillIn(v.validUntil < i.date ? w.ranOut : w.runsOut, vars)}`);
+    }
+  }
+  return lines.join("\n");
+}
