@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { describeEntry, fieldLabel, historyLink, idsIn, valueText, type HistoryFormat } from "./history";
+import { en } from "@/messages/en";
+import { describeEntry, fieldLabel, historyLink, HISTORY_TABLES, idsIn, valueText, type HistoryFormat, type HistoryWords } from "./history";
 
 const booking = "11111111-2222-4333-8444-555555555555";
 const ravi = "d0000000-0000-4000-8000-000000000002";
 const fmt: HistoryFormat = {
+  words: en.history.log,
   money: (minor) => `Rs ${(minor / 100).toFixed(2)}`,
   time: (iso) => `at ${iso.slice(11, 16)}`,
   name: (id) => (id === ravi ? "Ravi" : undefined),
@@ -53,6 +55,31 @@ describe("history in words", () => {
     expect(added).toEqual({ title: "Expense added", fields: [{ label: "Category", was: null, now: "Food" }, { label: "Amount", was: null, now: "Rs 300.00" }] });
     const removed = describeEntry({ action: "delete", table_name: "expenses", row_id: booking, old_data: { category: "Food" }, new_data: null }, fmt);
     expect(removed).toEqual({ title: "Expense removed", fields: [{ label: "Category", was: "Food", now: null }] });
+  });
+
+  it("says it all in the words it is given", () => {
+    // A made-up language: every word must come from the words passed in, none from the code.
+    const words: HistoryWords = {
+      tables: Object.fromEntries(HISTORY_TABLES.map((t) => [t, `T:${t}`])) as HistoryWords["tables"],
+      added: "+{what}",
+      changed: "~{what}",
+      removed: "-{what}",
+      empty: "(none)",
+      yes: "Y",
+      no: "N",
+      gone: "(gone)",
+    };
+    const w = { ...fmt, words };
+    expect(valueText("notes", "", w)).toBe("(none)");
+    expect(valueText("flags", [], w)).toBe("(none)");
+    expect(valueText("is_active", true, w)).toBe("Y");
+    expect(valueText("is_active", false, w)).toBe("N");
+    expect(valueText("kennel_id", booking, w)).toBe("(gone)");
+    expect(describeEntry({ action: "insert", table_name: "payments", row_id: booking, old_data: null, new_data: { note: null } }, w)).toEqual({ title: "+T:payments", fields: [] });
+    expect(describeEntry({ action: "update", table_name: "invoices", row_id: booking, old_data: {}, new_data: {} }, w).title).toBe("~T:invoices");
+    expect(describeEntry({ action: "delete", table_name: "memberships", row_id: booking, old_data: {}, new_data: null }, w).title).toBe("-T:memberships");
+    // A table the history does not name falls back to its column-style name.
+    expect(describeEntry({ action: "update", table_name: "play_yards", row_id: booking, old_data: {}, new_data: {} }, w).title).toBe("~Play yards");
   });
 
   it("links to where the row can be seen today", () => {

@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -8,33 +7,32 @@ import { InvoiceView } from "@/components/invoice-view";
 import { PaymentForm } from "@/components/payment-form";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/billing";
 import { billMessage, formatDate, formatMoney, formatPhone, todayIn, toDecimalString, whatsappLink } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
+import type { Messages } from "@/messages";
 import { deleteDraft, editLine, issueBill, makeBill, voidBill } from "../actions";
 
-export const metadata: Metadata = { title: "Bill" };
+export const generateMetadata = () => appTitle((m) => m.bill.title);
 
 export default function BillPage({ params, searchParams }: PageProps<"/app/bills/[id]">) {
   return (
-    <Suspense fallback={<Loading label="Loading the bill" />}>
+    <Suspense fallback={<Loading />}>
       <Bill params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-const DONE: Record<string, string> = {
-  issued: "Issued. The bill now has its number and cannot be changed. Send it to the parent.",
-  void: "Bill cancelled. Its number stays used. Make a new bill from the booking if needed.",
-};
-
 async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">, "params" | "searchParams">) {
   const { id } = await params;
   const doneKey = (await searchParams).done;
-  const done = typeof doneKey === "string" ? DONE[doneKey] : undefined;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const { m, locale } = t;
+  const done = typeof doneKey === "string" && doneKey in m.bill.done ? m.bill.done[doneKey as keyof typeof m.bill.done] : undefined;
   const supabase = await createClient();
 
   const res = await supabase
@@ -62,27 +60,35 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   ]);
   if (lines.error || payments.error || balance.error) throw new Error("Could not load the bill.");
 
-  const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale: org.locale, trimZeros: true });
+  const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale, trimZeros: true });
   const due = balance.data?.due_minor ?? 0;
   const paid = balance.data?.paid_minor ?? 0;
-  const pet = inv.bookings?.pets?.name ?? "your pet";
+  // The WhatsApp message is for the parent, in the kennel's language for parents.
+  const p = parentI18n(org.parent_language, org.locale);
+  const pet = inv.bookings?.pets?.name ?? p.m.bill.yourPet;
   const link = `${origin}/inv/${inv.public_token}`;
   const editable = inv.status === "draft" && canManage;
   const decimal = (minor: number) => toDecimalString(minor).replace(/\.00$/, "");
 
   return (
     <>
-      <PageTitle title={inv.number ?? "Draft bill"}>
+      <PageTitle title={inv.number ?? m.bill.draftTitle}>
         <Link href="/app/bills" className={buttonStyles.quiet}>
-          All bills
+          {m.bill.allBills}
         </Link>
       </PageTitle>
 
       <div className="mb-5 space-y-1">
         <p className="flex flex-wrap items-center gap-2">
-          <Badge tone={inv.status === "void" ? "alert" : inv.status === "draft" ? "attention" : "neutral"}>{INVOICE_STATUS_LABEL[inv.status]}</Badge>
-          {inv.status === "issued" ? due > 0 ? <Badge tone="attention">{money(due)} due</Badge> : <Badge tone="good">Paid</Badge> : null}
-          {inv.is_tax_invoice ? <Badge>Tax invoice</Badge> : null}
+          <Badge tone={inv.status === "void" ? "alert" : inv.status === "draft" ? "attention" : "neutral"}>{m.labels.invoiceStatus[inv.status]}</Badge>
+          {inv.status === "issued" ? (
+            due > 0 ? (
+              <Badge tone="attention">{fill(m.bills.due, { amount: money(due) })}</Badge>
+            ) : (
+              <Badge tone="good">{m.bills.paid}</Badge>
+            )
+          ) : null}
+          {inv.is_tax_invoice ? <Badge>{m.bill.taxInvoice}</Badge> : null}
         </p>
         {inv.clients ? (
           <p className="text-lg">
@@ -93,61 +99,66 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
           </p>
         ) : null}
         <p className="text-slate">
-          {inv.issued_on ? `Issued ${formatDate(inv.issued_on)}. ` : ""}
+          {inv.issued_on ? `${fill(m.bill.issuedOn, { date: formatDate(inv.issued_on, locale) })} ` : ""}
           {inv.bookings ? (
             <Link href={`/app/bookings/${inv.bookings.id}`} className="underline underline-offset-4">
-              {inv.bookings.pets?.name ?? "The"} booking
+              {inv.bookings.pets?.name ? fill(m.bill.petBooking, { pet: inv.bookings.pets.name }) : m.bill.theBooking}
             </Link>
           ) : null}
         </p>
-        {inv.status === "void" && inv.void_reason ? <p className="text-slate">Cancelled: {inv.void_reason}</p> : null}
+        {inv.status === "void" && inv.void_reason ? <p className="text-slate">{fill(m.bill.cancelledBecause, { reason: inv.void_reason })}</p> : null}
       </div>
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
 
       {inv.status === "draft" ? (
-        <Section title="Next">
+        <Section title={m.bill.next}>
           <ActionForm action={issueBill} className="space-y-3">
             <input type="hidden" name="invoiceId" value={inv.id} />
-            <p>Check the bill, then issue it. Issuing gives it a number and freezes it.</p>
-            <SubmitButton pendingLabel="Issuing">Issue bill</SubmitButton>
+            <p>{m.bill.issueHint}</p>
+            <SubmitButton pendingLabel={m.bill.issuing}>{m.bill.issue}</SubmitButton>
           </ActionForm>
-          {canManage ? null : <p className="mt-2 text-sm text-slate">Only an owner or manager can change what a bill charges.</p>}
+          {canManage ? null : <p className="mt-2 text-sm text-slate">{m.bill.managersOnly}</p>}
         </Section>
       ) : null}
 
       {inv.status === "issued" && inv.clients ? (
-        <Section title="Send to the parent">
+        <Section title={m.bill.sendTitle}>
           <div className="flex flex-wrap gap-2">
             <a
               href={whatsappLink(
-                billMessage({
-                  kennelName: org.name,
-                  parentName: inv.clients.full_name,
-                  petName: pet,
-                  invoiceNumber: inv.number ?? "",
-                  dueMinor: Math.max(due, 0),
-                  currency: inv.currency,
-                  invoiceUrl: link,
-                }),
+                billMessage(
+                  p.m.whatsapp,
+                  {
+                    kennelName: org.name,
+                    parentName: inv.clients.full_name,
+                    petName: pet,
+                    invoiceNumber: inv.number ?? "",
+                    dueMinor: Math.max(due, 0),
+                    currency: inv.currency,
+                    invoiceUrl: link,
+                  },
+                  p.locale,
+                ),
                 inv.clients.phone,
               )}
               target="_blank"
               rel="noreferrer"
               className={buttonStyles.whatsapp}
             >
-              Send bill
+              {m.bill.send}
             </a>
-            <CopyButton text={link} />
+            <CopyButton text={link} words={m.copy} />
             <a href={link} target="_blank" rel="noreferrer" className={buttonStyles.quiet}>
-              Open it
+              {m.bill.openIt}
             </a>
           </div>
         </Section>
       ) : null}
 
-      <Section title="The bill">
+      <Section title={m.bill.linesTitle}>
         <InvoiceView
+          words={m}
           lines={lines.data.map((l) => ({
             description: l.description,
             sacCode: l.sac_code,
@@ -174,7 +185,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
             totalMinor: inv.total_minor,
           }}
           currency={inv.currency}
-          locale={org.locale}
+          locale={locale}
           taxMode={org.tax_mode}
           taxLabel={org.tax_label}
           showTax={inv.status === "draft" ? org.tax_mode !== "none" : inv.is_tax_invoice}
@@ -184,13 +195,18 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
                   const l = lines.data[i];
                   return (
                     <details className="mt-2">
-                      <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">Change</summary>
-                      <LineForm invoiceId={inv.id} index={i} line={{ description: l.description, quantity: String(Number(l.quantity)), price: decimal(l.unit_price_minor), discount: l.discount_minor ? decimal(l.discount_minor) : "" }} />
+                      <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">{m.common.change}</summary>
+                      <LineForm
+                        m={m}
+                        invoiceId={inv.id}
+                        index={i}
+                        line={{ description: l.description, quantity: String(Number(l.quantity)), price: decimal(l.unit_price_minor), discount: l.discount_minor ? decimal(l.discount_minor) : "" }}
+                      />
                       <ActionForm action={editLine} className="mt-2">
                         <input type="hidden" name="invoiceId" value={inv.id} />
                         <input type="hidden" name="index" value={i} />
-                        <SubmitButton name="intent" value="remove" variant="quiet" pendingLabel="Removing">
-                          Remove this line
+                        <SubmitButton name="intent" value="remove" variant="quiet" pendingLabel={m.common.removing}>
+                          {m.bill.removeLine}
                         </SubmitButton>
                       </ActionForm>
                     </details>
@@ -201,60 +217,65 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         />
         {editable ? (
           <details className="mt-3 rounded-xl border border-rule bg-paper p-4">
-            <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">Add a line</summary>
-            <LineForm invoiceId={inv.id} />
+            <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{m.bill.addLineTitle}</summary>
+            <LineForm m={m} invoiceId={inv.id} />
           </details>
         ) : null}
         {inv.status === "draft" && inv.booking_id ? (
           <ActionForm action={makeBill} className="mt-3">
             <input type="hidden" name="bookingId" value={inv.booking_id} />
-            <SubmitButton variant="quiet" pendingLabel="Rebuilding">
-              Rebuild from the booking
+            <SubmitButton variant="quiet" pendingLabel={m.bill.rebuilding}>
+              {m.bill.rebuild}
             </SubmitButton>
           </ActionForm>
         ) : null}
       </Section>
 
       {inv.status !== "draft" ? (
-        <Section title="Payments" count={payments.data.length}>
+        <Section title={m.bill.paymentsTitle} count={payments.data.length}>
           {payments.data.length === 0 ? (
-            <Empty>Nothing recorded yet. Check your bank or UPI app, then record what came in.</Empty>
+            <Empty>{m.bill.noPayments}</Empty>
           ) : (
             <Ledger>
-              {payments.data.map((p) => (
-                <LedgerRow key={p.id}>
+              {payments.data.map((x) => (
+                <LedgerRow key={x.id}>
                   <span className="min-w-0 flex-1">
-                    {formatDate(p.received_on)}, {PAYMENT_METHOD_LABEL[p.method]}
-                    {p.reference ? `, ${p.reference}` : ""}
-                    {p.note ? <span className="block text-sm text-slate">{p.note}</span> : null}
+                    {fill(x.reference ? m.bill.paymentWithReference : m.bill.payment, {
+                      date: formatDate(x.received_on, locale),
+                      method: m.labels.paymentMethod[x.method],
+                      reference: x.reference ?? "",
+                    })}
+                    {x.note ? <span className="block text-sm text-slate">{x.note}</span> : null}
                   </span>
-                  <span className={`font-semibold tabular-nums ${p.direction === "out" ? "text-alert" : ""}`}>
-                    {p.direction === "out" ? `Refund ${money(p.amount_minor)}` : money(p.amount_minor)}
+                  <span className={`font-semibold tabular-nums ${x.direction === "out" ? "text-alert" : ""}`}>
+                    {x.direction === "out" ? fill(m.bill.refund, { amount: money(x.amount_minor) }) : money(x.amount_minor)}
                   </span>
                 </LedgerRow>
               ))}
               <LedgerRow>
-                <span className="flex-1 font-bold">Paid {money(paid)}</span>
-                <span className="font-extrabold">{due > 0 ? `${money(due)} due` : due < 0 ? `${money(-due)} paid over` : "Nothing due"}</span>
+                <span className="flex-1 font-bold">{fill(m.bill.paidTotal, { amount: money(paid) })}</span>
+                <span className="font-extrabold">
+                  {due > 0 ? fill(m.bills.due, { amount: money(due) }) : due < 0 ? fill(m.bill.paidOver, { amount: money(-due) }) : m.bill.nothingDue}
+                </span>
               </LedgerRow>
             </Ledger>
           )}
           {inv.status === "issued" ? (
-            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : ""} today={todayIn(org.time_zone)} canRefund={canManage} />
+            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : ""} today={todayIn(org.time_zone)} canRefund={canManage} words={m} />
           ) : null}
         </Section>
       ) : null}
 
       {inv.status === "issued" && canManage ? (
-        <Section title="Cancel this bill">
+        <Section title={m.bill.cancelTitle}>
           <ActionForm action={voidBill} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="invoiceId" value={inv.id} />
-            <p className="text-slate">A cancelled bill keeps its number. Payments on it move to the next bill made for the same stay.</p>
-            <Field label="Why is it cancelled?">
+            <p className="text-slate">{m.bill.cancelHint}</p>
+            <Field label={m.bill.cancelWhy}>
               <Input name="reason" required maxLength={500} />
             </Field>
-            <SubmitButton variant="secondary" pendingLabel="Cancelling">
-              Cancel bill
+            <SubmitButton variant="secondary" pendingLabel={m.bill.cancelling}>
+              {m.bill.cancel}
             </SubmitButton>
           </ActionForm>
         </Section>
@@ -263,8 +284,8 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
       {inv.status === "draft" && canManage ? (
         <ActionForm action={deleteDraft}>
           <input type="hidden" name="invoiceId" value={inv.id} />
-          <SubmitButton variant="quiet" pendingLabel="Deleting">
-            Delete this draft
+          <SubmitButton variant="quiet" pendingLabel={m.bill.deleting}>
+            {m.bill.deleteDraft}
           </SubmitButton>
         </ActionForm>
       ) : null}
@@ -272,26 +293,39 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   );
 }
 
-function LineForm({ invoiceId, index, line }: { invoiceId: string; index?: number; line?: { description: string; quantity: string; price: string; discount: string } }) {
+function LineForm({
+  m,
+  invoiceId,
+  index,
+  line,
+}: {
+  m: Messages;
+  invoiceId: string;
+  index?: number;
+  line?: { description: string; quantity: string; price: string; discount: string };
+}) {
+  const w = m.bill.line;
   return (
     <ActionForm action={editLine} className="mt-3 space-y-3">
       <input type="hidden" name="invoiceId" value={invoiceId} />
       {index !== undefined ? <input type="hidden" name="index" value={index} /> : null}
-      <Field label="What">
+      <Field label={w.what}>
         <Input name="description" required maxLength={300} defaultValue={line?.description} />
       </Field>
       <div className="grid grid-cols-3 gap-3">
-        <Field label="How many">
+        <Field label={w.howMany}>
           <Input name="quantity" inputMode="decimal" required defaultValue={line?.quantity ?? "1"} />
         </Field>
-        <Field label="Price">
+        <Field label={w.price}>
           <Input name="price" inputMode="decimal" required defaultValue={line?.price} />
         </Field>
-        <Field label="Discount">
+        <Field label={w.discount}>
           <Input name="discount" inputMode="decimal" defaultValue={line?.discount} />
         </Field>
       </div>
-      <SubmitButton variant="secondary">{index !== undefined ? "Save line" : "Add line"}</SubmitButton>
+      <SubmitButton variant="secondary" pendingLabel={index !== undefined ? m.common.saving : m.common.adding}>
+        {index !== undefined ? w.save : w.add}
+      </SubmitButton>
     </ActionForm>
   );
 }

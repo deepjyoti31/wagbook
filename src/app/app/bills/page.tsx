@@ -1,27 +1,26 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Rich } from "@/components/rich";
 import { Badge, Empty, Loading, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { INVOICE_STATUS_LABEL } from "@/lib/billing";
 import { formatDate, formatMoney } from "@/lib/core";
+import { fill, plural } from "@/lib/i18n";
+import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Bills" };
+export const generateMetadata = () => appTitle((m) => m.bills.title);
 
 export default function BillsPage() {
   return (
-    <>
-      <PageTitle title="Bills" />
-      <Suspense fallback={<Loading label="Loading bills" />}>
-        <Bills />
-      </Suspense>
-    </>
+    <Suspense fallback={<Loading />}>
+      <Bills />
+    </Suspense>
   );
 }
 
 async function Bills() {
   const { org } = await requireOrg();
+  const { m, language, locale } = await getAppI18n();
   const supabase = await createClient();
   const [invoices, balances] = await Promise.all([
     supabase
@@ -35,7 +34,7 @@ async function Bills() {
   if (invoices.error || balances.error) throw new Error("Could not load bills.");
 
   const due = new Map(balances.data.map((b) => [b.invoice_id, b.due_minor ?? 0]));
-  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: org.locale, trimZeros: true });
+  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
   const unpaid = invoices.data.filter((i) => i.status === "issued" && (due.get(i.id) ?? 0) > 0);
   const drafts = invoices.data.filter((i) => i.status === "draft");
   const rest = invoices.data.filter((i) => !unpaid.includes(i) && !drafts.includes(i)).slice(0, 100);
@@ -46,16 +45,18 @@ async function Bills() {
     return (
       <li key={i.id}>
         <Link href={`/app/bills/${i.id}`} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-ground">
-          <span className="font-bold">{i.number ?? "Draft"}</span>
+          <span className="font-bold">{i.number ?? m.labels.invoiceStatus.draft}</span>
           <span className="min-w-0 flex-1">
             {i.clients?.full_name}
             {i.bookings?.pets?.name ? `, ${i.bookings.pets.name}` : ""}
           </span>
-          {i.status === "void" ? <Badge tone="alert">{INVOICE_STATUS_LABEL.void}</Badge> : null}
-          {i.status === "issued" && d <= 0 ? <Badge tone="good">Paid</Badge> : null}
-          {i.status === "issued" && d > 0 ? <Badge tone="attention">{money(d)} due</Badge> : null}
+          {i.status === "void" ? <Badge tone="alert">{m.labels.invoiceStatus.void}</Badge> : null}
+          {i.status === "issued" && d <= 0 ? <Badge tone="good">{m.bills.paid}</Badge> : null}
+          {i.status === "issued" && d > 0 ? <Badge tone="attention">{fill(m.bills.due, { amount: money(d) })}</Badge> : null}
           <span className="tabular-nums text-slate">{money(i.total_minor)}</span>
-          <span className="w-full text-sm text-slate">{i.issued_on ? formatDate(i.issued_on) : `Started ${formatDate(i.created_at.slice(0, 10))}`}</span>
+          <span className="w-full text-sm text-slate">
+            {i.issued_on ? formatDate(i.issued_on, locale) : fill(m.bills.started, { date: formatDate(i.created_at.slice(0, 10), locale) })}
+          </span>
         </Link>
       </li>
     );
@@ -64,19 +65,26 @@ async function Bills() {
 
   return (
     <>
+      <PageTitle title={m.bills.title} />
       <p className="mb-5 text-lg">
         {unpaid.length === 0 ? (
-          "Nothing is owed."
+          m.bills.nothingOwed
         ) : (
-          <>
-            <strong className="font-extrabold">{money(owed)}</strong> owed on {unpaid.length} {unpaid.length === 1 ? "bill" : "bills"}.
-          </>
+          <Rich text={plural(language, unpaid.length, m.bills.owedOn)} parts={{ amount: <strong className="font-extrabold">{money(owed)}</strong> }} />
         )}
       </p>
-      {invoices.data.length === 0 ? <Empty>No bills yet. Make one from a booking, usually at check-out.</Empty> : null}
-      {unpaid.length > 0 ? <Section title="Not paid yet" count={unpaid.length}>{list(unpaid)}</Section> : null}
-      {drafts.length > 0 ? <Section title="Drafts" count={drafts.length}>{list(drafts)}</Section> : null}
-      {rest.length > 0 ? <Section title="Recent">{list(rest)}</Section> : null}
+      {invoices.data.length === 0 ? <Empty>{m.bills.none}</Empty> : null}
+      {unpaid.length > 0 ? (
+        <Section title={m.bills.notPaid} count={unpaid.length}>
+          {list(unpaid)}
+        </Section>
+      ) : null}
+      {drafts.length > 0 ? (
+        <Section title={m.bills.drafts} count={drafts.length}>
+          {list(drafts)}
+        </Section>
+      ) : null}
+      {rest.length > 0 ? <Section title={m.bills.recent}>{list(rest)}</Section> : null}
     </>
   );
 }

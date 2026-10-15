@@ -1,34 +1,39 @@
 import { connection, type NextRequest } from "next/server";
 import { requireOrg } from "@/lib/auth";
-import { INVOICE_STATUS_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/billing";
-import { STATUS_LABEL } from "@/lib/bookings";
 import { diffDays, parseRange, toCsv, toDecimalString, type CsvValue } from "@/lib/core";
-import { DOWNLOADS, fetchAll, type Download } from "@/lib/reports";
+import { getAppI18n } from "@/lib/i18n-server";
+import { fetchAll, isDownload } from "@/lib/reports";
 import { createClient } from "@/lib/supabase/server";
 
 /**
  * CSV downloads for a spreadsheet or an accountant: bookings, bills, payments
  * or expenses for a period. Owners and managers only. Money is written in
- * currency units with two decimals (1250.00), dates as YYYY-MM-DD.
+ * currency units with two decimals (1250.00), dates as YYYY-MM-DD. Column
+ * names and words such as "Received" are in the reader's language
+ * (m.downloads); what people typed (a category, a note) is as they typed it.
  */
 export async function GET(request: NextRequest) {
   // Per request, always: without this the build could save a response made with no one signed in.
   await connection();
   const { org, canManage } = await requireOrg();
-  if (!canManage) return plain("Downloads are for owners and managers.", 403);
+  const { m } = await getAppI18n();
+  const words = m.downloads;
+  const c = words.columns;
+  const v = words.values;
+  if (!canManage) return plain(words.managersOnly, 403);
 
   const params = request.nextUrl.searchParams;
   const what = params.get("what");
-  if (!what || !(what in DOWNLOADS)) return plain("Choose what to download.", 400);
+  if (!isDownload(what)) return plain(words.chooseWhat, 400);
   const range = parseRange(params.get("from"), params.get("to"));
-  if (!range) return plain("Choose a period of 400 days or less, with the start before the end.", 400);
+  if (!range) return plain(words.choosePeriod, 400);
 
   const supabase = await createClient();
   const money = (minor: number | null | undefined) => (minor === null || minor === undefined ? null : toDecimalString(minor));
   let header: string[];
   let rows: CsvValue[][] | null;
 
-  switch (what as Download) {
+  switch (what) {
     case "bookings": {
       const data = await fetchAll((a, b) =>
         supabase
@@ -41,14 +46,31 @@ export async function GET(request: NextRequest) {
           .order("id")
           .range(a, b),
       );
-      header = ["First day", "Last day", "Kind", "Nights or days", "Status", "Pet", "Parent", "Phone", "Kennel", "Price each", "Discount", "Tax rate %", "Checked in", "Checked out", "Why cancelled", "Booked on"];
+      header = [
+        c.firstDay,
+        c.lastDay,
+        c.kind,
+        c.nightsOrDays,
+        c.status,
+        c.pet,
+        c.parent,
+        c.phone,
+        c.kennel,
+        c.priceEach,
+        c.discount,
+        c.taxRate,
+        c.checkedIn,
+        c.checkedOut,
+        c.whyCancelled,
+        c.bookedOn,
+      ];
       rows =
         data?.map((r) => [
           r.start_date,
           r.end_date,
-          r.kind === "daycare" ? "Day boarding" : "Boarding",
+          m.labels.bookingKind[r.kind],
           r.kind === "daycare" ? diffDays(r.start_date, r.end_date) + 1 : diffDays(r.start_date, r.end_date),
-          STATUS_LABEL[r.status],
+          m.labels.bookingStatus[r.status],
           r.pets?.name,
           r.clients?.full_name,
           r.clients?.phone,
@@ -80,7 +102,25 @@ export async function GET(request: NextRequest) {
         fetchAll((a, b) => supabase.from("invoice_balances").select("invoice_id, paid_minor, due_minor").eq("org_id", org.id).neq("status", "draft").order("invoice_id").range(a, b)),
       ]);
       const paid = new Map((balances ?? []).map((x) => [x.invoice_id, x]));
-      header = ["Number", "Date", "Status", "Billed to", "Phone", "GSTIN", "Place of supply", "Taxed value", "CGST", "SGST", "IGST", "Tax", "Round off", "Total", "Paid", "Due", "Why cancelled"];
+      header = [
+        c.number,
+        c.date,
+        c.status,
+        c.billedTo,
+        c.phone,
+        c.gstin,
+        c.placeOfSupply,
+        c.taxedValue,
+        c.cgst,
+        c.sgst,
+        c.igst,
+        c.tax,
+        c.roundOff,
+        c.total,
+        c.paid,
+        c.due,
+        c.whyCancelled,
+      ];
       rows =
         data && balances
           ? data.map((r) => {
@@ -89,7 +129,7 @@ export async function GET(request: NextRequest) {
               return [
                 r.number,
                 r.issued_on,
-                INVOICE_STATUS_LABEL[r.status],
+                m.labels.invoiceStatus[r.status],
                 buyer.name ?? r.clients?.full_name,
                 buyer.phone ?? r.clients?.phone,
                 buyer.tax_id,
@@ -121,17 +161,17 @@ export async function GET(request: NextRequest) {
           .order("id")
           .range(a, b),
       );
-      header = ["Date", "Received or refunded", "Amount", "How", "Reference", "Parent", "Phone", "Bill", "Note"];
+      header = [c.date, c.receivedOrRefunded, c.amount, c.how, c.reference, c.parent, c.phone, c.bill, c.note];
       rows =
         data?.map((r) => [
           r.received_on,
-          r.direction === "out" ? "Refunded" : "Received",
+          r.direction === "out" ? v.refunded : v.received,
           money(r.amount_minor),
-          PAYMENT_METHOD_LABEL[r.method],
+          m.labels.paymentMethod[r.method],
           r.reference,
           r.clients?.full_name,
           r.clients?.phone,
-          r.invoices?.number ?? "Advance",
+          r.invoices?.number ?? v.advance,
           r.note,
         ]) ?? null;
       break;
@@ -148,15 +188,22 @@ export async function GET(request: NextRequest) {
           .order("id")
           .range(a, b),
       );
-      header = ["Date", "What for", "Shop or person", "Note", "Amount", "Paid by", "Receipt kept"];
+      header = [c.date, c.whatFor, c.shopOrPerson, c.note, c.amount, c.paidBy, c.receiptKept];
       rows =
-        data?.map((r) => [r.spent_on, r.category, r.vendor, r.description, money(r.amount_minor), r.method ? PAYMENT_METHOD_LABEL[r.method] : null, Boolean(r.receipt_path)]) ??
-        null;
+        data?.map((r) => [
+          r.spent_on,
+          r.category,
+          r.vendor,
+          r.description,
+          money(r.amount_minor),
+          r.method ? m.labels.paymentMethod[r.method] : null,
+          r.receipt_path ? v.yes : v.no,
+        ]) ?? null;
       break;
     }
   }
 
-  if (!rows) return plain("The download could not be made. Try again.", 500);
+  if (!rows) return plain(words.failed, 500);
   return new Response(toCsv(header, rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { InvoiceView } from "@/components/invoice-view";
 import { PrintButton } from "@/components/print-button";
+import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Loading } from "@/components/ui";
 import { formatDate, formatMoney, GST_STATES, qrMatrix, qrSvgPath, upiLink, type ISODate } from "@/lib/core";
+import { fill } from "@/lib/i18n";
+import { parentI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
-
-export const metadata: Metadata = { title: "Your bill", robots: { index: false } };
 
 interface PublicLine {
   description: string;
@@ -26,6 +27,8 @@ interface PublicLine {
 }
 
 interface PublicInvoice {
+  /** The kennel's language for parents. */
+  language: string;
   number: string;
   status: "issued" | "void";
   issued_on: ISODate;
@@ -63,6 +66,20 @@ interface PublicInvoice {
   lines: PublicLine[];
 }
 
+/** The bill for a link, read once per request (the title and the page share it). Null when there is no such bill. */
+const loadInvoice = cache(async (token: string): Promise<PublicInvoice | null> => {
+  if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) return null;
+  const { data, error } = await createAnonClient().rpc("get_public_invoice", { p_token: token });
+  if (error || !data) return null;
+  return data as unknown as PublicInvoice;
+});
+
+/** The tab title in the kennel's language for parents. */
+export async function generateMetadata({ params }: PageProps<"/inv/[token]">): Promise<Metadata> {
+  const inv = await loadInvoice((await params).token);
+  return { title: parentI18n(inv?.language).m.invoice.title, robots: { index: false } };
+}
+
 /** The bill a parent opens from the link the kennel sent them. No sign-in. Prints as a clean A4 invoice. */
 export default function PublicInvoicePage({ params }: PageProps<"/inv/[token]">) {
   return (
@@ -75,18 +92,19 @@ export default function PublicInvoicePage({ params }: PageProps<"/inv/[token]">)
 }
 
 const lines = (...parts: (string | null | undefined)[]) => parts.filter((p) => p && p.trim()).join(", ");
-const stateName = (code: string | null) => (code ? `${GST_STATES[code] ?? "State"} (${code})` : null);
 
 async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
   const { token } = await params;
-  if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) notFound();
-  const { data, error } = await createAnonClient().rpc("get_public_invoice", { p_token: token });
-  if (error || !data) notFound();
-  const inv = data as unknown as PublicInvoice;
+  const inv = await loadInvoice(token);
+  if (!inv) notFound();
+  // In the kennel's language for parents. The function does not return the kennel's locale, so amounts and dates use India's.
+  const { m, locale } = parentI18n(inv.language);
+  const w = m.invoice;
 
-  const money = (minor: number) => formatMoney(minor, { currency: inv.currency });
+  const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale });
   const due = inv.status === "issued" ? inv.total_minor - Number(inv.paid_minor) : 0;
   const gst = inv.seller.tax_mode === "gst_india";
+  const stateName = (code: string | null) => (code ? fill(w.stateWithCode, { state: GST_STATES[code] ?? w.unknownState, code }) : null);
 
   // A pay link and QR code for what is still owed, to the UPI ID frozen on the bill.
   let pay: { link: string; qr: { d: string; size: number } } | null = null;
@@ -99,6 +117,8 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
     }
   }
 
+  const sellerTaxId = inv.seller.tax_id ? <span className="font-semibold">{inv.seller.tax_id}</span> : null;
+
   return (
     <article className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -107,43 +127,46 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
           {inv.seller.trade_name && inv.seller.trade_name !== inv.seller.name ? <p>{inv.seller.name}</p> : null}
           <p className="text-slate">{lines(inv.seller.address_line1, inv.seller.address_line2, inv.seller.city, inv.seller.state, inv.seller.postal_code)}</p>
           <p className="text-slate">{lines(inv.seller.phone, inv.seller.email)}</p>
-          {inv.is_tax_invoice && inv.seller.tax_id ? (
+          {inv.is_tax_invoice && sellerTaxId ? (
             <p>
-              {gst ? "GSTIN" : "Tax number"}: <span className="font-semibold">{inv.seller.tax_id}</span>
-              {gst && inv.seller.gst_state_code ? `. State: ${stateName(inv.seller.gst_state_code)}` : ""}
+              <Rich
+                text={gst ? (inv.seller.gst_state_code ? w.sellerGstinState : w.sellerGstin) : w.sellerTaxNumber}
+                parts={{ id: sellerTaxId, state: stateName(inv.seller.gst_state_code) }}
+              />
             </p>
           ) : null}
         </div>
         <div className="text-right">
-          <h1 className="text-2xl font-extrabold tracking-tight">{inv.is_tax_invoice ? "Tax invoice" : "Bill"}</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">{inv.is_tax_invoice ? w.taxInvoice : w.bill}</h1>
           <p className="font-semibold">{inv.number}</p>
-          <p className="text-slate">{formatDate(inv.issued_on)}</p>
+          <p className="text-slate">{formatDate(inv.issued_on, locale)}</p>
         </div>
       </header>
 
       {inv.status === "void" ? (
         <p role="status" className="rounded-lg border-2 border-alert bg-alert-soft px-4 py-3 font-bold text-alert">
-          This bill was cancelled. Nothing is due on it.
+          {w.cancelled}
         </p>
       ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
-          <h2 className="font-bold">Billed to</h2>
+          <h2 className="font-bold">{w.billedTo}</h2>
           <p>{inv.buyer.name}</p>
           <p className="text-slate">{lines(inv.buyer.address, inv.buyer.city, inv.buyer.postal_code)}</p>
           <p className="text-slate">{inv.buyer.phone}</p>
-          {inv.buyer.tax_id ? <p>GSTIN: {inv.buyer.tax_id}</p> : null}
+          {inv.buyer.tax_id ? <p>{fill(w.buyerGstin, { id: inv.buyer.tax_id })}</p> : null}
         </div>
         {inv.is_tax_invoice && gst ? (
           <div>
-            <h2 className="font-bold">Place of supply</h2>
+            <h2 className="font-bold">{w.placeOfSupply}</h2>
             <p>{stateName(inv.place_of_supply_state_code)}</p>
           </div>
         ) : null}
       </section>
 
       <InvoiceView
+        words={m}
         lines={inv.lines.map((l) => ({
           description: l.description,
           sacCode: l.sac_code,
@@ -170,6 +193,7 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
           totalMinor: inv.total_minor,
         }}
         currency={inv.currency}
+        locale={locale}
         taxMode={inv.seller.tax_mode}
         taxLabel={inv.seller.tax_label}
         showTax={inv.is_tax_invoice}
@@ -178,21 +202,21 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
       {inv.status === "issued" ? (
         <section className="rounded-xl border border-rule bg-paper px-4 py-3">
           <p className="flex flex-wrap items-center justify-between gap-2 text-lg">
-            <span>Paid {money(Number(inv.paid_minor))}</span>
-            {due > 0 ? <Badge tone="attention">{money(due)} due</Badge> : <Badge tone="good">Paid in full</Badge>}
+            <span>{fill(w.paid, { amount: money(Number(inv.paid_minor)) })}</span>
+            {due > 0 ? <Badge tone="attention">{fill(w.due, { amount: money(due) })}</Badge> : <Badge tone="good">{w.paidInFull}</Badge>}
           </p>
         </section>
       ) : null}
 
       {pay ? (
         <section className="flex flex-col items-center gap-3 rounded-xl border border-rule bg-paper p-4 text-center">
-          <h2 className="text-lg font-bold">Pay {money(due)} by UPI</h2>
+          <h2 className="text-lg font-bold">{fill(w.payByUpi, { amount: money(due) })}</h2>
           <a href={pay.link} className={`${buttonStyles.primary} no-print w-full sm:hidden`}>
-            Pay with UPI
+            {w.payWithUpi}
           </a>
           <svg
             role="img"
-            aria-label={`QR code to pay ${money(due)} by UPI`}
+            aria-label={fill(w.qrLabel, { amount: money(due) })}
             viewBox={`0 0 ${pay.qr.size} ${pay.qr.size}`}
             className="h-56 w-56 text-ink"
             shapeRendering="crispEdges"
@@ -200,16 +224,14 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
             <rect width={pay.qr.size} height={pay.qr.size} fill="var(--color-paper)" />
             <path d={pay.qr.d} fill="currentColor" />
           </svg>
-          <p className="text-sm text-slate">
-            Scan with any UPI app. To {inv.upi?.payee_name} ({inv.upi?.vpa}). The kennel marks the bill paid once the money reaches them.
-          </p>
+          <p className="text-sm text-slate">{fill(w.scanHint, { payee: inv.upi?.payee_name ?? "", vpa: inv.upi?.vpa ?? "" })}</p>
         </section>
       ) : null}
 
       {inv.notes ? <p className="whitespace-pre-line text-slate">{inv.notes}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <PrintButton />
+        <PrintButton label={m.common.print} />
       </div>
     </article>
   );
