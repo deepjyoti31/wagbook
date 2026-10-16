@@ -670,16 +670,26 @@ test("pages run only their own scripts: an injected script is refused", async ({
 test("too many sign-in tries from one address are slowed down", async ({ page }) => {
   await page.context().setExtraHTTPHeaders({ "x-real-ip": "203.0.113.77" });
   await page.goto("/login");
-  // A short password is refused by the app before Supabase is asked, so only the app's limit is in play.
-  await page.locator("input[name=password]").evaluate((el) => el.removeAttribute("minlength"));
-  for (let i = 0; i < 20; i++) {
+  const password = page.getByLabel("Password");
+  // One try, counted only once its post has been answered. On a slow machine the
+  // first click can come before the page's scripts, and the form then posts and
+  // reloads the old way, so each try also takes the 8 character minimum off again:
+  // a short password is refused by the app before Supabase is asked, so only the
+  // app's limit is in play.
+  async function tryShortPassword() {
+    await password.evaluate((el) => el.removeAttribute("minlength"));
     await page.getByLabel("Email").fill("someone@example.test");
-    await page.getByLabel("Password").fill("short");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await password.fill("short");
+    await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/login"),
+      page.getByRole("button", { name: "Sign in" }).click(),
+    ]);
+  }
+  for (let i = 0; i < 20; i++) {
+    await tryShortPassword();
     await expect(page.getByText(en.auth.errors.passwordShort)).toBeVisible();
   }
-  await page.getByLabel("Password").fill("short");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await tryShortPassword();
   await expect(page.getByText(en.errors.slowDown)).toBeVisible();
 });
 
