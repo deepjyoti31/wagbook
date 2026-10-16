@@ -87,6 +87,7 @@ export const bookingsArea: typeof English = {
     },
     change: {
       title: "ಈ ಬುಕಿಂಗ್ ಬದಲಿಸಿ",
+      kindHint: "ಬೋರ್ಡಿಂಗ್‌ಗೆ ಪ್ರತಿ ರಾತ್ರಿ, ಡೇ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಪ್ರತಿ ದಿನ ದರ. ಇದನ್ನು ಬದಲಿಸಿದರೆ ಕೆಳಗಿನ ದರವನ್ನೂ ನೋಡಿ.",
       firstDay: "ಮೊದಲ ದಿನ",
       lastDay: "ಕೊನೆಯ ದಿನ",
       checkInDate: "ಚೆಕ್ ಇನ್ ದಿನಾಂಕ",

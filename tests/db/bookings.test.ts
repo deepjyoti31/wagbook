@@ -297,6 +297,19 @@ describe("only owners and managers decide what a stay costs", () => {
     expect(row.rows[0].end_date).toBe("2027-10-13");
   });
 
+  it("lets a manager turn boarding into day boarding, and then holds the kennel the day-boarding way", async () => {
+    const id = await book(db, k, { pet: k.pets[0], start: "2028-02-01", end: "2028-02-02", kennel: k.kennels[0] }, manager);
+    // As boarding the stay leaves on 2 February, so another pet may arrive in that kennel that day.
+    const next = await book(db, k, { pet: k.pets[1], start: "2028-02-02", end: "2028-02-04", kennel: k.kennels[0] }, manager);
+    // As day boarding it would hold the kennel all of the 2nd too, which that pet now has.
+    const e = await errorOf(() => as(db, user(manager), () => db.query("update public.bookings set kind = 'daycare', rate_minor = 72000 where id = $1", [id])));
+    expect(e.message).toContain("bookings_no_kennel_overlap");
+    await as(db, user(manager), () => db.query("update public.bookings set status = 'cancelled', cancel_reason = 'Test' where id = $1", [next]));
+    await as(db, user(manager), () => db.query("update public.bookings set kind = 'daycare', rate_minor = 72000 where id = $1", [id]));
+    const row = await db.query<{ kind: string }>("select kind from public.bookings where id = $1", [id]);
+    expect(row.rows[0].kind).toBe("daycare");
+  });
+
   it("lets a manager set any price and discount, and records the change in the audit log", async () => {
     const id = await book(db, k, { pet: k.pets[2], start: "2027-11-01", end: "2027-11-04", rate: 99900 }, manager);
     await as(db, user(manager), () => db.query("update public.bookings set rate_minor = 110000, discount_minor = 5000 where id = $1", [id]));

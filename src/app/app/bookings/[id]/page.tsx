@@ -379,6 +379,14 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         <Section title={w.change.title}>
           <ActionForm action={updateBooking} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="bookingId" value={b.id} />
+            {canManage ? (
+              <Field label={m.newBooking.stay} hint={w.change.kindHint}>
+                <Select name="kind" defaultValue={b.kind}>
+                  <option value="boarding">{m.newBooking.boarding}</option>
+                  <option value="daycare">{m.newBooking.daycare}</option>
+                </Select>
+              </Field>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={b.kind === "daycare" ? w.change.firstDay : w.change.checkInDate}>
                 <Input name="startDate" type="date" required defaultValue={b.start_date} />

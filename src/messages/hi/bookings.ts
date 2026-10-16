@@ -77,6 +77,7 @@ export const bookingsArea: typeof English = {
     },
     change: {
       title: "यह बुकिंग बदलें",
+      kindHint: "बोर्डिंग का दाम हर रात, डे बोर्डिंग का हर दिन। इसे बदलें तो नीचे दाम भी देख लें।",
       firstDay: "पहला दिन",
       lastDay: "आखिरी दिन",
       checkInDate: "चेक इन की तारीख",

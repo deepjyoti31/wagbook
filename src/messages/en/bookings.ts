@@ -85,6 +85,7 @@ export const bookingsArea = {
     },
     change: {
       title: "Change this booking",
+      kindHint: "Per night for boarding, per day for day boarding. Check the price below when you change it.",
       firstDay: "First day",
       lastDay: "Last day",
       checkInDate: "Check-in date",
