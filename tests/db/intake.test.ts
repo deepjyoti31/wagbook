@@ -31,7 +31,7 @@ beforeAll(async () => {
 afterAll(() => db.close());
 
 const submit = (payload: unknown, s = slug) =>
-  as(db, anon, () => db.query<{ ok: boolean }>("select public.submit_intake($1, $2::jsonb) as ok", [s, JSON.stringify(payload)]));
+  as(db, anon, () => db.query<{ ok: { folder: string; upload_token: string } }>("select public.submit_intake($1, $2::jsonb) as ok", [s, JSON.stringify(payload)]));
 
 describe("the public intake form", () => {
   it("tells an anonymous visitor only what the form page needs", async () => {
@@ -46,7 +46,9 @@ describe("the public intake form", () => {
   });
 
   it("stores a submission with the consent wording, without creating any client", async () => {
-    expect((await submit(form())).rows[0].ok).toBe(true);
+    const sent = (await submit(form())).rows[0].ok;
+    expect(sent.folder).toMatch(new RegExp(`^${k.org}/intake/[0-9a-f-]{36}$`));
+    expect(sent.upload_token).toMatch(/^[0-9a-f]{64}$/);
     const sub = await db.query<{ status: string; parent_phone: string; consent_text: string; requested_start: string }>(
       "select status, parent_phone, consent_text, requested_start::text from public.intake_submissions where org_id = $1",
       [k.org],

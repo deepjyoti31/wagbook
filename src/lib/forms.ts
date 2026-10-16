@@ -21,3 +21,12 @@ export function checked(form: FormData, name: string): boolean {
   const value = form.get(name);
   return value === "on" || value === "true";
 }
+
+/** What the form that turns on two-step sign-in holds between its two steps. */
+export interface TwoStepSetup extends FormState {
+  factorId?: string;
+  /** The picture to scan, as Supabase Auth returns it (an SVG data URL). */
+  qr?: string;
+  /** The same secret as text, for typing in by hand. */
+  secret?: string;
+}

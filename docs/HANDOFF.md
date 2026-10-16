@@ -2,22 +2,19 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 15 October 2026, after milestone M8.
+Last updated: 15 October 2026, after milestones M9 and M10.
 
 ## In one paragraph
 
-The database for the whole product exists, with its rules enforced and tested (159 database tests, 97 unit tests).
-Built: M2 (bookings), M3 (the care round and play), M4 (bills, payments, the parent's bill with a UPI QR code, printing),
-M5 (photos: pet photos on every row, updates with photos, photos on the stay page, certificates), M6 (pet and parent
-pages, search by parent and phone, vaccination warnings, incidents, people with invitation links, merging parents) and
-M7 (reports, expenses with receipts, CSV downloads, the history of changes) and M8 (every word in message files;
-English, Hindi and Kannada, each person choosing their own and each kennel choosing its parents'; Today and Care open
-offline and ticks made offline are sent later; a daily summary on WhatsApp). The whole day, from booking to a paid bill
-and a photo the parent sees, plus a new colleague joining through a link, the owner reading the month's numbers, a
-manager working in Hindi, a parent reading a stay in Kannada and a task ticked with no connection, is walked in a real
-browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 29 of 29 pass; also green in CI). **The
-Hindi and Kannada are first drafts** written without a native speaker; see "Translations waiting for a native speaker". What has still never happened is a **hosted** Supabase project:
-the setup guide, real sign-up email and production settings. That is what is left of M1.
+Every milestone on the roadmap is built: M2 to M8 (bookings, care, bills, photos, pets and people, reports, languages,
+offline), M9 (a script policy with nonces, rate limits, two-step sign-in enforced by the database, downloading and
+erasing a parent's details, certificates on the intake form, a backup and restore drill, a second security review) and
+M10 (running it on your own server with Docker Compose, a public demo that resets nightly, templates, code of conduct,
+changelog, release process, and a guide for kennel owners with pictures). The database rules are tested in-process (176
+database tests, 114 unit tests), and the whole day is walked in a real browser at 360 pixels wide against a **local**
+Supabase (`npm run test:e2e`, 33 tests). What has still never happened: a **hosted** Supabase project (the rest of M1),
+a real phone, and a server for the public demo. **The Hindi and Kannada are first drafts.** The licence (M10, item 5)
+waits for the owner.
 
 ## What is verified, and how
 
@@ -43,7 +40,10 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | CSV files: quoting, CRLF, byte order mark, formula-looking text defused; month arithmetic; the history in words | `src/lib/core/reports.test.ts`, `src/lib/history.test.ts` | High |
 | Generated types and reference docs match the migrations | `tests/db/generated.test.ts` | High |
 | The signed-in screens work through PostgREST, real Auth and real Storage | `npm run test:e2e` against the local Supabase: sign in, check in with checklist, double booking refused with the right sentence, staff sees no price box, family request then confirm, extend an overstay, care round with a double tap, plan and tick play, cancel with a reason, parent intake form in a private window then accept and book, stay page in a private window, manager price change and extra, calendar books from an empty square, sign up, create a kennel, add kennels, invite, join, switch, sign out, an advance, check out then make, issue and pay a bill (the parent sees the QR and then "Paid in full"), a manager edits a draft bill, a pet photo and an update with a photo seen by the parent, a vaccination with a PDF certificate, search by phone and parent name, a pet's details changed and a high incident shown on Today until dealt with, a parent's details changed and a duplicate merged in, a new person joining through an invitation link then suspended and restored, an expense with a receipt (staff refused reports, expenses, history and downloads), the month's report and all four downloads, the history filtered to one person's booking changes | High for the local stack |
-| Every screen at 360 pixels wide, no sideways scroll, no browser errors | In English, Hindi and Kannada (M8). Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search, Reports, Expenses, History of changes | Medium: desktop Chromium at phone size, not a phone |
+| Every screen at 360 pixels wide, no sideways scroll, no browser errors | In English, Hindi and Kannada (M8). Screenshots of Today, Bookings, booking page (staff and manager), New booking, Calendar, Care, Play, More, Daily routines, Play yards, Extras, Peak periods, Bills, a bill, the parent's bill, Write update, the stay page with photos, a pet, an incident, a parent, People, search, Reports, Expenses, History of changes. M9 and M10 (15 October 2026): the sign-in code page,
+two-step sign-in (set up with the picture, and on), the parent page's export and erase section, the intake form with a
+certificate field (English and Kannada), More in Hindi, the demo sign-in page; and the fourteen pictures in
+`docs/guide/` | Medium: desktop Chromium at phone size, not a phone |
 | Each person's language is theirs alone, in every kennel they work at; parents' language set by owners and managers; the consent wording stored in the language the parent read | `tests/db/languages.test.ts`; the own-rows rule removed once to see its test fail | High |
 | Every message exists in all three languages with the same placeholders; every database error code has a sentence | `src/messages/messages.test.ts`, `src/lib/errors.test.ts` | High for completeness, none for quality (see below) |
 | Language plumbing: placeholders, plurals by each language's rule, Accept-Language, values in bold | `src/lib/i18n.test.ts` | High |
@@ -52,6 +52,15 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | Ticks made offline: kept once however often tapped, cleaned of junk, sent and forgotten | `src/lib/offline-ticks.test.ts`; end-to-end: tick with no connection, see "not sent yet", reconnect, see it sent | High |
 | Service worker: Today and Care open with no connection, scripts included; other pages show the offline page; the sign-in page forgets the copies | End-to-end, with every request to the site cut off | High in Chromium |
 | Daily summary text | `src/lib/core/core.test.ts`; end-to-end checks the WhatsApp link | High |
+| Pages run only the app's own scripts: fresh nonce per request, the shell's two inline scripts by hash, an injected script refused, no browser errors on the main screens | `src/lib/csp.test.ts` (fails if React or Next.js change how they write those scripts); end-to-end; and the Docker image behind Caddy | High in Chromium |
+| Rate limits: the 21st sign-in post from one address in ten minutes gets the sentence, not the database; forged `X-Real-IP` and `X-Forwarded-For` do not help behind Caddy | `src/lib/rate-limit.test.ts`; end-to-end; 22 forged tries through the Compose stack | High on one server |
+| Two-step sign-in: a password-only session reaches no kennel, no membership, no own-membership function (`WB005`), and cannot enrol a new authenticator, through the API; turning on, signing in with the code, turning off | `tests/db/privacy.test.ts` (the rule removed once to see it fail); end-to-end with real Supabase Auth and a computed TOTP code, plus a direct Supabase client as the thief | High |
+| Export and erase: owners and managers only, another kennel gets "not found", refused while in house or still to come; afterwards only bills, payments and bare stays remain, no personal text in the history, the record stays hidden, the phone number is free | `tests/db/privacy.test.ts` (the history redaction removed once to see it fail); end-to-end: a downloaded export, then erasure, then the certificate file gone from real Storage | High |
+| Certificates on the intake form: one per pet, only with the form's own secret, only for an hour and while waiting, cannot be read back, replaced or removed; staff see them and accepting puts them on the vaccinations | `tests/db/privacy.test.ts` (the hour removed once to see it fail); end-to-end through real Storage | High |
+| Races 6 and 16 from the first review | `scripts/race-checks.sh` with two live sessions on the local Supabase's Postgres 17 | High |
+| Backup and restore: 61 tables, invoice numbering, 90 policies, 24 tables with row level security, 6 public functions, 75 triggers and every file survive a dump and restore | `scripts/backup-drill.sh` on the local Supabase | High locally; the hosted round trip not done |
+| The Docker image and `deploy/compose.yml` with Caddy: both addresses, sign-in, main screens, demo notices | Built and run here against the CLI's Supabase (`docs/14-self-hosting.md`, "What has been verified") | High for that setup |
+| `deploy/demo-reset.sh` | Run against the local Supabase | Medium |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -69,17 +78,29 @@ the setup guide, real sign-up email and production settings. That is what is lef
 | Photos from a real phone camera (HEIC on iPhone, very large photos, rotation) | Tested with a JPEG made in the browser | The browser redraws photos the right way up; a format the browser cannot read is refused with a sentence |
 | Send update, Send confirmation, the intake link on WhatsApp | Only the link is built; WhatsApp was not opened | Low: the functions are unit tested |
 | Storage upload paths and policies in use | No screen uses storage yet | Covered structurally by tests only |
-| The Claude Code cloud SessionStart hook | Not checked this session | If it fails, run `npm ci` by hand |
+| The Claude Code cloud SessionStart hook | Not checked this session. This session found `node_modules` incomplete (`jsqr`, `qrcode-generator`, `@playwright/test` missing) and ran `npm ci` | If `npm run check` fails on missing modules, run `npm ci` |
+| Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
+| The public demo running somewhere | No server | `deploy/demo-reset.sh` was tried locally only |
+| The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
+| Rate limits on Vercel | Each copy of the app counts on its own | Add a Vercel Firewall rule (`10`, "Rate limits") |
+| Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
+| An independent security review of M9 | The second review was Claude Code's own pass | Have a person outside the project review before a public instance |
 
 ## Do this next
 
 1. **Finish M1** (needs the owner): create a development Supabase project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
-   email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job.
-2. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone. Fix words in
-   `src/messages/hi/` and `src/messages/kn/` (and the consent wording in `default_intake_notice()`, the offline page
-   `public/offline.html`, and the error page `src/app/error.tsx`). The list below is where the drafts were least sure.
-3. **Then M9, hardening and privacy tools** ([08-roadmap.md](08-roadmap.md)).
+   email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job. Check
+   the script policy header and the rate limits on the hosted deploy (`10`, "Looking after it").
+2. **Decide the licence** (M10, item 5; D2) and the code of conduct's contact address, before any public announcement.
+3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
+4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
+5. **Put up the public demo** on its own small server ([14-self-hosting.md](14-self-hosting.md), "The public demo"),
+   and link it from the README.
+6. **Ask a person outside the project for a security review**, and take the erasure rules (D25) and question 8 in `06`
+   to a lawyer and an accountant.
+
+After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -88,7 +109,13 @@ hand):
 dockerd > /tmp/dockerd.log 2>&1 &          # only if the Docker daemon is not running
 SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io npx -y supabase@2.120.0 start   # docker.io if the default registry refuses
 npm run test:e2e
+bash scripts/race-checks.sh
+bash scripts/backup-drill.sh
 ```
+
+If Docker Hub answers "429 Too Many Requests" for an image (the Node or Caddy image for `docker build`), pull it from
+Google's mirror and retag it: `docker pull mirror.gcr.io/library/node:22-alpine && docker tag
+mirror.gcr.io/library/node:22-alpine node:22-alpine`.
 
 ## Migration freeze
 
@@ -105,6 +132,9 @@ migration. Add new files."
 | Should the reference kennel be named in `13-reference-deployment.md`? | That file | Unnamed. |
 | Where the public repository lives, and under which GitHub account or organisation | | Private for now |
 | Whether a bill may be in Hindi or Kannada (question 9 for the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md) | Bills say "Tax invoice" in English with the translation in brackets |
+| The contact address for the code of conduct (and so for conduct reports) | `CODE_OF_CONDUCT.md`, "Contact" | None yet: set one before the first public release |
+| Whether owners must use two-step sign-in, rather than be reminded | D24 | Reminded, not forced |
+| Where the public demo runs, and who pays for it | [14-self-hosting.md](14-self-hosting.md) | Not running |
 | Invoice prefix and the GST questions | [06-billing-and-gst.md](06-billing-and-gst.md), "Questions to take to an accountant" | Tax off, prefix `WB` |
 
 Decided: only owners and managers set or change a price (D15), extended to bills in M4.
@@ -124,6 +154,10 @@ parents see (intake form, stay page, bill, WhatsApp messages). The drafts were l
 - **Kannada:** tax words (ಟ್ಯಾಕ್ಸ್ or ತೆರಿಗೆ, used both ways), place of supply, issue a bill (ನೀಡು or ಇಶ್ಯೂ ಮಾಡು),
   extend (ಹೆಚ್ಚಿಸಿ or ವಿಸ್ತರಿಸಿ), routine (ರೂಟೀನ್ or ದಿನಚರಿ), undo (ಹಿಂಪಡೆಯಿರಿ or ಅನ್‌ಡೂ), cash (ಕ್ಯಾಶ್ or ನಗದು),
   decline (ತಿರಸ್ಕರಿಸಿ may be too formal), and "Pets" in the bottom bar, shortened to ಪ್ರಾಣಿಗಳು to fit.
+
+Drafted in M9 and M10, also unchecked: the two-step sign-in screens (दो-चरण साइन इन, ಎರಡು ಹಂತದ ಸೈನ್ ಇನ್), the
+words for "authenticator app" (kept close to English in both), "erase" (मिटाएं, ಅಳಿಸಿ), the export and erase section
+of the parent page, the certificate field on the intake form, the rate limit sentence, and the demo notices.
 
 ## Open questions
 
@@ -163,6 +197,14 @@ Product behaviours that were chosen as the simplest thing and may need the owner
   disappears from the earlier month's figure. Is that what the accountant wants for GST returns, or should a
   cancellation show in the month it happened? (A question for the accountant.)
 - "Received less spent" is money in and out in the month, not profit: it ignores what is owed and when bills fall.
+- Erasing a parent keeps their issued bills, payments and the stays' dates and prices, and empties everything else
+  (D25). Is that what the DPDP Act and GST law ask, no more and no less? (For a lawyer.)
+- Erasing also deletes the pets' incidents. A bite incident might matter to the kennel later. Keep incidents, emptied of
+  names, instead?
+- Two-step sign-in has no recovery codes; a lost phone needs an administrator (`10`). Enough for a small kennel?
+- The intake form accepts one certificate per pet. Some parents have two cards (rabies, and the yearly shot).
+- The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
+  signs in from one connection at shift change should not reach 20; tell us if it does.
 
 ## Known rough edges in what is built
 
@@ -189,22 +231,34 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
 - History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
-  rows; other ids read "a record no longer here".
+  rows; other ids read "a record no longer here". An erasure shows as a change to "clients".
+- An erased parent and their pets appear as "Erased" (stored in English) where a past stay or bill names them.
+- The export names photos and certificates by their storage paths; it does not include the files.
+- A certificate sent with the intake form is lost if the form arrives but the upload fails: the parent is told to send
+  it on WhatsApp.
+- On the two-step page, after the first code is accepted, the page redraws in its "on" state, so the longer "have your
+  phone with you" sentence is not seen (the "on" panel says to keep the app instead).
+- `scripts/race-checks.sh` and `scripts/backup-drill.sh` need the local Supabase, so they are not part of
+  `npm run check` or CI.
 
 ## How to check the state yourself
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 256 tests, build
+npm run check        # dash check, lint, typecheck, 290 tests, build
 ```
 
-All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e` (see
-above).
+All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
+`scripts/race-checks.sh` and `scripts/backup-drill.sh` (see above).
 
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 15 October 2026. M9 (script policy with nonces and hashes, rate limits, two-step sign-in in the database, export and
+  erase, intake certificates, backup drill, second review with races 6 and 16 staged) and M10 (Docker image and
+  Compose with Caddy, public demo mode and nightly reset, templates, code of conduct, changelog, releasing, owner's
+  guide with pictures); e2e walk extended to 33 tests.
 - 15 October 2026. M8 (every word in message files, by five helpers working in parallel; Hindi and Kannada drafts
   by six translators; each person's language and the parents' language; ticks saved offline; a service worker for
   Today and Care; the daily summary); e2e walk extended to 29 tests.

@@ -38,10 +38,16 @@ export async function createClient() {
  * With `stayToken`, every request carries the stay's secret in the
  * x-wagbook-stay header. Storage passes it to the database, where
  * stay_media_visible() lets that one stay's shared photos be read.
+ * With `intakeToken`, the secret of an intake form just sent goes in the
+ * x-wagbook-intake header, and intake_upload_allowed() lets its certificates
+ * be added.
  */
-export function createAnonClient(opts: { stayToken?: string } = {}) {
+export function createAnonClient(opts: { stayToken?: string; intakeToken?: string } = {}) {
+  const headers: Record<string, string> = {};
+  if (opts.stayToken) headers["x-wagbook-stay"] = opts.stayToken;
+  if (opts.intakeToken) headers["x-wagbook-intake"] = opts.intakeToken;
   return createPlainClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: opts.stayToken ? { headers: { "x-wagbook-stay": opts.stayToken } } : undefined,
+    global: Object.keys(headers).length > 0 ? { headers } : undefined,
   });
 }

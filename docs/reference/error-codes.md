@@ -17,13 +17,15 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB040 to WB049 | The public intake form |
 | WB050 to WB059 | Bills and payments (continued) |
 | WB060 to WB069 | Reports and expenses |
+| WB070 to WB079 | A parent's details: export and erase |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
 | `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
-| `WB003` | invoice not found<br>submission not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql` |
+| `WB003` | invoice not found<br>submission not found<br>parent not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
+| `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
 | `WB010` | unknown time zone "%" | `20261008000100_foundation.sql` |
 | `WB011` | a kennel must keep at least one active owner | `20261008000100_foundation.sql` |
 | `WB012` | you already own the maximum number of kennels | `20261008000100_foundation.sql` |
@@ -63,3 +65,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
+| `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |
+| `WB071` | a pet of this parent is in the kennel now. Check it out first. | `20261008001100_privacy.sql` |
+| `WB072` | this parent has stays still to come. Cancel them first. | `20261008001100_privacy.sql` |
+| `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |

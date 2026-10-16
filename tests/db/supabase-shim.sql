@@ -60,6 +60,26 @@ as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
 
+-- The whole set of claims, as Supabase's auth.jwt() returns it. Tests set
+-- request.jwt.claims to '{"aal":"aal2"}' to act as a session that has given
+-- its two-step code.
+create function auth.jwt()
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(nullif(current_setting('request.jwt.claim', true), ''), nullif(current_setting('request.jwt.claims', true), ''))::jsonb;
+$$;
+
+-- Supabase Auth's two-step sign-in factors (only the columns Wagbook reads).
+create table auth.mfa_factors (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  factor_type text not null default 'totp',
+  status text not null default 'unverified',
+  created_at timestamptz not null default now()
+);
+
 create table storage.buckets (
   id text primary key,
   name text not null,
@@ -73,12 +93,15 @@ create table storage.objects (
   bucket_id text references storage.buckets (id),
   name text not null,
   owner uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- As on Supabase: one file per name in a bucket.
+  unique (bucket_id, name)
 );
 alter table storage.objects enable row level security;
 
 grant usage on schema public, extensions, auth, storage to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+grant execute on function auth.jwt() to anon, authenticated, service_role;
 -- As on Supabase: both API roles reach storage.objects, and the policies decide.
 grant select, insert, update, delete on storage.objects to anon, authenticated;
 

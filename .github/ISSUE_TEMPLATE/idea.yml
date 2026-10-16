@@ -1,0 +1,28 @@
+name: An idea for the kennel
+description: Something Wagbook should do. Start from the kennel, not the software.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read docs/01-vision-and-principles.md first: it lists what Wagbook will not do (payment gateways, paid tiers,
+        tracking, parent accounts). Ideas that need one of those will be closed, however good.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What goes wrong at the kennel today
+      description: In kennel words. "Staff forget the evening tablet" is a good start. "Add a notifications service" is not.
+    validations:
+      required: true
+  - type: textarea
+    id: who
+    attributes:
+      label: Who meets this, and how often
+      description: Owner, manager, staff or parent. Every day, every festival, once a year?
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do about it now
+      description: The notebook, the WhatsApp group, the memory. This tells us what a fix must beat.

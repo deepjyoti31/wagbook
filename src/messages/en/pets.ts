@@ -164,6 +164,21 @@ export const petsArea = {
       gstState: "Choose the state from the list.",
       onlyManagersMerge: "Only an owner or manager can merge parents.",
     },
+    privacy: {
+      title: "What we hold about them",
+      intro: "A parent may ask for a copy of everything the kennel holds about them, or ask for it to be erased.",
+      download: "Download their details",
+      eraseTitle: "Erase their details",
+      eraseIntro:
+        "Their pets' notes, photos, vaccinations and incidents, every update and care task of their stays, their forms and certificates are deleted for good, and their name, phone and address are emptied. Bills already issued stay, with the name printed on them, because tax law says so.",
+      eraseConfirm: "I understand that this cannot be undone.",
+      eraseButton: "Erase their details",
+      erasing: "Erasing",
+      confirmFirst: "Tick the box to confirm.",
+      erased: "Their details were erased.",
+      erasedFilesLeft: "Their details were erased, but some photos or files could not be removed. Tell whoever runs your Wagbook.",
+      onlyManagers: "Only an owner or manager can download or erase a parent's details.",
+    },
   },
   // The people who work at the kennel, and inviting more.
   people: {

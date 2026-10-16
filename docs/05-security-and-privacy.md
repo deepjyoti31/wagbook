@@ -7,12 +7,13 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly five things, and can read no table.
+2. Someone who is not signed in can do exactly six things, and can read no table.
 3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
 5. An issued invoice cannot be changed by anyone, including owners.
 6. "Who did it and when" cannot be forged or backdated by the person doing it.
 7. Changes to bookings, money, settings and people are recorded in a log nobody can edit.
+8. Someone who has turned on two-step sign-in cannot be reached with their password alone.
 
 Each is enforced in the database and has tests that fail when the enforcement is removed.
 
@@ -53,6 +54,7 @@ In summary:
 | Expenses, and their receipt files | Nothing | Everything | Everything |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
 | Forms from parents | Read; accept or decline, once | Also delete | Same |
+| A parent's details: download everything, erase on request | No (`WB070`) | Yes (`export_client`, `erase_client`) | Same |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
 | Audit log (History of changes) | Nothing | Read | Read |
@@ -64,16 +66,25 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Five functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+Six functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
 is changed on purpose.
 
 | Function | Returns | Guard |
 | --- | --- | --- |
 | `get_public_intake_form(slug)` | Kennel name, city, WhatsApp number, usual times, consent wording, and whether the form is switched on | None: returned for any link name that exists. Nothing here is private. |
-| `submit_intake(slug, payload)` | Nothing useful | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
+| `submit_intake(slug, payload)` | The folder for this form's certificates and its upload secret | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
+| `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
+
+**Certificates with the intake form (milestone M9).** `submit_intake` hands back a 64 character secret made for that
+form. The app sends each certificate to Storage as the anonymous role with the secret in the `x-wagbook-intake`
+header, and the storage policy lets the file in only through `intake_upload_allowed()`. Staff read the files as members
+of the kennel (the folder is the kennel's own). The bucket keeps its limits: 10 MB, photos and PDF. The app turns a
+photo into a JPEG without its hidden data first; someone calling Storage directly could send a file as it is, which
+only staff ever open, from Supabase's address rather than Wagbook's. Worst case for a kennel that is flooded: 60
+waiting forms an hour (`WB048`), six files each.
 
 **Photos on the stay page (milestone M5).** A parent has no account, Postgres cannot sign storage links, and the
 service role key is never used. So the stay page asks Storage for signed links as the anonymous role, sending the stay
@@ -107,11 +118,11 @@ The intake form is the one place strangers write into the system. Treat everythi
 
 ## Browser protections
 
-Set in `next.config.ts` for every response:
+Set in `next.config.ts` for every response, and the Content-Security-Policy in `src/proxy.ts`:
 
 | Header | Effect |
 | --- | --- |
-| `Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'` | Cannot be framed (no clickjacking); forms cannot post elsewhere |
+| `Content-Security-Policy` (set by `src/proxy.ts`, a fresh nonce per request, D23) | Scripts run only from Wagbook's own files, inline only with this request's nonce or the hash of the prerendered shell's two small scripts; images only from Wagbook and the Supabase project; requests only to Wagbook; cannot be framed (no clickjacking); forms cannot post elsewhere; no plugins |
 | `X-Frame-Options: DENY` | The same, for old browsers |
 | `X-Content-Type-Options: nosniff` | Files are not reinterpreted as scripts |
 | `Referrer-Policy: strict-origin-when-cross-origin` | A parent's secret link is not sent to other sites as a referrer |
@@ -127,6 +138,28 @@ Other points:
 - Links sent to parents are built from `NEXT_PUBLIC_SITE_URL`, never from the request's Host header in production, so
   a forged header cannot put an attacker's address into a WhatsApp message.
 - Public pages carry `robots: noindex`.
+- **Limits at the edge of the app (M9, D26).** `src/proxy.ts` counts posts per visitor address: sign in, create an
+  account and two-step codes 20, the intake form 10, joining 20, each per ten minutes. Over the limit, the action
+  answers with a sentence and does not call the database. Posts over 1 MB are refused (413), except to signed-in pages
+  and the intake form, which may send photos (12 MB). The address is what the host in front reports (`x-real-ip`, then
+  `x-forwarded-for`): Vercel and the Caddy server of the self-hosting setup overwrite those headers. Supabase Auth keeps
+  its own limits per address for anyone who calls it directly, and the intake form keeps its database limits.
+
+## Two-step sign-in
+
+Milestone M9, decision D24. Any person can turn it on for themselves under More, Two-step sign-in: Supabase Auth gives a
+secret, shown as a picture to scan with an authenticator app, and the first code proves it was set up. From then on:
+
+- Signing in with the password gives a session at assurance level `aal1`. The app sends it to `/login/code`.
+- The database refuses such a session everything: `my_org_ids()` and `my_org_ids_with_role()`, which every policy
+  uses, return nothing for it (`session_meets_mfa()`), and the functions that act on a person's own memberships raise
+  `WB005`. So a stolen password is useless through the API as well. The end-to-end walk checks this with a direct API
+  client.
+- Supabase Auth refuses to add another authenticator, or remove one, from an `aal1` session.
+- A person who lost their phone asks whoever runs the installation to remove the factor (see
+  [10-setup-and-deploy.md](10-setup-and-deploy.md)).
+
+Owners who have not turned it on see a reminder under More. It is not forced.
 
 ## Privacy
 
@@ -143,8 +176,16 @@ What the software does:
 - **Keeps photos private.** The storage bucket is private; images are shown through short-lived signed links.
 - **Records who changed what.**
 
-Not built yet (milestone M9): exporting everything held about one parent, and erasing a parent on request while
-keeping the invoices that tax law requires.
+- **Gives a parent their details.** On the parent page, owners and managers download everything held about the parent
+  as one file (`export_client`).
+- **Erases on request** (`erase_client`, D25). Contact details, consent, notes, pets' details, vaccinations, routines,
+  incidents, updates, care tasks, play, intake forms, draft bills and every file are deleted or emptied, and the
+  personal text that the history of changes had copied is taken out of it. What tax law makes the kennel keep stays:
+  issued and cancelled bills with the buyer printed on them, payments, and the stays' dates and prices. Refused while
+  a pet is in house or a stay is still to come.
+
+What erasing does not reach: backups made before it (they age out on the backup schedule), a duplicate record merged
+into the parent earlier, the description of a bill line or extra (such as "Vet visit for Bruno"), and payment notes.
 
 For a kennel in India, choose Supabase's Mumbai region so the data stays in the country.
 
@@ -251,6 +292,38 @@ same-origin request and a JSON body of task ids, and can only turn this kennel's
 `tests/db/languages.test.ts` (the own-rows rule removed once to see its test fail), `src/lib/offline-ticks.test.ts`,
 and the end-to-end walk ticks a task offline, comes back online, and sees it sent.
 
+### 15 October 2026: second review (milestone M9)
+
+**Who.** Claude Code, as a separate adversarial pass at the end of the session that built M9. It is not independent of
+the author in the way the first review was; a review by a person outside the project is still recommended before a
+public instance (`HANDOFF.md`).
+
+**What was checked.** Every promise above against the code as it stands, with M9's changes read as an attacker would:
+the script policy and what same-origin content could run under `'self'`; the rate limits and whether their marker
+header can be forged (the proxy removes it from every incoming request); two-step sign-in through the API with only a
+password (the end-to-end walk now does this with a direct Supabase client: no organisations, no memberships, and
+Supabase Auth refuses to enrol a new authenticator); the anonymous upload path (names, other forms' secrets, expiry,
+reading back, replacing, removing); export and erase (staff, another kennel, the anonymous role, what is left in the
+history of changes); and every new function's `search_path`, grants and `security definer` reason.
+
+**Races 6 and 16, staged at last.** The first review left two race fixes without a test, because the in-process
+database has one connection. With a real Postgres (the local Supabase), `scripts/race-checks.sh` runs both with two
+sessions at once: two owners demoting each other (the second waits for the lock and is refused, `WB011`), and a line
+added to a bill while it is being issued (it waits, then is refused, `WB032`). Both held.
+
+**Found and fixed:**
+
+| # | Severity | What was possible | Fix |
+| --- | --- | --- | --- |
+| 21 | Low | Staff could bring an erased parent's empty record back into the lists by clearing `deleted_at`, and type details into it | Check `clients_erased_stay_hidden`; `erased_at` itself is not writable (column grants) |
+| 22 | Low | The script policy allowed the browser to connect to the Supabase project, which the app never does | `connect-src 'self'` only |
+| 23 | Low | `erase_client` (security definer) answered "only an owner or manager" for another kennel's parent, telling a stranger that the record exists | It answers "not found" (`WB003`) unless the caller is a member of the parent's kennel |
+| 24 | Low | Pets added on the intake form after removing others got keys past six and were silently dropped | The action reads keys up to 60 and still refuses more than six pets |
+
+**Looked at and left as they are** (in "Known limitations" below): `'self'` for scripts; per-server counting of rate
+limits; intake uploads by direct API callers (bounded by the form's hourly limits; staff open them from Supabase's
+address); no recovery codes for two-step sign-in.
+
 ## Known limitations
 
 These are real. Do not describe Wagbook as free of them.
@@ -258,19 +331,22 @@ These are real. Do not describe Wagbook as free of them.
 | Limitation | Consequence | Plan |
 | --- | --- | --- |
 | The signed-in screens have not been exercised against a live Supabase project | PostgREST, real Auth and real Storage may behave differently from the in-process tests | Milestone M1, first |
-| Intake flood limits are per kennel and per phone number, not per visitor | A determined attacker can fill a kennel's hourly quota and block real parents for that hour | M9: rate limiting at the edge, or a challenge |
-| No script-src Content Security Policy | An injected script would run. React's escaping is the only defence. | M9: nonces |
-| Server Actions accept bodies up to 12 MB | Needed for photos and certificates; any action, including the public intake form, can be sent that much | M9: limits at the edge |
+| The intake form's database limits are per kennel and per phone number | Someone calling Supabase directly, from many addresses, can still fill a kennel's hourly quota and block real parents for that hour. The app limits each address (D26). | Add the host's own rate limiting for `/i/` (Vercel Firewall, Cloudflare) on a public installation |
+| The app's rate limits are counted in each server's memory | On a host that runs many copies (Vercel), each copy counts on its own | Exact on one server (self-hosting); add the host's edge rules elsewhere |
+| Scripts from the same site are allowed (`'self'`) | A script file that is not the build's, served from Wagbook's address, would run | Nothing visitors send is served from that address (D23) |
+| The script policy needs the build's manifest | If `.next/build-manifest.json` cannot be read, pages are sent with no script rule (logged) | Check the header after deploying (`10-setup-and-deploy.md`) |
+| Posts to signed-in pages and the intake form may be 12 MB | Needed for photos and certificates | Everything else is capped at 1 MB at the edge |
 | A photo replaced by a new one, a draft's update that failed, or a removed expense can leave a file nobody points at | Storage use grows a little; staff cannot delete files by design | M9: a manager's clean-up |
 | A photo sent without JavaScript is stored as taken (only its hidden data removed) | It may show sideways and is larger | Most phones run the page's JavaScript; the photo still works |
-| The intake form does not take certificate uploads yet | Parents send certificates on WhatsApp; staff add them at check-in | M9, together with rate limits at the edge, because anonymous uploads would multiply the intake flood risk |
+| Anyone holding a form's upload secret can add its certificates for an hour | Only the sender has it; the files can only be added, one per pet | By design |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
 | An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | Invitation links (M6) need no lookup; the email invitation stays for people who already have an account. Remove it if this matters more than the convenience. |
 | An invitation link works for whoever holds it | A forwarded link lets someone else join, once, in its role, within seven days | Send it to one person; withdraw it from People if it went astray; suspend or remove the wrong person. The person's name and role show on People as soon as they join. |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |
-| Two race fixes have no automated test | See the review log, numbers 6 and 16 | M1: stage them against real Postgres with two connections |
-| No two-factor sign-in | A stolen password is enough | Supabase supports it; M9 |
+| Two race fixes are tested only against a real Postgres | Review numbers 6 and 16: `scripts/race-checks.sh` needs the local Supabase, so it is not part of `npm run check` | Run it after changing invoices or memberships |
+| Two-step sign-in is optional, and has no recovery codes | A person without it can be reached with a stolen password; a person who loses their phone needs an administrator | Owners see a reminder; recovery is documented in `10` |
+| Erasing a parent leaves backups, merged duplicates, bill line descriptions and payment notes | See "Privacy" | Backups age out; erase a merged duplicate too |
 | Links can be forwarded | Whoever has a stay link can see that stay | By design; kept minimal and expiring |
 | Copies of Today and Care stay on a phone for offline use | Whoever holds the phone, still signed in or not, can open the last copy (pet names, parents' phone numbers) with no connection | The copy is replaced on every visit and forgotten when the sign-in page opens. A shared phone should sign out at the end of a shift. |
 | A care task ticked offline is recorded at the time it reached the database | The history shows the sync time, not the time of the tap | By design: the database stamps who and when, and a phone's clock is not trusted |

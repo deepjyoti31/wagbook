@@ -6,7 +6,7 @@ create table public.clients (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations (id) on delete cascade,
   full_name text not null check (char_length(full_name) between 1 and 120),
-  phone text not null check (phone ~ '^\+[1-9][0-9]{7,14}$'),
+  phone text not null,
   alt_phone text check (alt_phone is null or alt_phone ~ '^\+[1-9][0-9]{7,14}$'),
   email text,
   address text,
@@ -21,9 +21,14 @@ create table public.clients (
   consent_source text check (consent_source is null or consent_source in ('intake_form', 'staff')),
   created_by uuid references auth.users (id) on delete set null,
   deleted_at timestamptz,
+  erased_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (org_id, id)
+  unique (org_id, id),
+  -- An erased parent keeps no phone number (erase_client).
+  constraint clients_phone_check check (phone ~ '^\+[1-9][0-9]{7,14}$' or (erased_at is not null and phone = '')),
+  -- An erased parent stays hidden: nobody can bring the empty record back to the lists.
+  constraint clients_erased_stay_hidden check (erased_at is null or deleted_at is not null)
 );
 
 comment on table public.clients is
@@ -35,6 +40,8 @@ comment on column public.clients.emergency_name is 'Someone to call when the par
 comment on column public.clients.consent_at is 'When the parent agreed to the kennel holding their details. Evidence for DPDP.';
 comment on column public.clients.consent_source is 'intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent.';
 comment on column public.clients.deleted_at is 'Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense.';
+comment on column public.clients.erased_at is
+  'When the parent''s details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it.';
 
 -- One live client per phone number per organisation.
 create unique index clients_org_phone_key on public.clients (org_id, phone) where deleted_at is null;

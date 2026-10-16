@@ -27,6 +27,7 @@ create table public.intake_submissions (
   client_id uuid,
   reviewed_by uuid references auth.users (id) on delete set null,
   reviewed_at timestamptz,
+  upload_token text not null default public.new_token(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, id),
@@ -39,6 +40,8 @@ comment on column public.intake_submissions.payload is
   'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}.';
 comment on column public.intake_submissions.consent_text is 'The exact consent wording the parent agreed to, kept as evidence.';
 comment on column public.intake_submissions.client_id is 'The client created or matched when the submission was accepted.';
+comment on column public.intake_submissions.upload_token is
+  'Secret returned to whoever sent the form, so the same visitor can add a vaccination certificate per pet within the hour (intake_upload_allowed). Useless after that.';
 
 create index intake_submissions_org_status_idx on public.intake_submissions (org_id, status, created_at desc);
 
@@ -144,7 +147,7 @@ comment on function public.get_public_intake_form(text) is
   'PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times and consent wording.';
 
 create function public.submit_intake(p_slug text, p_payload jsonb)
-returns boolean
+returns jsonb
 language plpgsql
 security definer
 set search_path = ''
@@ -156,6 +159,8 @@ declare
   v_pet jsonb;
   v_start date;
   v_end date;
+  v_id uuid;
+  v_token text;
 begin
   select * into v_org from public.organizations o where o.slug = lower(btrim(p_slug));
   if v_org.id is null or not v_org.intake_enabled then
@@ -213,13 +218,16 @@ begin
     (org_id, parent_name, parent_phone, requested_start, requested_end, payload, consent_at, consent_text)
   values
     (v_org.id, v_name, v_phone, v_start, v_end, p_payload, now(),
-     coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name, v_org.parent_language)));
+     coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name, v_org.parent_language)))
+  returning id, upload_token into v_id, v_token;
 
-  return true;
+  -- What the sender needs to add certificates: the folder for them, and the
+  -- secret that proves they sent this form.
+  return jsonb_build_object('folder', v_org.id || '/intake/' || v_id, 'upload_token', v_token);
 end;
 $$;
 comment on function public.submit_intake(text, jsonb) is
-  'PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself.';
+  'PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed).';
 
 -- Turning a reviewed submission into a client and pets. SECURITY INVOKER: it
 -- runs as the staff member, so row level security decides what they may do.
@@ -238,6 +246,8 @@ declare
   v_vax jsonb;
   v_given date;
   v_until date;
+  v_index integer := 0;
+  v_certificate text;
 begin
   select * into v_sub from public.intake_submissions s where s.id = p_submission for update;
   if v_sub.id is null then
@@ -272,6 +282,7 @@ begin
   end if;
 
   for v_pet in select * from jsonb_array_elements(v_sub.payload -> 'pets') loop
+    v_index := v_index + 1;
     -- Do not duplicate a pet the kennel already knows by name.
     select p.id into v_pet_id
     from public.pets p
@@ -300,6 +311,12 @@ begin
          nullif(left(btrim(v_pet ->> 'vet_phone'), 200), ''))
       returning id into v_pet_id;
 
+      -- The certificate the parent sent for this pet, if any, goes on each of
+      -- its vaccinations. Read as the staff member, so storage policies apply.
+      select o.name into v_certificate
+      from storage.objects o
+      where o.bucket_id = 'pet-media' and o.name = v_sub.org_id || '/intake/' || v_sub.id || '/pet-' || v_index;
+
       if jsonb_typeof(v_pet -> 'vaccinations') = 'array' then
         for v_vax in select * from jsonb_array_elements(v_pet -> 'vaccinations') limit 10 loop
           if char_length(btrim(coalesce(v_vax ->> 'vaccine', ''))) between 1 and 60 then
@@ -308,8 +325,8 @@ begin
             if v_given is not null and v_until is not null and v_until < v_given then
               v_until := null;
             end if;
-            insert into public.vaccinations (org_id, pet_id, vaccine, given_on, valid_until)
-            values (v_sub.org_id, v_pet_id, btrim(v_vax ->> 'vaccine'), v_given, v_until);
+            insert into public.vaccinations (org_id, pet_id, vaccine, given_on, valid_until, certificate_path)
+            values (v_sub.org_id, v_pet_id, btrim(v_vax ->> 'vaccine'), v_given, v_until, v_certificate);
           end if;
         end loop;
       end if;
@@ -324,7 +341,7 @@ begin
 end;
 $$;
 comment on function public.accept_intake(uuid) is
-  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added. Returns the client id. Creating the booking is a separate step.';
+  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any. Returns the client id. Creating the booking is a separate step.';
 
 -- ---------------------------------------------------------------------------
 -- Parent-facing read-only pages

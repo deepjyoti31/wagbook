@@ -38,7 +38,7 @@ export async function createTestDb(): Promise<PGlite> {
   return db;
 }
 
-export type Actor = { kind: "user"; id: string } | { kind: "anon" } | { kind: "admin" };
+export type Actor = { kind: "user"; id: string; aal2?: boolean } | { kind: "anon" } | { kind: "admin" };
 
 /**
  * Run a callback as a given actor, the way a request through the Supabase API
@@ -48,6 +48,7 @@ export type Actor = { kind: "user"; id: string } | { kind: "anon" } | { kind: "a
  */
 export async function as<T>(db: PGlite, actor: Actor, fn: () => Promise<T>): Promise<T> {
   await db.exec("reset role");
+  await db.query("select set_config('request.jwt.claims', $1, false)", [actor.kind === "user" && actor.aal2 ? '{"aal":"aal2"}' : ""]);
   if (actor.kind === "user") {
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [actor.id]);
     await db.exec("set role authenticated");
@@ -62,10 +63,13 @@ export async function as<T>(db: PGlite, actor: Actor, fn: () => Promise<T>): Pro
   } finally {
     await db.exec("reset role");
     await db.query("select set_config('request.jwt.claim.sub', '', false)");
+    await db.query("select set_config('request.jwt.claims', '', false)");
   }
 }
 
 export const user = (id: string): Actor => ({ kind: "user", id });
+/** The same person in a session that has also given its two-step code (assurance level aal2). */
+export const userWithCode = (id: string): Actor => ({ kind: "user", id, aal2: true });
 export const anon: Actor = { kind: "anon" };
 export const admin: Actor = { kind: "admin" };
 

@@ -413,6 +413,7 @@ export type Database = {
           consent_source: string | null;
           created_by: string | null;
           deleted_at: string | null;
+          erased_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -435,6 +436,7 @@ export type Database = {
           consent_source?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
+          erased_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -457,6 +459,7 @@ export type Database = {
           consent_source?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
+          erased_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -630,6 +633,7 @@ export type Database = {
           client_id: string | null;
           reviewed_by: string | null;
           reviewed_at: string | null;
+          upload_token: string;
           created_at: string;
           updated_at: string;
         };
@@ -647,6 +651,7 @@ export type Database = {
           client_id?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
+          upload_token?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -664,6 +669,7 @@ export type Database = {
           client_id?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
+          upload_token?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1726,9 +1732,17 @@ export type Database = {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
       };
+      check_privacy_access: {
+        Args: { p_org: string };
+        Returns: undefined;
+      };
       check_report_access: {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: undefined;
+      };
+      client_file_paths: {
+        Args: { p_client: string };
+        Returns: string[];
       };
       create_invitation_link: {
         Args: { p_org: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
@@ -1741,6 +1755,14 @@ export type Database = {
       default_intake_notice: {
         Args: { p_org_name: string; p_language: string };
         Returns: string;
+      };
+      erase_client: {
+        Args: { p_client: string };
+        Returns: string[];
+      };
+      export_client: {
+        Args: { p_client: string };
+        Returns: Json;
       };
       fiscal_year_label: {
         Args: { p_date: string; p_start_month?: number };
@@ -1765,6 +1787,10 @@ export type Database = {
       get_public_stay: {
         Args: { p_token: string };
         Returns: Json;
+      };
+      intake_upload_allowed: {
+        Args: { p_name: string };
+        Returns: boolean;
       };
       invite_member_by_email: {
         Args: { p_org: string; p_email: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
@@ -1834,6 +1860,10 @@ export type Database = {
         Args: { p_invoice: string; p_totals: Json; p_lines: Json };
         Returns: undefined;
       };
+      session_meets_mfa: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       set_my_language: {
         Args: { p_language: string };
         Returns: undefined;
@@ -1852,7 +1882,7 @@ export type Database = {
       };
       submit_intake: {
         Args: { p_slug: string; p_payload: Json };
-        Returns: boolean;
+        Returns: Json;
       };
       void_invoice: {
         Args: { p_invoice: string; p_reason: string };

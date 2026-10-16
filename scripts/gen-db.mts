@@ -59,6 +59,7 @@ export function errorCodes(): string {
     "| WB040 to WB049 | The public intake form |",
     "| WB050 to WB059 | Bills and payments (continued) |",
     "| WB060 to WB069 | Reports and expenses |",
+    "| WB070 to WB079 | A parent's details: export and erase |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

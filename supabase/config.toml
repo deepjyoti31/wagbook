@@ -60,3 +60,18 @@ enable_signup = true
 enable_signup = true
 # Locally there is no mail server, so new accounts work at once.
 enable_confirmations = false
+
+
+# Supabase Auth keeps its own limits per visitor address (sign-ins, code
+# checks), which hold even for someone who skips the app and its limits
+# (src/lib/rate-limit.ts). Locally the defaults are left alone: every request
+# in the end-to-end tests comes from one address. For a hosted project see
+# docs/10-setup-and-deploy.md, "Rate limits".
+
+# Two-step sign-in with an authenticator app (roadmap M9).
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

@@ -134,12 +134,16 @@ row shows the pet's photo, breed, weight, flags in red, the parent (opening thei
 ### B3. Intake form for parents. Built.
 
 `/i/{slug}`. One page, no account. The parent enters their details and an emergency contact, up to six pets (with food,
-health, behaviour and vaccinations), the dates they want, and ticks a consent box. The consent wording is the kennel's
-own, or a default. The submission waits for staff; it changes nothing until accepted.
+health, behaviour and vaccinations, and a photo or PDF of each pet's vaccination certificate), the dates they want, and
+ticks a consent box. The consent wording is the kennel's own, or a default. The submission waits for staff; it changes
+nothing until accepted. A certificate needs the vaccine's name beside it. If the form goes but a certificate does not,
+the thank-you page says to send it on WhatsApp.
 
 Protection against abuse: the form can be switched off; a submission is at most 20,000 bytes; at most 60 unreviewed
-submissions per kennel per hour and 5 per phone number per hour (`WB048`). This is blunt on purpose. See
-[05-security-and-privacy.md](05-security-and-privacy.md).
+submissions per kennel per hour and 5 per phone number per hour (`WB048`); at most 10 sends from one address in ten
+minutes (M9, `src/lib/rate-limit.ts`). Certificates (M9): one file per pet, at most 10 MB, photo or PDF, only within an
+hour of sending the form and only while it waits for staff, using the secret the form got back
+(`intake_upload_allowed`). See [05-security-and-privacy.md](05-security-and-privacy.md).
 
 ### B4. Review forms from parents. Built.
 
@@ -151,7 +155,8 @@ in; it does not carry over boarding or day boarding), Decline, Mark as junk. A f
 three it cannot be reopened. A form that cannot
 be read fully cannot be accepted; the screen says to call the parent.
 
-Accepting never rewrites an existing client's details. Only pets with new names are added.
+Accepting never rewrites an existing client's details. Only pets with new names are added. A certificate the parent
+sent shows as "See the certificate for (pet)", and accepting puts it on that pet's new vaccination.
 
 ### B5. Pet page. Built.
 
@@ -164,24 +169,38 @@ birth, weight, colour, microchip, food, health, allergies, behaviour, flags, vet
 
 `/app/clients/{id}`: phone numbers, what they owe in all, WhatsApp; their pets, stays and bills with what is due; every
 detail editable (name, phones, email, address, emergency contact, GSTIN and state, notes, consent if none is on record).
+For owners and managers, "What we hold about them": download their details, and erase them (B8).
 
 **Merging (B9, M6).** For owners and managers: "Same person as another parent?" finds another record by its phone
 number and merges it into this one. Pets, their stays, bills (issued ones keep the buyer printed on them), payments and
 forms move here; missing details are filled in from the other record, both sets of notes are kept, and the other
 number is kept as "another number". The other record is hidden, not deleted (`merge_clients`).
 
-### B7. Vaccination records. Built, except intake uploads.
+### B7. Vaccination records. Built.
 
 Table `vaccinations` (vaccine, given on, valid until, certificate file). The intake form collects the dates. The pet page
 shows each with its status and certificate, and adds one with a photo or PDF of its certificate. Warnings
 (`vaccinationWarnings()`): a request or confirmed booking says when there are no vaccinations on record, when one
 expired before arrival, or when one runs out before the pet goes home; arrivals on Today carry "Check vaccinations";
 the check-in checklist lists them with their dates. Only dates are judged: which vaccines a kennel requires is its own
-policy. Planned: certificate upload in the intake form (M9, see `05`, known limitations).
+policy. Parents can send a certificate with the intake form (B3, M9).
 
-### B8. Forget a parent. Planned (M9).
+### B8. A parent's details: download and erase. Built (M9).
 
-Export everything held about a parent, and erase it on request, keeping only what tax law requires (issued invoices).
+On the parent page, for owners and managers (`WB070` for anyone else):
+
+- **Download their details** gives one JSON file (`export_client`): the parent and their consent, each pet with its
+  vaccinations, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
+  lines, payments, the intake forms they sent, and the storage paths of their photos and certificates (the file names
+  them; it does not contain them).
+- **Erase their details**, after ticking "I understand that this cannot be undone" (`erase_client`): deletes their
+  pets' vaccinations, routines and incidents, every update, care task and play session of their stays, their intake
+  forms, draft bills, and every photo and certificate file; empties every personal detail on the parent, their pets and
+  their stays (the parent and pets are then shown as "Erased" where a past stay or bill names them); and takes the
+  personal text out of the history of changes. Issued and cancelled bills stay, with the buyer printed on them, and so
+  do payments and the stays' dates and prices, because tax law requires the kennel to keep them. Refused while a pet is
+  in house (`WB071`) or a stay is still to come (`WB072`). The erasure itself is in the history of changes. The phone
+  number is free for a new record afterwards.
 
 ---
 
@@ -440,7 +459,10 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Languages other than English | Built: English, Hindi and Kannada (drafts until reviewed). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |
 | Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
-| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase |
+| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase, and a public demo that resets nightly (M10, [14-self-hosting.md](14-self-hosting.md)) |
+| Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. |
+| Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
+| Scripts only from Wagbook itself | Built (M9): a Content-Security-Policy with a fresh nonce for every page (D23) |
 
 ## Words on screen
 

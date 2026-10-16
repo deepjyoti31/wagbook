@@ -1,14 +1,13 @@
 import type { NextConfig } from "next";
 
 /**
- * Sent with every response. See docs/05-security-and-privacy.md, "Browser headers".
- * There is no script-src policy yet: Next.js needs per-request nonces for that,
- * which is its own piece of work (roadmap M9).
+ * Sent with every response. See docs/05-security-and-privacy.md, "Browser protections".
+ * The Content-Security-Policy is not here: it carries a fresh nonce for every
+ * request, so src/proxy.ts sets it (src/lib/csp.ts).
  */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
@@ -16,6 +15,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // A self-contained server for the Docker image (Dockerfile sets this). Left
+  // off otherwise, so `next start` and Vercel behave as usual.
+  output: process.env.WAGBOOK_STANDALONE ? "standalone" : undefined,
   partialPrefetching: true,
   poweredByHeader: false,
   experimental: {

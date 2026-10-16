@@ -66,6 +66,7 @@ export const core = {
     parentNotFound: "That parent could not be found.",
     billNotFound: "That bill could not be found.",
     taskNotFound: "That task could not be found.",
+    slowDown: "Too many tries from this connection. Wait ten minutes and try again.",
     notWaitingForCheckIn: "This booking is no longer waiting to be checked in. Refresh the page.",
     notCheckedIn: "This pet is not checked in. Refresh the page.",
     constraints: {
@@ -95,6 +96,7 @@ export const core = {
       WB002: "Only an owner or manager can do that.",
       WB003: "That could not be found.",
       WB004: "This cannot be moved to another kennel.",
+      WB005: "Enter the code from your authenticator app first.",
       WB010: "That time zone is not known.",
       WB011: "A kennel must keep at least one active owner.",
       WB012: "You already own the most kennels allowed.",
@@ -134,6 +136,10 @@ export const core = {
       WB051: "Only a draft bill can be changed.",
       WB060: "Reports are for owners and managers.",
       WB061: "Choose a period of a year or less, with the start before the end.",
+      WB070: "Only an owner or manager can download or erase a parent's details.",
+      WB071: "A pet of this parent is in the kennel now. Check it out first.",
+      WB072: "This parent has stays still to come. Cancel them first.",
+      WB073: "This parent's details have already been erased.",
     },
   },
   labels: {

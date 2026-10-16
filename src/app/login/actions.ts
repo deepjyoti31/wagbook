@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { text, type FormState } from "@/lib/forms";
 import { isLanguage } from "@/lib/i18n";
+import { isRateLimited } from "@/lib/rate-limit-server";
 import { getVisitorI18n, rememberLanguage, type I18n } from "@/lib/i18n-server";
 import { safeDestination } from "@/lib/safe-redirect";
 import { siteOrigin } from "@/lib/site";
@@ -32,6 +33,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   if (!isSupabaseConfigured()) redirect("/setup");
   const { m } = await getVisitorI18n();
   const e = m.auth.errors;
+  if (await isRateLimited()) return { error: m.errors.slowDown };
   const parsed = parse(form, m);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -57,13 +59,20 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   }
 
   // Back to where they were going, such as an invitation link. Only ever a page on this site.
-  redirect(safeDestination(text(form, "next"), await siteOrigin(), "/app"));
+  const destination = safeDestination(text(form, "next"), await siteOrigin(), "/app");
+  // With two-step sign-in on, the password was only the first step.
+  const level = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (level.data?.currentLevel === "aal1" && level.data.nextLevel === "aal2") {
+    redirect(`/login/code?next=${encodeURIComponent(destination)}`);
+  }
+  redirect(destination);
 }
 
 export async function signUp(_state: FormState, form: FormData): Promise<FormState> {
   if (!isSupabaseConfigured()) redirect("/setup");
   const { m } = await getVisitorI18n();
   const e = m.auth.errors;
+  if (await isRateLimited()) return { error: m.errors.slowDown };
   const parsed = parse(form, m);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 

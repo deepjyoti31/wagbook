@@ -54,8 +54,21 @@ export async function requireUser(): Promise<SessionUser> {
   if (!isSupabaseConfigured()) redirect("/setup");
   const user = await getUser();
   if (!user) redirect("/login");
+  if (await owesCode()) redirect("/login/code");
   return user;
 }
+
+/**
+ * True when this person has turned on two-step sign-in and this session has
+ * not given its code yet. Read from the session cookie, so it costs nothing;
+ * the database decides for itself (session_meets_mfa), and requireOrg() asks
+ * it when the cookie may be out of date.
+ */
+export const owesCode = cache(async (): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.currentLevel === "aal1" && data.nextLevel === "aal2";
+});
 
 /** The signed-in user's organisations, oldest membership first. */
 export const getMemberships = cache(async () => {
@@ -78,7 +91,13 @@ export const getMemberships = cache(async () => {
 export const requireOrg = cache(async (): Promise<OrgContext> => {
   const user = await requireUser();
   const memberships = await getMemberships();
-  if (memberships.length === 0) redirect("/onboarding");
+  if (memberships.length === 0) {
+    // Two-step sign-in turned on from another phone since this session began:
+    // the database hides every kennel until the code is given.
+    const { data: fullySignedIn } = await (await createClient()).rpc("session_meets_mfa");
+    if (fullySignedIn === false) redirect("/login/code?check=1");
+    redirect("/onboarding");
+  }
 
   const preferred = (await cookies()).get(ORG_COOKIE)?.value;
   const chosen = memberships.find((m) => m.organizations!.id === preferred) ?? memberships[0];

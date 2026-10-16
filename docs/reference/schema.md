@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 10. Tables: 24. Views: 1. Functions: 53.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 59.
 
 ## Contents
 
@@ -336,6 +336,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 | `consent_source` | `text` |  |  | intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent. |
 | `created_by` | `uuid` |  |  |  |
 | `deleted_at` | `timestamp with time zone` |  |  | Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense. |
+| `erased_at` | `timestamp with time zone` |  |  | When the parent's details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -347,9 +348,10 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 - Foreign key `clients_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `clients_alt_phone_check`: `CHECK (((alt_phone IS NULL) OR (alt_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 - Check `clients_consent_source_check`: `CHECK (((consent_source IS NULL) OR (consent_source = ANY (ARRAY['intake_form'::text, 'staff'::text]))))`
+- Check `clients_erased_stay_hidden`: `CHECK (((erased_at IS NULL) OR (deleted_at IS NOT NULL)))`
 - Check `clients_full_name_check`: `CHECK (((char_length(full_name) >= 1) AND (char_length(full_name) <= 120)))`
 - Check `clients_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
-- Check `clients_phone_check`: `CHECK ((phone ~ '^\+[1-9][0-9]{7,14}$'::text))`
+- Check `clients_phone_check`: `CHECK (((phone ~ '^\+[1-9][0-9]{7,14}$'::text) OR ((erased_at IS NOT NULL) AND (phone = ''::text))))`
 
 **Indexes**
 
@@ -364,7 +366,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 
 **Access**
 
-- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
 - `clients_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `clients_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -493,6 +495,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 | `client_id` | `uuid` |  |  | The client created or matched when the submission was accepted. |
 | `reviewed_by` | `uuid` |  |  |  |
 | `reviewed_at` | `timestamp with time zone` |  |  |  |
+| `upload_token` | `text` | yes | `new_token()` | Secret returned to whoever sent the form, so the same visitor can add a vaccination certificate per pet within the hour (intake_upload_allowed). Useless after that. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -825,7 +828,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
 - `memberships_delete` (delete): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
 - `memberships_delete_self` (delete): rows where `(user_id = ( SELECT auth.uid() AS uid))`
-- `memberships_select` (select): rows where `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) OR (user_id = ( SELECT auth.uid() AS uid)))`
+- `memberships_select` (select): rows where `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) OR ((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT session_meets_mfa() AS session_meets_mfa)))`
 - `memberships_update` (update): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`; new values must satisfy `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
 
 ### organizations
@@ -1330,7 +1333,7 @@ accept_intake(p_submission uuid) returns uuid
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added. Returns the client id. Creating the booking is a separate step.
+Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any. Returns the client id. Creating the booking is a separate step.
 
 ### accept_invitation_link
 
@@ -1428,6 +1431,18 @@ bookings_stamp_status() returns trigger
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
 
+### check_privacy_access
+
+```
+check_privacy_access(p_org uuid) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first.
+
 ### check_report_access
 
 ```
@@ -1439,6 +1454,18 @@ check_report_access(p_org uuid, p_from date, p_to date) returns void
 - Volatility: stable
 
 Raises unless the caller is an owner or manager of the organisation and the period runs forwards for at most 400 days. Every report calls it first.
+
+### client_file_paths
+
+```
+client_file_paths(p_client uuid) returns text[]
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Paths in the pet-media bucket that hold this parent's pets' photos and certificates, photos from their stays, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.
 
 ### create_invitation_link
 
@@ -1475,6 +1502,30 @@ default_intake_notice(p_org_name text, p_language text) returns text
 - Volatility: immutable
 
 Consent wording used when an organisation has not written its own, in the parent pages' language (en, hi or kn; anything else gives English).
+
+### erase_client
+
+```
+erase_client(p_client uuid) returns text[]
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner or manager (WB070).
+
+### export_client
+
+```
+export_client(p_client uuid) returns jsonb
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
 ### fiscal_year_label
 
@@ -1571,6 +1622,18 @@ intake_submissions_stamp_review() returns trigger
 - Volatility: volatile
 
 Trigger: a submission is reviewed once. Records who and when as it leaves "new", and refuses any later change of status, so a declined form cannot be reopened and accepted.
+
+### intake_upload_allowed
+
+```
+intake_upload_allowed(p_name text) returns boolean
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
 
 ### invite_member_by_email
 
@@ -1678,7 +1741,7 @@ my_org_ids() returns SETOF uuid
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-Organisations the signed-in user is an active member of. The basis of tenant isolation.
+Organisations the signed-in user is an active member of. The basis of tenant isolation. Empty for a session that still owes its two-step code.
 
 ### my_org_ids_with_role
 
@@ -1824,6 +1887,18 @@ save_invoice_draft(p_invoice uuid, p_totals jsonb, p_lines jsonb) returns void
 
 Replaces a draft invoice's lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.
 
+### session_meets_mfa
+
+```
+session_meets_mfa() returns boolean
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1). SECURITY DEFINER because only it may read auth.mfa_factors.
+
 ### set_my_language
 
 ```
@@ -1923,14 +1998,14 @@ The organisation a stored file belongs to, read from the first folder of its pat
 ### submit_intake
 
 ```
-submit_intake(p_slug text, p_payload jsonb) returns boolean
+submit_intake(p_slug text, p_payload jsonb) returns jsonb
 ```
 
 - Who may call: public
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself.
+PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed).
 
 ### validate_organization
 
