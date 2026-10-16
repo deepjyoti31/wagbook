@@ -10,6 +10,11 @@ export const petsArea = {
     nothingFound: "Nothing found for \"{q}\".",
     none: "No pets yet. Add one, or send parents your intake form from More.",
     bookStay: "Book a stay",
+    hiddenLink: "Hidden pets",
+    hiddenTitle: "Hidden pets",
+    hiddenAbout: "Pets hidden from lists and search. Their stays, bills and notes are kept. Open one to show it again.",
+    hiddenNone: "No hidden pets.",
+    backToPets: "Back to pets",
   },
   // One pet's page, and the fields shared with the form that adds a pet.
   pet: {
@@ -104,6 +109,24 @@ export const petsArea = {
     },
   },
   // One parent's page.
+  // Hiding a pet or parent from lists (deleted_at), on their pages.
+  hiding: {
+    title: "Hide from lists",
+    petAbout: "For a pet who no longer comes, or has died. Stays, bills and notes are kept, and you can show the pet again.",
+    parentAbout: "For a parent who no longer comes. Their pets are hidden with them. Stays, bills and notes are kept, and you can show them again.",
+    hidePet: "Hide this pet",
+    hideParent: "Hide this parent and their pets",
+    hiddenPet: "This pet is hidden from lists and search.",
+    hiddenParent: "This parent and the pets hidden with them are not in lists or search.",
+    withParent: "Hidden with their parent. Show the parent again to bring this pet back.",
+    show: "Show in lists again",
+    badge: "Hidden",
+    doneHidden: "Hidden from lists.",
+    doneShown: "Back in lists.",
+    busyPet: "This pet has a stay in the kennel now or still to come. Check it out or cancel it first.",
+    busyParent: "This parent has a stay in the kennel now or still to come. Check it out or cancel it first.",
+    onlyManagers: "Only an owner or manager can hide a pet or parent, or show one again.",
+  },
   parent: {
     title: "Parent",
     // Follows the main phone number: "98765 43210, also 91234 56789".

@@ -106,6 +106,7 @@ export const core = {
       WB016: "That invitation link has expired or was already used. Ask for a new one.",
       WB017: "You already work at this kennel.",
       WB018: "Choose two different parents of this kennel.",
+      WB019: "This has a stay in the kennel now or still to come, or its parent is hidden. Deal with that first.",
       WB020: "No space on {date} ({booked} booked, {kennels} kennels).",
       WB021: "That kennel is out of service.",
       WB022: "Only an owner or manager can change the price or the kind of stay.",

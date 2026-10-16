@@ -346,7 +346,9 @@ describe("parent links", () => {
     expect(await visible(await token(a))).toBe(false);
 
     expect(await visible(await token(b))).toBe(true);
-    await sql(p.owner, "update public.pets set deleted_at = now() where id = $1", [p.pets[1]]);
+    // The app refuses to hide a pet with a stay to come (WB019), so hide it the way only the database's own
+    // maintenance could: the stay page must still stop showing it.
+    await db.query("update public.pets set deleted_at = now() where id = $1", [p.pets[1]]);
     expect(await visible(await token(b))).toBe(false);
   });
 });

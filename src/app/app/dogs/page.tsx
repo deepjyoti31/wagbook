@@ -29,6 +29,7 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
   const supabase = await createClient();
 
   const PET = "id, name, breed, species, weight_kg, flags, photo_path, clients(id, full_name, phone)" as const;
+  if (params.hidden === "1") return <HiddenPets orgId={org.id} />;
   const pets = () => supabase.from("pets").select(PET).eq("org_id", org.id).is("deleted_at", null).order("name").limit(200);
   // % and _ are wildcards in a LIKE pattern; strip them so a search is always literal.
   const literal = q.replace(/[%_\\,()]/g, "");
@@ -106,6 +107,56 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
               <Link href={`/app/bookings/new?pet=${p.id}`} className={buttonStyles.secondary}>
                 {m.pets.bookStay}
               </Link>
+            </LedgerRow>
+          ))}
+        </Ledger>
+      )}
+      <p className="mt-6">
+        <Link href="/app/dogs?hidden=1" className={buttonStyles.quiet}>
+          {m.pets.hiddenLink}
+        </Link>
+      </p>
+    </>
+  );
+}
+
+/** Pets hidden from lists (deleted_at), so that one can be found and shown again. Erased pets are not listed. */
+async function HiddenPets({ orgId }: { orgId: string }) {
+  const { m } = await getAppI18n();
+  const supabase = await createClient();
+  const res = await supabase
+    .from("pets")
+    .select("id, name, breed, clients(id, full_name, erased_at)")
+    .eq("org_id", orgId)
+    .not("deleted_at", "is", null)
+    .order("name")
+    .limit(500);
+  if (res.error) throw new Error("Could not load pets.");
+  const pets = res.data.filter((p) => !p.clients?.erased_at);
+
+  return (
+    <>
+      <PageTitle title={m.pets.hiddenTitle}>
+        <Link href="/app/dogs" className={buttonStyles.secondary}>
+          {m.pets.backToPets}
+        </Link>
+      </PageTitle>
+      <p className="mb-4 text-slate">{m.pets.hiddenAbout}</p>
+      {pets.length === 0 ? (
+        <Empty>{m.pets.hiddenNone}</Empty>
+      ) : (
+        <Ledger>
+          {pets.map((p) => (
+            <LedgerRow key={p.id}>
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2">
+                  <Link href={`/app/dogs/${p.id}`} className="text-lg font-bold underline underline-offset-4">
+                    {p.name}
+                  </Link>
+                  {p.breed ? <span className="text-slate">{p.breed}</span> : null}
+                </p>
+                {p.clients ? <p className="mt-1 text-slate">{p.clients.full_name}</p> : null}
+              </div>
             </LedgerRow>
           ))}
         </Ledger>

@@ -550,3 +550,83 @@ as $$
 $$;
 comment on function public.available_kennels(uuid, public.booking_kind, date, date) is
   'Active kennels with no booking holding them at any point in the given stay. Used to offer kennels when booking or checking in.';
+
+-- ---------------------------------------------------------------------------
+-- Hiding pets and parents from lists
+-- ---------------------------------------------------------------------------
+
+-- deleted_at hides a pet or parent from lists and search while keeping their
+-- past stays and bills whole. Only owners and managers hide one or show one
+-- again, and never while a stay is in house or still to come: the pet would
+-- vanish from lists while Today still expects it. Merging and erasing hide
+-- rows too, and check the same things first. With no signed-in user (the
+-- database's own maintenance) the checks are skipped, as for prices.
+create function public.guard_hiding()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.deleted_at is not distinct from old.deleted_at or (select auth.uid()) is null then
+    return new;
+  end if;
+  -- Hidden at one moment and hidden at another are the same to a list.
+  if new.deleted_at is not null and old.deleted_at is not null then
+    return new;
+  end if;
+  if new.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    raise exception 'WB002: only an owner or manager can hide a pet or parent, or show one again' using errcode = '42501';
+  end if;
+  if new.deleted_at is not null and exists (
+    select 1 from public.bookings b
+    where b.org_id = new.org_id
+      and (case when tg_table_name = 'pets' then b.pet_id else b.client_id end) = new.id
+      and b.status in ('requested', 'confirmed', 'checked_in')
+  ) then
+    raise exception 'WB019: this has a stay in the kennel now or still to come. Check it out or cancel it first.' using errcode = '23514';
+  end if;
+  -- Nested, because plpgsql would read new.client_id on a parent's row too.
+  if tg_table_name = 'pets' and new.deleted_at is null then
+    if exists (select 1 from public.clients c where c.org_id = new.org_id and c.id = new.client_id and c.deleted_at is not null) then
+      raise exception 'WB019: this pet''s parent is hidden. Show the parent again first.' using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+comment on function public.guard_hiding() is
+  'Trigger on pets and clients: only owners and managers hide a row (deleted_at) or show it again; never while it has a stay requested, confirmed or in house (WB019); a pet is shown again only once its parent is.';
+
+create trigger pets_guard_hiding
+  before update of deleted_at on public.pets
+  for each row execute function public.guard_hiding();
+
+create trigger clients_guard_hiding
+  before update of deleted_at on public.clients
+  for each row execute function public.guard_hiding();
+
+-- A parent's pets go with them: hidden together, and shown again together.
+-- Pets hidden on their own before (one that died, say) carry an earlier time
+-- and stay hidden when the parent comes back.
+create function public.clients_hide_pets()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.deleted_at is not null and old.deleted_at is null then
+    update public.pets p set deleted_at = new.deleted_at
+    where p.org_id = new.org_id and p.client_id = new.id and p.deleted_at is null;
+  elsif new.deleted_at is null and old.deleted_at is not null then
+    update public.pets p set deleted_at = null
+    where p.org_id = new.org_id and p.client_id = new.id and p.deleted_at = old.deleted_at;
+  end if;
+  return null;
+end;
+$$;
+comment on function public.clients_hide_pets() is
+  'Trigger: hiding a parent hides their pets with the same time; showing the parent again shows the pets hidden at that time, not ones hidden on their own earlier.';
+
+create trigger clients_hide_pets
+  after update of deleted_at on public.clients
+  for each row execute function public.clients_hide_pets();

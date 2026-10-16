@@ -185,6 +185,24 @@ expired before arrival, or when one runs out before the pet goes home; arrivals 
 the check-in checklist lists them with their dates. Only dates are judged: which vaccines a kennel requires is its own
 policy. Parents can send a certificate with the intake form (B3, M9).
 
+### B9. Hide a pet or parent from lists. Built.
+
+For a pet who no longer comes, or has died, and a parent who no longer comes. At the end of the pet or parent page,
+owners and managers press **Hide this pet** or **Hide this parent and their pets**. The pet or parent leaves the pets
+list, search and New booking; their page stays, reached from past stays, with a notice and **Show in lists again**.
+Hidden pets are listed under **Hidden pets** at the foot of the pets list. Nothing is deleted.
+
+What the database refuses (`guard_hiding()`):
+
+| Rule | Error |
+| --- | --- |
+| Staff hiding or showing a pet or parent | `WB002` |
+| Hiding while a stay is requested, confirmed or in house | `WB019` |
+| Showing a pet again while its parent is hidden | `WB019` |
+
+Hiding a parent hides their pets at the same moment; showing the parent again brings back those pets, but not a pet
+that was hidden on its own before. Merging and erasing hide rows the same way.
+
 ### B8. A parent's details: download and erase. Built (M9).
 
 On the parent page, for owners and managers (`WB070` for anyone else):
@@ -252,7 +270,9 @@ cancelling happens. A Calendar button opens C5.
 - **What it costs**: the stay and its extras as lines with an estimated total (tax included where the kennel charges
   it); add an extra from the price list or a one-off item; owners and managers can remove one.
 - **Change this booking**: dates, kennel (free ones offered), expected drop-off and pick-up times, belongings, notes;
-  price per night or day and a discount for owners and managers only.
+  price per night or day, a discount, and boarding or day boarding (the kind of stay) for owners and managers only
+  (`WB022` for staff). Changing the kind leaves the price as typed, with a hint to check it; the kennel and pet
+  overlap rules apply to the new kind at once.
 - **The pet's own routines** (D2) and what the parent said about food, health, allergies and behaviour.
 - **Cancel**, with a reason (required), and a warning when the stay touches a no-refund peak period.
 
