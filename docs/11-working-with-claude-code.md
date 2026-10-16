@@ -50,7 +50,8 @@ the code must be on GitHub first.
      migrations need applying to the real project, a person runs `supabase db push` on their own machine after
      reviewing the pull request.
 
-   **Setup script.** Not needed. The SessionStart hook runs `npm ci` when `node_modules` is missing. If you prefer the
+   **Setup script.** Not needed. The SessionStart hook runs `npm ci` when `node_modules` is missing or was installed from a different
+   `package-lock.json`. If you prefer the
    environment's own setup script (it is cached between sessions when quick), use:
 
    ```bash

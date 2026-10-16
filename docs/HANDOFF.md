@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 15 October 2026, after milestones M9 and M10.
+Last updated: 16 October 2026, after milestones M9 and M10 and a fix to the cloud session hook.
 
 ## In one paragraph
 
@@ -78,7 +78,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Photos from a real phone camera (HEIC on iPhone, very large photos, rotation) | Tested with a JPEG made in the browser | The browser redraws photos the right way up; a format the browser cannot read is refused with a sentence |
 | Send update, Send confirmation, the intake link on WhatsApp | Only the link is built; WhatsApp was not opened | Low: the functions are unit tested |
 | Storage upload paths and policies in use | No screen uses storage yet | Covered structurally by tests only |
-| The Claude Code cloud SessionStart hook | Not checked this session. This session found `node_modules` incomplete (`jsqr`, `qrcode-generator`, `@playwright/test` missing) and ran `npm ci` | If `npm run check` fails on missing modules, run `npm ci` |
+| The Claude Code cloud SessionStart hook in a fresh container | Two sessions in a row found an old `node_modules` (`jsqr`, `qrcode-generator`, `@playwright/test` missing), because the hook skipped `npm ci` whenever the folder existed. On 16 October 2026 it was changed to install again when `package-lock.json` differs from the last install, and run by hand twice (installs, then skips) | If `npm run check` fails on missing modules, run `npm ci` and say so here |
 | Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
 | The public demo running somewhere | No server | `deploy/demo-reset.sh` was tried locally only |
 | The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
@@ -255,6 +255,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 16 October 2026. The cloud session hook now reinstalls when `package-lock.json` changes, not only when
+  `node_modules` is missing.
 - 15 October 2026. M9 (script policy with nonces and hashes, rate limits, two-step sign-in in the database, export and
   erase, intake certificates, backup drill, second review with races 6 and 16 staged) and M10 (Docker image and
   Compose with Caddy, public demo mode and nightly reset, templates, code of conduct, changelog, releasing, owner's
