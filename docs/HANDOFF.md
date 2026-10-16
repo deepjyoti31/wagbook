@@ -213,8 +213,6 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - New booking offers every kennel in service, not only the free ones. The database refuses a taken one with a clear
   sentence. The booking page and Today offer only free kennels.
 - `care_items.requires_photo` is not offered or enforced: proof photos on tasks are not built.
-- The bill's stay line shows its dates as 2026-10-12 rather than 12 Oct 2026 (it comes from `stayLines()` and is frozen
-  on issued bills).
 - Pets and parents cannot be hidden from lists from the screen yet (soft delete exists in the database).
 - Incidents cannot be edited once written; add a new one or ask a manager.
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
