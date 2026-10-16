@@ -61,6 +61,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Backup and restore: 61 tables, invoice numbering, 90 policies, 24 tables with row level security, 6 public functions, 75 triggers and every file survive a dump and restore | `scripts/backup-drill.sh` on the local Supabase | High locally; the hosted round trip not done |
 | The Docker image and `deploy/compose.yml` with Caddy: both addresses, sign-in, main screens, demo notices | Built and run here against the CLI's Supabase (`docs/14-self-hosting.md`, "What has been verified") | High for that setup |
 | `deploy/demo-reset.sh` | Run against the local Supabase | Medium |
+| New booking: the pet search (name, breed, parent, phone digits) and only free kennels offered for the dates typed | `src/lib/core/bookings.test.ts`; end-to-end (K05 hidden while Coco holds it, offered again from the day she leaves; a pet found by phone digits); screenshot at 360 pixels, 16 October 2026 | High |
+| Currency and financial year start fixed once a bill is issued, including a cancelled one (`WB052`); drafts do not count | `tests/db/billing.test.ts` (the trigger removed once to see it fail); Settings shows both locked and still saves, checked in a browser at 360 pixels against the local Supabase | High |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -209,15 +211,12 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 ## Known rough edges in what is built
 
 - The kind of stay (boarding or day boarding) cannot be changed on a booking; cancel and book again.
-- New booking lists every pet in one dropdown (capped at 2,000). Needs search later (M6).
-- New booking offers every kennel in service, not only the free ones. The database refuses a taken one with a clear
-  sentence. The booking page and Today offer only free kennels.
 - `care_items.requires_photo` is not offered or enforced: proof photos on tasks are not built.
+- New booking still loads every pet into one list (capped at 2,000) and narrows it in the browser as you type.
 - Pets and parents cannot be hidden from lists from the screen yet (soft delete exists in the database).
 - Incidents cannot be edited once written; add a new one or ask a manager.
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
-- Settings has no fields yet for time zone, currency, locale or financial year start. They default to India (M4).
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
 - Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
   of kennels going in or out of service.

@@ -134,6 +134,7 @@ export const core = {
       WB049: "This form has already been dealt with.",
       WB050: "Only an owner or manager can issue a bill that differs from its booking.",
       WB051: "Only a draft bill can be changed.",
+      WB052: "The currency and the month the financial year starts cannot change once a bill has been issued.",
       WB060: "Reports are for owners and managers.",
       WB061: "Choose a period of a year or less, with the start before the end.",
       WB070: "Only an owner or manager can download or erase a parent's details.",

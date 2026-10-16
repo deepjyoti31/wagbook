@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 59.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 60.
 
 ## Contents
 
@@ -906,6 +906,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 **Triggers**
 
 - `organizations_audit` (after insert or delete or update) runs `audit_row()`
+- `organizations_lock_billing_settings` (before update of currency, fiscal_year_start_month) runs `organizations_lock_billing_settings()`
 - `organizations_set_updated_at` (before update) runs `set_updated_at()`
 - `organizations_validate` (before insert or update of time_zone) runs `validate_organization()`
 
@@ -1778,6 +1779,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 - Volatility: stable
 
 Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.
+
+### organizations_lock_billing_settings
+
+```
+organizations_lock_billing_settings() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: refuses a change of currency or financial year start once the kennel has issued a bill (issued or cancelled), so stored amounts keep one currency and bill numbers keep running in order through the year.
 
 ### paths_in_org
 

@@ -63,6 +63,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB049` | this form has already been dealt with<br>this form was declined and cannot be accepted | `20261008000600_intake_and_public_pages.sql` |
 | `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
 | `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
+| `WB052` | the currency and the month the financial year starts cannot change once a bill has been issued | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
 | `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |
