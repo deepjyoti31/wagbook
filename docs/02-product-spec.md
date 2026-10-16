@@ -214,6 +214,10 @@ price for the kind of stay; only owners and managers see a Price box and can typ
 copied onto the booking, so changing the rate card later never changes an old booking. Opening it from the calendar
 fills in the kennel and the date. After booking, the booking page opens.
 
+A search box above the pet list narrows it by pet name, breed, parent's name, or three or more digits of the parent's
+phone; when one pet matches it is chosen. The kennel list offers only kennels free on the dates typed, and changes as
+the dates change (`freeKennels()`, the same rule as `available_kennels()`); a sentence says when some are left out.
+
 What the database refuses, whatever the screen does:
 
 | Rule | Error |

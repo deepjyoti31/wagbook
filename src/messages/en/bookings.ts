@@ -222,6 +222,8 @@ export const bookingsArea = {
     kennel: "Kennel",
     kennelHint: "You can leave this until check-in. Space is still held. Other pets booked together get theirs at check-in.",
     decideAtCheckIn: "Decide at check-in",
+    // Before kennelHint, when the dates make some kennels taken.
+    kennelsTaken: "Kennels taken on these dates are left out.",
     price: "Price",
     // The usual prices, put into {usual} in the sentences below.
     usualBoarding: "{boarding} a night",
@@ -240,6 +242,9 @@ export const bookingsArea = {
     requestNote: "A request holds no space. Confirm it later from the booking.",
     // The pet chooser at the top of the form.
     picker: {
+      find: "Find a pet",
+      findHint: "Name, breed, parent or phone",
+      noMatch: "No pet matches that. Clear the box to see every pet.",
       pet: "Pet",
       choose: "Choose a pet",
       withBreed: "{name}, {breed}",

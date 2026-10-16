@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { petMatches } from "@/lib/core/bookings";
 import { fill } from "@/lib/i18n";
 import type { Messages } from "@/messages";
 import { inputStyles } from "./ui";
@@ -11,11 +12,14 @@ export interface PickablePet {
   breed: string | null;
   clientId: string;
   parentName: string | null;
+  parentPhone: string | null;
 }
 
 /**
  * Choose a pet, then tick any other pets of the same parent to book them
- * together. Without JavaScript the first choice still works on its own.
+ * together. A search box above the list narrows it by name, breed, parent or
+ * phone. Without JavaScript the list and the first choice still work on their
+ * own.
  */
 export function FamilyPicker({
   pets,
@@ -30,19 +34,34 @@ export function FamilyPicker({
   defaultAlso?: string[];
 }) {
   const [petId, setPetId] = useState(defaultPetId ?? "");
+  const [query, setQuery] = useState("");
   const chosen = pets.find((p) => p.id === petId);
+  // The chosen pet stays in the list whatever is typed, so the choice never vanishes.
+  const shown = pets.filter((p) => p.id === petId || petMatches(p, query));
+  const find = (q: string) => {
+    setQuery(q);
+    const matches = pets.filter((p) => petMatches(p, q));
+    if (q.trim() !== "" && matches.length === 1) setPetId(matches[0].id);
+  };
   const siblings = chosen ? pets.filter((p) => p.clientId === chosen.clientId && p.id !== chosen.id) : [];
   const withBreed = (p: PickablePet) => (p.breed ? fill(words.withBreed, { name: p.name, breed: p.breed }) : p.name);
 
   return (
     <div className="space-y-3">
+      {pets.length > 1 ? (
+        <label className="block">
+          <span className="mb-1 block font-semibold">{words.find}</span>
+          <input type="search" value={query} onChange={(e) => find(e.target.value)} placeholder={words.findHint} autoComplete="off" className={inputStyles} />
+          {shown.length === 0 ? <span className="mt-1 block text-sm text-slate">{words.noMatch}</span> : null}
+        </label>
+      ) : null}
       <label className="block">
         <span className="mb-1 block font-semibold">{words.pet}</span>
         <select name="petId" required value={petId} onChange={(e) => setPetId(e.target.value)} className={inputStyles}>
           <option value="" disabled>
             {words.choose}
           </option>
-          {pets.map((p) => (
+          {shown.map((p) => (
             <option key={p.id} value={p.id}>
               {p.parentName ? fill(words.withParent, { name: withBreed(p), parent: p.parentName }) : withBreed(p)}
             </option>

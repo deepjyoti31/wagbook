@@ -86,12 +86,19 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
   // What was typed is still there.
   await expect(page.getByLabel("Check-out date")).toHaveValue(day(3));
 
-  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  // Found by typing part of the parent's phone number.
+  await page.getByLabel("Find a pet").fill("00105");
+  await expect(page.locator("select[name=petId]")).toHaveValue(/.+/);
+  await expect(page.locator("select[name=petId] option:checked")).toHaveText("Tofu, Shih Tzu (Neha Placeholder)");
   await page.getByLabel("Check-in date").fill(day(1));
   await page.getByLabel("Check-out date").fill(day(3));
-  await page.locator("select[name=kennelId]").selectOption({ label: "K05" });
-  await page.getByRole("button", { name: "Confirm booking" }).click();
-  await expect(page.getByText("That kennel is already taken for some of those dates.")).toBeVisible();
+  // K05 is taken on those dates, so it is not offered; it is again from the day Coco leaves.
+  const k05 = page.locator("select[name=kennelId] option", { hasText: /^K05$/ });
+  await expect(k05).toHaveCount(0);
+  await expect(page.getByText("Kennels taken on these dates are left out.")).toBeVisible();
+  await page.getByLabel("Check-out date").fill(day(7));
+  await page.getByLabel("Check-in date").fill(day(4));
+  await expect(k05).toHaveCount(1);
 });
 
 test("staff cannot set a price; a family is booked together as a request, then confirmed", async ({ page }) => {

@@ -208,6 +208,7 @@ export const bookingsArea: typeof English = {
     kennel: "केनेल",
     kennelHint: "इसे चेक इन तक छोड़ सकते हैं। जगह फिर भी रुकी रहती है। साथ में बुक हुए दूसरे पालतुओं को उनका केनेल चेक इन पर मिलता है।",
     decideAtCheckIn: "चेक इन पर तय करें",
+    kennelsTaken: "इन तारीखों में भरे हुए केनेल नहीं दिखाए गए हैं।",
     price: "कीमत",
     usualBoarding: "{boarding} एक रात",
     usualDaycare: "डे बोर्डिंग के लिए {daycare} एक दिन",
@@ -224,6 +225,9 @@ export const bookingsArea: typeof English = {
     back: "बुकिंग पर वापस",
     requestNote: "अनुरोध में कोई जगह नहीं रुकती। बाद में बुकिंग से इसे पक्का करें।",
     picker: {
+      find: "पालतू खोजें",
+      findHint: "नाम, नस्ल, पेरेंट या फ़ोन",
+      noMatch: "कोई पालतू नहीं मिला। सब देखने के लिए खाना खाली करें।",
       pet: "पालतू",
       choose: "एक पालतू चुनें",
       withBreed: "{name}, {breed}",
