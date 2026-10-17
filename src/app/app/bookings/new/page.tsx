@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { FamilyPicker } from "@/components/family-picker";
-import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Select, Textarea } from "@/components/ui";
+import { StayFields } from "@/components/stay-fields";
+import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { formatMoney, isISODate, todayIn } from "@/lib/core";
+import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -27,12 +28,22 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
   const w = m.newBooking;
   const supabase = await createClient();
 
-  const [pets, kennels, services] = await Promise.all([
-    supabase.from("pets").select("id, name, breed, client_id, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
+  const today = todayIn(org.time_zone);
+  const [pets, kennels, services, holds] = await Promise.all([
+    supabase.from("pets").select("id, name, breed, client_id, clients(full_name, phone)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
     supabase.from("kennels").select("id, name").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
+    // Stays that hold a kennel from yesterday on, the same rule as available_kennels().
+    supabase
+      .from("bookings")
+      .select("kennel_id, kind, start_date, end_date")
+      .eq("org_id", org.id)
+      .in("status", ["confirmed", "checked_in"])
+      .not("kennel_id", "is", null)
+      .gte("end_date", addDays(today, -1))
+      .limit(5000),
   ]);
-  if (pets.error || kennels.error || services.error) throw new Error("Could not load the booking form.");
+  if (pets.error || kennels.error || services.error || holds.error) throw new Error("Could not load the booking form.");
 
   if (pets.data.length === 0) {
     return (
@@ -74,32 +85,17 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
         <FamilyPicker
           words={w.picker}
           defaultPetId={pick(params.pet)}
-          pets={pets.data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null }))}
+          pets={pets.data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null, parentPhone: p.clients?.phone ?? null }))}
         />
-        <Field label={w.stay}>
-          <Select name="kind" defaultValue={pick(params.kind) === "daycare" ? "daycare" : "boarding"}>
-            <option value="boarding">{w.boarding}</option>
-            <option value="daycare">{w.daycare}</option>
-          </Select>
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={w.checkInDate}>
-            <Input name="startDate" type="date" required defaultValue={start && isISODate(start) ? start : todayIn(org.time_zone)} />
-          </Field>
-          <Field label={w.checkOutDate} hint={w.checkOutHint}>
-            <Input name="endDate" type="date" defaultValue={end && isISODate(end) ? end : undefined} />
-          </Field>
-        </div>
-        <Field label={w.kennel} hint={w.kennelHint}>
-          <Select name="kennelId" defaultValue={kennel && kennels.data.some((k) => k.id === kennel) ? kennel : ""}>
-            <option value="">{w.decideAtCheckIn}</option>
-            {kennels.data.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <StayFields
+          words={w}
+          kennels={kennels.data}
+          holds={holds.data.map((h) => ({ kennelId: h.kennel_id as string, kind: h.kind, startDate: h.start_date, endDate: h.end_date }))}
+          defaultKind={pick(params.kind) === "daycare" ? "daycare" : "boarding"}
+          defaultStart={start && isISODate(start) ? start : today}
+          defaultEnd={end && isISODate(end) ? end : ""}
+          defaultKennelId={kennel && kennels.data.some((k) => k.id === kennel) ? kennel : ""}
+        />
         {canManage ? (
           <Field label={w.price} hint={usual ? fill(w.leaveEmpty, { usual }) : w.noUsualHint}>
             <Input name="rate" inputMode="decimal" placeholder={boarding ?? undefined} />

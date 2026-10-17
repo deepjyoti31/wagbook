@@ -205,7 +205,7 @@ describe("a parent's details", () => {
   });
 
   it("stay hidden once erased", async () => {
-    const e = await errorOf(() => as(db, user(staff), () => db.query("update public.clients set deleted_at = null where id = $1", [k.client])));
+    const e = await errorOf(() => as(db, user(k.owner), () => db.query("update public.clients set deleted_at = null where id = $1", [k.client])));
     expect(e.message).toContain("clients_erased_stay_hidden");
   });
 

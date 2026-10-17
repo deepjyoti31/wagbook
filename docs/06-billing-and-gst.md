@@ -59,6 +59,11 @@ financial year, no longer than 16 characters, using only letters, digits, hyphen
 throws if a number would break that. Ask your accountant to confirm the format suits you before issuing the first one,
 because the prefix should not change mid-year.
 
+**Fixed after the first bill.** Once a kennel has issued a bill (including one later cancelled), the database refuses a
+change to its currency or to the month its financial year starts (`WB052`). A new year start would begin a new label
+and restart the count at 1 partway through a year, and a new currency would mix two currencies in every stored amount.
+Settings shows both as fixed from then on.
+
 **No gaps, no duplicates.** The next number comes from `invoice_counters`, one row per kennel and year, updated inside
 the issuing transaction with a row lock. Two people issuing at the same moment queue up. If issuing fails, the
 transaction rolls back and the number is not consumed. A plain Postgres sequence would not do: sequences skip numbers

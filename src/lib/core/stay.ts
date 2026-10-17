@@ -1,4 +1,4 @@
-import { diffDays, isISODate, type ISODate } from "./dates";
+import { diffDays, formatDate, isISODate, type ISODate } from "./dates";
 import type { Minor } from "./money";
 import { computeInvoice, type InvoiceTotals, type LineInput, type TaxContext } from "./tax";
 
@@ -62,7 +62,7 @@ export function stayLines(input: StayQuoteInput): LineInput[] {
       : `Day boarding: ${input.petName}, ${units} ${units === 1 ? "day" : "days"}`;
   return [
     {
-      description: `${what} (${input.startDate} to ${input.endDate})`,
+      description: `${what} (${formatDate(input.startDate)} to ${formatDate(input.endDate)})`,
       quantity: units,
       unitPriceMinor: input.rateMinor,
       discountMinor: input.discountMinor ?? 0,

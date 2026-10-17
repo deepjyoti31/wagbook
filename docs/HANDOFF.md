@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 15 October 2026, after milestones M9 and M10.
+Last updated: 16 October 2026, after milestones M9 and M10 and a round of rough edges.
 
 ## In one paragraph
 
@@ -10,9 +10,9 @@ Every milestone on the roadmap is built: M2 to M8 (bookings, care, bills, photos
 offline), M9 (a script policy with nonces, rate limits, two-step sign-in enforced by the database, downloading and
 erasing a parent's details, certificates on the intake form, a backup and restore drill, a second security review) and
 M10 (running it on your own server with Docker Compose, a public demo that resets nightly, templates, code of conduct,
-changelog, release process, and a guide for kennel owners with pictures). The database rules are tested in-process (176
-database tests, 114 unit tests), and the whole day is walked in a real browser at 360 pixels wide against a **local**
-Supabase (`npm run test:e2e`, 33 tests). What has still never happened: a **hosted** Supabase project (the rest of M1),
+changelog, release process, and a guide for kennel owners with pictures). The database rules are tested in-process (182
+database tests, 125 unit tests), and the whole day is walked in a real browser at 360 pixels wide against a **local**
+Supabase (`npm run test:e2e`, 34 tests). What has still never happened: a **hosted** Supabase project (the rest of M1),
 a real phone, and a server for the public demo. **The Hindi and Kannada are first drafts.** The licence (M10, item 5)
 waits for the owner.
 
@@ -61,6 +61,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Backup and restore: 61 tables, invoice numbering, 90 policies, 24 tables with row level security, 6 public functions, 75 triggers and every file survive a dump and restore | `scripts/backup-drill.sh` on the local Supabase | High locally; the hosted round trip not done |
 | The Docker image and `deploy/compose.yml` with Caddy: both addresses, sign-in, main screens, demo notices | Built and run here against the CLI's Supabase (`docs/14-self-hosting.md`, "What has been verified") | High for that setup |
 | `deploy/demo-reset.sh` | Run against the local Supabase | Medium |
+| New booking: the pet search (name, breed, parent, phone digits) and only free kennels offered for the dates typed | `src/lib/core/bookings.test.ts`; end-to-end (K05 hidden while Coco holds it, offered again from the day she leaves; a pet found by phone digits); screenshot at 360 pixels, 16 October 2026 | High |
+| Currency and financial year start fixed once a bill is issued, including a cancelled one (`WB052`); drafts do not count | `tests/db/billing.test.ts` (the trigger removed once to see it fail); Settings shows both locked and still saves, checked in a browser at 360 pixels against the local Supabase | High |
+| Hiding a pet or parent: owners and managers only, refused with a stay requested, confirmed or in house, a parent's pets go and come back with them (not ones hidden before), a pet waits for its parent | `tests/db/people.test.ts` (the triggers removed once to see the tests fail); end-to-end: a manager hides a new pet, it leaves search, is found under Hidden pets and shown again, and a pet with a stay to come is refused with the sentence | High |
+| Owners and managers change a booking between boarding and day boarding; the kennel overlap then follows the new kind | `tests/db/bookings.test.ts` (staff refused with `WB022` already tested there); end-to-end: a manager turns a request into day boarding and back | High |
 | Lint, types, production build | `npm run check` | High |
 
 ## What is NOT verified
@@ -78,7 +82,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Photos from a real phone camera (HEIC on iPhone, very large photos, rotation) | Tested with a JPEG made in the browser | The browser redraws photos the right way up; a format the browser cannot read is refused with a sentence |
 | Send update, Send confirmation, the intake link on WhatsApp | Only the link is built; WhatsApp was not opened | Low: the functions are unit tested |
 | Storage upload paths and policies in use | No screen uses storage yet | Covered structurally by tests only |
-| The Claude Code cloud SessionStart hook | Not checked this session. This session found `node_modules` incomplete (`jsqr`, `qrcode-generator`, `@playwright/test` missing) and ran `npm ci` | If `npm run check` fails on missing modules, run `npm ci` |
+| The Claude Code cloud SessionStart hook in a fresh container | Two sessions in a row found an old `node_modules` (`jsqr`, `qrcode-generator`, `@playwright/test` missing), because the hook skipped `npm ci` whenever the folder existed. On 16 October 2026 it was changed to install again when `package-lock.json` differs from the last install, and run by hand twice (installs, then skips) | If `npm run check` fails on missing modules, run `npm ci` and say so here |
 | Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
 | The public demo running somewhere | No server | `deploy/demo-reset.sh` was tried locally only |
 | The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
@@ -159,6 +163,10 @@ Drafted in M9 and M10, also unchecked: the two-step sign-in screens (दो-च�
 words for "authenticator app" (kept close to English in both), "erase" (मिटाएं, ಅಳಿಸಿ), the export and erase section
 of the parent page, the certificate field on the intake form, the rate limit sentence, and the demo notices.
 
+Drafted on 16 October 2026, also unchecked: hiding from lists (सूचियों से छिपाएं, ಪಟ್ಟಿಗಳಿಂದ ಮರೆಮಾಡಿ) and the hidden
+pets list, "Find a pet" on New booking, the sentence about taken kennels, the hint that the currency and year start
+are fixed, and the hint under Stay on a booking.
+
 ## Open questions
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
@@ -181,6 +189,10 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Invitation links are not tied to an email or phone: whoever holds one can join, once (D19). Right for how kennels
   hire?
 - Merging parents keeps the record you are on and hides the other. There is no "unmerge".
+- Changing a booking between boarding and day boarding keeps the price that is in the box; the manager changes it by
+  hand (a hint says so). Should it switch to the usual price for the new kind instead?
+- Hiding a pet or parent from lists is for owners and managers only, and hiding a parent hides their pets too. A
+  hidden parent has no list of their own: they are reached from their pets (under Hidden pets) or a past stay. Right?
 - Any member can edit any detail of a pet or parent, including phone numbers. Should changing a parent's phone be for
   managers only?
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
@@ -208,18 +220,11 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ## Known rough edges in what is built
 
-- The kind of stay (boarding or day boarding) cannot be changed on a booking; cancel and book again.
-- New booking lists every pet in one dropdown (capped at 2,000). Needs search later (M6).
-- New booking offers every kennel in service, not only the free ones. The database refuses a taken one with a clear
-  sentence. The booking page and Today offer only free kennels.
 - `care_items.requires_photo` is not offered or enforced: proof photos on tasks are not built.
-- The bill's stay line shows its dates as 2026-10-12 rather than 12 Oct 2026 (it comes from `stayLines()` and is frozen
-  on issued bills).
-- Pets and parents cannot be hidden from lists from the screen yet (soft delete exists in the database).
+- New booking still loads every pet into one list (capped at 2,000) and narrows it in the browser as you type.
 - Incidents cannot be edited once written; add a new one or ask a manager.
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
-- Settings has no fields yet for time zone, currency, locale or financial year start. They default to India (M4).
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
 - Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
   of kennels going in or out of service.
@@ -245,7 +250,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 290 tests, build
+npm run check        # dash check, lint, typecheck, 307 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -255,6 +260,10 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 16 October 2026. Rough edges: the cloud session hook reinstalls when `package-lock.json` changes; bill stay lines
+  read "14 Apr 2027"; New booking searches pets and offers only free kennels; currency and financial year start fixed
+  once a bill is issued (`WB052`); pets and parents hidden from lists and shown again (`WB019`); a booking's kind of
+  stay changed by owners and managers. e2e walk extended to 34 tests.
 - 15 October 2026. M9 (script policy with nonces and hashes, rate limits, two-step sign-in in the database, export and
   erase, intake certificates, backup drill, second review with races 6 and 16 staged) and M10 (Docker image and
   Compose with Caddy, public demo mode and nightly reset, templates, code of conduct, changelog, releasing, owner's

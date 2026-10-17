@@ -126,7 +126,7 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
 
 /**
  * Change a booking's dates, kennel, notes and belongings, and (owners and
- * managers only) its price and discount. Every date change goes through the
+ * managers only) its price, discount and kind of stay. Every date change goes through the
  * same database rules as a new booking.
  */
 export async function updateBooking(_state: FormState, form: FormData): Promise<FormState> {
@@ -142,7 +142,9 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
   if (!current.data) return { error: t.m.errors.bookingNotFound };
   if (!["requested", "confirmed", "checked_in"].includes(current.data.status)) return { error: e.finished };
 
-  const kind = current.data.kind;
+  // Only owners and managers change the kind of stay (WB022), because it changes how the stay is priced.
+  const typedKind = form.get("kind");
+  const kind = canManage && (typedKind === "boarding" || typedKind === "daycare") ? typedKind : current.data.kind;
   const start = text(form, "startDate");
   const stay = staySchema(t.m).safeParse({ kind, startDate: start, endDate: text(form, "endDate") ?? (kind === "daycare" ? start : null) });
   if (!stay.success) return { error: stay.error.issues[0].message };
@@ -154,6 +156,7 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
   for (const time of [arrival, departure]) if (time !== null && !clock.safeParse(time).success) return { error: e.clock };
 
   const update: TablesUpdate<"bookings"> = {
+    ...(kind !== current.data.kind ? { kind } : {}),
     start_date: stay.data.startDate,
     end_date: stay.data.endDate,
     kennel_id: kennel,

@@ -181,6 +181,43 @@ describe("issuing invoices", () => {
   });
 });
 
+describe("settings that bills depend on", () => {
+  it("can change freely until the first bill is issued, then the currency and year start are fixed", async () => {
+    const g = await seedKennel(db);
+    const set = (sql: string) => as(db, user(g.owner), () => db.query(sql, [g.org]));
+    await set("update public.organizations set currency = 'USD', fiscal_year_start_month = 1 where id = $1");
+    await set("update public.organizations set currency = 'INR', fiscal_year_start_month = 4 where id = $1");
+
+    // A draft does not count.
+    const d = await as(db, user(g.owner), async () => {
+      const r = await db.query<{ id: string }>(
+        `insert into public.invoices (org_id, client_id, subtotal_minor, taxable_minor, total_minor) values ($1, $2, 100, 100, 100) returning id`,
+        [g.org, g.client],
+      );
+      await db.query(
+        `insert into public.invoice_lines (org_id, invoice_id, description, quantity, unit_price_minor, taxable_minor, total_minor) values ($1, $2, 'Walk', 1, 100, 100, 100)`,
+        [g.org, r.rows[0].id],
+      );
+      return r.rows[0].id;
+    });
+    await set("update public.organizations set fiscal_year_start_month = 1 where id = $1");
+    await set("update public.organizations set fiscal_year_start_month = 4 where id = $1");
+
+    await as(db, user(g.owner), () => db.query("select public.issue_invoice($1)", [d]));
+    for (const sql of [
+      "update public.organizations set currency = 'USD' where id = $1",
+      "update public.organizations set fiscal_year_start_month = 1 where id = $1",
+    ]) {
+      expect((await errorOf(() => set(sql))).message, sql).toContain("WB052");
+    }
+    // Everything else, and saving the same values again, still works.
+    await set("update public.organizations set name = 'Renamed Kennel', currency = 'INR', fiscal_year_start_month = 4 where id = $1");
+    // A cancelled bill still used its number.
+    await as(db, user(g.owner), () => db.query("select public.void_invoice($1, 'Wrong parent')", [d]));
+    expect((await errorOf(() => set("update public.organizations set currency = 'USD' where id = $1"))).message).toContain("WB052");
+  });
+});
+
 describe("issued invoices are frozen", () => {
   let id: string;
   beforeAll(async () => {

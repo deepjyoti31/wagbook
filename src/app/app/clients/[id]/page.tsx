@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { HidePanel } from "@/components/hide-panel";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
@@ -12,7 +13,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
-import { eraseClient, mergeClient, updateClient } from "../actions";
+import { eraseClient, mergeClient, setParentHidden, updateClient } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.parent.title);
 
@@ -36,17 +37,18 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
   const res = await supabase
     .from("clients")
-    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source")
+    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at, erased_at")
     .eq("org_id", org.id)
     .eq("id", id)
-    .is("deleted_at", null)
     .maybeSingle();
   if (res.error) throw new Error("Could not load the parent.");
-  if (!res.data) notFound();
+  // A hidden parent still has a page, reached from their pets; an erased one does not.
+  if (!res.data || res.data.erased_at) notFound();
   const c = res.data;
+  const hidden = c.deleted_at !== null;
 
   const [pets, stays, bills] = await Promise.all([
-    supabase.from("pets").select("id, name, breed, flags, photo_path").eq("org_id", org.id).eq("client_id", id).is("deleted_at", null).order("name"),
+    supabase.from("pets").select("id, name, breed, flags, photo_path, deleted_at").eq("org_id", org.id).eq("client_id", id).order("name"),
     supabase.from("bookings").select("id, kind, status, start_date, end_date, pets(name)").eq("org_id", org.id).eq("client_id", id).order("start_date", { ascending: false }).limit(50),
     supabase.from("invoices").select("id, status, number, issued_on, total_minor").eq("org_id", org.id).eq("client_id", id).order("created_at", { ascending: false }).limit(50),
   ]);
@@ -56,6 +58,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   const owed = [...due.values()].reduce((n, d) => n + Math.max(d, 0), 0);
   const photos = await signedUrls(supabase, pets.data.map((p) => p.photo_path), { small: true });
   const f = p.fields;
+  const hideWords = { title: m.hiding.title, about: m.hiding.parentAbout, hide: m.hiding.hideParent, hidden: m.hiding.hiddenParent, show: m.hiding.show, saving: m.common.saving };
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true });
 
   // Merging: find the duplicate by phone number first, then confirm.
@@ -86,6 +89,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
       </p>
 
       {query.done === "merged" ? <Notice tone="ok">{p.merged}</Notice> : null}
+      {query.done === "hidden" ? <Notice tone="ok">{m.hiding.doneHidden}</Notice> : null}
+      {query.done === "shown" && !hidden ? <Notice tone="ok">{m.hiding.doneShown}</Notice> : null}
+      {hidden ? <HidePanel action={setParentHidden} field="clientId" id={c.id} hidden canManage={canManage} words={hideWords} /> : null}
       {c.consent_at ? null : <Notice tone="info">{p.noConsent}</Notice>}
 
       <Section title={p.pets} count={pets.data.length}>
@@ -99,6 +105,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                   <PetAvatar name={p.name} url={p.photo_path ? photos.get(p.photo_path) : null} />
                   <span className="flex flex-1 flex-wrap items-center gap-2">
                     <span className="font-bold">{p.name}</span>
+                    {p.deleted_at ? <Badge>{m.hiding.badge}</Badge> : null}
                     {p.breed ? <span className="text-slate">{p.breed}</span> : null}
                     {p.flags.map((f) => (
                       <Badge key={f} tone="alert">
@@ -277,6 +284,8 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           </div>
         </Section>
       ) : null}
+
+      {hidden ? null : <HidePanel action={setParentHidden} field="clientId" id={c.id} hidden={false} canManage={canManage} words={hideWords} />}
     </>
   );
 }

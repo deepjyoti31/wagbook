@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { HidePanel } from "@/components/hide-panel";
 import { AddVaccinationForm, PetPhotoForm, VaccinationList } from "@/components/pet-panels";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
@@ -13,7 +14,7 @@ import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
-import { updateIncident, updatePet } from "../actions";
+import { setPetHidden, updateIncident, updatePet } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.pet.title);
 
@@ -29,7 +30,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const { id } = await params;
   const doneKey = (await searchParams).done;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
   const { m } = t;
   const done = typeof doneKey === "string" && Object.hasOwn(m.pet.done, doneKey) ? m.pet.done[doneKey as keyof typeof m.pet.done] : null;
@@ -39,15 +40,16 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const res = await supabase
     .from("pets")
     .select(
-      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_kg, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, clients(id, full_name, phone)",
+      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_kg, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
     )
     .eq("org_id", org.id)
     .eq("id", id)
-    .is("deleted_at", null)
     .maybeSingle();
   if (res.error) throw new Error("Could not load the pet.");
-  if (!res.data) notFound();
+  // A hidden pet still has its page, reached from its past stays; an erased one does not.
+  if (!res.data || res.data.clients?.erased_at) notFound();
   const pet = res.data;
+  const hidden = pet.deleted_at !== null;
 
   const [stays, incidents, vaccinations] = await Promise.all([
     supabase.from("bookings").select("id, kind, status, start_date, end_date, kennels(name)").eq("org_id", org.id).eq("pet_id", id).order("start_date", { ascending: false }).limit(50),
@@ -67,6 +69,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
     signedUrls(supabase, vaccinations.data.map((v) => v.certificate_path)),
   ]);
   const f = m.pet.fields;
+  const hideWords = { title: m.hiding.title, about: m.hiding.petAbout, hide: m.hiding.hidePet, hidden: m.hiding.hiddenPet, show: m.hiding.show, saving: m.common.saving };
   const when = new Intl.DateTimeFormat(t.locale, { timeZone: org.time_zone, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 
   return (
@@ -75,9 +78,11 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         <PetAvatar name={pet.name} url={pet.photo_path ? photo.get(pet.photo_path) : null} size="lg" />
       </div>
       <PageTitle title={pet.name}>
-        <Link href={`/app/bookings/new?pet=${pet.id}`} className={buttonStyles.primary}>
-          {m.pet.bookStay}
-        </Link>
+        {hidden ? null : (
+          <Link href={`/app/bookings/new?pet=${pet.id}`} className={buttonStyles.primary}>
+            {m.pet.bookStay}
+          </Link>
+        )}
       </PageTitle>
       <div className="mb-5 space-y-1">
         <p className="flex flex-wrap items-center gap-2">
@@ -102,6 +107,19 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       </div>
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
+      {doneKey === "hidden" ? <Notice tone="ok">{m.hiding.doneHidden}</Notice> : null}
+      {doneKey === "shown" && !hidden ? <Notice tone="ok">{m.hiding.doneShown}</Notice> : null}
+      {hidden ? (
+        <HidePanel
+          action={setPetHidden}
+          field="petId"
+          id={pet.id}
+          hidden
+          canManage={canManage}
+          words={{ ...hideWords, hidden: m.hiding.hiddenPet }}
+          blocked={pet.clients?.deleted_at ? m.hiding.withParent : null}
+        />
+      ) : null}
 
       <Section title={m.pet.incidents} count={incidents.data.length}>
         {incidents.data.length === 0 ? (
@@ -256,6 +274,8 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           <SubmitButton pendingLabel={m.common.saving}>{m.common.saveDetails}</SubmitButton>
         </ActionForm>
       </Section>
+
+      {hidden ? null : <HidePanel action={setPetHidden} field="petId" id={pet.id} hidden={false} canManage={canManage} words={hideWords} />}
     </>
   );
 }

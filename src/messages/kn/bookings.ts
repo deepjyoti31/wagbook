@@ -87,6 +87,7 @@ export const bookingsArea: typeof English = {
     },
     change: {
       title: "ಈ ಬುಕಿಂಗ್ ಬದಲಿಸಿ",
+      kindHint: "ಬೋರ್ಡಿಂಗ್‌ಗೆ ಪ್ರತಿ ರಾತ್ರಿ, ಡೇ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಪ್ರತಿ ದಿನ ದರ. ಇದನ್ನು ಬದಲಿಸಿದರೆ ಕೆಳಗಿನ ದರವನ್ನೂ ನೋಡಿ.",
       firstDay: "ಮೊದಲ ದಿನ",
       lastDay: "ಕೊನೆಯ ದಿನ",
       checkInDate: "ಚೆಕ್ ಇನ್ ದಿನಾಂಕ",
@@ -224,6 +225,7 @@ export const bookingsArea: typeof English = {
     kennel: "ಕೆನೆಲ್",
     kennelHint: "ಇದನ್ನು ಚೆಕ್ ಇನ್‌ವರೆಗೆ ಬಿಡಬಹುದು. ಜಾಗ ಆದರೂ ಕಾಯ್ದಿರಿಸಲಾಗುತ್ತದೆ. ಒಟ್ಟಿಗೆ ಬುಕ್ ಆದ ಬೇರೆ ಸಾಕುಪ್ರಾಣಿಗಳಿಗೆ ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ಕೆನೆಲ್ ಸಿಗುತ್ತದೆ.",
     decideAtCheckIn: "ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ನಿರ್ಧರಿಸಿ",
+    kennelsTaken: "ಈ ದಿನಾಂಕಗಳಲ್ಲಿ ತುಂಬಿರುವ ಕೆನೆಲ್‌ಗಳನ್ನು ತೋರಿಸಿಲ್ಲ.",
     price: "ದರ",
     // The usual prices, put into {usual} in the sentences below.
     usualBoarding: "ಒಂದು ರಾತ್ರಿಗೆ {boarding}",
@@ -242,6 +244,9 @@ export const bookingsArea: typeof English = {
     requestNote: "ವಿನಂತಿ ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ. ನಂತರ ಬುಕಿಂಗ್ ಪುಟದಿಂದ ಖಚಿತಪಡಿಸಿ.",
     // The pet chooser at the top of the form.
     picker: {
+      find: "ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಹುಡುಕಿ",
+      findHint: "ಹೆಸರು, ತಳಿ, ಪೇರೆಂಟ್ ಅಥವಾ ಫೋನ್",
+      noMatch: "ಯಾವ ಸಾಕುಪ್ರಾಣಿಯೂ ಹೊಂದುತ್ತಿಲ್ಲ. ಎಲ್ಲವನ್ನೂ ನೋಡಲು ಬಾಕ್ಸ್ ಖಾಲಿ ಮಾಡಿ.",
       pet: "ಸಾಕುಪ್ರಾಣಿ",
       choose: "ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       withBreed: "{name}, {breed}",

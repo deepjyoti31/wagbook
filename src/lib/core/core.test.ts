@@ -198,6 +198,10 @@ describe("stays", () => {
     expect(q.lines[0].description).toContain("3 nights");
     expect(q.totalMinor).toBe(560000);
   });
+  it("writes the stay's dates on the bill the way people read them", () => {
+    const q = quoteStay({ kind: "daycare", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-14", rateMinor: 50000 }, { mode: "none" });
+    expect(q.lines[0].description).toBe("Day boarding: Bruno, 1 day (14 Apr 2027 to 14 Apr 2027)");
+  });
 });
 
 describe("whatsapp", () => {
