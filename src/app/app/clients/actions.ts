@@ -7,6 +7,7 @@ import { requireOrg } from "@/lib/auth";
 import { isGstStateCode, isValidGstin, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { setHidden } from "@/lib/hiding";
 import { getAppI18n } from "@/lib/i18n-server";
 import { BUCKET } from "@/lib/media";
 import type { Messages } from "@/messages";
@@ -105,6 +106,21 @@ export async function mergeClient(_state: FormState, form: FormData): Promise<Fo
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/clients/${keep.data}?done=merged`);
+}
+
+/** Hide a parent, with their pets, from lists, or show them again. Owners and managers; the database checks (guard_hiding). */
+export async function setParentHidden(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.hiding.onlyManagers };
+  const id = z.uuid().safeParse(form.get("clientId"));
+  if (!id.success) return { error: t.m.errors.parentNotFound };
+  const hide = form.get("hide") === "1";
+  const supabase = await createClient();
+  const error = await setHidden(supabase, t, org.id, "clients", id.data, hide);
+  if (error) return { error };
+  revalidatePath("/app", "layout");
+  redirect(`/app/clients/${id.data}?done=${hide ? "hidden" : "shown"}`);
 }
 
 /**

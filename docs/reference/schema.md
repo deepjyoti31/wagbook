@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 59.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 62.
 
 ## Contents
 
@@ -361,6 +361,8 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 **Triggers**
 
 - `clients_forbid_org_change` (before update) runs `forbid_org_change()`
+- `clients_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
+- `clients_hide_pets` (after update of deleted_at) runs `clients_hide_pets()`
 - `clients_set_updated_at` (before update) runs `set_updated_at()`
 - `clients_stamp_actor` (before insert or update) runs `stamp_actor()`
 
@@ -906,6 +908,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 **Triggers**
 
 - `organizations_audit` (after insert or delete or update) runs `audit_row()`
+- `organizations_lock_billing_settings` (before update of currency, fiscal_year_start_month) runs `organizations_lock_billing_settings()`
 - `organizations_set_updated_at` (before update) runs `set_updated_at()`
 - `organizations_validate` (before insert or update of time_zone) runs `validate_organization()`
 
@@ -1061,6 +1064,7 @@ An animal in the kennel's care. Belongs to one client.
 **Triggers**
 
 - `pets_forbid_org_change` (before update) runs `forbid_org_change()`
+- `pets_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
 - `pets_set_updated_at` (before update) runs `set_updated_at()`
 
 **Access**
@@ -1467,6 +1471,18 @@ client_file_paths(p_client uuid) returns text[]
 
 Paths in the pet-media bucket that hold this parent's pets' photos and certificates, photos from their stays, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.
 
+### clients_hide_pets
+
+```
+clients_hide_pets() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: hiding a parent hides their pets with the same time; showing the parent again shows the pets hidden at that time, not ones hidden on their own earlier.
+
 ### create_invitation_link
 
 ```
@@ -1610,6 +1626,18 @@ get_public_stay(p_token text) returns jsonb
 - Volatility: stable
 
 PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).
+
+### guard_hiding
+
+```
+guard_hiding() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger on pets and clients: only owners and managers hide a row (deleted_at) or show it again; never while it has a stay requested, confirmed or in house (WB019); a pet is shown again only once its parent is.
 
 ### intake_submissions_stamp_review
 
@@ -1778,6 +1806,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 - Volatility: stable
 
 Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.
+
+### organizations_lock_billing_settings
+
+```
+organizations_lock_billing_settings() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: refuses a change of currency or financial year start once the kennel has issued a bill (issued or cancelled), so stored amounts keep one currency and bill numbers keep running in order through the year.
 
 ### paths_in_org
 

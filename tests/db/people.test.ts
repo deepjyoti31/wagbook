@@ -156,3 +156,62 @@ describe("people", () => {
     expect(await as(db, user(staff), async () => (await db.query("select id from public.bookings where id = $1", [b])).rows.length)).toBe(1);
   });
 });
+
+describe("hiding pets and parents from lists", () => {
+  const hidden = async (table: "pets" | "clients", id: string) =>
+    (await db.query<{ deleted_at: string | null }>(`select deleted_at from public.${table} where id = $1`, [id])).rows[0].deleted_at;
+  const run = (actor: string, text: string, params: unknown[]) => as(db, user(actor), () => db.query(text, params));
+
+  it("is for owners and managers only", async () => {
+    const h = await seedKennel(db);
+    const helper = await addMember(db, h, "staff");
+    const e = await errorOf(() => run(helper, "update public.pets set deleted_at = now() where id = $1", [h.pets[0]]));
+    expect(e.message).toContain("WB002");
+    expect(await hidden("pets", h.pets[0])).toBeNull();
+    await run(h.owner, "update public.pets set deleted_at = now() where id = $1", [h.pets[0]]);
+    expect(await hidden("pets", h.pets[0])).not.toBeNull();
+    expect((await errorOf(() => run(helper, "update public.pets set deleted_at = null where id = $1", [h.pets[0]]))).message).toContain("WB002");
+    // Other changes by staff are untouched by the rule.
+    await run(helper, "update public.pets set food_notes = 'Rice' where id = $1", [h.pets[1]]);
+  });
+
+  it("is refused while a stay is requested, confirmed or in house, and allowed once it is over", async () => {
+    const h = await seedKennel(db);
+    for (const status of ["requested", "confirmed", "checked_in"]) {
+      const b = await book(db, h, { pet: h.pets[0], start: "2029-01-10", end: "2029-01-12", status });
+      for (const [table, id] of [["pets", h.pets[0]], ["clients", h.client]] as const) {
+        const e = await errorOf(() => run(h.owner, `update public.${table} set deleted_at = now() where id = $1`, [id]));
+        expect(e.message, `${status} ${table}`).toContain("WB019");
+      }
+      await run(h.owner, "update public.bookings set status = 'cancelled', cancel_reason = 'Test' where id = $1", [b]);
+    }
+    await run(h.owner, "update public.pets set deleted_at = now() where id = $1", [h.pets[0]]);
+    expect(await hidden("pets", h.pets[0])).not.toBeNull();
+  });
+
+  it("takes a parent's pets with them, and brings back only the ones hidden with them", async () => {
+    const h = await seedKennel(db);
+    await run(h.owner, "update public.pets set deleted_at = now() - interval '1 day' where id = $1", [h.pets[0]]);
+    const before = await hidden("pets", h.pets[0]);
+
+    await run(h.owner, "update public.clients set deleted_at = now() where id = $1", [h.client]);
+    for (const pet of h.pets) expect(await hidden("pets", pet), pet).not.toBeNull();
+    expect(await hidden("pets", h.pets[0])).toEqual(before);
+
+    // A pet cannot come back while its parent is hidden.
+    expect((await errorOf(() => run(h.owner, "update public.pets set deleted_at = null where id = $1", [h.pets[1]]))).message).toContain("WB019");
+
+    await run(h.owner, "update public.clients set deleted_at = null where id = $1", [h.client]);
+    expect(await hidden("pets", h.pets[0])).toEqual(before);
+    for (const pet of h.pets.slice(1)) expect(await hidden("pets", pet), pet).toBeNull();
+  });
+
+  it("keeps a hidden parent's phone number free, and refuses to show them while another parent has it", async () => {
+    const h = await seedKennel(db);
+    const phone = (await db.query<{ phone: string }>("select phone from public.clients where id = $1", [h.client])).rows[0].phone;
+    await run(h.owner, "update public.clients set deleted_at = now() where id = $1", [h.client]);
+    await run(h.owner, "insert into public.clients (org_id, full_name, phone) values ($1, 'Same Phone', $2)", [h.org, phone]);
+    const e = await errorOf(() => run(h.owner, "update public.clients set deleted_at = null where id = $1", [h.client]));
+    expect(e.message).toContain("clients_org_phone_key");
+  });
+});

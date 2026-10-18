@@ -582,6 +582,35 @@ comment on function public.void_invoice(uuid, text) is
   'Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it.';
 
 -- ---------------------------------------------------------------------------
+-- Settings that bills depend on
+-- ---------------------------------------------------------------------------
+
+-- Once a kennel has issued a bill, its currency and the month its financial
+-- year starts are fixed. Every amount the kennel has stored is in its
+-- currency, so changing it would add rupees to dollars in every total. A new
+-- year start would restart bill numbers at 1 partway through a financial year
+-- under a new label, and numbers must run in order through the year.
+create function public.organizations_lock_billing_settings()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (new.currency is distinct from old.currency or new.fiscal_year_start_month is distinct from old.fiscal_year_start_month)
+     and exists (select 1 from public.invoices i where i.org_id = old.id and i.status <> 'draft') then
+    raise exception 'WB052: the currency and the month the financial year starts cannot change once a bill has been issued' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.organizations_lock_billing_settings() is
+  'Trigger: refuses a change of currency or financial year start once the kennel has issued a bill (issued or cancelled), so stored amounts keep one currency and bill numbers keep running in order through the year.';
+
+create trigger organizations_lock_billing_settings
+  before update of currency, fiscal_year_start_month on public.organizations
+  for each row execute function public.organizations_lock_billing_settings();
+
+-- ---------------------------------------------------------------------------
 -- Payments and expenses
 -- ---------------------------------------------------------------------------
 

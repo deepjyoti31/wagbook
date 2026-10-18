@@ -1,4 +1,4 @@
-import { addDays, stayHoldsUntil, type ISODate, type StaySpan } from "./dates";
+import { addDays, isISODate, staysOverlap, stayHoldsUntil, type ISODate, type StaySpan } from "./dates";
 
 /**
  * Small rules about bookings that screens need and the database does not
@@ -74,4 +74,52 @@ export function calendarGrid<B extends CalendarStay>(kennelIds: readonly string[
     });
   }
   return { byKennel, unassigned };
+}
+
+/** A booking that holds a kennel: confirmed or checked in, with a kennel chosen. */
+export interface KennelHold extends StaySpan {
+  kennelId: string;
+}
+
+/**
+ * The stay a booking form describes, or null while it is not yet a stay. An
+ * empty check-out date means a single day of day boarding; a boarding stay
+ * needs a check-out date after its check-in date.
+ */
+export function stayFromForm(kind: string, startDate: string, endDate: string): StaySpan | null {
+  if (!isISODate(startDate)) return null;
+  if (kind === "daycare") {
+    const end = endDate === "" ? startDate : endDate;
+    return isISODate(end) && end >= startDate ? { kind, startDate, endDate: end } : null;
+  }
+  if (kind === "boarding") return isISODate(endDate) && endDate > startDate ? { kind, startDate, endDate } : null;
+  return null;
+}
+
+/**
+ * Kennels no hold overlaps for a stay, in the order given. With no stay yet,
+ * every kennel. Must agree with available_kennels() in the database, which has
+ * the last word when the booking is saved.
+ */
+export function freeKennels<K extends { id: string }>(kennels: readonly K[], holds: readonly KennelHold[], stay: StaySpan | null): K[] {
+  if (!stay) return [...kennels];
+  const taken = new Set(holds.filter((h) => staysOverlap(h, stay)).map((h) => h.kennelId));
+  return kennels.filter((k) => !taken.has(k.id));
+}
+
+/**
+ * Does a pet match what was typed into a search box? Words match the pet's
+ * name, breed or parent's name anywhere, ignoring case; three or more digits
+ * match anywhere in the parent's phone number.
+ */
+export function petMatches(
+  pet: { name: string; breed: string | null; parentName: string | null; parentPhone: string | null },
+  query: string,
+): boolean {
+  const q = query.trim().toLocaleLowerCase();
+  if (q === "") return true;
+  const digits = q.replace(/[^0-9]/g, "");
+  if (digits.length >= 3 && /^[0-9+\s()-]+$/.test(q)) return (pet.parentPhone ?? "").includes(digits);
+  const text = [pet.name, pet.breed, pet.parentName].filter(Boolean).join(" ").toLocaleLowerCase();
+  return q.split(/\s+/).every((word) => text.includes(word));
 }

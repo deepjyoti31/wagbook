@@ -45,8 +45,13 @@ async function Settings() {
   const { m, locale } = await getAppI18n();
   const s = m.settings;
   const supabase = await createClient();
-  const services = await supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true);
-  if (services.error) throw new Error("Could not load prices.");
+  const [services, issued] = await Promise.all([
+    supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
+    supabase.from("invoices").select("id", { count: "exact", head: true }).eq("org_id", org.id).neq("status", "draft"),
+  ]);
+  if (services.error || issued.error) throw new Error("Could not load prices.");
+  // The database refuses these once a bill is issued (WB052), so they are shown but not offered.
+  const billed = (issued.count ?? 0) > 0;
   const price = (kind: string) => {
     const found = services.data.find((x) => x.kind === kind);
     return found ? toDecimalString(found.price_minor).replace(/\.00$/, "") : "";
@@ -170,14 +175,14 @@ async function Settings() {
                 ))}
               </Select>
             </Field>
-            <Field label={s.region.currency} hint={s.region.currencyHint}>
-              <Input name="currency" defaultValue={org.currency} maxLength={3} autoCapitalize="characters" />
+            <Field label={s.region.currency} hint={billed ? s.region.lockedHint : s.region.currencyHint}>
+              <Input name="currency" defaultValue={org.currency} maxLength={3} autoCapitalize="characters" disabled={billed} />
             </Field>
             <Field label={s.region.locale} hint={s.region.localeHint}>
               <Input name="locale" defaultValue={org.locale} maxLength={20} autoCapitalize="none" spellCheck={false} />
             </Field>
-            <Field label={s.region.fiscalStart} hint={s.region.fiscalStartHint}>
-              <Select name="fiscal_year_start_month" defaultValue={String(org.fiscal_year_start_month)}>
+            <Field label={s.region.fiscalStart} hint={billed ? s.region.lockedHint : s.region.fiscalStartHint}>
+              <Select name="fiscal_year_start_month" defaultValue={String(org.fiscal_year_start_month)} disabled={billed}>
                 {monthNames(locale).map((month, i) => (
                   <option key={i} value={String(i + 1)}>
                     {month}

@@ -86,12 +86,19 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
   // What was typed is still there.
   await expect(page.getByLabel("Check-out date")).toHaveValue(day(3));
 
-  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  // Found by typing part of the parent's phone number.
+  await page.getByLabel("Find a pet").fill("00105");
+  await expect(page.locator("select[name=petId]")).toHaveValue(/.+/);
+  await expect(page.locator("select[name=petId] option:checked")).toHaveText("Tofu, Shih Tzu (Neha Placeholder)");
   await page.getByLabel("Check-in date").fill(day(1));
   await page.getByLabel("Check-out date").fill(day(3));
-  await page.locator("select[name=kennelId]").selectOption({ label: "K05" });
-  await page.getByRole("button", { name: "Confirm booking" }).click();
-  await expect(page.getByText("That kennel is already taken for some of those dates.")).toBeVisible();
+  // K05 is taken on those dates, so it is not offered; it is again from the day Coco leaves.
+  const k05 = page.locator("select[name=kennelId] option", { hasText: /^K05$/ });
+  await expect(k05).toHaveCount(0);
+  await expect(page.getByText("Kennels taken on these dates are left out.")).toBeVisible();
+  await page.getByLabel("Check-out date").fill(day(7));
+  await page.getByLabel("Check-in date").fill(day(4));
+  await expect(k05).toHaveCount(1);
 });
 
 test("staff cannot set a price; a family is booked together as a request, then confirmed", async ({ page }) => {
@@ -193,6 +200,17 @@ test("a manager changes a price and adds an extra", async ({ page }) => {
   await page.getByRole("button", { name: "Add extra" }).click();
   await expect(page.getByText("Added Grooming.")).toBeVisible();
   await expect(page.getByText(/Estimated total/)).toBeVisible();
+
+  // Turned into day boarding and back again, priced per day in between.
+  await page.getByRole("combobox", { name: /^Stay/ }).selectOption("daycare");
+  await page.getByLabel("Price per night").fill("720");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Booking saved.")).toBeVisible();
+  await expect(page.getByLabel("Price per day")).toHaveValue("720");
+  await page.getByRole("combobox", { name: /^Stay/ }).selectOption("boarding");
+  await page.getByLabel("Price per day").fill("1100");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByLabel("Price per night")).toHaveValue("1100");
 });
 
 test("the calendar shows kennels by day and books from an empty square", async ({ page }) => {
@@ -431,6 +449,36 @@ test("a parent's details change, and a second record of the same parent is merge
   await expect(page.getByText("Merged.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Toffee/ })).toBeVisible();
   await expect(page.getByText(/also 98000 00188/)).toBeVisible();
+});
+
+test("a manager hides a pet from lists and shows it again, but not one with a stay to come", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/dogs/new");
+  await page.getByLabel("Mobile number").fill("9800000199");
+  await page.getByLabel("Name").first().fill("Meera Sample");
+  await page.locator("input[name=petName]").fill("Pebble");
+  await page.getByRole("button", { name: "Save pet" }).click();
+  await page.waitForURL(/\/app\/dogs$/);
+
+  await openPet(page, "Pebble");
+  await page.getByRole("button", { name: "Hide this pet" }).click();
+  await expect(page.getByText("Hidden from lists.")).toBeVisible();
+  await expect(page.getByText("This pet is hidden from lists and search.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Book a stay" })).toHaveCount(0);
+  await page.goto(`/app/dogs?q=Pebble`);
+  await expect(page.getByText('Nothing found for "Pebble".')).toBeVisible();
+
+  await page.goto("/app/dogs");
+  await page.getByRole("link", { name: "Hidden pets" }).click();
+  await page.getByRole("link", { name: "Pebble", exact: true }).click();
+  await page.getByRole("button", { name: "Show in lists again" }).click();
+  await expect(page.getByText("Back in lists.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Book a stay" })).toBeVisible();
+
+  // Rocky has a stay in the festival week.
+  await openPet(page, "Rocky");
+  await page.getByRole("button", { name: "Hide this pet" }).click();
+  await expect(page.getByText("This pet has a stay in the kennel now or still to come. Check it out or cancel it first.")).toBeVisible();
 });
 
 test("someone with no account joins with an invite link, and is suspended and restored", async ({ page, browser }) => {

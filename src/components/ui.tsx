@@ -18,7 +18,7 @@ export const buttonStyles = {
 } as const;
 
 export const inputStyles =
-  "block w-full min-h-12 rounded-lg border-2 border-rule bg-paper px-3 py-2 text-base text-ink placeholder:text-slate/70 focus:border-ink focus:outline-none";
+  "block w-full min-h-12 rounded-lg border-2 border-rule bg-paper px-3 py-2 text-base text-ink placeholder:text-slate/70 focus:border-ink focus:outline-none disabled:opacity-60";
 
 export function PageTitle({ title, children }: { title: string; children?: ReactNode }) {
   return (

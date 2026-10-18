@@ -22,7 +22,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000500_billing.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
 | `WB003` | invoice not found<br>submission not found<br>parent not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
@@ -35,6 +35,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB016` | that invitation link has expired or was already used. Ask for a new one. | `20261008000100_foundation.sql` |
 | `WB017` | you already work at this kennel | `20261008000100_foundation.sql` |
 | `WB018` | choose two different parents of this kennel | `20261008000500_billing.sql` |
+| `WB019` | this has a stay in the kennel now or still to come. Check it out or cancel it first.<br>this pet's parent is hidden. Show the parent again first. | `20261008000300_kennels_and_bookings.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
 | `WB022` | only an owner or manager can change the price or the kind of stay | `20261008000300_kennels_and_bookings.sql` |
@@ -63,6 +64,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB049` | this form has already been dealt with<br>this form was declined and cannot be accepted | `20261008000600_intake_and_public_pages.sql` |
 | `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
 | `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
+| `WB052` | the currency and the month the financial year starts cannot change once a bill has been issued | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
 | `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |

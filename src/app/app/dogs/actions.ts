@@ -7,6 +7,7 @@ import { requireOrg } from "@/lib/auth";
 import { isISODate, normalizePhone } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
+import { setHidden } from "@/lib/hiding";
 import { getAppI18n } from "@/lib/i18n-server";
 import type { Messages } from "@/messages";
 import { INCIDENT_CATEGORIES, PET_FLAGS } from "@/lib/pets";
@@ -172,6 +173,21 @@ const incident = (m: Messages) =>
     description: z.string().min(1, m.incident.errors.description).max(4000, m.incident.errors.tooLong),
     actionTaken: z.string().max(4000).nullable(),
   });
+
+/** Hide a pet from lists, or show them again. Owners and managers; the database checks (guard_hiding). */
+export async function setPetHidden(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.hiding.onlyManagers };
+  const id = z.uuid().safeParse(form.get("petId"));
+  if (!id.success) return { error: t.m.errors.notFound };
+  const hide = form.get("hide") === "1";
+  const supabase = await createClient();
+  const error = await setHidden(supabase, t, org.id, "pets", id.data, hide);
+  if (error) return { error };
+  revalidatePath("/app", "layout");
+  redirect(`/app/dogs/${id.data}?done=${hide ? "hidden" : "shown"}`);
+}
 
 /** Write down something out of the ordinary, while it is fresh. */
 export async function addIncident(_state: FormState, form: FormData): Promise<FormState> {

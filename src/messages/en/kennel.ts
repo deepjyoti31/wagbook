@@ -116,6 +116,7 @@ export const kennelArea = {
       localeHint: "Like en-IN, which writes 1,20,000.",
       fiscalStart: "Financial year starts in",
       fiscalStartHint: "April in India. Bill numbers start again from 1 each year.",
+      lockedHint: "Fixed now that bills have been issued.",
       round: "Round bill totals to a whole rupee (or unit), with the difference shown as round off",
     },
     intake: {
