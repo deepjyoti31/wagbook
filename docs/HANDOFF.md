@@ -77,6 +77,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | History of changes in the reader's language | `src/lib/history.test.ts`; end-to-end ("Price per night or day: was ...") | High |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
+| `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
 
 ## What is NOT verified
 
@@ -84,7 +85,6 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | --- | --- | --- |
 | A hosted Supabase project, and `docs/10-setup-and-deploy.md` followed end to end | Needs a person with a Supabase account | The local stack is the same software, so schema problems are unlikely. Settings screens, email templates and menu names in the guide may be off. |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
-| `.github/workflows/ci.yml` on GitHub | Never run there. The `e2e` job is new. | It runs exactly what passed here; image pulls in CI may be slow |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
 | "A full meal round for twenty dogs in under two minutes" (M3), "billed, sent, paid and marked paid from a phone in under a minute" (M4), "today's photo within seconds on a slow connection" (M5) | Not timed on a phone or a throttled connection | Each step is one round trip; the stay page loads small copies (480 pixels) of photos. Probably fine; slow networks are M8 |
 | The CSV downloads opened in Excel, Google Sheets and LibreOffice | Checked as text in tests: byte order mark, quoting, CRLF | Low; an accountant opening one would settle it |
