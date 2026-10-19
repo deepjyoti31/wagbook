@@ -99,3 +99,21 @@ describe("play hours", () => {
     await as(db, user(staff), () => db.query("update public.play_sessions set starts_at = '09:00' where id = $1", [s2]));
   });
 });
+
+describe("incidents", () => {
+  it("are corrected only by owners and managers once written, while anyone marks them told or dealt with", async () => {
+    const k = await seedKennel(db, { kennels: 1, pets: 1 });
+    const staff = await addMember(db, k, "staff");
+    const manager = await addMember(db, k, "manager");
+    const id = await as(db, user(staff), async () =>
+      (await db.query<{ id: string }>("insert into public.incidents (org_id, pet_id, category, severity, description) values ($1, $2, 'injury', 'low', 'Limping') returning id", [k.org, k.pets[0]])).rows[0].id,
+    );
+    const asStaff = (q: string) => as(db, user(staff), () => db.query(q, [id]));
+    expect((await errorOf(() => asStaff("update public.incidents set description = 'Nothing happened' where id = $1"))).message).toContain("WB080");
+    expect((await errorOf(() => asStaff("update public.incidents set severity = 'high' where id = $1"))).message).toContain("WB080");
+    await asStaff("update public.incidents set parent_notified_at = now(), resolved_at = now() where id = $1");
+    await as(db, user(manager), () => db.query("update public.incidents set description = 'Limping on the left front leg', severity = 'medium' where id = $1", [id]));
+    const row = await db.query<{ description: string; severity: string }>("select description, severity from public.incidents where id = $1", [id]);
+    expect(row.rows[0]).toEqual({ description: "Limping on the left front leg", severity: "medium" });
+  });
+});

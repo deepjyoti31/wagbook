@@ -16,7 +16,6 @@ create table public.care_items (
   label text not null check (char_length(label) between 1 and 80),
   details text,
   due_time time not null,
-  requires_photo boolean not null default false,
   is_active boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -29,7 +28,6 @@ comment on table public.care_items is
   'A routine that repeats every day. With no pet it is the house routine for every boarded pet (e.g. breakfast at 9); with a pet it is that pet''s own (e.g. a tablet at 8).';
 comment on column public.care_items.pet_id is 'Empty for a house routine that applies to every pet in house.';
 comment on column public.care_items.details is 'How to do it: "200 g kibble with warm water", "1 tablet with food".';
-comment on column public.care_items.requires_photo is 'When true the app asks for a photo before the task can be marked done. Useful for medication.';
 
 create index care_items_org_pet_idx on public.care_items (org_id, pet_id);
 
@@ -310,3 +308,33 @@ create trigger incidents_stamp_actor
 create trigger incidents_stamp_notified
   before insert or update on public.incidents
   for each row execute function public.stamp_when_set('parent_notified_at', 'parent_notified_by');
+
+-- What an incident says is a record the kennel may need later, so once it is
+-- written only an owner or manager corrects it (the history of changes keeps
+-- what it said before). Anyone may still mark the parent told or the incident
+-- dealt with. With no signed-in user (the database's own work) it is let through.
+create function public.incidents_guard_content()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null
+     or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+  then
+    return new;
+  end if;
+  if (new.category, new.severity, new.description, new.action_taken, new.vet_visited, new.occurred_at, new.pet_id, new.booking_id)
+     is distinct from (old.category, old.severity, old.description, old.action_taken, old.vet_visited, old.occurred_at, old.pet_id, old.booking_id)
+  then
+    raise exception 'WB080: only an owner or manager can change what an incident says' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.incidents_guard_content() is
+  'Trigger: once written, an incident''s account (what, how serious, what was done, vet, when, which pet and stay) is changed only by an owner or manager (WB080). Anyone may mark the parent told or the incident dealt with.';
+
+create trigger incidents_guard_content
+  before update on public.incidents
+  for each row execute function public.incidents_guard_content();

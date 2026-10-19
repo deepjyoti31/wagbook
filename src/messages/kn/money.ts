@@ -1,4 +1,5 @@
 import type { moneyArea as English } from "../en/money";
+import { historyFields } from "./fields";
 
 /** Kannada words for bills, payments, the parent's bill, reports, expenses and the history of changes. First draft, to be checked by a native speaker. */
 export const moneyArea: typeof English = {
@@ -259,6 +260,8 @@ export const moneyArea: typeof English = {
     older: "ಹಳೆಯ ಬದಲಾವಣೆಗಳು",
     kennel: "ಕೆನೆಲ್ {name}",
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "ಬುಕಿಂಗ್",
         booking_items: "ಬುಕಿಂಗ್‌ನ ಹೆಚ್ಚುವರಿ",

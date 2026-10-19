@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 66.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 67.
 
 ## Contents
 
@@ -226,7 +226,6 @@ A routine that repeats every day. With no pet it is the house routine for every 
 | `label` | `text` | yes |  |  |
 | `details` | `text` |  |  | How to do it: "200 g kibble with warm water", "1 tablet with food". |
 | `due_time` | `time without time zone` | yes |  |  |
-| `requires_photo` | `boolean` | yes | `false` | When true the app asks for a photo before the task can be marked done. Useful for medication. |
 | `is_active` | `boolean` | yes | `true` |  |
 | `sort_order` | `integer` | yes | `0` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -467,6 +466,7 @@ Anything out of the ordinary: illness, injury, a fight, an escape. A written, ti
 
 - `incidents_audit` (after insert or delete or update) runs `audit_row()`
 - `incidents_forbid_org_change` (before update) runs `forbid_org_change()`
+- `incidents_guard_content` (before update) runs `incidents_guard_content()`
 - `incidents_set_updated_at` (before update) runs `set_updated_at()`
 - `incidents_stamp_actor` (before insert or update) runs `stamp_actor()`
 - `incidents_stamp_notified` (before insert or update) runs `stamp_when_set()`
@@ -1661,6 +1661,18 @@ guard_hiding() returns trigger
 - Volatility: volatile
 
 Trigger on pets and clients: only owners and managers hide a row (deleted_at) or show it again; never while it has a stay requested, confirmed or in house (WB019); a pet is shown again only once its parent is.
+
+### incidents_guard_content
+
+```
+incidents_guard_content() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: once written, an incident's account (what, how serious, what was done, vet, when, which pet and stay) is changed only by an owner or manager (WB080). Anyone may mark the parent told or the incident dealt with.
 
 ### intake_submissions_stamp_review
 

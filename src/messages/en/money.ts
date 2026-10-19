@@ -1,3 +1,4 @@
+import { historyFields } from "./fields";
 /** English words for bills, payments, the parent's bill, reports, expenses and the history of changes. Part of en.ts. */
 export const moneyArea = {
   // The list of bills.
@@ -278,6 +279,8 @@ export const moneyArea = {
     kennel: "kennel {name}",
     // Words inside each change (src/lib/history.ts).
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "Booking",
         booking_items: "Extra on a booking",

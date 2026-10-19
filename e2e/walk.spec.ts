@@ -462,6 +462,19 @@ test("a pet's details change, and an incident shows on Today until it is dealt w
   await expect(page.getByText("Marked as dealt with.")).toBeVisible();
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: /Incidents to deal with/ })).toHaveCount(0);
+  // Staff are not offered a correction; a manager is.
+  await openPet(page, "Bruno");
+  await expect(page.getByRole("link", { name: "Correct it" })).toHaveCount(0);
+
+  await signIn(page, "manager");
+  await openPet(page, "Bruno");
+  await page.getByRole("link", { name: "Correct it" }).first().click();
+  await expect(page.getByLabel("Describe it")).toHaveValue("Cut on the left front paw after play.");
+  await page.getByLabel("Describe it").fill("Small cut on the left front paw after play. Cleaned and dressed.");
+  await page.locator("select[name=severity]").selectOption("medium");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText(/^Incident corrected\./)).toBeVisible();
+  await expect(page.getByText("Small cut on the left front paw after play. Cleaned and dressed.")).toBeVisible();
 });
 
 test("a parent's details change, and a second record of the same parent is merged in", async ({ page }) => {
@@ -578,6 +591,10 @@ test("a manager writes down an expense with its receipt; staff see no money repo
 
   const staff = await privateWindow(browser);
   await signIn(staff.page, "staff");
+  // More does not offer them to staff, and opening one by its address says why.
+  await staff.page.goto("/app/more");
+  await expect(staff.page.getByRole("link", { name: /^Bills/ })).toBeVisible();
+  for (const title of ["Reports", "Expenses", "History of changes"]) await expect(staff.page.getByRole("link", { name: new RegExp(`^${title}`) })).toHaveCount(0);
   for (const path of ["/app/more/reports", "/app/more/expenses", "/app/more/history"]) {
     await staff.page.goto(path);
     await expect(staff.page.getByText(/for owners and managers\.$/)).toBeVisible();
@@ -619,7 +636,7 @@ test("the history of changes says who changed a price", async ({ page }) => {
   await page.getByLabel("Who").selectOption({ label: "Ravi" });
   await page.getByRole("button", { name: "Show" }).click();
   await expect(page.getByText(/^Ravi, /).first()).toBeVisible();
-  await expect(page.getByText(/^Rate: was ₹1,200, now/).first()).toBeVisible();
+  await expect(page.getByText(/^Price per night or day: was ₹1,200, now/).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 

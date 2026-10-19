@@ -1,4 +1,5 @@
 import type { moneyArea as English } from "../en/money";
+import { historyFields } from "./fields";
 
 /** Hindi words for bills, payments, the parent's bill, reports, expenses and the history of changes. First draft, to be checked by a native speaker. */
 export const moneyArea: typeof English = {
@@ -280,6 +281,8 @@ export const moneyArea: typeof English = {
     kennel: "केनेल {name}",
     // Words inside each change (src/lib/history.ts).
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "बुकिंग",
         booking_items: "बुकिंग पर एक्स्ट्रा",

@@ -260,7 +260,6 @@ export type Database = {
           label: string;
           details: string | null;
           due_time: string;
-          requires_photo: boolean;
           is_active: boolean;
           sort_order: number;
           created_at: string;
@@ -274,7 +273,6 @@ export type Database = {
           label: string;
           details?: string | null;
           due_time: string;
-          requires_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -288,7 +286,6 @@ export type Database = {
           label?: string;
           details?: string | null;
           due_time?: string;
-          requires_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;

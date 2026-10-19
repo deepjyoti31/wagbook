@@ -27,6 +27,7 @@ export const petsArea = {
       incident: "Incident written down.",
       told: "Marked as told.",
       resolved: "Marked as dealt with.",
+      corrected: "Incident corrected. The history of changes keeps what it said before.",
     },
     incidents: "Incidents",
     noIncidents: "Nothing out of the ordinary has been written down.",
@@ -37,6 +38,7 @@ export const petsArea = {
     whatWeDid: "What we did: {action}",
     markTold: "Parent has been told",
     markDealtWith: "Dealt with",
+    correctIncident: "Correct it",
     writeIncident: "Write down an incident",
     vaccinations: "Vaccinations",
     stays: "Stays",
@@ -91,6 +93,9 @@ export const petsArea = {
   incident: {
     title: "Write down an incident",
     pageTitle: "Incident: {pet}",
+    // An owner or manager correcting an incident already written.
+    correctTitle: "Correct an incident: {pet}",
+    correctAbout: "Change what is wrong. What it said before stays in the history of changes.",
     back: "Back to {pet}",
     whatHappened: "What happened",
     howSerious: "How serious",

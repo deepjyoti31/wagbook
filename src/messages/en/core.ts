@@ -149,6 +149,7 @@ export const core = {
       WB071: "A pet of this parent is in the kennel now. Check it out first.",
       WB072: "This parent has stays still to come. Cancel them first.",
       WB073: "This parent's details have already been erased.",
+      WB080: "Only an owner or manager can change what an incident says.",
     },
   },
   labels: {

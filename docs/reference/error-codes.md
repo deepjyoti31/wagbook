@@ -18,6 +18,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB050 to WB059 | Bills and payments (continued) |
 | WB060 to WB069 | Reports and expenses |
 | WB070 to WB079 | A parent's details: export and erase |
+| WB080 to WB089 | Daily care and incidents |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -75,3 +76,4 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB071` | a pet of this parent is in the kennel now. Check it out first. | `20261008001100_privacy.sql` |
 | `WB072` | this parent has stays still to come. Cancel them first. | `20261008001100_privacy.sql` |
 | `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |
+| `WB080` | only an owner or manager can change what an incident says | `20261008000400_daily_care.sql` |

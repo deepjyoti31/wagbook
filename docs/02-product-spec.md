@@ -356,7 +356,7 @@ medicine has a red edge and badge and is never folded away. One tap on Done; a s
 the first who and when). Skip opens a note; a medicine cannot be skipped without one (constraint
 `care_tasks_skipped_medication_needs_note`). Undo puts a task back. Filters: Still to do, and by kind.
 
-Not yet: `care_items.requires_photo` is not offered or enforced, because photos arrive in M5.
+Proof photos on care tasks are not built; the field meant for them was removed (M13).
 
 ### D3. Solo play timetable. Built.
 
