@@ -8,7 +8,8 @@
 --     {org_id}/vaccinations/{vaccination_id}.pdf
 --     {org_id}/updates/{update_id}/1.jpg
 --     {org_id}/expenses/{expense_id}.jpg     (owners and managers only)
---     {org_id}/intake/{submission_id}/pet-1  (a certificate sent with an intake form)
+--     {org_id}/intake/{submission_id}/pet-1    (a certificate sent with an intake form)
+--     {org_id}/intake/{submission_id}/pet-1-2  (the certificate for that pet's second vaccine)
 -- The first folder decides who can see the file. Nothing is public; pages
 -- that show a photo ask for a short-lived signed link.
 -- =============================================================================
@@ -164,8 +165,8 @@ create policy pet_media_select_for_stay on storage.objects for select to anon
 --
 -- Whoever sent a form gets its secret upload token back from submit_intake().
 -- With it, in the x-wagbook-intake request header, the anonymous role may add
--- one file per pet on the form, named {org_id}/intake/{submission_id}/pet-N,
--- within an hour of sending, while the form is still waiting for staff. Only
+-- one file per vaccine of each pet on the form (two at most), named
+-- {org_id}/intake/{submission_id}/pet-N and pet-N-2, within an hour of sending, while the form is still waiting for staff. Only
 -- adding: anon has no select, update or delete policy, so a file cannot be
 -- read back, replaced (the name is unique) or removed. The bucket limits size
 -- and type (10 MB; photos and PDF).
@@ -192,7 +193,7 @@ begin
   end if;
   v_parts := regexp_match(
     p_name,
-    '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/intake/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/pet-([1-6])$'
+    '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/intake/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/pet-([1-6])(-2)?$'
   );
   if v_parts is null then
     return false;
@@ -210,7 +211,7 @@ begin
 end;
 $$;
 comment on function public.intake_upload_allowed(text) is
-  'PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N for one of the form''s pets. SECURITY DEFINER because the anonymous role can read no table.';
+  'PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form''s pets. SECURITY DEFINER because the anonymous role can read no table.';
 revoke all on function public.intake_upload_allowed(text) from public, anon;
 grant execute on function public.intake_upload_allowed(text) to anon;
 

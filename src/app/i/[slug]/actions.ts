@@ -44,14 +44,20 @@ export async function submitIntake(slug: string, kennelName: string, language: s
   if (!phone) return { error: e.phone };
 
   const pets = [];
-  // The certificate sent for each pet, in the same order as `pets`.
-  const certificates: (Upload | null)[] = [];
+  // The certificates sent for each pet (one for each of its two vaccines), in the same order as `pets`.
+  const certificates: (Upload | null)[][] = [];
   for (let i = 0; i < MAX_PET_KEYS && pets.length <= MAX_PETS; i++) {
     const name = text(form, `pets.${i}.name`);
     if (name === null) continue;
     const neutered = form.get(`pets.${i}.is_neutered`);
     const vaccine = text(form, `pets.${i}.vaccine`);
     const validUntil = text(form, `pets.${i}.vaccine_valid_until`);
+    const vaccine2 = text(form, `pets.${i}.vaccine2`);
+    const validUntil2 = text(form, `pets.${i}.vaccine2_valid_until`);
+    const vaccinations = [
+      ...(vaccine ? [{ vaccine, given_on: null, valid_until: validUntil && isISODate(validUntil) ? validUntil : null }] : []),
+      ...(vaccine2 ? [{ vaccine: vaccine2, given_on: null, valid_until: validUntil2 && isISODate(validUntil2) ? validUntil2 : null }] : []),
+    ];
     pets.push({
       name,
       species: form.get(`pets.${i}.species`),
@@ -66,12 +72,17 @@ export async function submitIntake(slug: string, kennelName: string, language: s
       behaviour_notes: text(form, `pets.${i}.behaviour_notes`),
       vet_name: text(form, `pets.${i}.vet_name`),
       vet_phone: text(form, `pets.${i}.vet_phone`),
-      vaccinations: vaccine ? [{ vaccine, given_on: null, valid_until: validUntil && isISODate(validUntil) ? validUntil : null }] : [],
+      vaccinations,
     });
-    const certificate = await readUpload(form.get(`pets.${i}.certificate`), t.m, { allowPdf: true });
-    if (certificate && "error" in certificate) return { error: certificate.error };
-    if (certificate && !vaccine) return { error: e.certificateNeedsVaccine };
-    certificates.push(certificate);
+    // The first card belongs to the first vaccine written; the second card to the second.
+    const cards: (Upload | null)[] = [];
+    for (const [field, forVaccine] of [["certificate", vaccine ?? vaccine2], ["certificate2", vaccine && vaccine2]] as const) {
+      const card = await readUpload(form.get(`pets.${i}.${field}`), t.m, { allowPdf: true });
+      if (card && "error" in card) return { error: card.error };
+      if (card && !forVaccine) return { error: e.certificateNeedsVaccine };
+      cards.push(card);
+    }
+    certificates.push(cards);
   }
 
   const start = text(form, "start_date");
@@ -108,14 +119,16 @@ export async function submitIntake(slug: string, kennelName: string, language: s
   // gave back (intake_upload_allowed). The form is in either way.
   const sent = data as { folder: string; upload_token: string } | null;
   let allSent = true;
-  if (certificates.some(Boolean)) {
+  if (certificates.flat().some(Boolean)) {
     const anon = createAnonClient({ intakeToken: sent?.upload_token });
-    for (const [i, c] of certificates.entries()) {
-      if (!c) continue;
-      const { error: uploadError } = sent
-        ? await anon.storage.from(BUCKET).upload(`${sent.folder}/pet-${i + 1}`, c.bytes, { contentType: c.contentType, upsert: false })
-        : { error: true };
-      if (uploadError) allSent = false;
+    for (const [i, cards] of certificates.entries()) {
+      for (const [j, c] of cards.entries()) {
+        if (!c) continue;
+        // pet-N for the first vaccine, pet-N-2 for the second (intake_upload_allowed).
+        const name = `${sent?.folder}/pet-${i + 1}${j === 1 ? "-2" : ""}`;
+        const { error: uploadError } = sent ? await anon.storage.from(BUCKET).upload(name, c.bytes, { contentType: c.contentType, upsert: false }) : { error: true };
+        if (uploadError) allSent = false;
+      }
     }
   }
   return { ok: allSent ? "sent" : fill(t.m.intakeForm.certificateNotSent, { kennel: kennelName }) };

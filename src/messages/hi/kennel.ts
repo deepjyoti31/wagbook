@@ -320,6 +320,8 @@ export const kennelArea: typeof English = {
     validUntil: "कब तक मान्य",
     certificate: "टीके का सर्टिफ़िकेट (चाहें तो)",
     certificateHint: "कार्ड की फ़ोटो या PDF। 10 MB तक।",
+    anotherVaccine: "एक और टीका, उसके अपने कार्ड के साथ",
+    secondVaccine: "दूसरा टीका",
     vet: "आपके पशु डॉक्टर",
     vetPhone: "पशु डॉक्टर का फ़ोन",
     removePet: "यह पालतू हटाएं",

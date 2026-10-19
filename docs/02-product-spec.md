@@ -137,14 +137,15 @@ row shows the pet's photo, breed, weight, flags in red, the parent (opening thei
 ### B3. Intake form for parents. Built.
 
 `/i/{slug}`. One page, no account. The parent enters their details and an emergency contact, up to six pets (with food,
-health, behaviour and vaccinations, and a photo or PDF of each pet's vaccination certificate), the dates they want, and
+health, behaviour, a vaccination and a photo or PDF of its certificate, and optionally another vaccination with its own
+card), the dates they want, and
 ticks a consent box. The consent wording is the kennel's own, or a default. The submission waits for staff; it changes
 nothing until accepted. A certificate needs the vaccine's name beside it. If the form goes but a certificate does not,
 the thank-you page says to send it on WhatsApp.
 
 Protection against abuse: the form can be switched off; a submission is at most 20,000 bytes; at most 60 unreviewed
 submissions per kennel per hour and 5 per phone number per hour (`WB048`); at most 10 sends from one address in ten
-minutes (M9, `src/lib/rate-limit.ts`). Certificates (M9): one file per pet, at most 10 MB, photo or PDF, only within an
+minutes (M9, `src/lib/rate-limit.ts`). Certificates (M9, a second per pet in M13): one file for each of a pet's two vaccines, at most 10 MB, photo or PDF, only within an
 hour of sending the form and only while it waits for staff, using the secret the form got back
 (`intake_upload_allowed`). See [05-security-and-privacy.md](05-security-and-privacy.md).
 
@@ -235,17 +236,20 @@ price for the kind of stay; only owners and managers see a Price box and can typ
 copied onto the booking, so changing the rate card later never changes an old booking. Opening it from the calendar
 fills in the kennel and the date. After booking, the booking page opens.
 
-A search box above the pet list narrows it by pet name, breed, parent's name, or three or more digits of the parent's
-phone; when one pet matches it is chosen. The kennel list offers only kennels free on the dates typed, and changes as
+The pet list starts with recently booked and recently added pets and their families, not every pet the kennel has. A
+search box above it finds any pet by name, breed, parent's name, or three or more digits of the parent's phone: the
+list narrows at once, and the server is asked for the rest as you type (`searchPets()`, M13); when one pet matches it
+is chosen. The kennel list offers only kennels free on the dates typed, and changes as
 the dates change (`freeKennels()`, the same rule as `available_kennels()`); a sentence says when some are left out.
 
 What the database refuses, whatever the screen does:
 
 | Rule | Error |
 | --- | --- |
-| Two pets in one kennel on overlapping nights | `bookings_no_kennel_overlap` |
+| Pets of different parents in one kennel on overlapping nights | `bookings_no_kennel_overlap` |
+| A third pet in one kennel | `WB027` |
 | One pet in two bookings at once | `bookings_no_pet_overlap` |
-| More pets in house on any day than kennels in service (once at least one kennel exists) | `WB020` |
+| More kennels in use on any day than kennels in service (once at least one kennel exists; two siblings sharing use one) | `WB020` |
 | A kennel that is out of service | `WB021` |
 | Boarding with no night; check-out before check-in; longer than a year | check constraints |
 | Staff booking at a price that is not on the price list, or with a discount | `WB023` |
@@ -391,7 +395,9 @@ page.
 injury, fight, escape, behaviour, damage, other), how serious (low, medium: tell the parent today, high: tell the parent
 and a vet now), what happened in words, what was done, vet seen, parent told. It is tied to the pet's current stay. The
 pet page lists them with "Parent has been told" (the database stamps who and when) and "Dealt with". Today shows, at the
-top, every open high one and every open medium or high one the parent has not been told about.
+top, every open high one and every open medium or high one the parent has not been told about. Owners and managers can
+correct what an incident says ("Correct it"); the database refuses anyone else (`WB080`), and History of changes keeps
+what it said before.
 
 ### D6. Check-in checklist. Built.
 
@@ -462,8 +468,8 @@ refuse anyone who is not an owner or manager of the kennel.
 ### E6. History of changes. Built.
 
 `/app/more/history`, owners and managers only: the audit log in words, newest first. "Booking changed" by whom and
-when, with each field as it was and as it is now; filter by kind of record and by person; a link to the booking, bill
-or pet where there is one.
+when, with each field, named in the reader's language, as it was and as it is now; filter by kind of record and by
+person; a link to the booking, bill or pet where there is one. Staff do not see it, Reports or Expenses under More.
 
 ---
 

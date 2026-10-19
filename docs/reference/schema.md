@@ -1696,7 +1696,7 @@ intake_upload_allowed(p_name text) returns boolean
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
+PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
 
 ### invite_member_by_email
 

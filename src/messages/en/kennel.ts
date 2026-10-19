@@ -319,6 +319,9 @@ export const kennelArea = {
     validUntil: "Valid until",
     certificate: "Vaccination certificate (optional)",
     certificateHint: "A photo or PDF of the card. Up to 10 MB.",
+    // A second vaccine, with its own card, for parents who have two.
+    anotherVaccine: "Another vaccination, with its own card",
+    secondVaccine: "Other vaccination",
     vet: "Your vet",
     vetPhone: "Vet's phone",
     removePet: "Remove this pet",

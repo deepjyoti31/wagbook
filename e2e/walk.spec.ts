@@ -897,6 +897,12 @@ test("a parent sends a certificate with the form, then asks for their details an
   await parent.page.locator("input[name='pets.0.certificate']").setInputFiles({
     name: "card.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%Wagbook test card\n%%EOF\n"),
   });
+  // A second vaccine with its own card.
+  await parent.page.getByText(en.intakeForm.anotherVaccine).click();
+  await parent.page.locator("input[name='pets.0.vaccine2']").fill("DHPPi");
+  await parent.page.locator("input[name='pets.0.certificate2']").setInputFiles({
+    name: "card2.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%Wagbook second card\n%%EOF\n"),
+  });
   await parent.page.getByRole("checkbox").check();
   await parent.page.getByRole("button", { name: /Send to/ }).click();
   await expect(parent.page.getByText(/Thank you/).first()).toBeVisible();
@@ -905,16 +911,17 @@ test("a parent sends a certificate with the form, then asks for their details an
 
   await signIn(page, "owner");
   await page.goto("/app/more/intake");
-  const card = page.getByRole("link", { name: "See the certificate for Mochi" });
+  const card = page.getByRole("link", { name: "See the certificate for Mochi" }).first();
   await expect(card).toBeVisible();
+  await expect(page.getByRole("link", { name: "See the certificate for Mochi" })).toHaveCount(2);
   const cardUrl = (await card.getAttribute("href"))!;
   expect((await (await page.request.get(cardUrl)).body()).toString()).toContain("Wagbook test card");
   await page.getByRole("listitem").filter({ hasText: "Rhea Invented" }).getByRole("button", { name: "Accept and book" }).click();
   await page.waitForURL(/\/app\/bookings\/new/);
 
-  // The certificate is now on Mochi's vaccination.
+  // Each certificate is now on its vaccination.
   await openPet(page, "Mochi");
-  await expect(page.getByRole("link", { name: "Certificate" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Certificate" })).toHaveCount(2);
 
   // The parent asks what the kennel holds about them.
   await page.goto(`/app/dogs?q=${phone}`);

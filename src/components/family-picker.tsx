@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { petMatches } from "@/lib/core/bookings";
 import { fill } from "@/lib/i18n";
 import type { Messages } from "@/messages";
@@ -20,13 +20,18 @@ export interface PickablePet {
  * together. A search box above the list narrows it by name, breed, parent or
  * phone. Without JavaScript the list and the first choice still work on their
  * own. `onFamilyChange` hears whose pets are chosen and how many.
+ *
+ * The list starts with the pets the page sent (recent ones). With `search`,
+ * typing also asks the server for matching pets and their families, so a
+ * kennel with thousands of pets never sends them all to the phone.
  */
 export function FamilyPicker({
-  pets,
+  pets: initialPets,
   words,
   defaultPetId,
   defaultAlso = [],
   onFamilyChange,
+  search,
 }: {
   pets: PickablePet[];
   /** m.newBooking.picker */
@@ -34,35 +39,55 @@ export function FamilyPicker({
   defaultPetId?: string;
   defaultAlso?: string[];
   onFamilyChange?: (family: { clientId: string | null; pets: number }) => void;
+  search?: (query: string) => Promise<PickablePet[]>;
 }) {
+  const [pets, setPets] = useState(initialPets);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const asked = useRef(0);
   const [petId, setPetId] = useState(defaultPetId ?? "");
   const [also, setAlso] = useState<string[]>(defaultAlso);
   const [query, setQuery] = useState("");
   const chosen = pets.find((p) => p.id === petId);
   // The chosen pet stays in the list whatever is typed, so the choice never vanishes.
   const shown = pets.filter((p) => p.id === petId || petMatches(p, query));
-  const choose = (id: string) => {
+  const choose = (id: string, from: PickablePet[] = pets) => {
     setPetId(id);
     // Another pet may have another parent, so the ticks start again.
     setAlso([]);
-    onFamilyChange?.({ clientId: pets.find((p) => p.id === id)?.clientId ?? null, pets: 1 });
+    onFamilyChange?.({ clientId: from.find((p) => p.id === id)?.clientId ?? null, pets: 1 });
   };
   const tick = (id: string, on: boolean) => {
     const next = on ? [...also, id] : also.filter((x) => x !== id);
     setAlso(next);
     onFamilyChange?.({ clientId: chosen?.clientId ?? null, pets: 1 + next.length });
   };
+  // One match is chosen for the person.
+  const pickOnly = (q: string, from: PickablePet[]) => {
+    const matches = from.filter((p) => petMatches(p, q));
+    if (q.trim() !== "" && matches.length === 1 && matches[0].id !== petId) choose(matches[0].id, from);
+  };
   const find = (q: string) => {
     setQuery(q);
-    const matches = pets.filter((p) => petMatches(p, q));
-    if (q.trim() !== "" && matches.length === 1 && matches[0].id !== petId) choose(matches[0].id);
+    pickOnly(q, pets);
+    if (!search || q.trim() === "") return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const mine = ++asked.current;
+      const found = await search(q);
+      // An answer to an older question is thrown away.
+      if (mine !== asked.current || found.length === 0) return;
+      const known = new Set(pets.map((p) => p.id));
+      const merged = [...pets, ...found.filter((p) => !known.has(p.id))].sort((a, b) => a.name.localeCompare(b.name));
+      setPets(merged);
+      pickOnly(q, merged);
+    }, 250);
   };
   const siblings = chosen ? pets.filter((p) => p.clientId === chosen.clientId && p.id !== chosen.id) : [];
   const withBreed = (p: PickablePet) => (p.breed ? fill(words.withBreed, { name: p.name, breed: p.breed }) : p.name);
 
   return (
     <div className="space-y-3">
-      {pets.length > 1 ? (
+      {pets.length > 1 || search ? (
         <label className="block">
           <span className="mb-1 block font-semibold">{words.find}</span>
           <input type="search" value={query} onChange={(e) => find(e.target.value)} placeholder={words.findHint} autoComplete="off" className={inputStyles} />

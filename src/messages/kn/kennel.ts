@@ -317,6 +317,8 @@ export const kennelArea: typeof English = {
     validUntil: "ಯಾವಾಗದವರೆಗೆ ಮಾನ್ಯ",
     certificate: "ಲಸಿಕೆ ಪ್ರಮಾಣಪತ್ರ (ಬೇಕಿದ್ದರೆ)",
     certificateHint: "ಕಾರ್ಡ್‌ನ ಫೋಟೋ ಅಥವಾ PDF. 10 MB ವರೆಗೆ.",
+    anotherVaccine: "ಇನ್ನೊಂದು ಲಸಿಕೆ, ಅದರದೇ ಕಾರ್ಡ್‌ನೊಂದಿಗೆ",
+    secondVaccine: "ಇನ್ನೊಂದು ಲಸಿಕೆ",
     vet: "ನಿಮ್ಮ ವೆಟ್",
     vetPhone: "ವೆಟ್ ಫೋನ್",
     removePet: "ಈ ಸಾಕುಪ್ರಾಣಿ ತೆಗೆಯಿರಿ",

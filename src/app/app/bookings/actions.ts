@@ -7,6 +7,7 @@ import { requireOrg } from "@/lib/auth";
 import { formatDate, isISODate, parseMoney, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
+import { searchPets, type PetChoice } from "@/lib/pet-search";
 import { fill } from "@/lib/i18n";
 import { getAppI18n, type I18n } from "@/lib/i18n-server";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
@@ -340,4 +341,18 @@ export async function removeExtra(_state: FormState, form: FormData): Promise<Fo
   if (data.length === 0) return { error: t.m.booking.errors.extraNotFound };
   revalidatePath("/app", "layout");
   return { ok: t.m.booking.extraRemoved };
+}
+
+/**
+ * Pets matching what was typed in New booking's search box, with their
+ * families. Called by the picker as the person types; nothing changes.
+ */
+export async function findPets(query: string): Promise<PetChoice[]> {
+  const { org } = await requireOrg();
+  if (typeof query !== "string") return [];
+  try {
+    return await searchPets(await createClient(), org.id, query);
+  } catch {
+    return [];
+  }
 }

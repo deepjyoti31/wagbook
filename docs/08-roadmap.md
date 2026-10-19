@@ -321,6 +321,23 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M13. Rough edges
+
+- [x] Finished 19 October 2026.
+
+**Build**
+
+1. [x] New booking starts with recent pets and searches the rest on the server as you type.
+2. [x] More shows Reports, Expenses and History of changes only to owners and managers.
+3. [x] History of changes names fields in the reader's language.
+4. [x] A second vaccination with its own card on the intake form.
+5. [x] Owners and managers correct an incident (`WB080` for anyone else).
+6. [x] The unused `care_items.requires_photo` is removed.
+7. [ ] Deleting an expense removes its receipt file. **Waiting for the owner** (see "Decisions waiting" in
+   `HANDOFF.md`: whether anything may be deleted at all).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

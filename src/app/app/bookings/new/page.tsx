@@ -8,7 +8,8 @@ import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
-import { createBooking } from "../actions";
+import { hasPets, startingPets } from "@/lib/pet-search";
+import { createBooking, findPets } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.newBooking.title);
 
@@ -28,8 +29,12 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
   const supabase = await createClient();
 
   const today = todayIn(org.time_zone);
-  const [pets, kennels, services, holds] = await Promise.all([
-    supabase.from("pets").select("id, name, breed, client_id, clients(full_name, phone)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
+  const pick = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
+  const askedPet = pick(params.pet);
+  // Recent pets to start with; the search box finds the rest on the server.
+  const [anyPet, pets, kennels, services, holds] = await Promise.all([
+    hasPets(supabase, org.id),
+    startingPets(supabase, org.id, askedPet && /^[0-9a-f-]{36}$/.test(askedPet) ? askedPet : undefined),
     supabase.from("kennels").select("id, name").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     supabase.from("services").select("kind, price_minor, shared_price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
     // Stays that hold a kennel from yesterday on, the same rule as available_kennels().
@@ -42,9 +47,9 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
       .gte("end_date", addDays(today, -1))
       .limit(5000),
   ]);
-  if (pets.error || kennels.error || services.error || holds.error) throw new Error("Could not load the booking form.");
+  if (kennels.error || services.error || holds.error) throw new Error("Could not load the booking form.");
 
-  if (pets.data.length === 0) {
+  if (!anyPet) {
     return (
       <>
         <PageTitle title={w.title} />
@@ -58,7 +63,6 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
     );
   }
 
-  const pick = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
   const start = pick(params.start);
   const end = pick(params.end);
   const kennel = pick(params.kennel);
@@ -82,8 +86,9 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
       <ActionForm action={createBooking}>
         <NewBookingFields
           pickerWords={w.picker}
-          defaultPetId={pick(params.pet)}
-          pets={pets.data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null, parentPhone: p.clients?.phone ?? null }))}
+          defaultPetId={askedPet}
+          pets={pets}
+          search={findPets}
           stay={{
             words: w,
             kennels: kennels.data,
