@@ -271,7 +271,7 @@ test("a new person creates a kennel, invites a colleague, who joins and switches
   await page.getByLabel("Your name").fill("Tester");
   await page.getByRole("button", { name: /Create/ }).click();
   await page.waitForURL(/\/app\/more\/kennels/);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add the row" }).click();
   await expect(page.getByText("Added 10 kennels.")).toBeVisible();
 
   // Invite the demo staff member, who then has two kennels.
@@ -920,4 +920,30 @@ test("a parent sends a certificate with the form, then asks for their details an
   await expect(page.getByRole("link", { name: /Rhea Invented|Mochi/ })).toHaveCount(0);
   // The certificate file is gone from storage too.
   expect((await page.request.get(cardUrl)).ok()).toBe(false);
+});
+
+test("a manager adds a kennel with its own name, renames it and moves it to the top of the list", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/kennels");
+  await page.locator("input[name=name]").first().fill("Garden suite");
+  await page.getByRole("button", { name: "Add kennel", exact: true }).click();
+  await expect(page.getByText("Added Garden suite.")).toBeVisible();
+
+  // Each row's Change says which kennel it is for, to a screen reader.
+  const row = page.locator("details").filter({ has: page.locator("summary", { hasText: "Change Garden suite" }) });
+  await row.locator("summary").click();
+  await row.locator("input[name=name]").fill("Garden suite 1");
+  await row.locator("input[name=position]").fill("0");
+  await row.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved Garden suite 1.")).toBeVisible();
+  await page.reload();
+  // First in the list now, before K01.
+  const names = await page.locator(".door-tag").allTextContents();
+  expect(names[0]).toContain("Garden suite 1");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  // A name already in use is refused with a sentence.
+  await page.locator("input[name=name]").first().fill("K01");
+  await page.getByRole("button", { name: "Add kennel", exact: true }).click();
+  await expect(page.getByText("A kennel with that name already exists.")).toBeVisible();
 });

@@ -80,8 +80,11 @@ land on Kennels with a welcome note asking them to add kennels. A person can own
 
 ### A3. Add kennels. Built.
 
-Add a run in one go: prefix `K`, how many, first number, gives `K01` to `K60`. Repeating it never duplicates. A kennel
-can be taken out of service and put back. The number of kennels in service is the kennel's capacity.
+Add one kennel with any name ("Garden suite"), at the end of the list, or a numbered row in one go: prefix `K`, how
+many, first number, gives `K01` to `K60`. Repeating a row never duplicates. Each kennel's Change renames it and sets
+its position in the list, which is also the order the care round walks. Two kennels cannot share a name. A kennel can
+be taken out of service and put back. The number of kennels in service is the kennel's capacity. Owners and managers
+(M12).
 
 ### A4. Invite the team. Built.
 

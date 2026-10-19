@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
-import { plural } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,4 +62,49 @@ export async function setKennelActive(_state: FormState, form: FormData): Promis
 
   revalidatePath("/app", "layout");
   return {};
+}
+
+const One = z.object({
+  name: z.string().trim().min(1).max(40),
+  position: z.coerce.number().int().min(0).max(9999),
+});
+
+/** Add one kennel with a name of the kennel's choosing, at the end of the list unless a position is given. */
+export async function addKennel(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.kennels.errors;
+  const supabase = await createClient();
+  const last = await supabase.from("kennels").select("sort_order").eq("org_id", org.id).order("sort_order", { ascending: false }).limit(1).maybeSingle();
+  if (last.error) return { error: friendlyError(last.error, t) };
+  const parsed = One.safeParse({ name: text(form, "name") ?? "", position: Math.min((last.data?.sort_order ?? 0) + 1, 9999) });
+  if (!parsed.success) return { error: e.name };
+
+  const { error } = await supabase.from("kennels").insert({ org_id: org.id, name: parsed.data.name, sort_order: parsed.data.position });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: fill(t.m.kennels.addedOne, { kennel: parsed.data.name }) };
+}
+
+/** Rename a kennel, or move it in the list (the order the care round walks). Owners and managers (the update policy). */
+export async function changeKennel(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.kennels.errors;
+  const id = z.uuid().safeParse(form.get("kennelId"));
+  if (!id.success) return { error: e.notFound };
+  const parsed = One.safeParse({ name: text(form, "name") ?? "", position: text(form, "position") ?? "" });
+  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "name" ? e.name : e.position };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("kennels")
+    .update({ name: parsed.data.name, sort_order: parsed.data.position })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: e.onlyManagers };
+  revalidatePath("/app", "layout");
+  return { ok: fill(t.m.kennels.saved, { kennel: parsed.data.name }) };
 }

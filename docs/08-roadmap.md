@@ -309,6 +309,18 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M12. Name kennels freely
+
+- [x] Finished 19 October 2026. Asked for by the owner: name kennels when adding them.
+
+**Build**
+
+1. [x] Add one kennel with a name of your choosing, beside the numbered row.
+2. [x] Rename a kennel.
+3. [x] Change a kennel's position in the list (the care round's walking order).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
