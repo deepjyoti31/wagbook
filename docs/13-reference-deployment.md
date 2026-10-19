@@ -1,10 +1,10 @@
 # 13. Reference deployment
 
-Wagbook is maintained by a dog boarding kennel in Bengaluru that builds it for its own operations. This page describes
-that kennel's **public operating rules** and how each maps onto Wagbook, as a worked example for other kennels and as a set of real
-requirements for contributors.
+A worked example: the **public operating rules** of one dog boarding kennel in Bengaluru, and how each maps onto
+Wagbook. It is here for other kennels to copy from and as a set of real requirements for contributors. Wagbook is an
+independent project, not tied to any one kennel, and this example is never named.
 
-It holds only what a parent could learn by asking at the gate. Nothing else about that business belongs in this
+It holds only what a parent could learn by asking at the gate. Nothing else about any real business belongs in this
 repository (see `CLAUDE.md`, rule 25).
 
 Your kennel will differ. Every rule below is a setting, not something built into the code.
@@ -13,8 +13,9 @@ Your kennel will differ. Every rule below is a setting, not something built into
 
 | Rule | In Wagbook |
 | --- | --- |
-| 60 kennels, one dog in each | 60 rows in `kennels` (More, Kennels: prefix K, 60, from 1). Capacity is then 60 and the database refuses a 61st dog on any day. |
-| Dogs are never mixed | One booking per kennel per night (exclusion constraint). Play is solo (below). |
+| 60 kennels, one dog in each, or two dogs of one family | 60 rows in `kennels` (More, Kennels: prefix K, 60, from 1). Capacity is then 60 kennels and the database refuses a 61st kennel on any day. Two dogs of one parent may share a kennel and use one of the 60 (D27). |
+| Dogs of different families are never mixed | Only pets of one parent share a kennel on a night (exclusion constraint), two at most. Play is solo, or with siblings (below). |
+| A second dog sharing a kennel costs less | Settings, Prices: "Second pet sharing a kennel". The kennel sets the price. |
 | Boarding at ₹1,200 a night, the same for every dog | Settings, Prices: boarding 1200. One default `services` row of kind `boarding`. |
 | Day boarding at 60% of the night rate | Settings, Prices: day boarding 720. |
 | Grooming at ₹2,000 | An add-on in the rate card (screen in M2; the table exists). |
@@ -41,7 +42,8 @@ Two sessions of 20 minutes for each of 60 dogs is:
 60 dogs × 2 sessions × 20 minutes = 2,400 yard-minutes = 40 yard-hours a day
 ```
 
-A yard holds one dog at a time. With yards in use for ten hours a day:
+A yard holds one dog at a time (or two siblings who share a kennel, which needs fewer sessions still). With yards in
+use for ten hours a day:
 
 | Session | Changeover between dogs | Yard-hours needed | Yards needed |
 | --- | --- | --- | --- |

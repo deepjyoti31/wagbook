@@ -414,12 +414,6 @@ export const kennelArea = {
     step4: "Restart the app.",
     walkthrough: "The full walkthrough is in {path}.",
   },
-  demo: {
-    banner: "This is a demo with an invented kennel. Anyone can change anything, and it all goes back every night.",
-    tryAs: "Try it as the owner, a manager or staff:",
-    password: "The password for all three is {password}.",
-    noTwoStep: "Two-step sign-in is switched off in the demo, because everyone shares these accounts.",
-  },
   landing: {
     headline: "The register for your kennel, on your phone.",
     about:

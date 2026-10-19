@@ -9,8 +9,8 @@ the same kennel during Diwali week, or nobody can say whether the old Labrador h
 Software that fixes this exists, but it tends to be priced per month in a way a ten-kennel business cannot justify, or
 it is built for another country: card payments, email reminders, sales tax.
 
-Wagbook is free, open source kennel software that any kennel can use, however small. It is maintained by a kennel that
-builds it for its own use.
+Wagbook is free, open source kennel software that any kennel can use, however small. It is an independent project,
+built from how kennels really work and meant to be used in one every day.
 
 ## Who it is for
 

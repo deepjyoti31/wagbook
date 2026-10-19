@@ -113,35 +113,13 @@ depend on ([05-security-and-privacy.md](05-security-and-privacy.md)).
 [16-releasing.md](16-releasing.md), "Updating an installation". Update Supabase's containers as its own guide says,
 and the server itself (security updates) regularly.
 
-## The public demo
-
-A demo anyone can try: the invented kennel of `supabase/seed.sql`, with its three accounts shown on the sign-in page,
-put back every night. Run it on its **own** server and Supabase, never beside a real kennel.
-
-1. Parts 1 to 3 as above, with `ENABLE_EMAIL_AUTOCONFIRM=true` in Supabase's `.env` (visitors cannot confirm email)
-   and `WAGBOOK_DEMO=1` in `deploy/.env`. The app then says on every screen that it is a demo, lists the accounts on
-   the sign-in page, and refuses two-step sign-in (one visitor must not lock the shared accounts).
-2. Load the demo once, and every night at 03:00 India time, with `deploy/demo-reset.sh`. It deletes every kennel and
-   account (including any password a visitor changed), removes the files visitors added, and runs
-   `supabase db reset`, which applies the migrations and the seed again. It refuses to run against a database that has
-   a kennel more than three days old, which the demo never has.
-
-   ```cron
-   30 21 * * *  DEMO_DB_URL='postgresql://postgres...' SUPABASE_DIR=/srv/supabase /srv/wagbook/deploy/demo-reset.sh >> /var/log/wagbook-demo-reset.log 2>&1
-   ```
-
-3. Link to it from the README once it is up.
-
-Between resets, visitors can see what other visitors typed. The sign-in page says so; nothing real belongs there.
-
 ## What has been verified
 
 | Thing | How | Confidence |
 | --- | --- | --- |
 | The `Dockerfile` builds, and the image serves Wagbook with its script policy (the build manifest is in the image) | Built and run on 15 October 2026 | High |
-| `deploy/compose.yml` and `deploy/Caddyfile`: both addresses through Caddy, the app reaching Supabase by the network alias, sign-in, Today, Care, Bookings, Pets, More and two-step sign-in with no browser errors, the demo notices | Run on one computer against the local Supabase from the CLI (`SUPABASE_UPSTREAM=supabase_kong_wagbook:8000`, `SUPABASE_NETWORK=supabase_network_wagbook`, `http://wagbook.localhost` and `http://api.wagbook.localhost`) | High for that setup |
+| `deploy/compose.yml` and `deploy/Caddyfile`: both addresses through Caddy, the app reaching Supabase by the network alias, sign-in, Today, Care, Bookings, Pets, More and two-step sign-in with no browser errors | Run on one computer against the local Supabase from the CLI (`SUPABASE_UPSTREAM=supabase_kong_wagbook:8000`, `SUPABASE_NETWORK=supabase_network_wagbook`, `http://wagbook.localhost` and `http://api.wagbook.localhost`) | High for that setup |
 | Rate limits behind Caddy cannot be dodged by sending your own `X-Real-IP` or `X-Forwarded-For` | 22 sign-in tries, each with a different forged address: the 21st onwards were slowed down | High |
-| `deploy/demo-reset.sh` | Run against the local Supabase: a visitor's account and the files folder were removed, the demo kennel and its three accounts came back | Medium: locally `supabase db reset` recreates the whole database; against a remote one it resets the schemas it manages |
 | Supabase's own self-hosting setup (Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Not done here: needs a server with public names | The CLI's local Supabase runs the same services; settings and names in Part 1 may differ by Supabase version |
 
 To try it on one computer, the way it was verified: start the local Supabase (`npx -y supabase@2.120.0 start`), put

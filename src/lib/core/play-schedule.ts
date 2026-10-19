@@ -1,7 +1,7 @@
 /**
  * Solo play scheduling.
  *
- * Some kennels (the reference deployment is one) never let dogs of different
+ * Some kennels (the example in docs/13 is one) never let dogs of different
  * families play together. Every dog gets the yard to itself (or with its
  * siblings, when they share a kennel) for a fixed number of short sessions a
  * day. That is safer, and it makes the yard a scarce

@@ -17,8 +17,8 @@ Read in this order the first time. After that, `HANDOFF.md` is the page to open 
 | [10-setup-and-deploy.md](10-setup-and-deploy.md) | From nothing to a running Wagbook, click by click. |
 | [11-working-with-claude-code.md](11-working-with-claude-code.md) | Setting up cloud sessions, and prompts that work. |
 | [12-glossary.md](12-glossary.md) | The words Wagbook uses, and the ones it avoids. |
-| [13-reference-deployment.md](13-reference-deployment.md) | The operating rules of the kennel that maintains Wagbook, as a worked example. |
-| [14-self-hosting.md](14-self-hosting.md) | Running Wagbook and Supabase on your own server with Docker Compose, and the public demo. |
+| [13-reference-deployment.md](13-reference-deployment.md) | One unnamed kennel's public operating rules, as a worked example. |
+| [14-self-hosting.md](14-self-hosting.md) | Running Wagbook and Supabase on your own server with Docker Compose. |
 | [15-backup-and-restore.md](15-backup-and-restore.md) | Copying the database and the files, bringing them back, and the drill. |
 | [16-releasing.md](16-releasing.md) | Version numbers, making a release, updating an installation. |
 | [17-guide-for-kennel-owners.md](17-guide-for-kennel-owners.md) | Wagbook explained to a kennel owner, with pictures. Share this one. |

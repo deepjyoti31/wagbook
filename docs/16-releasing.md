@@ -30,8 +30,6 @@ From an up-to-date `main`, on a branch:
    file).
 5. **Merge, then tag** the merge commit on `main`: `git tag -a v0.2.0 -m "Wagbook 0.2.0"` and push the tag.
 6. **The GitHub release.** Create it from the tag, with that version's changelog section as its text.
-7. **The demo.** Update the public demo ([14-self-hosting.md](14-self-hosting.md), "The public demo") and check it
-   after the next nightly reset.
 
 Never put a parent's details, a real kennel's name or a key in a changelog, a tag message or a release.
 

@@ -275,22 +275,37 @@ settings, security review and fixes, documentation.
 
 ## M10. Ready for the world
 
-- [ ] Built 15 October 2026, except item 5, which is the owner's decision. The public demo is ready to run but has no
-  server yet.
+- [x] Finished 19 October 2026. The owner confirmed the licence; the public demo was dropped for trying Wagbook on
+  your own computer (D28).
 
 **Build**
 
 1. [x] A self-hosting guide with Docker Compose (self-hosted Supabase plus the app): [14-self-hosting.md](14-self-hosting.md),
    `Dockerfile`, `deploy/`. Verified on one computer against the CLI's Supabase; Supabase's own self-hosting stack not
    tried.
-2. [x] A public demo with seeded, invented data that resets nightly: `NEXT_PUBLIC_WAGBOOK_DEMO=1` and
-   `deploy/demo-reset.sh`. Needs a server to run on.
+2. [x] ~~A public demo that resets nightly~~. Dropped (D28): the seeded, invented kennel runs on a local Supabase
+   instead (README, "Try it on your own computer", `npm run setup:local`).
 3. [x] Issue and pull request templates, a code of conduct, a release process and changelog (`.github/`,
    `CODE_OF_CONDUCT.md`, [16-releasing.md](16-releasing.md), `CHANGELOG.md`).
 4. [x] A short guide for a kennel owner, with screenshots: [17-guide-for-kennel-owners.md](17-guide-for-kennel-owners.md)
    (`scripts/guide-screenshots.mjs` takes the pictures again).
-5. [ ] Confirm the licence decision (see `09-decisions.md`, D2) before the first public announcement. **Waiting for the
-   owner.**
+5. [x] Confirm the licence decision: AGPL-3.0-or-later, confirmed 19 October 2026 (D2).
+
+---
+
+## M11. Families
+
+- [x] Finished 19 October 2026. Asked for by the owner: some families board two dogs in one kennel (D27).
+
+**Build**
+
+1. [x] Two pets of one parent may share a kennel, never three, never with another parent's pet, all in the database.
+   Capacity counts kennels in use.
+2. [x] A shared kennel price for the second pet, set by the kennel in Settings; New booking offers "One kennel
+   together" for two pets.
+3. [x] Today, the booking page and the calendar offer and show a shared kennel.
+4. [x] One bill for a family booked together; advances on any of the pets count against it.
+5. [x] Siblings may play together, and are planned together.
 
 ---
 

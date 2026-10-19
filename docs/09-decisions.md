@@ -50,7 +50,7 @@ instance for many kennels would move to a paid plan, which is a fixed monthly pr
 
 ## D2. Licence: AGPL-3.0-or-later
 
-**Status:** Provisional. The project owner must confirm before the first public release.
+**Status:** Decided. Confirmed by the owner, 19 October 2026.
 
 **Situation.** The goal is that every kennel can use Wagbook free for ever. The risk is a company taking the code,
 improving it privately, and selling it as a hosted service that out-competes the free one.
@@ -63,11 +63,8 @@ version over a network to share their changes. That keeps improvements flowing b
 **Cost.** Some companies have policies against using AGPL software, which may reduce corporate contributions.
 A kennel that only uses Wagbook is unaffected.
 
-**The alternative.** MIT or Apache-2.0: simpler, friendlier to businesses, and allows closed commercial forks. If the
-owner would rather maximise adoption than protect against closed forks, switch **before** accepting outside
-contributions; afterwards every contributor would have to agree.
-
-**To do.** Owner confirms or changes. Then remove "Provisional" here and in `HANDOFF.md`.
+**The alternative.** MIT or Apache-2.0: simpler, friendlier to businesses, and allows closed commercial forks. Not
+chosen. Changing now would need every contributor's agreement.
 
 ---
 
@@ -510,3 +507,42 @@ their own edge rule ([10-setup-and-deploy.md](10-setup-and-deploy.md)).
 is exact.
 
 **Cost.** On Vercel each copy of the app counts on its own. Whoever calls Supabase directly is not counted by the app.
+
+## D27. Two pets of one parent may share a kennel, and a family pays on one bill
+
+**Status:** Decided, 19 October 2026, by the owner.
+
+**Situation.** Some families board two dogs that live together and want them in one kennel. They use one kennel, so
+they expect to pay less for the second dog, and they expect one bill for the family. Until now the database refused two
+pets in one kennel on the same night, and each pet's stay was billed on its own.
+
+**Decision.** A kennel holds one pet, or two pets of the same parent. The kennel overlap constraint compares the parent,
+so pets of different parents can never share; a trigger refuses a third pet (`WB027`), even when overbooking is
+allowed. Capacity counts kennels in use, not pets. Each stay price (boarding, day boarding) may carry a shared kennel
+price, set by the kennel, for the second pet; New booking offers "One kennel together" for two pets and books the
+second at it. Staff may book that price only when the pets really share (`bookings_check_shared_price`). Pets booked
+together (one `group_id`) are billed on one bill (`invoices.group_id`), never on their own (`WB053`), and a family stays
+the family it was booked as (`WB026`). Siblings may share a play yard, and the planner gives siblings sharing a kennel
+the same slots.
+
+**Why.** The price is per night, like any stay price, so it stays right when dates change and needs no new
+arithmetic on the bill: the database checks a family's bill with the same rules as any other (`WB050`). Sharing is
+decided by the parent, not the booking, so a sibling booked later can still join its brother.
+
+**Cost.** A second pet keeps its shared price if its sibling leaves early; a manager changes it by hand. Which pet is
+"the second" is whichever was chosen second at booking. A pet cannot be added to a family after booking; it is booked
+on its own and billed on its own.
+
+## D28. No public demo; people try Wagbook on their own computer
+
+**Status:** Decided, 19 October 2026, by the owner.
+
+**Situation.** M10 built a demo mode (a notice on every screen, the accounts on the sign-in page, a nightly reset
+script) for a public demo server. Nobody wants to run or pay for that server.
+
+**Decision.** The demo mode and the reset script are removed. The invented kennel in `supabase/seed.sql` stays, for a
+local Supabase: the README's "Try it on your own computer" and `npm run setup:local` get anyone there in a few commands.
+
+**Why.** Code for a server that will never run is code to keep working for nothing.
+
+**Cost.** Trying Wagbook needs Docker and a few minutes, not a link.

@@ -3,8 +3,8 @@
 @AGENTS.md
 
 Wagbook is open source kennel management software: bookings, daily care, billing and parent updates for pet boarding
-kennels. India first, usable anywhere. A real kennel builds it to run its own operations on, so correctness of bookings
-and money matters more than speed of delivery.
+kennels. India first, usable anywhere. Real kennels run their operations on it, so correctness of bookings and money
+matters more than speed of delivery.
 
 ## Start of every session
 
@@ -111,10 +111,11 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 24. **Do not copy from other kennel software.** No text, screens, layouts, names or code from any commercial product.
     Wagbook is designed from how kennels work, not from someone else's screens. Do not scrape other products' sites.
 
-### Privacy of the reference kennel
+### Privacy of real kennels
 
-25. `docs/13-reference-deployment.md` holds the public operating rules of the kennel that maintains Wagbook. Do not add
-    anything else about that business to this repository: no finances, plans, dates, suppliers or customer data.
+25. `docs/13-reference-deployment.md` holds one example kennel's public operating rules, unnamed. Wagbook is an
+    independent project: never name a real kennel business in this repository, and add nothing about one: no
+    finances, plans, dates, suppliers or customer data.
 
 ## Definition of done
 

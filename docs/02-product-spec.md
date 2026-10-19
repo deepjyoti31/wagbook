@@ -108,7 +108,7 @@ cookie is only a preference: membership is checked on every request.
 ### A6. Settings. Built.
 
 Kennel details (name, phones, email, address, usual drop-off and pick-up times), usual prices for boarding and day
-boarding, UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
+boarding and a shared kennel price for each (the second pet of one parent in one kennel; empty means the usual price), UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
 prefix, whether prices include tax), intake form (on or off, consent wording). Staff can look but not save. Solo play
 settings are on Play yards (D3).
 
@@ -281,8 +281,17 @@ After a step that changes the status, the page comes back saying what happened. 
 ### C4. Family bookings. Built.
 
 In New booking, choosing a pet lists the other pets of the same parent with a tick box each. Ticked pets are booked in
-the same statement (all or none), share a `group_id`, and show each other on the booking page. Only the first pet gets
-the chosen kennel; the others get theirs at check-in. The database refuses a group that mixes parents (`WB024`).
+the same statement (all or none), share a `group_id`, and show each other on the booking page. The database refuses a
+group that mixes parents (`WB024`), and a family stays as it was booked (`WB026`).
+
+With two pets ticked, Kennels offers "A kennel each" (the first pet gets the chosen kennel, the other gets one at
+check-in) or "One kennel together": then a kennel must be chosen, only kennels with room for both are offered, both
+pets get it, and the second is booked at the shared kennel price from Settings (when one is set). A kennel holds two
+pets of one parent at most, never pets of different parents (D27); Today, the booking page and the calendar offer and
+label a sibling's kennel ("K05, with Coco"), and the booking page says "Shares K05 with Coco." The calendar shows both in
+the kennel's square, and its top row counts kennels in use, with the number of pets when siblings share.
+
+The family pays on one bill (E1).
 
 ### C5. Calendar. Built.
 
@@ -355,8 +364,9 @@ minutes between pets, opening hours and an optional break. A calculator there an
 `/app/play`: Plan today builds a fair timetable for every pet in house (`planPlaySessions()`): everyone gets a first
 session before anyone gets a second, at least two hours between a pet's sessions, pets taken in kennel order, around any
 sessions already planned, so it can be pressed again after new arrivals. A peak period's shorter session length applies.
-The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees the slot). The database refuses two pets
-in one yard at once, or one pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
+The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees the slot). Siblings sharing a kennel
+are planned together, in the same slots. The database refuses pets of different parents in one yard at once, or one
+pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
 to happen.
 
 ### D4. Updates to parents. Built.
@@ -402,6 +412,10 @@ or opens the issued bill. Owners and managers can change, add and remove lines o
 its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
 cancel an issued bill with a reason; the number stays used. Bills, under More: what is owed first, then drafts, then
 recent.
+
+Pets booked together are billed together: Make the family bill puts each pet's stay and extras on one bill
+(`billForFamily()`), with every pet of the family that is not a request or cancelled. A pet of a family is never billed
+on its own (`WB053`); advances on any of the pets count against the family's bill (D27).
 
 ### E2. Bill for the parent. Built.
 
@@ -483,7 +497,7 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Languages other than English | Built: English, Hindi and Kannada (drafts until reviewed). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |
 | Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
-| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase, and a public demo that resets nightly (M10, [14-self-hosting.md](14-self-hosting.md)) |
+| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase; `npm run setup:local` points the app at it (README, "Try it on your own computer"). No public demo (D28). |
 | Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. |
 | Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
 | Scripts only from Wagbook itself | Built (M9): a Content-Security-Policy with a fresh nonce for every page (D23) |
