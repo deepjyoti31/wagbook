@@ -10,7 +10,7 @@ describe("friendlyError", () => {
     );
   });
   it("explains constraint violations by name", () => {
-    expect(friendlyError({ code: "23P01", message: 'conflicting key value violates exclusion constraint "bookings_no_kennel_overlap"' })).toContain("already taken");
+    expect(friendlyError({ code: "23P01", message: 'conflicting key value violates exclusion constraint "bookings_no_kennel_overlap"' })).toContain("another parent");
     expect(friendlyError({ code: "23505", message: 'duplicate key value violates unique constraint "clients_org_phone_key"' })).toContain("phone number");
   });
   it("maps permission errors and hides everything else", () => {

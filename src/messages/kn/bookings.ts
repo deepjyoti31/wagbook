@@ -42,6 +42,8 @@ export const bookingsArea: typeof English = {
     sendConfirmation: "ಕನ್ಫರ್ಮೇಶನ್ ಕಳುಹಿಸಿ",
     openIt: "ತೆರೆಯಿರಿ",
     bookedTogetherTitle: "ಒಟ್ಟಿಗೆ ಬುಕ್ ಆಗಿರುವವು",
+    kennelWith: "{kennel}, {pets} ಜೊತೆ",
+    sharesWith: "{pets} ಜೊತೆ {kennel} ಹಂಚಿಕೊಂಡಿದೆ.",
     costs: {
       title: "ಎಷ್ಟು ಆಗುತ್ತದೆ",
       // {what} is "Boarding", "Day boarding" or the name of an extra.
@@ -77,6 +79,8 @@ export const bookingsArea: typeof English = {
       noneYet: "ಇನ್ನೂ ಬಿಲ್ ಇಲ್ಲ. ಚೆಕ್ ಔಟ್ ಸಮಯದಲ್ಲಿ ಮಾಡಿ, ಅಥವಾ ಪೇರೆಂಟ್ ಮುಂಗಡ ಕಟ್ಟುತ್ತಿದ್ದರೆ ಈಗಲೇ ಮಾಡಿ.",
       make: "ಬಿಲ್ ಮಾಡಿ",
       making: "ಬಿಲ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
+      familyNote: "ಒಟ್ಟಿಗೆ ಬುಕ್ ಆದ ಸಾಕುಪ್ರಾಣಿಗಳಿಗೆ ಒಂದೇ ಬಿಲ್.",
+      makeFamily: "ಕುಟುಂಬದ ಬಿಲ್ ಮಾಡಿ",
     },
     // Money taken before the bill. {method} is UPI, Cash and so on; {reference} is what was typed, like a UTR.
     payment: {
@@ -173,6 +177,8 @@ export const bookingsArea: typeof English = {
       choosePet: "ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       atMostSix: "ಒಟ್ಟಿಗೆ ಹೆಚ್ಚೆಂದರೆ ಆರು ಸಾಕುಪ್ರಾಣಿಗಳನ್ನು ಬುಕ್ ಮಾಡಿ.",
       sameParent: "ಒಂದೇ ಪೇರೆಂಟ್‌ನ ಸಾಕುಪ್ರಾಣಿಗಳನ್ನು ಮಾತ್ರ ಒಟ್ಟಿಗೆ ಬುಕ್ ಮಾಡಬಹುದು.",
+      shareTwo: "ಒಂದು ಕೆನೆಲ್ ಅನ್ನು ಎರಡು ಸಾಕುಪ್ರಾಣಿಗಳು ಮಾತ್ರ ಹಂಚಿಕೊಳ್ಳಬಹುದು. ಎರಡು ಸಾಕುಪ್ರಾಣಿಗಳನ್ನು ಆರಿಸಿ, ಅಥವಾ ಪ್ರತಿಯೊಂದಕ್ಕೂ ಬೇರೆ ಕೆನೆಲ್.",
+      shareKennel: "ಎರಡು ಸಾಕುಪ್ರಾಣಿಗಳು ಹಂಚಿಕೊಳ್ಳುವ ಕೆನೆಲ್ ಆರಿಸಿ.",
       priceNumber: "ದರವನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 1200 ಅಥವಾ 1200.50.",
       priceWhole: "ದರವನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 1200.",
       discountNumber: "ಡಿಸ್ಕೌಂಟ್ ಅನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 200, ಅಥವಾ ಖಾಲಿ ಬಿಡಿ.",
@@ -226,6 +232,12 @@ export const bookingsArea: typeof English = {
     kennelHint: "ಇದನ್ನು ಚೆಕ್ ಇನ್‌ವರೆಗೆ ಬಿಡಬಹುದು. ಜಾಗ ಆದರೂ ಕಾಯ್ದಿರಿಸಲಾಗುತ್ತದೆ. ಒಟ್ಟಿಗೆ ಬುಕ್ ಆದ ಬೇರೆ ಸಾಕುಪ್ರಾಣಿಗಳಿಗೆ ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ಕೆನೆಲ್ ಸಿಗುತ್ತದೆ.",
     decideAtCheckIn: "ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ನಿರ್ಧರಿಸಿ",
     kennelsTaken: "ಈ ದಿನಾಂಕಗಳಲ್ಲಿ ತುಂಬಿರುವ ಕೆನೆಲ್‌ಗಳನ್ನು ತೋರಿಸಿಲ್ಲ.",
+    kennels: "ಕೆನೆಲ್‌ಗಳು",
+    kennelEach: "ಪ್ರತಿಯೊಂದಕ್ಕೂ ಬೇರೆ ಕೆನೆಲ್",
+    kennelTogether: "ಎರಡೂ ಒಂದೇ ಕೆನೆಲ್‌ನಲ್ಲಿ",
+    chooseKennel: "ಕೆನೆಲ್ ಆರಿಸಿ",
+    shareHint: "ಎರಡೂ ಸಾಕುಪ್ರಾಣಿಗಳು ನೀವು ಆರಿಸುವ ಕೆನೆಲ್‌ನಲ್ಲಿ ಇರುತ್ತವೆ.",
+    sharedPriceNote: "ಎರಡನೇ ಸಾಕುಪ್ರಾಣಿಗೆ ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ, {price}.",
     price: "ದರ",
     // The usual prices, put into {usual} in the sentences below.
     usualBoarding: "ಒಂದು ರಾತ್ರಿಗೆ {boarding}",
@@ -272,6 +284,7 @@ export const bookingsArea: typeof English = {
     region: "ದಿನವಾರು ಕೆನೆಲ್‌ಗಳು",
     kennel: "ಕೆನೆಲ್",
     inHouse: "ಇಲ್ಲಿ ಇದೆ",
+    petsShort: "{n} ಸಾಕುಪ್ರಾಣಿಗಳು",
     pet: "ಸಾಕುಪ್ರಾಣಿ",
     // For screen readers on an empty square. {day} is a short date like "14 Apr".
     bookFrom: "{day} ರಿಂದ {kennel} ಬುಕ್ ಮಾಡಿ",

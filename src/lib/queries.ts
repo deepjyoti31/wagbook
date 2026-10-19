@@ -40,3 +40,21 @@ export type PeakRow = QueryData<ReturnType<typeof peakPeriods>>[number];
 export function toPeak(p: PeakRow) {
   return { name: p.name, startDate: p.start_date, endDate: p.end_date, noRefund: p.no_refund, playSessionMinutes: p.play_session_minutes };
 }
+
+/**
+ * Kennels the given parents' pets hold between two dates, with the pet in
+ * each, so a kennel offered for sharing can say who is already in it.
+ */
+export function familyHolds(supabase: Client, orgId: string, clientIds: string[], from: string, to: string) {
+  return supabase
+    .from("bookings")
+    .select("id, client_id, kennel_id, kind, start_date, end_date, pets(name)")
+    .eq("org_id", orgId)
+    .in("client_id", clientIds.length > 0 ? clientIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("status", ["confirmed", "checked_in"])
+    .not("kennel_id", "is", null)
+    .lte("start_date", to)
+    .gte("end_date", from);
+}
+
+export type FamilyHold = QueryData<ReturnType<typeof familyHolds>>[number];

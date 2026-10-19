@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { FamilyPicker } from "@/components/family-picker";
-import { StayFields } from "@/components/stay-fields";
+import { NewBookingFields } from "@/components/new-booking-fields";
 import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
@@ -32,11 +31,11 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
   const [pets, kennels, services, holds] = await Promise.all([
     supabase.from("pets").select("id, name, breed, client_id, clients(full_name, phone)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(2000),
     supabase.from("kennels").select("id, name").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
-    supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
+    supabase.from("services").select("kind, price_minor, shared_price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
     // Stays that hold a kennel from yesterday on, the same rule as available_kennels().
     supabase
       .from("bookings")
-      .select("kennel_id, kind, start_date, end_date")
+      .select("kennel_id, client_id, kind, start_date, end_date")
       .eq("org_id", org.id)
       .in("status", ["confirmed", "checked_in"])
       .not("kennel_id", "is", null)
@@ -63,10 +62,9 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
   const start = pick(params.start);
   const end = pick(params.end);
   const kennel = pick(params.kennel);
-  const price = (kind: string) => {
-    const s = services.data.find((x) => x.kind === kind);
-    return s ? formatMoney(s.price_minor, { currency: org.currency, locale, trimZeros: true }) : null;
-  };
+  const money = (minor: number | null | undefined) => (minor == null ? null : formatMoney(minor, { currency: org.currency, locale, trimZeros: true }));
+  const price = (kind: string) => money(services.data.find((x) => x.kind === kind)?.price_minor);
+  const sharedPrice = (kind: string) => money(services.data.find((x) => x.kind === kind)?.shared_price_minor);
   const boarding = price("boarding");
   const daycare = price("daycare");
   const usual =
@@ -82,19 +80,20 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
     <>
       <PageTitle title={w.title} />
       <ActionForm action={createBooking}>
-        <FamilyPicker
-          words={w.picker}
+        <NewBookingFields
+          pickerWords={w.picker}
           defaultPetId={pick(params.pet)}
           pets={pets.data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null, parentPhone: p.clients?.phone ?? null }))}
-        />
-        <StayFields
-          words={w}
-          kennels={kennels.data}
-          holds={holds.data.map((h) => ({ kennelId: h.kennel_id as string, kind: h.kind, startDate: h.start_date, endDate: h.end_date }))}
-          defaultKind={pick(params.kind) === "daycare" ? "daycare" : "boarding"}
-          defaultStart={start && isISODate(start) ? start : today}
-          defaultEnd={end && isISODate(end) ? end : ""}
-          defaultKennelId={kennel && kennels.data.some((k) => k.id === kennel) ? kennel : ""}
+          stay={{
+            words: w,
+            kennels: kennels.data,
+            holds: holds.data.map((h) => ({ kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date })),
+            defaultKind: pick(params.kind) === "daycare" ? "daycare" : "boarding",
+            defaultStart: start && isISODate(start) ? start : today,
+            defaultEnd: end && isISODate(end) ? end : "",
+            defaultKennelId: kennel && kennels.data.some((k) => k.id === kennel) ? kennel : "",
+            sharedPrice: { boarding: sharedPrice("boarding"), daycare: sharedPrice("daycare") },
+          }}
         />
         {canManage ? (
           <Field label={w.price} hint={usual ? fill(w.leaveEmpty, { usual }) : w.noUsualHint}>

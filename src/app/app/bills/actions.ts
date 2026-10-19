@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { billForBooking, billFromLines, draftPayload, PAYMENT_METHODS } from "@/lib/billing";
+import { BILLABLE_IN_FAMILY, billForBooking, billForFamily, billFromLines, draftPayload, PAYMENT_METHODS } from "@/lib/billing";
 import { isISODate, parseMoney, todayIn, type LineInput } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
@@ -17,7 +17,8 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 /**
  * Make the bill for a booking, or bring an existing draft back in line with
  * the booking. A stay has one live bill at a time (the database insists), so
- * an issued bill is simply opened.
+ * an issued bill is simply opened. Pets booked together are billed together:
+ * the family's bill has every pet that is not a request or cancelled.
  */
 export async function makeBill(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
@@ -26,28 +27,53 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   if (!bookingId.success) return { error: t.m.errors.bookingNotFound };
   const supabase = await createClient();
 
-  const [booking, items, existing] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("id, client_id, kind, start_date, end_date, rate_minor, discount_minor, tax_rate_bp, sac_code, status, pets(name)")
-      .eq("org_id", org.id)
-      .eq("id", bookingId.data)
-      .maybeSingle(),
-    supabase.from("booking_items").select("description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", bookingId.data).order("created_at"),
-    supabase.from("invoices").select("id, status").eq("org_id", org.id).eq("booking_id", bookingId.data).neq("status", "void").maybeSingle(),
-  ]);
-  if (booking.error || items.error || existing.error) return { error: friendlyError(booking.error ?? items.error ?? existing.error, t) };
+  const booking = await supabase.from("bookings").select("id, client_id, group_id, status").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
+  if (booking.error) return { error: friendlyError(booking.error, t) };
   if (!booking.data) return { error: t.m.errors.bookingNotFound };
-  if (booking.data.status === "cancelled" || booking.data.status === "requested") return { error: t.m.bill.errors.nothingToBill };
+  const group = booking.data.group_id;
+
+  // The stays this bill covers: the booking, or its family.
+  const stays = await supabase
+    .from("bookings")
+    .select("id, client_id, kind, start_date, end_date, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
+    .eq("org_id", org.id)
+    .in(group ? "group_id" : "id", [group ?? booking.data.id])
+    .in("status", group ? [...BILLABLE_IN_FAMILY] : ["confirmed", "checked_in", "checked_out", "no_show"])
+    .order("created_at")
+    .order("id");
+  if (stays.error) return { error: friendlyError(stays.error, t) };
+  if (stays.data.length === 0) return { error: t.m.bill.errors.nothingToBill };
+
+  const [items, existing] = await Promise.all([
+    supabase
+      .from("booking_items")
+      .select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code")
+      .eq("org_id", org.id)
+      .in("booking_id", stays.data.map((b) => b.id))
+      .order("created_at"),
+    supabase
+      .from("invoices")
+      .select("id, status")
+      .eq("org_id", org.id)
+      .eq(group ? "group_id" : "booking_id", group ?? booking.data.id)
+      .neq("status", "void")
+      .maybeSingle(),
+  ]);
+  if (items.error || existing.error) return { error: friendlyError(items.error ?? existing.error, t) };
   if (existing.data?.status === "issued") redirect(`/app/bills/${existing.data.id}`);
 
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
-  const totals = billForBooking(org, booking.data.pets?.name ?? "Pet", booking.data, items.data);
+  const totals = group
+    ? billForFamily(
+        org,
+        stays.data.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
+      )
+    : billForBooking(org, stays.data[0].pets?.name ?? "Pet", stays.data[0], items.data);
   let invoiceId = existing.data?.id;
   if (!invoiceId) {
     const created = await supabase
       .from("invoices")
-      .insert({ org_id: org.id, client_id: booking.data.client_id, booking_id: booking.data.id })
+      .insert({ org_id: org.id, client_id: booking.data.client_id, booking_id: group ? null : booking.data.id, group_id: group })
       .select("id")
       .single();
     if (created.error) return { error: friendlyError(created.error, t) };

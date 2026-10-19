@@ -63,7 +63,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
   if (occupancy.error || money.error || tax.error || extras.error || owed.error) throw new Error("Could not add up the reports.");
 
   const fmt = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
-  const days = occupancy.data.map((d) => ({ day: d.day, boarding: d.boarding, dayBoarding: d.day_boarding, capacity: d.capacity }));
+  const days = occupancy.data.map((d) => ({ day: d.day, boarding: d.boarding, dayBoarding: d.day_boarding, capacity: d.capacity, kennelsUsed: d.kennels_used }));
   const stay = summariseOccupancy(days);
   const thisMonth = money.data.find((x) => x.month.slice(0, 7) === month);
   const owedTotal = owed.data.reduce((n, b) => n + (b.due_minor ?? 0), 0);

@@ -217,10 +217,10 @@ create policy care_items_update_for_pet on public.care_items for update to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -349,7 +349,7 @@ grant execute on function public.accept_invitation_link(text) to authenticated;
 grant execute on function public.set_my_language(text) to authenticated;
 grant execute on function public.merge_clients(uuid, uuid) to authenticated;
 grant execute on function public.occupancy_by_day(uuid, date, date) to authenticated;
-grant execute on function public.available_kennels(uuid, public.booking_kind, date, date) to authenticated;
+grant execute on function public.available_kennels(uuid, public.booking_kind, date, date, uuid, integer) to authenticated;
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;

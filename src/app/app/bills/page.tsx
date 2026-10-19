@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Rich } from "@/components/rich";
 import { Badge, Empty, Loading, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
+import { BILLABLE_IN_FAMILY } from "@/lib/billing";
 import { formatDate, formatMoney } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -25,13 +26,24 @@ async function Bills() {
   const [invoices, balances] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, status, number, issued_on, created_at, total_minor, clients(full_name), bookings(pets(name))")
+      .select("id, status, number, issued_on, created_at, total_minor, group_id, clients(full_name), bookings(pets(name))")
       .eq("org_id", org.id)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase.from("invoice_balances").select("invoice_id, paid_minor, due_minor").eq("org_id", org.id).limit(5000),
   ]);
   if (invoices.error || balances.error) throw new Error("Could not load bills.");
+
+  // A family's bill names every pet on it.
+  const groups = [...new Set(invoices.data.flatMap((i) => (i.group_id ? [i.group_id] : [])))];
+  const familyPets = groups.length
+    ? await supabase.from("bookings").select("group_id, pets(name)").eq("org_id", org.id).in("group_id", groups).in("status", [...BILLABLE_IN_FAMILY]).order("created_at")
+    : { data: [], error: null };
+  if (familyPets.error) throw new Error("Could not load bills.");
+  const petsOf = (i: (typeof invoices.data)[number]) =>
+    i.group_id
+      ? familyPets.data.filter((b) => b.group_id === i.group_id).map((b) => b.pets?.name).filter(Boolean).join(", ")
+      : (i.bookings?.pets?.name ?? "");
 
   const due = new Map(balances.data.map((b) => [b.invoice_id, b.due_minor ?? 0]));
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
@@ -48,7 +60,7 @@ async function Bills() {
           <span className="font-bold">{i.number ?? m.labels.invoiceStatus.draft}</span>
           <span className="min-w-0 flex-1">
             {i.clients?.full_name}
-            {i.bookings?.pets?.name ? `, ${i.bookings.pets.name}` : ""}
+            {petsOf(i) ? `, ${petsOf(i)}` : ""}
           </span>
           {i.status === "void" ? <Badge tone="alert">{m.labels.invoiceStatus.void}</Badge> : null}
           {i.status === "issued" && d <= 0 ? <Badge tone="good">{m.bills.paid}</Badge> : null}

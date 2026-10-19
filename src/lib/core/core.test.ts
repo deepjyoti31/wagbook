@@ -307,6 +307,16 @@ describe("solo play scheduling", () => {
     expect(plan.shortfall).toHaveLength(8);
     expect(plan.shortfall.every((s) => s.missing === 1)).toBe(true);
   });
+  it("gives siblings sharing a kennel the same slots, so they play together and use less yard time", () => {
+    const family = [{ id: "a", together: "k1" }, { id: "b", together: "k1" }, { id: "c" }];
+    const plan = planPlaySessions({ dogs: family, yards: yards(1), windows: [{ start: "07:00", end: "08:00" }], sessionMinutes: 20, sessionsPerDog: 1 });
+    expect(plan.shortfall).toEqual([]);
+    expect(plan.slotsNeeded).toBe(2);
+    const at = (id: string) => plan.sessions.find((s) => s.dogId === id)!;
+    expect(at("a").start).toBe(at("b").start);
+    expect(at("a").yardId).toBe(at("b").yardId);
+    expect(at("c").start).not.toBe(at("a").start);
+  });
 });
 
 describe("bookings", () => {
@@ -342,8 +352,8 @@ describe("bookings", () => {
     const b = { id: "b", kennelId: "k1", kind: "boarding" as const, startDate: "2027-04-15", endDate: "2027-04-20" };
     const c = { id: "c", kennelId: null, kind: "daycare" as const, startDate: "2027-04-16", endDate: "2027-04-16" };
     const grid = calendarGrid(["k1", "k2"], [a, b, c], days);
-    expect(grid.byKennel.get("k1")!.map((x) => x?.id ?? null)).toEqual(["a", "b", "b", "b"]);
-    expect(grid.byKennel.get("k2")!.every((x) => x === null)).toBe(true);
+    expect(grid.byKennel.get("k1")!.map((cell) => cell.map((x) => x.id))).toEqual([["a"], ["b"], ["b"], ["b"]]);
+    expect(grid.byKennel.get("k2")!.every((cell) => cell.length === 0)).toBe(true);
     expect(grid.unassigned.map((d) => d.map((x) => x.id))).toEqual([[], [], ["c"], []]);
   });
 

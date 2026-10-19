@@ -78,6 +78,9 @@ export const kennelArea = {
       about: "Filled in for you on every new booking. You can still change the price on any one booking.",
       boarding: "Boarding, per night",
       daycare: "Day boarding, per day",
+      sharedBoarding: "Second pet sharing a kennel, per night",
+      sharedDaycare: "Second pet sharing a kennel, per day",
+      sharedHint: "For two pets of one parent in one kennel. Leave empty to charge the usual price.",
     },
     paid: {
       title: "Getting paid",

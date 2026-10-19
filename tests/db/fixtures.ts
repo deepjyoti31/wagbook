@@ -77,13 +77,33 @@ export interface BookingInput {
   rate?: number;
 }
 
+/** Book a pet, for its own parent. */
 export async function book(db: PGlite, k: Kennel, b: BookingInput, actor: string = k.owner): Promise<string> {
   return as(db, user(actor), async () => {
     const r = await db.query<{ id: string }>(
       `insert into public.bookings (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
-      [k.org, k.client, b.pet, b.kind ?? "boarding", b.status ?? "confirmed", b.start, b.end, b.kennel ?? null, b.rate ?? 120000],
+       select $1, p.client_id, p.id, $3, $4, $5, $6, $7, $8 from public.pets p where p.org_id = $1 and p.id = $2 returning id`,
+      [k.org, b.pet, b.kind ?? "boarding", b.status ?? "confirmed", b.start, b.end, b.kennel ?? null, b.rate ?? 120000],
     );
     return r.rows[0].id;
+  });
+}
+
+/**
+ * A pet of another parent. The pets of seedKennel() are siblings, and
+ * siblings may share a kennel and a yard; a stranger's pet may not.
+ */
+export async function strangerPet(db: PGlite, k: Kennel): Promise<string> {
+  const n = ++counter;
+  return as(db, user(k.owner), async () => {
+    const c = await db.query<{ id: string }>(
+      "insert into public.clients (org_id, full_name, phone) values ($1, $2, $3) returning id",
+      [k.org, `Other parent ${n}`, `+9197654${String(10000 + n).slice(-5)}`],
+    );
+    const p = await db.query<{ id: string }>(
+      "insert into public.pets (org_id, client_id, name) values ($1, $2, $3) returning id",
+      [k.org, c.rows[0].id, `Other dog ${n}`],
+    );
+    return p.rows[0].id;
   });
 }

@@ -50,35 +50,40 @@ export interface CalendarStay extends StaySpan {
 }
 
 export interface CalendarGrid<B extends CalendarStay> {
-  /** For each kennel id, the stay holding it on each day (null when free). */
-  byKennel: Map<string, (B | null)[]>;
+  /** For each kennel id, the stays holding it on each day: none when free, two when siblings share it. */
+  byKennel: Map<string, B[][]>;
   /** Stays with no kennel yet, for each day. */
   unassigned: B[][];
 }
 
 /**
- * Lay stays out on a grid of kennels by days. A cell holds the stay that holds
+ * Lay stays out on a grid of kennels by days. A cell holds the stays that hold
  * that kennel on that day (see stayHoldsUntil), so a boarding stay is not shown
- * on its check-out day and the next pet can be.
+ * on its check-out day and the next pet can be. Two siblings sharing a kennel
+ * are both in its cell.
  */
 export function calendarGrid<B extends CalendarStay>(kennelIds: readonly string[], stays: readonly B[], days: readonly ISODate[]): CalendarGrid<B> {
-  const byKennel = new Map<string, (B | null)[]>(kennelIds.map((id) => [id, days.map(() => null)]));
+  const byKennel = new Map<string, B[][]>(kennelIds.map((id) => [id, days.map(() => [])]));
   const unassigned: B[][] = days.map(() => []);
   for (const stay of stays) {
     const until = stayHoldsUntil(stay);
     days.forEach((day, i) => {
       if (day < stay.startDate || day >= until) return;
       const row = stay.kennelId ? byKennel.get(stay.kennelId) : undefined;
-      if (row) row[i] = stay;
-      else unassigned[i].push(stay);
+      (row ? row[i] : unassigned[i]).push(stay);
     });
   }
   return { byKennel, unassigned };
 }
 
+/** The most pets one kennel holds: two, and only of one parent. Must match bookings_check_capacity() (WB027). */
+export const PETS_PER_KENNEL = 2;
+
 /** A booking that holds a kennel: confirmed or checked in, with a kennel chosen. */
 export interface KennelHold extends StaySpan {
   kennelId: string;
+  /** The parent of the pet holding it. Without one, a hold is treated as another parent's. */
+  clientId?: string | null;
 }
 
 /**
@@ -97,14 +102,29 @@ export function stayFromForm(kind: string, startDate: string, endDate: string): 
 }
 
 /**
- * Kennels no hold overlaps for a stay, in the order given. With no stay yet,
- * every kennel. Must agree with available_kennels() in the database, which has
- * the last word when the booking is saved.
+ * Kennels that can take `pets` more pets (one, or two sharing) for a stay, in
+ * the order given. A kennel is free when nobody holds it on any day of the
+ * stay, or, given the parent, when only that parent's pets hold it and there
+ * is room on every day (a kennel holds two). With no stay yet, every kennel.
+ * Must agree with available_kennels() in the database, which has the last word
+ * when the booking is saved.
  */
-export function freeKennels<K extends { id: string }>(kennels: readonly K[], holds: readonly KennelHold[], stay: StaySpan | null): K[] {
+export function freeKennels<K extends { id: string }>(
+  kennels: readonly K[],
+  holds: readonly KennelHold[],
+  stay: StaySpan | null,
+  options: { clientId?: string | null; pets?: number } = {},
+): K[] {
   if (!stay) return [...kennels];
-  const taken = new Set(holds.filter((h) => staysOverlap(h, stay)).map((h) => h.kennelId));
-  return kennels.filter((k) => !taken.has(k.id));
+  const pets = options.pets ?? 1;
+  const overlapping = holds.filter((h) => staysOverlap(h, stay));
+  const days: ISODate[] = [];
+  for (let d = stay.startDate; d < stayHoldsUntil(stay); d = addDays(d, 1)) days.push(d);
+  return kennels.filter((k) => {
+    const here = overlapping.filter((h) => h.kennelId === k.id);
+    if (here.some((h) => !options.clientId || h.clientId !== options.clientId)) return false;
+    return days.every((day) => here.filter((h) => h.startDate <= day && day < stayHoldsUntil(h)).length + pets <= PETS_PER_KENNEL);
+  });
 }
 
 /**
@@ -122,4 +142,21 @@ export function petMatches(
   if (digits.length >= 3 && /^[0-9+\s()-]+$/.test(q)) return (pet.parentPhone ?? "").includes(digits);
   const text = [pet.name, pet.breed, pet.parentName].filter(Boolean).join(" ").toLocaleLowerCase();
   return q.split(/\s+/).every((word) => text.includes(word));
+}
+
+/**
+ * Who is already in each kennel a stay could share: for every kennel held on
+ * a day of the stay by another booking of the same parent, those pets' names.
+ * Used to label "K05, with Bruno" where kennels are offered.
+ */
+export function sharedWith(
+  stay: StaySpan & { id?: string; clientId: string },
+  holds: readonly (KennelHold & { id: string; petName: string })[],
+): Map<string, string[]> {
+  const names = new Map<string, string[]>();
+  for (const h of holds) {
+    if (h.id === stay.id || h.clientId !== stay.clientId || !staysOverlap(h, stay)) continue;
+    names.set(h.kennelId, [...(names.get(h.kennelId) ?? []), h.petName]);
+  }
+  return names;
 }

@@ -70,7 +70,7 @@ export const core = {
     notWaitingForCheckIn: "This booking is no longer waiting to be checked in. Refresh the page.",
     notCheckedIn: "This pet is not checked in. Refresh the page.",
     constraints: {
-      bookings_no_kennel_overlap: "That kennel is already taken for some of those dates. Pick another kennel or change the dates.",
+      bookings_no_kennel_overlap: "That kennel has another parent's pet in it on some of those dates. Pick another kennel or change the dates.",
       bookings_no_pet_overlap: "This pet already has a booking that overlaps those dates.",
       bookings_boarding_has_a_night: "A boarding stay needs at least one night. For a day visit, choose day boarding.",
       bookings_dates_in_order: "Check-out cannot be before check-in.",
@@ -88,6 +88,9 @@ export const core = {
       organizations_play_break_inside_day: "The break must start and end while the yards are open.",
       peak_periods_check: "The last day cannot be before the first day.",
       play_yards_org_id_name_key: "A yard with that name already exists.",
+      services_shared_price_only_for_stays: "A shared kennel price is only for boarding and day boarding.",
+      invoices_one_live_per_booking: "This stay already has a bill. Open it from the booking.",
+      invoices_one_live_per_family: "This family already has a bill. Open it from the booking.",
     },
     // In English the database's own sentence is shown. Other languages show
     // these, one per code (docs/reference/error-codes.md).
@@ -113,6 +116,8 @@ export const core = {
       WB023: "Only an owner or manager can book at a price that is not on your price list.",
       WB024: "Bookings made together must all be for one parent.",
       WB025: "Only an owner or manager can change what an extra costs.",
+      WB026: "A pet cannot be moved into or out of a family booking. Book it on its own instead.",
+      WB027: "A kennel holds two pets at most, both of one parent.",
       WB030: "An issued bill cannot be deleted. Cancel it instead.",
       WB031: "A cancelled bill cannot be changed.",
       WB032: "An issued bill cannot be edited. Cancel it and make a new one.",
@@ -136,6 +141,8 @@ export const core = {
       WB050: "Only an owner or manager can issue a bill that differs from its booking.",
       WB051: "Only a draft bill can be changed.",
       WB052: "The currency and the month the financial year starts cannot change once a bill has been issued.",
+      WB053: "This pet was booked together with others. Bill the family together.",
+      WB054: "That family booking was not found for this parent.",
       WB060: "Reports are for owners and managers.",
       WB061: "Choose a period of a year or less, with the start before the end.",
       WB070: "Only an owner or manager can download or erase a parent's details.",

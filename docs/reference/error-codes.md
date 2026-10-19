@@ -42,6 +42,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
 | `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
 | `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql` |
+| `WB026` | a pet cannot be moved into or out of a family booking. Book it on its own instead. | `20261008000300_kennels_and_bookings.sql` |
+| `WB027` | a kennel holds two pets at most, both of one parent | `20261008000300_kennels_and_bookings.sql` |
 | `WB030` | an issued invoice cannot be deleted. Void it instead. | `20261008000500_billing.sql` |
 | `WB031` | a void invoice cannot be changed | `20261008000500_billing.sql` |
 | `WB032` | an issued invoice cannot be edited. Void it and issue a new one.<br>lines of an issued invoice cannot be changed<br>a line cannot be moved to another invoice | `20261008000500_billing.sql` |
@@ -65,6 +67,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB050` | only an owner or manager can issue a bill that differs from its booking | `20261008000500_billing.sql` |
 | `WB051` | only a draft bill can be changed | `20261008000500_billing.sql` |
 | `WB052` | the currency and the month the financial year starts cannot change once a bill has been issued | `20261008000500_billing.sql` |
+| `WB053` | this pet was booked together with others. Bill the family together. | `20261008000500_billing.sql` |
+| `WB054` | that family booking was not found for this parent | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
 | `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |

@@ -49,8 +49,10 @@ function typedMoney(form: FormData, name: string): number | null | undefined {
 /**
  * Book one pet, or several pets of one parent together. Several pets share a
  * group_id and are inserted in one statement, so either all are booked or
- * none is. Staff book at the usual price; only owners and managers can type a
- * different one (the database refuses anything else, see bookings_guard_price).
+ * none is. Two of them may share one kennel: then both get the chosen kennel,
+ * and the second the shared kennel price, if the price list has one. Staff
+ * book at the usual price; only owners and managers can type a different one
+ * (the database refuses anything else, see bookings_guard_price).
  */
 export async function createBooking(_state: FormState, form: FormData): Promise<FormState> {
   const { org, canManage } = await requireOrg();
@@ -71,6 +73,9 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const b = { ...parsed.data, ...stay.data };
+  const together = form.get("sharing") === "together";
+  if (together && b.petIds.length !== 2) return { error: e.shareTwo };
+  if (together && !b.kennelId) return { error: e.shareKennel };
 
   const supabase = await createClient();
 
@@ -83,7 +88,7 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
 
   const service = await supabase
     .from("services")
-    .select("price_minor, tax_rate_bp, sac_code")
+    .select("price_minor, shared_price_minor, tax_rate_bp, sac_code")
     .eq("org_id", org.id)
     .eq("kind", b.kind)
     .eq("is_default", true)
@@ -108,9 +113,9 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
         status: b.status,
         start_date: b.startDate,
         end_date: b.endDate,
-        // A kennel is one pet's: the others are given theirs at check-in.
-        kennel_id: i === 0 ? b.kennelId : null,
-        rate_minor: rateMinor,
+        // Two sharing get the one kennel. Otherwise it is the first pet's, and the others are given theirs at check-in.
+        kennel_id: i === 0 || together ? b.kennelId : null,
+        rate_minor: together && i === 1 ? (service.data?.shared_price_minor ?? rateMinor) : rateMinor,
         tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
         sac_code: service.data?.sac_code ?? null,
         notes: b.notes,

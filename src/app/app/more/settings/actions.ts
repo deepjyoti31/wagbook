@@ -12,14 +12,27 @@ import { createClient } from "@/lib/supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** Set (or clear) the usual price for boarding or day boarding on the rate card. */
-async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boarding" | "daycare", priceMinor: number | null, name: string) {
+/**
+ * Set the usual price for boarding or day boarding on the rate card, and the
+ * shared kennel price for a second pet of the same parent in one kennel (an
+ * empty box there means no shared price: the second pet pays the usual price).
+ */
+async function saveDefaultPrice(
+  supabase: Supabase,
+  orgId: string,
+  kind: "boarding" | "daycare",
+  priceMinor: number | null,
+  sharedMinor: number | null,
+  name: string,
+) {
   const existing = await supabase.from("services").select("id").eq("org_id", orgId).eq("kind", kind).eq("is_default", true).eq("is_active", true).maybeSingle();
   if (existing.error) return existing.error;
-  if (priceMinor === null) return null; // An empty box leaves the current price alone.
   if (existing.data) {
-    return (await supabase.from("services").update({ price_minor: priceMinor }).eq("org_id", orgId).eq("id", existing.data.id)).error;
+    // An empty usual price leaves the current one alone.
+    const change = priceMinor === null ? { shared_price_minor: sharedMinor } : { price_minor: priceMinor, shared_price_minor: sharedMinor };
+    return (await supabase.from("services").update(change).eq("org_id", orgId).eq("id", existing.data.id)).error;
   }
+  if (priceMinor === null) return null;
   return (
     await supabase.from("services").insert({
       org_id: orgId,
@@ -28,6 +41,7 @@ async function saveDefaultPrice(supabase: Supabase, orgId: string, kind: "boardi
       name,
       unit: kind === "boarding" ? "night" : "day",
       price_minor: priceMinor,
+      shared_price_minor: sharedMinor,
       is_default: true,
     })
   ).error;
@@ -74,12 +88,15 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   if (!Number.isFinite(ratePercent) || ratePercent < 0 || ratePercent > 100) return { error: e.rate };
 
   const prices: Record<"boarding" | "daycare", number | null> = { boarding: null, daycare: null };
+  const shared: Record<"boarding" | "daycare", number | null> = { boarding: null, daycare: null };
   for (const kind of ["boarding", "daycare"] as const) {
-    const typed = text(form, `price_${kind}`);
-    if (typed === null) continue;
-    const minor = parseMoney(typed);
-    if (minor === null || minor < 0) return { error: e.prices };
-    prices[kind] = minor;
+    for (const [box, into] of [[`price_${kind}`, prices], [`shared_price_${kind}`, shared]] as const) {
+      const typed = text(form, box);
+      if (typed === null) continue;
+      const minor = parseMoney(typed);
+      if (minor === null || minor < 0) return { error: e.prices };
+      into[kind] = minor;
+    }
   }
 
   const timeZone = text(form, "time_zone") ?? org.time_zone;
@@ -134,7 +151,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   if (data.length === 0) return { error: t.m.settings.onlyManagers };
 
   for (const kind of ["boarding", "daycare"] as const) {
-    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], t.m.labels.bookingKind[kind]);
+    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], shared[kind], t.m.labels.bookingKind[kind]);
     if (priceError) return { error: friendlyError(priceError, t) };
   }
 

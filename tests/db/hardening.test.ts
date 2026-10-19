@@ -1,7 +1,7 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeInvoice } from "../../src/lib/core";
-import { addMember, book, inviteMember, seedKennel, type Kennel } from "./fixtures";
+import { addMember, book, inviteMember, seedKennel, strangerPet, type Kennel } from "./fixtures";
 import { anon, as, createTestDb, createUser, errorOf, user } from "./harness";
 
 /**
@@ -237,8 +237,9 @@ describe("space", () => {
 
   it("is held by day boarding through its last day", async () => {
     await book(db, s, { pet: s.pets[0], start: "2027-07-05", end: "2027-07-07", kennel: s.kennels[0], kind: "daycare" });
-    // Another pet in the same kennel on the last day: refused.
-    expect((await errorOf(() => book(db, s, { pet: s.pets[1], start: "2027-07-07", end: "2027-07-07", kennel: s.kennels[0], kind: "daycare" }))).message).toContain("bookings_no_kennel_overlap");
+    // Another parent's pet in the same kennel on the last day: refused.
+    const other = await strangerPet(db, s);
+    expect((await errorOf(() => book(db, s, { pet: other, start: "2027-07-07", end: "2027-07-07", kennel: s.kennels[0], kind: "daycare" }))).message).toContain("bookings_no_kennel_overlap");
     // The same pet again on its own last day: refused.
     expect((await errorOf(() => book(db, s, { pet: s.pets[0], start: "2027-07-07", end: "2027-07-09" }))).message).toContain("bookings_no_pet_overlap");
     // The day after is free.
@@ -481,7 +482,7 @@ describe("second pass", () => {
 
   it("moving a booking to another kennel is checked like a new booking", async () => {
     const a = await book(db, s, { pet: s.pets[0], start: "2029-03-01", end: "2029-03-04", kennel: s.kennels[0] });
-    const b = await book(db, s, { pet: s.pets[2], start: "2029-03-02", end: "2029-03-05", kennel: s.kennels[1] });
+    const b = await book(db, s, { pet: await strangerPet(db, s), start: "2029-03-02", end: "2029-03-05", kennel: s.kennels[1] });
     // Only the kennel changes: into one that is taken, then into one that is out of service.
     expect((await fails(sStaff, "update public.bookings set kennel_id = $1 where id = $2", [s.kennels[0], b])).message).toContain("bookings_no_kennel_overlap");
     await sql(sStaff, "update public.bookings set status = 'cancelled' where id = $1", [a]);

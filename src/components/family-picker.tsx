@@ -19,29 +19,43 @@ export interface PickablePet {
  * Choose a pet, then tick any other pets of the same parent to book them
  * together. A search box above the list narrows it by name, breed, parent or
  * phone. Without JavaScript the list and the first choice still work on their
- * own.
+ * own. `onFamilyChange` hears whose pets are chosen and how many.
  */
 export function FamilyPicker({
   pets,
   words,
   defaultPetId,
   defaultAlso = [],
+  onFamilyChange,
 }: {
   pets: PickablePet[];
   /** m.newBooking.picker */
   words: Messages["newBooking"]["picker"];
   defaultPetId?: string;
   defaultAlso?: string[];
+  onFamilyChange?: (family: { clientId: string | null; pets: number }) => void;
 }) {
   const [petId, setPetId] = useState(defaultPetId ?? "");
+  const [also, setAlso] = useState<string[]>(defaultAlso);
   const [query, setQuery] = useState("");
   const chosen = pets.find((p) => p.id === petId);
   // The chosen pet stays in the list whatever is typed, so the choice never vanishes.
   const shown = pets.filter((p) => p.id === petId || petMatches(p, query));
+  const choose = (id: string) => {
+    setPetId(id);
+    // Another pet may have another parent, so the ticks start again.
+    setAlso([]);
+    onFamilyChange?.({ clientId: pets.find((p) => p.id === id)?.clientId ?? null, pets: 1 });
+  };
+  const tick = (id: string, on: boolean) => {
+    const next = on ? [...also, id] : also.filter((x) => x !== id);
+    setAlso(next);
+    onFamilyChange?.({ clientId: chosen?.clientId ?? null, pets: 1 + next.length });
+  };
   const find = (q: string) => {
     setQuery(q);
     const matches = pets.filter((p) => petMatches(p, q));
-    if (q.trim() !== "" && matches.length === 1) setPetId(matches[0].id);
+    if (q.trim() !== "" && matches.length === 1 && matches[0].id !== petId) choose(matches[0].id);
   };
   const siblings = chosen ? pets.filter((p) => p.clientId === chosen.clientId && p.id !== chosen.id) : [];
   const withBreed = (p: PickablePet) => (p.breed ? fill(words.withBreed, { name: p.name, breed: p.breed }) : p.name);
@@ -57,7 +71,7 @@ export function FamilyPicker({
       ) : null}
       <label className="block">
         <span className="mb-1 block font-semibold">{words.pet}</span>
-        <select name="petId" required value={petId} onChange={(e) => setPetId(e.target.value)} className={inputStyles}>
+        <select name="petId" required value={petId} onChange={(e) => choose(e.target.value)} className={inputStyles}>
           <option value="" disabled>
             {words.choose}
           </option>
@@ -74,7 +88,7 @@ export function FamilyPicker({
           <p className="mb-2 text-slate">{chosen.parentName ? fill(words.otherPets, { parent: chosen.parentName }) : words.otherPetsNoName}</p>
           {siblings.map((p) => (
             <label key={p.id} className="flex min-h-12 items-center gap-3">
-              <input type="checkbox" name="alsoPetId" value={p.id} defaultChecked={defaultAlso.includes(p.id)} className="size-5" />
+              <input type="checkbox" name="alsoPetId" value={p.id} checked={also.includes(p.id)} onChange={(e) => tick(p.id, e.target.checked)} className="size-5" />
               <span>{withBreed(p)}</span>
             </label>
           ))}

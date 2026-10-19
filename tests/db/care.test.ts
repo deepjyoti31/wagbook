@@ -1,6 +1,6 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, book, seedKennel, type Kennel } from "./fixtures";
+import { addMember, book, seedKennel, strangerPet, type Kennel } from "./fixtures";
 import { anon, as, createTestDb, errorOf, user } from "./harness";
 
 let db: PGlite;
@@ -80,8 +80,9 @@ describe("play hours", () => {
   });
 
   it("lets staff move a session, and refuses a move onto another pet's slot", async () => {
+    const other = await strangerPet(db, k);
     const b1 = await book(db, k, { pet: k.pets[0], start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
-    const b2 = await book(db, k, { pet: k.pets[1], start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
+    const b2 = await book(db, k, { pet: other, start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
     const yard = await as(db, user(k.owner), async () => (await db.query<{ id: string }>("insert into public.play_yards (org_id, name) values ($1, 'Yard A') returning id", [k.org])).rows[0].id);
     const add = (booking: string, pet: string, at: string) =>
       as(db, user(staff), async () =>
@@ -91,7 +92,7 @@ describe("play hours", () => {
         )).rows[0].id,
       );
     await add(b1, k.pets[0], "08:00");
-    const s2 = await add(b2, k.pets[1], "08:20");
+    const s2 = await add(b2, other, "08:20");
     expect((await errorOf(() => as(db, user(staff), () => db.query("update public.play_sessions set starts_at = '08:10' where id = $1", [s2])))).message).toContain(
       "play_sessions_one_pet_per_yard",
     );

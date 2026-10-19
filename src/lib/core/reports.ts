@@ -42,6 +42,8 @@ export interface OccupancyDay {
   boarding: number;
   dayBoarding: number;
   capacity: number;
+  /** Kennels in use: two siblings sharing one count once. Defaults to the number of pets. */
+  kennelsUsed?: number;
 }
 
 export interface OccupancySummary {
@@ -65,7 +67,7 @@ export function summariseOccupancy(days: readonly OccupancyDay[]): OccupancySumm
     nights += d.boarding;
     dayCount += d.dayBoarding;
     const pets = d.boarding + d.dayBoarding;
-    used += pets;
+    used += d.kennelsUsed ?? pets;
     available += d.capacity;
     if (pets > 0 && (!busiest || pets > busiest.pets)) busiest = { day: d.day, pets };
   }

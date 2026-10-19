@@ -22,6 +22,7 @@ create table public.invoices (
   org_id uuid not null references public.organizations (id) on delete cascade,
   client_id uuid not null,
   booking_id uuid,
+  group_id uuid,
   status public.invoice_status not null default 'draft',
   number text,
   fiscal_year text,
@@ -55,6 +56,9 @@ create table public.invoices (
   unique (org_id, fiscal_year, seq),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete set null (booking_id),
+  -- A bill is for one stay, for a family booked together, or for neither (a
+  -- one-off bill). Never both.
+  constraint invoices_one_stay_or_one_family check (booking_id is null or group_id is null),
   -- A draft carries no number, sequence, year, date or issuer; an issued or
   -- void invoice carries all of them. Only issue_invoice() crosses that line.
   constraint invoices_numbered_once_issued check (
@@ -71,6 +75,9 @@ create table public.invoices (
 
 comment on table public.invoices is
   'A bill. Editable while a draft; frozen for ever once issued. A tax invoice when the kennel charges tax, otherwise a plain bill.';
+comment on column public.invoices.booking_id is 'The stay this bill is for, when it is for one pet''s stay that was booked on its own.';
+comment on column public.invoices.group_id is
+  'The family booking this bill is for: every pet booked together (bookings.group_id) is billed on it, each with its stay and extras. A pet of a family is never billed on its own.';
 comment on column public.invoices.number is 'Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused.';
 comment on column public.invoices.fiscal_year is 'Financial year the number belongs to, e.g. 2027-28.';
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
@@ -91,6 +98,10 @@ create index invoices_org_issued_idx on public.invoices (org_id, issued_on desc)
 create unique index invoices_one_live_per_booking on public.invoices (org_id, booking_id)
   where booking_id is not null and status <> 'void';
 comment on index public.invoices_one_live_per_booking is 'A booking has at most one draft or issued invoice, so a stay cannot be billed twice.';
+-- And one bill per family at a time.
+create unique index invoices_one_live_per_family on public.invoices (org_id, group_id)
+  where group_id is not null and status <> 'void';
+comment on index public.invoices_one_live_per_family is 'A family booking has at most one draft or issued invoice, so it cannot be billed twice.';
 create index invoices_org_client_idx on public.invoices (org_id, client_id);
 create index invoices_org_booking_idx on public.invoices (org_id, booking_id);
 
@@ -101,6 +112,39 @@ create trigger invoices_set_updated_at
 create trigger invoices_stamp_actor
   before insert or update on public.invoices
   for each row execute function public.stamp_actor('created_by');
+
+-- A pet booked together with others is billed with them, on the family's
+-- bill, never on its own: otherwise its stay could be billed twice. And a
+-- family's bill belongs to that family's parent.
+create function public.invoices_check_stay()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.booking_id is not null and (tg_op = 'INSERT' or new.booking_id is distinct from old.booking_id) and exists (
+    select 1 from public.bookings b where b.org_id = new.org_id and b.id = new.booking_id and b.group_id is not null
+  ) then
+    raise exception 'WB053: this pet was booked together with others. Bill the family together.' using errcode = '23514';
+  end if;
+  if new.group_id is not null and (tg_op = 'INSERT' or new.group_id is distinct from old.group_id or new.client_id is distinct from old.client_id)
+     and not exists (
+       select 1 from public.bookings b where b.org_id = new.org_id and b.group_id = new.group_id and b.client_id = new.client_id
+     )
+     -- Merging parents moves the bills and the bookings one after the other.
+     and coalesce(current_setting('wagbook.merging', true), '') <> 'on'
+  then
+    raise exception 'WB054: that family booking was not found for this parent' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.invoices_check_stay() is
+  'Trigger: a pet booked with others is billed only on the family''s bill (WB053), and a family''s bill names a family booking of that parent (WB054).';
+
+create trigger invoices_check_stay
+  before insert or update of booking_id, group_id, client_id on public.invoices
+  for each row execute function public.invoices_check_stay();
 
 create table public.invoice_lines (
   id uuid primary key default gen_random_uuid(),
@@ -265,7 +309,24 @@ create trigger invoice_lines_guard
 -- Issuing and voiding
 -- ---------------------------------------------------------------------------
 
-create function public.invoice_expected_lines(p_booking uuid, p_tax_mode public.tax_mode)
+-- The stays a bill covers: its one booking, or every pet of its family that
+-- is staying, stayed or did not come (not requests, not cancellations).
+create function public.invoice_bookings(p_org uuid, p_booking uuid, p_group uuid)
+returns setof uuid
+language sql
+stable
+set search_path = ''
+as $$
+  select b.id
+  from public.bookings b
+  where b.org_id = p_org
+    and (b.id = p_booking
+         or (p_group is not null and b.group_id = p_group and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show')));
+$$;
+comment on function public.invoice_bookings(uuid, uuid, uuid) is
+  'The bookings a bill covers: its own booking, or the family''s bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.';
+
+create function public.invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 language sql
 stable
@@ -277,14 +338,14 @@ as $$
     b.discount_minor,
     case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end
   from public.bookings b
-  where b.id = p_booking
+  where b.org_id = p_org and b.id in (select public.invoice_bookings(p_org, p_booking, p_group))
   union all
   select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
   from public.booking_items bi
-  where bi.booking_id = p_booking;
+  where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group));
 $$;
-comment on function public.invoice_expected_lines(uuid, public.tax_mode) is
-  'The lines a bill for a booking should have, as quantity, unit price, discount and tax rate: the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.';
+comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode) is
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.';
 
 create function public.issue_invoice(p_invoice uuid)
 returns public.invoices
@@ -413,17 +474,21 @@ begin
   -- more and nothing less. A bill that was edited is issued by an owner or
   -- manager. The same rule as bookings_guard_price() (docs/09-decisions.md, D15).
   if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
-    if v_inv.booking_id is null
-       or not exists (select 1 from public.bookings b where b.id = v_inv.booking_id and b.client_id = v_inv.client_id)
+    if (v_inv.booking_id is null and v_inv.group_id is null)
+       or not exists (
+         select 1 from public.bookings b
+         where b.org_id = v_inv.org_id and b.client_id = v_inv.client_id
+           and b.id in (select public.invoice_bookings(v_inv.org_id, v_inv.booking_id, v_inv.group_id))
+       )
        or exists (
-         (select * from public.invoice_expected_lines(v_inv.booking_id, v_org.tax_mode))
+         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode))
          except all
          (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
        )
        or exists (
          (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
          except all
-         (select * from public.invoice_expected_lines(v_inv.booking_id, v_org.tax_mode))
+         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode))
        )
     then
       raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
@@ -489,13 +554,15 @@ begin
   returning * into v_inv;
   perform set_config('wagbook.issuing', 'off', true);
 
-  -- Money already received for this stay counts against its bill: advances,
-  -- and anything paid against an earlier bill for it that was voided.
-  if v_inv.booking_id is not null then
+  -- Money already received for these stays counts against the bill: advances
+  -- (on any pet of a family), and anything paid against an earlier bill for
+  -- them that was voided.
+  if v_inv.booking_id is not null or v_inv.group_id is not null then
     update public.payments p
     set invoice_id = v_inv.id
     where p.org_id = v_inv.org_id
-      and p.booking_id = v_inv.booking_id
+      and (p.booking_id = v_inv.booking_id
+           or p.booking_id in (select b.id from public.bookings b where b.org_id = v_inv.org_id and b.group_id = v_inv.group_id))
       and (p.invoice_id is null
            or p.invoice_id in (select i.id from public.invoices i where i.org_id = v_inv.org_id and i.status = 'void'));
   end if;
@@ -504,7 +571,7 @@ begin
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings) says. Takes in advances paid for those stays.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -700,6 +767,7 @@ select
   i.org_id,
   i.client_id,
   i.booking_id,
+  i.group_id,
   i.status,
   i.number,
   i.total_minor,
@@ -742,13 +810,17 @@ begin
     raise exception 'WB002: only an owner or manager can merge parents' using errcode = '42501';
   end if;
 
+  -- While merging, a family's bookings and bills are briefly split between the
+  -- two parents; the checks that keep a family with one parent wait until the end.
+  perform set_config('wagbook.merging', 'on', true);
   -- Pets, and with them their bookings (on update cascade).
   update public.pets p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   -- Anything else that names the parent.
   update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
-  perform set_config('wagbook.merging', 'on', true);
   update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
   perform set_config('wagbook.merging', 'off', true);
+  -- Play sessions copy their parent from the booking whenever they are written.
+  update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
   update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
 
