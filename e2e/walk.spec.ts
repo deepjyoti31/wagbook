@@ -118,6 +118,42 @@ test("staff cannot set a price; a family is booked together as a request, then c
   await expect(page.getByText("Confirmed. The space is now held.")).toBeVisible();
 });
 
+test("two pets of one parent share a kennel, the second at the shared kennel price", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/settings");
+  await page.getByLabel("Second pet sharing a kennel, per night").fill("900");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText(en.settings.saved)).toBeVisible();
+  await expect(page.getByLabel("Second pet sharing a kennel, per night")).toHaveValue("900");
+
+  await signIn(page, "staff");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Rocky, Indie (Vikram Mock)" });
+  await page.getByRole("checkbox", { name: /Luna/ }).check();
+  await page.getByLabel("Check-in date").fill(day(50));
+  await page.getByLabel("Check-out date").fill(day(53));
+  await page.getByRole("radio", { name: "One kennel together" }).check();
+  await expect(page.getByText("The second pet is at your shared kennel price, ₹900.")).toBeVisible();
+  // Sharing needs a kennel chosen.
+  await expect(page.locator("select[name=kennelId]")).toHaveAttribute("required", "");
+  await page.locator("select[name=kennelId]").selectOption({ label: "K09" });
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("2 pets booked together.")).toBeVisible();
+  await expect(page.getByText("Shares K09 with Luna.")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  await page.getByRole("link", { name: /Luna/ }).first().click();
+  await expect(page.getByText("Shares K09 with Rocky.")).toBeVisible();
+  await expect(page.getByText(/₹900 a night/)).toBeVisible();
+
+  // Both are in K09's square on the calendar.
+  await page.goto(`/app/calendar?from=${day(50)}`);
+  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) });
+  // One link a night for each of them, three nights.
+  await expect(row.getByRole("link", { name: "Rocky" })).toHaveCount(3);
+  await expect(row.getByRole("link", { name: "Luna" })).toHaveCount(3);
+});
+
 test("a pet that overstays is extended to today", async ({ page }) => {
   await signIn(page, "staff");
   await page.goto("/app");
@@ -303,8 +339,10 @@ test("check out, make the bill, issue it, and the parent sees it with a UPI QR c
 test("a manager changes a line on a draft bill before issuing it", async ({ page }) => {
   await signIn(page, "manager");
   await openBooking(page, "Biscuit", "In house");
-  await page.getByRole("button", { name: "Make bill" }).click();
+  // Biscuit was booked with Pepper, so they share one bill.
+  await page.getByRole("button", { name: "Make the family bill" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pepper booking" })).toBeVisible();
   await page.getByText("Change").first().click();
   await page.getByLabel("Discount").first().fill("500");
   await page.getByRole("button", { name: "Save line" }).first().click();
