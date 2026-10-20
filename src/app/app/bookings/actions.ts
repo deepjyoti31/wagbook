@@ -329,10 +329,11 @@ export async function addExtra(_state: FormState, form: FormData): Promise<FormS
   return { ok: fill(t.m.booking.added, { item: item.description }) };
 }
 
+/** Delete an extra from a booking. Owners only (D29). */
 export async function removeExtra(_state: FormState, form: FormData): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.booking.errors.removeExtra };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const id = Id.safeParse(form.get("itemId"));
   if (!id.success) return { error: t.m.booking.errors.extraNotFound };
   const supabase = await createClient();

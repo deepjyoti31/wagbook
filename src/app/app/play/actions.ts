@@ -147,11 +147,11 @@ export async function moveSession(_state: FormState, form: FormData): Promise<Fo
   return { ok: fill(t.m.play.moved, { time: start }) };
 }
 
-/** Clear today's sessions still to happen, to plan again from scratch. Owners and managers. */
+/** Clear today's sessions still to happen, to plan again from scratch. Owners only: it deletes (D29). */
 export async function clearPlan(): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.play.clearOnlyManagers };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const today = todayIn(org.time_zone);
   const supabase = await createClient();
   const { error } = await supabase.from("play_sessions").delete().eq("org_id", org.id).eq("session_date", today).eq("status", "pending");

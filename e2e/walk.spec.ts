@@ -588,6 +588,26 @@ test("a manager writes down an expense with its receipt; staff see no money repo
   const receiptUrl = (await row.getByRole("link", { name: "See receipt" }).getAttribute("href"))!;
   expect((await page.request.get(receiptUrl)).status()).toBe(200);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  // Deleting is for owners: a manager is not offered it.
+  await expect(row.getByText("Remove")).toHaveCount(0);
+
+  // The owner deletes an expense written by mistake, in two steps, and its receipt goes with it.
+  const owner = await privateWindow(browser);
+  await signIn(owner.page, "owner");
+  await owner.page.goto("/app/more/expenses");
+  await owner.page.getByLabel("Amount").fill("99");
+  await owner.page.getByLabel("What for").fill("Typed by mistake");
+  await owner.page.locator("input[name=receipt]").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: receipt });
+  await owner.page.getByRole("button", { name: "Add expense" }).click();
+  await expect(owner.page.getByText("Expense written down.")).toBeVisible();
+  const wrong = owner.page.getByRole("listitem").filter({ hasText: "Typed by mistake" });
+  const wrongReceipt = (await wrong.getByRole("link", { name: "See receipt" }).getAttribute("href"))!;
+  await wrong.getByText("Remove").click();
+  await expect(wrong.getByText("This cannot be undone. The receipt is deleted too.")).toBeVisible();
+  await wrong.getByRole("button", { name: "Yes, delete it" }).click();
+  await expect(owner.page.getByRole("listitem").filter({ hasText: "Typed by mistake" })).toHaveCount(0);
+  expect((await owner.page.request.get(wrongReceipt)).status()).not.toBe(200);
+  await owner.context.close();
 
   const staff = await privateWindow(browser);
   await signIn(staff.page, "staff");

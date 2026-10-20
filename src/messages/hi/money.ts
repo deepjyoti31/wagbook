@@ -83,7 +83,6 @@ export const moneyArea: typeof English = {
       cancelManagers: "सिर्फ़ मालिक या मैनेजर बिल रद्द कर सकते हैं।",
       sayWhy: "बताएं कि बिल क्यों रद्द हो रहा है।",
       reasonTooLong: "कारण 500 अक्षरों से कम रखें।",
-      deleteManagers: "सिर्फ़ मालिक या मैनेजर ड्राफ़्ट बिल मिटा सकते हैं।",
       onlyDraftDeleted: "सिर्फ़ ड्राफ़्ट बिल मिटाया जा सकता है।",
     },
     updated: "बिल अपडेट हो गया।",
@@ -215,6 +214,7 @@ export const moneyArea: typeof English = {
     },
   },
   expenses: {
+    deleteWarning: "इसे वापस नहीं लाया जा सकता। रसीद भी मिट जाएगी।",
     title: "खर्च",
     managersOnly: "खर्च सिर्फ़ मालिक और मैनेजर के लिए हैं।",
     removed: "खर्च हटा दिया गया।",

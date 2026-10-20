@@ -124,15 +124,15 @@ export async function setParentHidden(_state: FormState, form: FormData): Promis
 }
 
 /**
- * Erase a parent's details on their request (erase_client). Owners and
- * managers only; the database refuses anyone else, and refuses while a pet is
+ * Erase a parent's details on their request (erase_client). Owners only
+ * (D29); the database refuses anyone else (WB074), and refuses while a pet is
  * in house or a stay is still to come. Then the files go from storage.
  */
 export async function eraseClient(_state: FormState, form: FormData): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const w = t.m.parent.privacy;
-  if (!canManage) return { error: w.onlyManagers };
+  if (!canDelete) return { error: t.m.errors.codes.WB074 };
   const clientId = Id.safeParse(form.get("clientId"));
   if (!clientId.success) return { error: t.m.errors.parentNotFound };
   if (!checked(form, "confirm")) return { error: w.confirmFirst };

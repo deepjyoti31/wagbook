@@ -69,10 +69,11 @@ create policy pet_media_update on storage.objects for update to authenticated
     bucket_id = 'pet-media'
     and public.storage_org_id(name) in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
   );
+-- Deleting a file is for owners (D29).
 create policy pet_media_delete on storage.objects for delete to authenticated
   using (
     bucket_id = 'pet-media'
-    and public.storage_org_id(name) in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+    and public.storage_org_id(name) in (select public.my_org_ids_with_role(array['owner']::public.member_role[]))
   );
 
 -- ---------------------------------------------------------------------------

@@ -210,6 +210,8 @@ export const petsArea = {
   },
   // The people who work at the kennel, and inviting more.
   people: {
+    yesRemove: "Yes, remove them",
+    yesWithdraw: "Yes, withdraw it",
     title: "People",
     whoWorks: "Who works at {kennel}",
     invited: "Invited, not yet accepted",

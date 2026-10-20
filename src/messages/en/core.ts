@@ -1,6 +1,9 @@
 /** English words shared across Wagbook, and the Today screen. Part of en.ts. */
 export const core = {
   common: {
+    // Every deletion asks once more (ConfirmStep), and only owners see it.
+    cannotUndo: "This cannot be undone.",
+    yesDelete: "Yes, delete it",
     appName: "Wagbook",
     loading: "Loading",
     saving: "Saving",
@@ -67,6 +70,7 @@ export const core = {
     billNotFound: "That bill could not be found.",
     taskNotFound: "That task could not be found.",
     slowDown: "Too many tries from this connection. Wait ten minutes and try again.",
+    ownersDelete: "Only an owner can delete things.",
     notWaitingForCheckIn: "This booking is no longer waiting to be checked in. Refresh the page.",
     notCheckedIn: "This pet is not checked in. Refresh the page.",
     constraints: {
@@ -149,6 +153,7 @@ export const core = {
       WB071: "A pet of this parent is in the kennel now. Check it out first.",
       WB072: "This parent has stays still to come. Cancel them first.",
       WB073: "This parent's details have already been erased.",
+      WB074: "Only an owner can erase a parent's details.",
       WB080: "Only an owner or manager can change what an incident says.",
     },
   },

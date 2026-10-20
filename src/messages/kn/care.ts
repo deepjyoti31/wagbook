@@ -27,6 +27,8 @@ export const careArea: typeof English = {
     noteTooLong: "ನೋಟ್ 500 ಅಕ್ಷರಗಳಿಗಿಂತ ಕಡಿಮೆ ಇರಲಿ.",
   },
   play: {
+    clearWarning: "ಇಂದು ಇನ್ನೂ ನಡೆಯಬೇಕಿರುವ ಎಲ್ಲಾ ಸೆಷನ್‌ಗಳು ಹೋಗುತ್ತವೆ. ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ.",
+    yesClear: "ಹೌದು, ತೆಗೆಯಿರಿ",
     title: "ಆಟ",
     // {done} and {total} are drawn in bold; the form follows {total}.
     sessionsDone: { one: "{date}. {total} ಸೆಷನ್‌ಗಳಲ್ಲಿ {done} ಆಯಿತು.", other: "{date}. {total} ಸೆಷನ್‌ಗಳಲ್ಲಿ {done} ಆಯಿತು." },
@@ -63,7 +65,6 @@ export const careArea: typeof English = {
     timeLike: "10:40 ತರಹ ಸಮಯ ನಮೂದಿಸಿ.",
     onlyPendingMove: "ಇನ್ನೂ ನಡೆಯಬೇಕಿರುವ ಸೆಷನ್ ಅನ್ನು ಮಾತ್ರ ಸರಿಸಬಹುದು.",
     moved: "{time} ಕ್ಕೆ ಸರಿಸಲಾಗಿದೆ.",
-    clearOnlyManagers: "ಪ್ಲಾನ್ ಅನ್ನು ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಮಾತ್ರ ಅಳಿಸಬಹುದು. ಬದಲಿಗೆ ಸೆಷನ್‌ಗಳನ್ನು ಒಂದೊಂದಾಗಿ ಬಿಟ್ಟುಬಿಡಿ.",
     cleared: "ಇಂದು ಇನ್ನೂ ನಡೆಯಬೇಕಿದ್ದ ಸೆಷನ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗಿದೆ. ಆಗಿಹೋದ ಸೆಷನ್‌ಗಳು ಹಾಗೇ ಇರುತ್ತವೆ. ಸಿದ್ಧವಾದಾಗ ಮತ್ತೆ ಪ್ಲಾನ್ ಮಾಡಿ.",
   },
   routines: {

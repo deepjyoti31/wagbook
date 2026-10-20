@@ -2,8 +2,8 @@
 -- Wagbook 0011: a parent's rights over their details (roadmap M9)
 --
 -- India's Digital Personal Data Protection Act lets a person ask what a
--- business holds about them, and ask for it to be erased. Two functions,
--- for owners and managers:
+-- business holds about them, and ask for it to be erased. Two functions: an
+-- owner or manager exports, and only an owner erases (D29):
 --
 --   export_client(id)  everything held about one parent, as one JSON document
 --   erase_client(id)   erases it, keeping only what the law makes the kennel
@@ -27,7 +27,7 @@ begin
 end;
 $$;
 comment on function public.check_privacy_access(uuid) is
-  'Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first.';
+  'Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first; erase_client then also needs an owner (WB074).';
 
 -- ---------------------------------------------------------------------------
 
@@ -168,13 +168,17 @@ declare
 begin
   -- SECURITY DEFINER: erasing has to remove personal text from the audit log,
   -- which nobody may write, and nothing else. Who may do it is checked here:
-  -- an owner or manager of the parent's kennel, in a fully signed-in session.
+  -- an owner of the parent's kennel, in a fully signed-in session.
   select * into v_client from public.clients c where c.id = p_client for update;
   -- Another kennel's parent is "not found", as it would be to the caller.
   if v_client.id is null or v_client.org_id not in (select public.my_org_ids()) then
     raise exception 'WB003: parent not found' using errcode = 'P0002';
   end if;
   perform public.check_privacy_access(v_client.org_id);
+  -- Erasing deletes, and deleting is for owners (D29).
+  if v_client.org_id not in (select public.my_org_ids_with_role(array['owner']::public.member_role[])) then
+    raise exception 'WB074: only an owner can erase a parent''s details' using errcode = '42501';
+  end if;
   if v_client.erased_at is not null then
     raise exception 'WB073: this parent''s details have already been erased' using errcode = '23514';
   end if;
@@ -252,7 +256,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: deletes their pets'' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner or manager (WB070).';
+  'Erases a parent on their request: deletes their pets'' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

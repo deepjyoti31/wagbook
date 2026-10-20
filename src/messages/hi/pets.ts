@@ -201,6 +201,8 @@ export const petsArea: typeof English = {
     },
   },
   people: {
+    yesRemove: "हां, हटाएं",
+    yesWithdraw: "हां, न्योता वापस लें",
     title: "लोग",
     whoWorks: "{kennel} में कौन काम करता है",
     invited: "बुलाया गया, अभी माना नहीं",

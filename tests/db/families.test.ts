@@ -264,7 +264,7 @@ describe("one bill for a family", () => {
     const t = computeInvoice(stayLines({ ...stay, petName: "Dog A", rateMinor: 120000, addOns: [{ description: "Bath", quantity: 1, unitPriceMinor: 50000 }] }), { mode: "none" });
     const id = await makeDraft(staff, t, { group: family.group });
     expect((await errorOf(() => issue(staff, id))).message).toContain("WB050");
-    await as(db, user(manager), () => db.query("delete from public.invoices where id = $1", [id]));
+    await as(db, user(k.owner), () => db.query("delete from public.invoices where id = $1", [id]));
   });
 
   it("lets staff issue the family's bill as its bookings price it, takes in an advance on either pet, and only once", async () => {
@@ -294,7 +294,7 @@ describe("one bill for a family", () => {
     const withBoth = computeInvoice([...lines, ...lines], { mode: "none" });
     const both = await makeDraft(staff, withBoth, { group: f.group });
     expect((await errorOf(() => issue(staff, both))).message).toContain("WB050");
-    await as(db, user(manager), () => db.query("delete from public.invoices where id = $1", [both]));
+    await as(db, user(k.owner), () => db.query("delete from public.invoices where id = $1", [both]));
     await issue(staff, await makeDraft(staff, computeInvoice(lines, { mode: "none" }), { group: f.group }));
   });
 });

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { Rich } from "@/components/rich";
@@ -45,7 +46,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const query = await searchParams;
   const justBooked = query.new === "1";
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale } = t;
   const w = m.booking;
@@ -279,12 +280,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 })}
               </span>
               <span className="font-semibold">{money(l.totalMinor)}</span>
-              {i > 0 && canManage && open ? (
+              {i > 0 && canDelete && open ? (
                 <ActionForm action={removeExtra} className="contents">
                   <input type="hidden" name="itemId" value={items.data[i - 1].id} />
-                  <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
-                    {m.common.remove}
-                  </SubmitButton>
+                  <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.common.removing} />
                 </ActionForm>
               ) : null}
             </LedgerRow>

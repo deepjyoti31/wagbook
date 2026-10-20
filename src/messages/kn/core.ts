@@ -3,6 +3,8 @@ import type { core as English } from "../en/core";
 /** Kannada words shared across Wagbook, and the Today screen. First draft, to be checked by a native speaker. */
 export const core: typeof English = {
   common: {
+    cannotUndo: "ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ.",
+    yesDelete: "ಹೌದು, ಅಳಿಸಿ",
     appName: "Wagbook",
     loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ",
     saving: "ಉಳಿಸಲಾಗುತ್ತಿದೆ",
@@ -69,6 +71,7 @@ export const core: typeof English = {
     billNotFound: "ಆ ಬಿಲ್ ಸಿಗಲಿಲ್ಲ.",
     taskNotFound: "ಆ ಕೆಲಸ ಸಿಗಲಿಲ್ಲ.",
     slowDown: "ಈ ಸಂಪರ್ಕದಿಂದ ತುಂಬಾ ಸಲ ಪ್ರಯತ್ನಿಸಲಾಗಿದೆ. ಹತ್ತು ನಿಮಿಷ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    ownersDelete: "ಮಾಲೀಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
     notWaitingForCheckIn: "ಈ ಬುಕಿಂಗ್ ಈಗ ಚೆಕ್ ಇನ್‌ಗಾಗಿ ಕಾಯುತ್ತಿಲ್ಲ. ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     notCheckedIn: "ಈ ಸಾಕುಪ್ರಾಣಿ ಚೆಕ್ ಇನ್ ಆಗಿಲ್ಲ. ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     constraints: {
@@ -151,6 +154,7 @@ export const core: typeof English = {
       WB071: "ಈ ಪೇರೆಂಟ್‌ರ ಒಂದು ಸಾಕುಪ್ರಾಣಿ ಈಗ ಕೆನೆಲ್‌ನಲ್ಲಿದೆ. ಮೊದಲು ಚೆಕ್ ಔಟ್ ಮಾಡಿ.",
       WB072: "ಈ ಪೇರೆಂಟ್‌ರ ಮುಂದಿನ ವಾಸ್ತವ್ಯಗಳು ಇನ್ನೂ ಇವೆ. ಮೊದಲು ಅವುಗಳನ್ನು ರದ್ದು ಮಾಡಿ.",
       WB073: "ಈ ಪೇರೆಂಟ್‌ರ ವಿವರಗಳನ್ನು ಈಗಾಗಲೇ ಅಳಿಸಲಾಗಿದೆ.",
+      WB074: "ಪೇರೆಂಟ್‌ನ ವಿವರಗಳನ್ನು ಮಾಲೀಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
       WB080: "ಘಟನೆಯಲ್ಲಿ ಬರೆದಿರುವುದನ್ನು ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಮಾತ್ರ ಬದಲಾಯಿಸಬಹುದು.",
     },
   },

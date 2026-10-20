@@ -210,6 +210,8 @@ export const petsArea: typeof English = {
   },
   // The people who work at the kennel, and inviting more.
   people: {
+    yesRemove: "ಹೌದು, ತೆಗೆಯಿರಿ",
+    yesWithdraw: "ಹೌದು, ಆಹ್ವಾನ ಹಿಂಪಡೆಯಿರಿ",
     title: "ಜನರು",
     whoWorks: "{kennel} ನಲ್ಲಿ ಕೆಲಸ ಮಾಡುವವರು",
     invited: "ಆಹ್ವಾನಿಸಲಾಗಿದೆ, ಇನ್ನೂ ಒಪ್ಪಿಲ್ಲ",

@@ -45,10 +45,11 @@ export async function inviteMember(_state: FormState, form: FormData): Promise<F
   return { ok: t.m.people.invitationSaved };
 }
 
-/** Remove a member, or withdraw an invitation that has not been answered. */
+/** Remove a member, or withdraw an invitation that has not been answered. Owners only (D29). */
 export async function removeMember(_state: FormState, form: FormData): Promise<FormState> {
-  const { org } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const id = z.uuid().safeParse(form.get("userId"));
   if (!id.success) return { error: t.m.people.errors.personNotFound };
 

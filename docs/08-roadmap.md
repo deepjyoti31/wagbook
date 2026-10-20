@@ -333,8 +333,8 @@ settings, security review and fixes, documentation.
 4. [x] A second vaccination with its own card on the intake form.
 5. [x] Owners and managers correct an incident (`WB080` for anyone else).
 6. [x] The unused `care_items.requires_photo` is removed.
-7. [ ] Deleting an expense removes its receipt file. **Waiting for the owner** (see "Decisions waiting" in
-   `HANDOFF.md`: whether anything may be deleted at all).
+7. [x] Deleting an expense removes its receipt file. Only owners delete anything, and every deletion asks once more
+   (D29).
 
 ---
 

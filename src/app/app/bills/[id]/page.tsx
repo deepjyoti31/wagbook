@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { InvoiceView } from "@/components/invoice-view";
 import { PaymentForm } from "@/components/payment-form";
@@ -30,7 +31,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const { id } = await params;
   const doneKey = (await searchParams).done;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale } = t;
   const done = typeof doneKey === "string" && doneKey in m.bill.done ? m.bill.done[doneKey as keyof typeof m.bill.done] : undefined;
@@ -290,12 +291,10 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         </Section>
       ) : null}
 
-      {inv.status === "draft" && canManage ? (
+      {inv.status === "draft" && canDelete ? (
         <ActionForm action={deleteDraft}>
           <input type="hidden" name="invoiceId" value={inv.id} />
-          <SubmitButton variant="quiet" pendingLabel={m.bill.deleting}>
-            {m.bill.deleteDraft}
-          </SubmitButton>
+          <ConfirmStep label={m.bill.deleteDraft} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.bill.deleting} />
         </ActionForm>
       ) : null}
     </>

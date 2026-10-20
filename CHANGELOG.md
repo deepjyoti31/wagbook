@@ -12,6 +12,8 @@ The first release will be 0.1.0. Everything below is in it.
 
 - Bookings for boarding and day boarding, with no double booking and no overfilling, enforced by the database.
   Families booked together, requests, peak periods, a calendar, extras and prices.
+- Only an owner can delete anything (an expense with its receipt, a draft bill, an extra, a person, a parent's
+  details), and every deletion asks "Yes, delete it" first.
 - Two pets of one parent can share a kennel, the second at a shared kennel price you set; never three, and never pets
   of different parents. Pets booked together are billed together on one bill, and siblings play together.
 - Today: arrivals, pets in house, check-outs, overstays, incidents to deal with. Check-in with a checklist.

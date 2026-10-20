@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
@@ -22,7 +23,7 @@ export default function PeoplePage({ searchParams }: PageProps<"/app/more/people
 
 async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "searchParams">) {
   const made = (await searchParams).made === "1";
-  const { org, user, role, canManage } = await requireOrg();
+  const { org, user, role, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m } = t;
   const w = m.people;
@@ -95,12 +96,17 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                         </SubmitButton>
                       </ActionForm>
                     ) : null}
-                    <ActionForm action={removeMember} className="contents">
-                      <input type="hidden" name="userId" value={mm.user_id} />
-                      <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
-                        {mm.accepted_at ? m.common.remove : w.withdrawInvitation}
-                      </SubmitButton>
-                    </ActionForm>
+                    {canDelete ? (
+                      <ActionForm action={removeMember} className="contents">
+                        <input type="hidden" name="userId" value={mm.user_id} />
+                        <ConfirmStep
+                          label={mm.accepted_at ? m.common.remove : w.withdrawInvitation}
+                          warning={m.common.cannotUndo}
+                          confirm={mm.accepted_at ? w.yesRemove : w.yesWithdraw}
+                          pending={m.common.removing}
+                        />
+                      </ActionForm>
+                    ) : null}
                   </div>
                 </details>
               ) : null}

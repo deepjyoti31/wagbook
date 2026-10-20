@@ -81,7 +81,6 @@ export const moneyArea = {
       cancelManagers: "Only an owner or manager can cancel a bill.",
       sayWhy: "Say why the bill is cancelled.",
       reasonTooLong: "Keep the reason under 500 characters.",
-      deleteManagers: "Only an owner or manager can delete a draft bill.",
       onlyDraftDeleted: "Only a draft bill can be deleted.",
     },
     updated: "Bill updated.",
@@ -213,6 +212,7 @@ export const moneyArea = {
     },
   },
   expenses: {
+    deleteWarning: "This cannot be undone. The receipt is deleted too.",
     title: "Expenses",
     managersOnly: "Expenses are for owners and managers.",
     removed: "Expense removed.",

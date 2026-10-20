@@ -475,7 +475,7 @@ it on in one browser is asked for the code in the others when the database next 
 **Situation.** India's DPDP Act lets a parent ask a kennel to erase their details. GST law requires a business to keep
 its tax invoices, with the buyer's name, for years. Bills, payments and reports rest on the parent, pet and stay rows.
 
-**Decision.** `erase_client()` (owners and managers) keeps the parent and pet rows, empty and named "Erased", and the
+**Decision.** `erase_client()` (owners only since D29) keeps the parent and pet rows, empty and named "Erased", and the
 stays' dates, kennels and prices, so that bills and reports still add up; issued and cancelled bills keep the buyer
 details frozen on them when they were issued, and payments stay. Everything else about the parent goes: contact
 details, consent, notes, pets' details, vaccinations, routines, incidents, updates, care tasks, play, intake forms,
@@ -546,3 +546,24 @@ local Supabase: the README's "Try it on your own computer" and `npm run setup:lo
 **Why.** Code for a server that will never run is code to keep working for nothing.
 
 **Cost.** Trying Wagbook needs Docker and a few minutes, not a link.
+
+## D29. Only owners delete, and every deletion asks once more
+
+**Status:** Decided, 19 October 2026, by the owner.
+
+**Situation.** Managers could delete records and files (an expense, a draft bill, an extra, a peak period, a person,
+today's play plan, a parent's details) with one tap. The owner wants to keep a way to delete things, but not by
+accident and not by anyone but the owner.
+
+**Decision.** Every delete policy in the database is for owners: tenant tables, setup tables, invoices, payments,
+expenses, forms from parents, memberships (anyone may still leave) and files in storage. `erase_client` needs an owner
+too (`WB074`); a manager can still download a parent's details. Screens show a delete only to owners, as two taps
+(`ConfirmStep`: "This cannot be undone.", then "Yes, delete it"). Deleting an expense deletes its receipt file.
+Taking something out of use (an extra off the price list, a kennel out of service, hiding a pet) is not deleting and
+stays with managers.
+
+**Why.** Deleting cannot be undone, and the person who answers for the kennel's records is the owner.
+
+**Cost.** A kennel run day to day by a manager needs the owner for every clean-up. Erasing a parent at their request
+waits for the owner.
+

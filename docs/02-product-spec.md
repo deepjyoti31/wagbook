@@ -12,8 +12,8 @@ When you build something, change its mark here in the same change.
 
 | Person | Signs in? | What they can do |
 | --- | --- | --- |
-| Owner | Yes | Everything, including inviting and removing owners, and deleting the kennel. |
-| Manager | Yes | Everything except managing owners and deleting the kennel. Changes kennels, prices, settings; voids invoices; records refunds. |
+| Owner | Yes | Everything, including deleting anything (D29), inviting and removing owners, and deleting the kennel. |
+| Manager | Yes | Everything except deleting, managing owners and deleting the kennel. Changes kennels, prices, settings; voids invoices; records refunds. |
 | Staff | Yes | Runs the day: bookings, check-in and out, pets, care tasks, updates, incidents, payments received, issuing invoices. |
 | Parent | Never | Opens links sent to them: the intake form, their pet's stay page, their bill. |
 
@@ -66,6 +66,10 @@ board too. Leave both as they are.
 
 ---
 
+**Deleting (D29).** Only an owner deletes anything: an expense (with its receipt), a draft bill, an extra on a booking,
+a peak period, a person or an invitation, today's play plan, a parent's details. Each asks once more ("This cannot be
+undone.", then "Yes, delete it"), and the database refuses anyone else.
+
 ## A. Getting started
 
 ### A1. Create an account. Built.
@@ -101,7 +105,8 @@ withdrawn. Whoever opens it creates an account or signs in, sees which kennel an
 signed-out visitor learns nothing from the link. Only owners can make a link that grants owner.
 
 **Changing people (M6).** On People, Change opens a colleague's name and role, Suspend (they lose access at once; their
-history stays) or Restore, and Remove. Managers change staff and managers; only owners change owners.
+history stays) or Restore, and Remove (owners only, after a second tap). Managers change staff and managers; only owners
+change owners.
 
 ### A5. Work at more than one kennel. Built.
 
@@ -173,7 +178,7 @@ birth, weight, colour, microchip, food, health, allergies, behaviour, flags, vet
 
 `/app/clients/{id}`: phone numbers, what they owe in all, WhatsApp; their pets, stays and bills with what is due; every
 detail editable (name, phones, email, address, emergency contact, GSTIN and state, notes, consent if none is on record).
-For owners and managers, "What we hold about them": download their details, and erase them (B8).
+For owners and managers, "What we hold about them": download their details; owners can also erase them (B8).
 
 **Merging (B9, M6).** For owners and managers: "Same person as another parent?" finds another record by its phone
 number and merges it into this one. Pets, their stays, bills (issued ones keep the buyer printed on them), payments and
@@ -209,7 +214,7 @@ that was hidden on its own before. Merging and erasing hide rows the same way.
 
 ### B8. A parent's details: download and erase. Built (M9).
 
-On the parent page, for owners and managers (`WB070` for anyone else):
+On the parent page, for owners and managers (`WB070` for anyone else); erasing is for owners only (`WB074`):
 
 - **Download their details** gives one JSON file (`export_client`): the parent and their consent, each pet with its
   vaccinations, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
@@ -275,7 +280,7 @@ cancelling happens. A Calendar button opens C5.
   estimated total).
 - **Booked together**: the other pets of a family booking.
 - **What it costs**: the stay and its extras as lines with an estimated total (tax included where the kennel charges
-  it); add an extra from the price list or a one-off item; owners and managers can remove one.
+  it); add an extra from the price list or a one-off item; owners can remove one, after a second tap.
 - **Change this booking**: dates, kennel (free ones offered), expected drop-off and pick-up times, belongings, notes;
   price per night or day, a discount, and boarding or day boarding (the kind of stay) for owners and managers only
   (`WB022` for staff). Changing the kind leaves the price as typed, with a hint to check it; the kennel and pet
@@ -324,8 +329,8 @@ refund shows a warning. Prices never change.
 
 Settings edits the two usual prices. More, then Extras: add an extra (each time or by the hour), change its price, take
 it off the list; owners and managers. On the booking page anyone adds an extra at its listed price, or a one-off item
-with its own price (a vet bill paid for the parent). Changing what an extra costs, or removing one, is for owners and
-managers (`WB025`, and the delete policy).
+with its own price (a vet bill paid for the parent). Changing what an extra costs is for owners and managers
+(`WB025`); removing one from a booking is for owners (the delete policy, D29).
 
 ---
 

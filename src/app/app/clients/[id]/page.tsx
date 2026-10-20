@@ -29,7 +29,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   const { id } = await params;
   const query = await searchParams;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m } = t;
   const p = m.parent;
@@ -269,6 +269,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
             <a href={`/app/clients/${c.id}/export`} download className={buttonStyles.secondary}>
               {p.privacy.download}
             </a>
+            {canDelete ? (
             <ActionForm action={eraseClient} className="space-y-3 rounded-lg bg-alert-soft p-3">
               <input type="hidden" name="clientId" value={c.id} />
               <p className="font-bold">{p.privacy.eraseTitle}</p>
@@ -281,6 +282,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                 {p.privacy.eraseButton}
               </SubmitButton>
             </ActionForm>
+            ) : (
+              <p className="text-slate">{t.m.errors.codes.WB074}</p>
+            )}
           </div>
         </Section>
       ) : null}

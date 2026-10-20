@@ -10,9 +10,10 @@ Every milestone on the roadmap is built, M2 to M13. The latest: two pets of one 
 never another parent's pet), the second at a shared kennel price the kennel sets, and a family booked together pays on
 one bill (M11, D27); kennels can be named freely and reordered (M12); New booking searches pets on the server, staff no
 longer see the owners' menu items, History of changes names fields in the reader's language, the intake form takes a
-second vaccine with its own card, and managers can correct an incident (M13). The owner confirmed the licence (AGPL),
+second vaccine with its own card, managers can correct an incident, and only owners delete anything, after a second
+tap (M13, D29). The owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (198 database tests, 134 unit tests), and the whole day is walked in a
+kennel. The database rules are tested in-process (202 database tests, 134 unit tests), and the whole day is walked in a
 real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 36 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
@@ -74,6 +75,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A second vaccine and card on the intake form: `pet-N-2` accepted, `pet-N-3` refused, each card on its own vaccination after accepting | `tests/db/privacy.test.ts` (the matching removed once to see it fail); end-to-end through real Storage | High |
 | New booking finds a pet not in its starting list, by parent's name and by phone digits | Checked by hand against the local Supabase with 41 extra parents, 19 October 2026 (not an automated test) | Medium |
 | Staff do not see Reports, Expenses or History of changes under More | End-to-end | High |
+| Only owners delete: every kind of record, a person (anyone may still leave), a file, and erasing a parent (`WB074`); managers and staff touch nothing | `tests/db/deletion.test.ts`; the rules removed once to see the tests fail | High |
+| Deleting takes two taps, and an expense takes its receipt with it; a manager is not offered Remove | End-to-end (the receipt's link stops working); screenshot at 360 pixels, 20 October 2026 | High |
 | History of changes in the reader's language | `src/lib/history.test.ts`; end-to-end ("Price per night or day: was ...") | High |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
@@ -106,12 +109,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
    email confirmation, and walk the first run. Check the script policy header and the rate limits on the hosted deploy
    (`10`, "Looking after it"). Then record the migration freeze below.
-2. **Answer the deletion question** under "Decisions waiting for the owner": it decides whether erasing a parent stays
-   and whether a removed expense takes its receipt with it.
-3. **Switch on "Private vulnerability reporting"** in the GitHub repository's settings, so `SECURITY.md` works.
-4. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
-5. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
-6. **Ask a person outside the project for a security review**, and take question 8 in `06` to an accountant.
+2. **Switch on "Private vulnerability reporting"** in the GitHub repository's settings, so `SECURITY.md` works.
+3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
+4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
+5. **Ask a person outside the project for a security review**, and take question 8 in `06` to an accountant.
 
 After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
@@ -141,7 +142,6 @@ migration. Add new files."
 
 | Decision | Where | Default taken |
 | --- | --- | --- |
-| "No deletion possible once the data is there, I want to keep everything" (19 October 2026). Does that mean removing "Erase this parent's details" (D25, which empties a parent on request under India's DPDP Act), and never deleting files such as a removed expense's receipt? | D25, `erase_client` | Asked; nothing removed yet. Erasing stays until the owner confirms, because the DPDP Act gives a parent the right to ask. |
 | Whether a bill may be in Hindi or Kannada (question 9 for the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md) | Bills say "Tax invoice" in English with the translation in brackets |
 | Whether owners must use two-step sign-in, rather than be reminded | D24 | Reminded, not forced |
 | Invoice prefix and the GST questions | [06-billing-and-gst.md](06-billing-and-gst.md), "Questions to take to an accountant" | Tax off, prefix `WB` |
@@ -150,7 +150,8 @@ Decided: only owners and managers set or change a price (D15), extended to bills
 (D2, confirmed 19 October 2026). The repository is public on the owner's GitHub account; conduct reports go to the owner
 there. No public demo (D28). The example kennel in `13` is never named, and Wagbook is independent of any kennel.
 Overstays stay manual (Extend to today). A family booked together pays on one bill, and two pets of one parent may share
-a kennel at a shared price the kennel sets, two at most; siblings may play together (D27).
+a kennel at a shared price the kennel sets, two at most; siblings may play together (D27). Erasing a parent stays; only
+owners delete anything, with a second tap, and a deleted expense takes its receipt with it (D29, 20 October 2026).
 
 ## Translations waiting for a native speaker
 
@@ -244,7 +245,6 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
   of kennels going in or out of service.
 - A pet that overstays counts in the occupancy report only up to its check-out date unless someone pressed Extend.
-- Removing an expense leaves its receipt file in storage (see `05`, known limitations).
 - Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
 - History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
@@ -262,7 +262,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 332 tests, build
+npm run check        # dash check, lint, typecheck, 336 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -272,6 +272,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 20 October 2026. Only owners delete (D29): every delete policy, erasing a parent (`WB074`), a second tap on every
+  deletion, and a deleted expense removes its receipt.
 - 19 October 2026. The owner's decisions recorded (licence, no demo, independent of any kennel). M11: shared kennels
   with a shared price and one bill per family; siblings play together. M12: kennels named freely. M13: server pet
   search, staff menu, history field names, second intake card, incident corrections. e2e walk extended to 36 tests.

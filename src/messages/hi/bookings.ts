@@ -193,7 +193,6 @@ export const bookingsArea: typeof English = {
       extraOrDescribe: "लिस्ट से एक एक्स्ट्रा चुनें, या एक बार की चीज़ लिखकर बताएं।",
       descriptionLong: "जानकारी 200 अक्षरों से कम रखें।",
       itemPrice: "चीज़ की कीमत लिखें, जैसे 500।",
-      removeExtra: "एक्स्ट्रा सिर्फ़ मालिक या मैनेजर हटा सकते हैं।",
       extraNotFound: "वह एक्स्ट्रा नहीं मिला।",
     },
     saved: "बुकिंग सेव हो गई।",

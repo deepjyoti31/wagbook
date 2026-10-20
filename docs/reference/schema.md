@@ -117,7 +117,7 @@ Add-ons charged on top of the stay: grooming, pick-up and drop, a vet bill paid 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `booking_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `booking_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `booking_items_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `booking_items_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `booking_items_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -208,7 +208,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `bookings_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `bookings_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `bookings_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -251,7 +251,7 @@ A routine that repeats every day. With no pet it is the house routine for every 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `care_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `care_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `care_items_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `care_items_insert_for_pet` (insert): new values must satisfy `((pet_id IS NOT NULL) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
 - `care_items_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -307,7 +307,7 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `care_tasks_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `care_tasks_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `care_tasks_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -369,7 +369,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `clients_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `clients_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `clients_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -421,7 +421,10 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `expenses_all` (all): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `expenses_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### incidents
 
@@ -474,7 +477,7 @@ Anything out of the ordinary: illness, injury, a fight, an escape. A written, ti
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `incidents_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `incidents_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `incidents_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `incidents_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `incidents_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -523,7 +526,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `intake_submissions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `intake_submissions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
@@ -748,7 +751,7 @@ END)`
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `invoices_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `invoices_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `invoices_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -785,7 +788,7 @@ A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets o
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `kennels_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `kennels_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `kennels_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `kennels_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `kennels_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -833,7 +836,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `memberships_delete` (delete): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
+- `memberships_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `memberships_delete_self` (delete): rows where `(user_id = ( SELECT auth.uid() AS uid))`
 - `memberships_select` (select): rows where `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) OR ((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT session_meets_mfa() AS session_meets_mfa)))`
 - `memberships_update` (update): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`; new values must satisfy `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
@@ -972,7 +975,7 @@ Money received from a parent, or refunded to one. Wagbook records payments; it d
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `payments_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `payments_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `payments_insert` (insert): new values must satisfy `(((direction = 'in'::text) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
 - `payments_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `payments_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1014,7 +1017,7 @@ Busy stretches such as Diwali week or a long weekend. Used to warn about cancell
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `peak_periods_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `peak_periods_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `peak_periods_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `peak_periods_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `peak_periods_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1075,7 +1078,7 @@ An animal in the kennel's care. Belongs to one client.
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `pets_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `pets_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `pets_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1127,7 +1130,7 @@ A slot when one pet, or siblings of one parent together, have a yard to themselv
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `play_sessions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `play_sessions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `play_sessions_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_sessions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_sessions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1162,7 +1165,7 @@ A fenced area where one pet at a time plays or exercises.
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `play_yards_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `play_yards_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `play_yards_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1215,7 +1218,7 @@ The rate card. A boarding or daycare row sets the price of a stay; addon rows ar
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `services_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `services_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `services_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `services_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `services_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1261,7 +1264,7 @@ A note about how a pet is doing, usually with photos. Doubles as the shift hando
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `stay_updates_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `stay_updates_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `stay_updates_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `stay_updates_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `stay_updates_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1308,7 +1311,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `vaccinations_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `vaccinations_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `vaccinations_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `vaccinations_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `vaccinations_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1468,7 +1471,7 @@ check_privacy_access(p_org uuid) returns void
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first.
+Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first; erase_client then also needs an owner (WB074).
 
 ### check_report_access
 
@@ -1552,7 +1555,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner or manager (WB070).
+Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 

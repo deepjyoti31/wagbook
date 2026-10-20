@@ -205,11 +205,11 @@ export async function voidBill(_state: FormState, form: FormData): Promise<FormS
   redirect(`/app/bills/${invoiceId.data}?done=void`);
 }
 
-/** Throw away a draft. Owners and managers (the delete policy). */
+/** Throw away a draft. Owners only (the delete policy, D29). */
 export async function deleteDraft(_state: FormState, form: FormData): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.bill.errors.deleteManagers };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const invoiceId = Id.safeParse(form.get("invoiceId"));
   if (!invoiceId.success) return { error: t.m.errors.billNotFound };
   const supabase = await createClient();

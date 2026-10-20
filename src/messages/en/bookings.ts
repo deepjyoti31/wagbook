@@ -209,7 +209,6 @@ export const bookingsArea = {
       extraOrDescribe: "Choose an extra from the list, or describe a one-off item.",
       descriptionLong: "Keep the description under 200 characters.",
       itemPrice: "Enter the price of the item, like 500.",
-      removeExtra: "Only an owner or manager can remove an extra.",
       extraNotFound: "That extra could not be found.",
     },
     saved: "Booking saved.",

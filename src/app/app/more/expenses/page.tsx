@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { MonthPicker } from "@/components/month-picker";
 import { PhotoInput } from "@/components/photo-input";
 import { Rich } from "@/components/rich";
@@ -27,7 +28,7 @@ export default function ExpensesPage({ searchParams }: PageProps<"/app/more/expe
 
 async function Expenses({ searchParams }: Pick<PageProps<"/app/more/expenses">, "searchParams">) {
   const query = await searchParams;
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const { m, language, locale } = await getAppI18n();
   const x = m.expenses;
   const title = <PageTitle title={x.title} />;
@@ -145,13 +146,13 @@ async function Expenses({ searchParams }: Pick<PageProps<"/app/more/expenses">, 
                       {x.seeReceipt}
                     </a>
                   ) : null}
-                  <ActionForm action={deleteExpense} className="contents">
-                    <input type="hidden" name="expenseId" value={r.id} />
-                    <input type="hidden" name="month" value={month} />
-                    <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
-                      {m.common.remove}
-                    </SubmitButton>
-                  </ActionForm>
+                  {canDelete ? (
+                    <ActionForm action={deleteExpense} className="contents">
+                      <input type="hidden" name="expenseId" value={r.id} />
+                      <input type="hidden" name="month" value={month} />
+                      <ConfirmStep label={m.common.remove} warning={x.deleteWarning} confirm={m.common.yesDelete} pending={m.common.removing} />
+                    </ActionForm>
+                  ) : null}
                 </div>
               </li>
             ))}

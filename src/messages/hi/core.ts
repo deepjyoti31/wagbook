@@ -3,6 +3,8 @@ import type { core as English } from "../en/core";
 /** Hindi words shared across Wagbook, and the Today screen. First draft, to be checked by a native speaker. */
 export const core: typeof English = {
   common: {
+    cannotUndo: "इसे वापस नहीं लाया जा सकता।",
+    yesDelete: "हां, मिटाएं",
     appName: "Wagbook",
     loading: "लोड हो रहा है",
     saving: "सेव हो रहा है",
@@ -69,6 +71,7 @@ export const core: typeof English = {
     billNotFound: "वह बिल नहीं मिला।",
     taskNotFound: "वह काम नहीं मिला।",
     slowDown: "इस कनेक्शन से बहुत बार कोशिश हुई। दस मिनट रुककर फिर कोशिश करें।",
+    ownersDelete: "चीज़ें सिर्फ़ मालिक मिटा सकते हैं।",
     notWaitingForCheckIn: "यह बुकिंग अब चेक इन के इंतज़ार में नहीं है। पेज रिफ़्रेश करें।",
     notCheckedIn: "इस पालतू का चेक इन नहीं हुआ है। पेज रिफ़्रेश करें।",
     constraints: {
@@ -150,6 +153,7 @@ export const core: typeof English = {
       WB071: "इस पेरेंट का एक पालतू अभी केनेल में है। पहले उसे चेक आउट करें।",
       WB072: "इस पेरेंट के आगे के ठहराव बाकी हैं। पहले उन्हें रद्द करें।",
       WB073: "इस पेरेंट की जानकारी पहले ही मिटा दी गई है।",
+      WB074: "किसी पेरेंट की जानकारी सिर्फ़ मालिक मिटा सकते हैं।",
       WB080: "किसी घटना में लिखी बात सिर्फ़ मालिक या मैनेजर बदल सकते हैं।",
     },
   },
