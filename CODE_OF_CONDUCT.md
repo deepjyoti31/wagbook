@@ -33,5 +33,5 @@ Maintainers who break these rules are held to them in the same way.
 
 ## Contact
 
-Use the address given as the maintainers' contact on the repository's main page. (Maintainers: set one before the
-first public release; see `docs/HANDOFF.md`.) For a security problem, see [SECURITY.md](SECURITY.md) instead.
+Contact the maintainer directly through their GitHub profile (the owner of the repository,
+[github.com/deepjyoti31](https://github.com/deepjyoti31)). For a security problem, see [SECURITY.md](SECURITY.md) instead.

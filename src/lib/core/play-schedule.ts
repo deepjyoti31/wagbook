@@ -1,9 +1,10 @@
 /**
  * Solo play scheduling.
  *
- * Some kennels (the reference deployment is one) never let dogs
- * play in groups. Every dog gets the yard to itself for a fixed number of
- * short sessions a day. That is safer, and it makes the yard a scarce
+ * Some kennels (the example in docs/13 is one) never let dogs of different
+ * families play together. Every dog gets the yard to itself (or with its
+ * siblings, when they share a kennel) for a fixed number of short sessions a
+ * day. That is safer, and it makes the yard a scarce
  * resource that has to be scheduled: 60 dogs x 2 sessions x 20 minutes is 40
  * yard-hours a day.
  *
@@ -20,7 +21,11 @@ export interface PlayWindow {
 }
 
 export interface PlayPlanInput {
-  dogs: readonly { id: string }[];
+  /**
+   * The dogs to plan for. Dogs with the same `together` key (siblings sharing
+   * a kennel) play together: they get the same slots in the same yard.
+   */
+  dogs: readonly { id: string; together?: string | null }[];
   yards: readonly { id: string }[];
   /** When the yards are in use, e.g. morning and late afternoon to avoid the heat. */
   windows: readonly PlayWindow[];
@@ -126,32 +131,46 @@ export function planPlaySessions(input: PlayPlanInput): PlayPlan {
     existing.some((e) => e.dogId === dogId && slot.start < e.end + minGap && e.start < slot.end + minGap);
 
   const sessions: PlannedSession[] = [];
-  const lastEnd = new Map<string, number>();
   const already = new Map<string, number>(input.dogs.map((d) => [d.id, existing.filter((e) => e.dogId === d.id).length]));
   const got = new Map<string, number>(already);
 
+  // Siblings who play together are planned as one: a slot for the group is a
+  // slot for each of them. In the order the first of each group appears.
+  const groups = new Map<string, string[]>();
+  for (const dog of input.dogs) {
+    const key = dog.together ? `together:${dog.together}` : `dog:${dog.id}`;
+    groups.set(key, [...(groups.get(key) ?? []), dog.id]);
+  }
+  const units = [...groups.values()];
+  const unitGot = (dogs: string[]) => Math.min(...dogs.map((d) => got.get(d)!));
+  const lastEnd = new Map<string[], number>();
+
   for (let round = 0; round < sessionsPerDog; round++) {
-    for (const dog of input.dogs) {
+    for (const dogs of units) {
       // Fair before full: nobody gets a session in this round ahead of a dog with fewer.
-      if (got.get(dog.id)! > round) continue;
-      const earliest = lastEnd.has(dog.id) ? lastEnd.get(dog.id)! + minGap : 0;
-      const slot = slots.find((s) => !s.taken && s.start >= earliest && !clashesWithExisting(dog.id, s));
+      if (unitGot(dogs) > round) continue;
+      const earliest = lastEnd.has(dogs) ? lastEnd.get(dogs)! + minGap : 0;
+      const slot = slots.find((s) => !s.taken && s.start >= earliest && !dogs.some((d) => clashesWithExisting(d, s)));
       if (!slot) continue;
       slot.taken = true;
-      lastEnd.set(dog.id, slot.end);
-      got.set(dog.id, got.get(dog.id)! + 1);
-      sessions.push({ dogId: dog.id, yardId: slot.yardId, start: toClock(slot.start), end: toClock(slot.end) });
+      lastEnd.set(dogs, slot.end);
+      for (const dogId of dogs) {
+        // A sibling who already has its sessions (one moved by hand, say) gets no extra.
+        if (got.get(dogId)! >= sessionsPerDog) continue;
+        got.set(dogId, got.get(dogId)! + 1);
+        sessions.push({ dogId, yardId: slot.yardId, start: toClock(slot.start), end: toClock(slot.end) });
+      }
     }
   }
 
-  sessions.sort((a, b) => a.start.localeCompare(b.start) || a.yardId.localeCompare(b.yardId));
+  sessions.sort((a, b) => a.start.localeCompare(b.start) || a.yardId.localeCompare(b.yardId) || a.dogId.localeCompare(b.dogId));
   return {
     sessions,
     shortfall: input.dogs
       .map((d) => ({ dogId: d.id, missing: sessionsPerDog - got.get(d.id)! }))
       .filter((s) => s.missing > 0),
     slotsAvailable: slots.length,
-    slotsNeeded: input.dogs.reduce((n, d) => n + Math.max(0, sessionsPerDog - already.get(d.id)!), 0),
+    slotsNeeded: units.reduce((n, dogs) => n + Math.max(0, sessionsPerDog - Math.min(...dogs.map((d) => already.get(d)!))), 0),
   };
 }
 

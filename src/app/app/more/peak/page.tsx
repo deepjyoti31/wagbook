@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { Badge, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, todayIn } from "@/lib/core";
@@ -19,7 +20,7 @@ export default function PeakPage() {
 }
 
 async function Peaks() {
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const { m, locale } = await getAppI18n();
   const k = m.peak;
   const supabase = await createClient();
@@ -56,12 +57,10 @@ async function Peaks() {
                       : fill(m.stay.dates, { start: formatDate(p.start_date, locale), end: formatDate(p.end_date, locale) })}
                   </span>
                 </span>
-                {canManage ? (
+                {canDelete ? (
                   <ActionForm action={removePeakPeriod} className="contents">
                     <input type="hidden" name="periodId" value={p.id} />
-                    <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
-                      {m.common.remove}
-                    </SubmitButton>
+                    <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.common.removing} />
                   </ActionForm>
                 ) : null}
               </LedgerRow>

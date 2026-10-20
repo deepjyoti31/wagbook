@@ -53,10 +53,11 @@ export async function addPeakPeriod(_state: FormState, form: FormData): Promise<
   return { ok: fill(t.m.peak.added, { name: p.name }) };
 }
 
+/** Delete a peak period. Owners only (D29). */
 export async function removePeakPeriod(_state: FormState, form: FormData): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.peak.viewOnly };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const id = z.uuid().safeParse(form.get("periodId"));
   if (!id.success) return { error: t.m.peak.errors.notFound };
   const supabase = await createClient();

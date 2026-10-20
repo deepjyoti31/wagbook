@@ -248,6 +248,8 @@ declare
   v_until date;
   v_index integer := 0;
   v_certificate text;
+  v_certificate2 text;
+  v_vax_index bigint;
 begin
   select * into v_sub from public.intake_submissions s where s.id = p_submission for update;
   if v_sub.id is null then
@@ -311,14 +313,18 @@ begin
          nullif(left(btrim(v_pet ->> 'vet_phone'), 200), ''))
       returning id into v_pet_id;
 
-      -- The certificate the parent sent for this pet, if any, goes on each of
-      -- its vaccinations. Read as the staff member, so storage policies apply.
+      -- The certificates the parent sent for this pet: pet-N for its first
+      -- vaccine and pet-N-2 for its second. A vaccine with no card of its own
+      -- gets the first one. Read as the staff member, so storage policies apply.
       select o.name into v_certificate
       from storage.objects o
       where o.bucket_id = 'pet-media' and o.name = v_sub.org_id || '/intake/' || v_sub.id || '/pet-' || v_index;
+      select o.name into v_certificate2
+      from storage.objects o
+      where o.bucket_id = 'pet-media' and o.name = v_sub.org_id || '/intake/' || v_sub.id || '/pet-' || v_index || '-2';
 
       if jsonb_typeof(v_pet -> 'vaccinations') = 'array' then
-        for v_vax in select * from jsonb_array_elements(v_pet -> 'vaccinations') limit 10 loop
+        for v_vax, v_vax_index in select * from jsonb_array_elements(v_pet -> 'vaccinations') with ordinality limit 10 loop
           if char_length(btrim(coalesce(v_vax ->> 'vaccine', ''))) between 1 and 60 then
             v_given := public.safe_date(v_vax ->> 'given_on');
             v_until := public.safe_date(v_vax ->> 'valid_until');
@@ -326,7 +332,8 @@ begin
               v_until := null;
             end if;
             insert into public.vaccinations (org_id, pet_id, vaccine, given_on, valid_until, certificate_path)
-            values (v_sub.org_id, v_pet_id, btrim(v_vax ->> 'vaccine'), v_given, v_until, v_certificate);
+            values (v_sub.org_id, v_pet_id, btrim(v_vax ->> 'vaccine'), v_given, v_until,
+                    case when v_vax_index = 2 then coalesce(v_certificate2, v_certificate) else v_certificate end);
           end if;
         end loop;
       end if;

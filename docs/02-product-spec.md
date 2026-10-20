@@ -12,8 +12,8 @@ When you build something, change its mark here in the same change.
 
 | Person | Signs in? | What they can do |
 | --- | --- | --- |
-| Owner | Yes | Everything, including inviting and removing owners, and deleting the kennel. |
-| Manager | Yes | Everything except managing owners and deleting the kennel. Changes kennels, prices, settings; voids invoices; records refunds. |
+| Owner | Yes | Everything, including deleting anything (D29), inviting and removing owners, and deleting the kennel. |
+| Manager | Yes | Everything except deleting, managing owners and deleting the kennel. Changes kennels, prices, settings; voids invoices; records refunds. |
 | Staff | Yes | Runs the day: bookings, check-in and out, pets, care tasks, updates, incidents, payments received, issuing invoices. |
 | Parent | Never | Opens links sent to them: the intake form, their pet's stay page, their bill. |
 
@@ -66,6 +66,10 @@ board too. Leave both as they are.
 
 ---
 
+**Deleting (D29).** Only an owner deletes anything: an expense (with its receipt), a draft bill, an extra on a booking,
+a peak period, a person or an invitation, today's play plan, a parent's details. Each asks once more ("This cannot be
+undone.", then "Yes, delete it"), and the database refuses anyone else.
+
 ## A. Getting started
 
 ### A1. Create an account. Built.
@@ -80,8 +84,11 @@ land on Kennels with a welcome note asking them to add kennels. A person can own
 
 ### A3. Add kennels. Built.
 
-Add a run in one go: prefix `K`, how many, first number, gives `K01` to `K60`. Repeating it never duplicates. A kennel
-can be taken out of service and put back. The number of kennels in service is the kennel's capacity.
+Add one kennel with any name ("Garden suite"), at the end of the list, or a numbered row in one go: prefix `K`, how
+many, first number, gives `K01` to `K60`. Repeating a row never duplicates. Each kennel's Change renames it and sets
+its position in the list, which is also the order the care round walks. Two kennels cannot share a name. A kennel can
+be taken out of service and put back. The number of kennels in service is the kennel's capacity. Owners and managers
+(M12).
 
 ### A4. Invite the team. Built.
 
@@ -98,7 +105,8 @@ withdrawn. Whoever opens it creates an account or signs in, sees which kennel an
 signed-out visitor learns nothing from the link. Only owners can make a link that grants owner.
 
 **Changing people (M6).** On People, Change opens a colleague's name and role, Suspend (they lose access at once; their
-history stays) or Restore, and Remove. Managers change staff and managers; only owners change owners.
+history stays) or Restore, and Remove (owners only, after a second tap). Managers change staff and managers; only owners
+change owners.
 
 ### A5. Work at more than one kennel. Built.
 
@@ -108,7 +116,7 @@ cookie is only a preference: membership is checked on every request.
 ### A6. Settings. Built.
 
 Kennel details (name, phones, email, address, usual drop-off and pick-up times), usual prices for boarding and day
-boarding, UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
+boarding and a shared kennel price for each (the second pet of one parent in one kennel; empty means the usual price), UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
 prefix, whether prices include tax), intake form (on or off, consent wording). Staff can look but not save. Solo play
 settings are on Play yards (D3).
 
@@ -134,14 +142,15 @@ row shows the pet's photo, breed, weight, flags in red, the parent (opening thei
 ### B3. Intake form for parents. Built.
 
 `/i/{slug}`. One page, no account. The parent enters their details and an emergency contact, up to six pets (with food,
-health, behaviour and vaccinations, and a photo or PDF of each pet's vaccination certificate), the dates they want, and
+health, behaviour, a vaccination and a photo or PDF of its certificate, and optionally another vaccination with its own
+card), the dates they want, and
 ticks a consent box. The consent wording is the kennel's own, or a default. The submission waits for staff; it changes
 nothing until accepted. A certificate needs the vaccine's name beside it. If the form goes but a certificate does not,
 the thank-you page says to send it on WhatsApp.
 
 Protection against abuse: the form can be switched off; a submission is at most 20,000 bytes; at most 60 unreviewed
 submissions per kennel per hour and 5 per phone number per hour (`WB048`); at most 10 sends from one address in ten
-minutes (M9, `src/lib/rate-limit.ts`). Certificates (M9): one file per pet, at most 10 MB, photo or PDF, only within an
+minutes (M9, `src/lib/rate-limit.ts`). Certificates (M9, a second per pet in M13): one file for each of a pet's two vaccines, at most 10 MB, photo or PDF, only within an
 hour of sending the form and only while it waits for staff, using the secret the form got back
 (`intake_upload_allowed`). See [05-security-and-privacy.md](05-security-and-privacy.md).
 
@@ -169,7 +178,7 @@ birth, weight, colour, microchip, food, health, allergies, behaviour, flags, vet
 
 `/app/clients/{id}`: phone numbers, what they owe in all, WhatsApp; their pets, stays and bills with what is due; every
 detail editable (name, phones, email, address, emergency contact, GSTIN and state, notes, consent if none is on record).
-For owners and managers, "What we hold about them": download their details, and erase them (B8).
+For owners and managers, "What we hold about them": download their details; owners can also erase them (B8).
 
 **Merging (B9, M6).** For owners and managers: "Same person as another parent?" finds another record by its phone
 number and merges it into this one. Pets, their stays, bills (issued ones keep the buyer printed on them), payments and
@@ -205,7 +214,7 @@ that was hidden on its own before. Merging and erasing hide rows the same way.
 
 ### B8. A parent's details: download and erase. Built (M9).
 
-On the parent page, for owners and managers (`WB070` for anyone else):
+On the parent page, for owners and managers (`WB070` for anyone else); erasing is for owners only (`WB074`):
 
 - **Download their details** gives one JSON file (`export_client`): the parent and their consent, each pet with its
   vaccinations, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
@@ -232,17 +241,20 @@ price for the kind of stay; only owners and managers see a Price box and can typ
 copied onto the booking, so changing the rate card later never changes an old booking. Opening it from the calendar
 fills in the kennel and the date. After booking, the booking page opens.
 
-A search box above the pet list narrows it by pet name, breed, parent's name, or three or more digits of the parent's
-phone; when one pet matches it is chosen. The kennel list offers only kennels free on the dates typed, and changes as
+The pet list starts with recently booked and recently added pets and their families, not every pet the kennel has. A
+search box above it finds any pet by name, breed, parent's name, or three or more digits of the parent's phone: the
+list narrows at once, and the server is asked for the rest as you type (`searchPets()`, M13); when one pet matches it
+is chosen. The kennel list offers only kennels free on the dates typed, and changes as
 the dates change (`freeKennels()`, the same rule as `available_kennels()`); a sentence says when some are left out.
 
 What the database refuses, whatever the screen does:
 
 | Rule | Error |
 | --- | --- |
-| Two pets in one kennel on overlapping nights | `bookings_no_kennel_overlap` |
+| Pets of different parents in one kennel on overlapping nights | `bookings_no_kennel_overlap` |
+| A third pet in one kennel | `WB027` |
 | One pet in two bookings at once | `bookings_no_pet_overlap` |
-| More pets in house on any day than kennels in service (once at least one kennel exists) | `WB020` |
+| More kennels in use on any day than kennels in service (once at least one kennel exists; two siblings sharing use one) | `WB020` |
 | A kennel that is out of service | `WB021` |
 | Boarding with no night; check-out before check-in; longer than a year | check constraints |
 | Staff booking at a price that is not on the price list, or with a discount | `WB023` |
@@ -268,7 +280,7 @@ cancelling happens. A Calendar button opens C5.
   estimated total).
 - **Booked together**: the other pets of a family booking.
 - **What it costs**: the stay and its extras as lines with an estimated total (tax included where the kennel charges
-  it); add an extra from the price list or a one-off item; owners and managers can remove one.
+  it); add an extra from the price list or a one-off item; owners can remove one, after a second tap.
 - **Change this booking**: dates, kennel (free ones offered), expected drop-off and pick-up times, belongings, notes;
   price per night or day, a discount, and boarding or day boarding (the kind of stay) for owners and managers only
   (`WB022` for staff). Changing the kind leaves the price as typed, with a hint to check it; the kennel and pet
@@ -281,8 +293,17 @@ After a step that changes the status, the page comes back saying what happened. 
 ### C4. Family bookings. Built.
 
 In New booking, choosing a pet lists the other pets of the same parent with a tick box each. Ticked pets are booked in
-the same statement (all or none), share a `group_id`, and show each other on the booking page. Only the first pet gets
-the chosen kennel; the others get theirs at check-in. The database refuses a group that mixes parents (`WB024`).
+the same statement (all or none), share a `group_id`, and show each other on the booking page. The database refuses a
+group that mixes parents (`WB024`), and a family stays as it was booked (`WB026`).
+
+With two pets ticked, Kennels offers "A kennel each" (the first pet gets the chosen kennel, the other gets one at
+check-in) or "One kennel together": then a kennel must be chosen, only kennels with room for both are offered, both
+pets get it, and the second is booked at the shared kennel price from Settings (when one is set). A kennel holds two
+pets of one parent at most, never pets of different parents (D27); Today, the booking page and the calendar offer and
+label a sibling's kennel ("K05, with Coco"), and the booking page says "Shares K05 with Coco." The calendar shows both in
+the kennel's square, and its top row counts kennels in use, with the number of pets when siblings share.
+
+The family pays on one bill (E1).
 
 ### C5. Calendar. Built.
 
@@ -308,8 +329,8 @@ refund shows a warning. Prices never change.
 
 Settings edits the two usual prices. More, then Extras: add an extra (each time or by the hour), change its price, take
 it off the list; owners and managers. On the booking page anyone adds an extra at its listed price, or a one-off item
-with its own price (a vet bill paid for the parent). Changing what an extra costs, or removing one, is for owners and
-managers (`WB025`, and the delete policy).
+with its own price (a vet bill paid for the parent). Changing what an extra costs is for owners and managers
+(`WB025`); removing one from a booking is for owners (the delete policy, D29).
 
 ---
 
@@ -344,7 +365,7 @@ medicine has a red edge and badge and is never folded away. One tap on Done; a s
 the first who and when). Skip opens a note; a medicine cannot be skipped without one (constraint
 `care_tasks_skipped_medication_needs_note`). Undo puts a task back. Filters: Still to do, and by kind.
 
-Not yet: `care_items.requires_photo` is not offered or enforced, because photos arrive in M5.
+Proof photos on care tasks are not built; the field meant for them was removed (M13).
 
 ### D3. Solo play timetable. Built.
 
@@ -355,8 +376,9 @@ minutes between pets, opening hours and an optional break. A calculator there an
 `/app/play`: Plan today builds a fair timetable for every pet in house (`planPlaySessions()`): everyone gets a first
 session before anyone gets a second, at least two hours between a pet's sessions, pets taken in kennel order, around any
 sessions already planned, so it can be pressed again after new arrivals. A peak period's shorter session length applies.
-The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees the slot). The database refuses two pets
-in one yard at once, or one pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
+The timetable is shown by yard. Done, Undo, Move (time and yard) and Skip (frees the slot). Siblings sharing a kennel
+are planned together, in the same slots. The database refuses pets of different parents in one yard at once, or one
+pet in two yards; Move says so in a sentence. Owners and managers can clear the sessions still
 to happen.
 
 ### D4. Updates to parents. Built.
@@ -378,7 +400,9 @@ page.
 injury, fight, escape, behaviour, damage, other), how serious (low, medium: tell the parent today, high: tell the parent
 and a vet now), what happened in words, what was done, vet seen, parent told. It is tied to the pet's current stay. The
 pet page lists them with "Parent has been told" (the database stamps who and when) and "Dealt with". Today shows, at the
-top, every open high one and every open medium or high one the parent has not been told about.
+top, every open high one and every open medium or high one the parent has not been told about. Owners and managers can
+correct what an incident says ("Correct it"); the database refuses anyone else (`WB080`), and History of changes keeps
+what it said before.
 
 ### D6. Check-in checklist. Built.
 
@@ -402,6 +426,10 @@ or opens the issued bill. Owners and managers can change, add and remove lines o
 its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
 cancel an issued bill with a reason; the number stays used. Bills, under More: what is owed first, then drafts, then
 recent.
+
+Pets booked together are billed together: Make the family bill puts each pet's stay and extras on one bill
+(`billForFamily()`), with every pet of the family that is not a request or cancelled. A pet of a family is never billed
+on its own (`WB053`); advances on any of the pets count against the family's bill (D27).
 
 ### E2. Bill for the parent. Built.
 
@@ -445,8 +473,8 @@ refuse anyone who is not an owner or manager of the kennel.
 ### E6. History of changes. Built.
 
 `/app/more/history`, owners and managers only: the audit log in words, newest first. "Booking changed" by whom and
-when, with each field as it was and as it is now; filter by kind of record and by person; a link to the booking, bill
-or pet where there is one.
+when, with each field, named in the reader's language, as it was and as it is now; filter by kind of record and by
+person; a link to the booking, bill or pet where there is one. Staff do not see it, Reports or Expenses under More.
 
 ---
 
@@ -483,7 +511,7 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Languages other than English | Built: English, Hindi and Kannada (drafts until reviewed). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |
 | Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
-| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase, and a public demo that resets nightly (M10, [14-self-hosting.md](14-self-hosting.md)) |
+| Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase; `npm run setup:local` points the app at it (README, "Try it on your own computer"). No public demo (D28). |
 | Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. |
 | Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
 | Scripts only from Wagbook itself | Built (M9): a Content-Security-Policy with a fresh nonce for every page (D23) |

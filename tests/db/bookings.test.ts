@@ -1,6 +1,6 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, book, seedKennel, type Kennel } from "./fixtures";
+import { addMember, book, seedKennel, strangerPet, type Kennel } from "./fixtures";
 import { as, createTestDb, errorOf, user } from "./harness";
 
 let db: PGlite;
@@ -13,7 +13,9 @@ afterAll(() => db.close());
 describe("double booking is impossible", () => {
   let k: Kennel;
   beforeAll(async () => {
-    k = await seedKennel(db, { kennels: 3, pets: 4 });
+    k = await seedKennel(db, { kennels: 3, pets: 1 });
+    // Pets of four different parents: siblings may share a kennel (see "shared kennels").
+    for (let i = 0; i < 3; i++) k.pets.push(await strangerPet(db, k));
     await book(db, k, { pet: k.pets[0], start: "2027-04-14", end: "2027-04-17", kennel: k.kennels[0] });
   });
 
@@ -214,8 +216,9 @@ describe("daily care", () => {
 describe("solo play", () => {
   it("never lets two pets share a yard, or one pet be in two yards", async () => {
     const k = await seedKennel(db);
+    const other = await strangerPet(db, k);
     const b1 = await book(db, k, { pet: k.pets[0], start: "2027-04-14", end: "2027-04-17", status: "checked_in" });
-    const b2 = await book(db, k, { pet: k.pets[1], start: "2027-04-14", end: "2027-04-17", status: "checked_in" });
+    const b2 = await book(db, k, { pet: other, start: "2027-04-14", end: "2027-04-17", status: "checked_in" });
 
     const yards = await as(db, user(k.owner), async () => {
       const r = await db.query<{ id: string }>(
@@ -235,9 +238,9 @@ describe("solo play", () => {
 
     await add(yards[0], b1, k.pets[0], "07:00");
     // Overlapping in the same yard: refused.
-    expect((await errorOf(() => add(yards[0], b2, k.pets[1], "07:10"))).message).toContain("play_sessions_one_pet_per_yard");
+    expect((await errorOf(() => add(yards[0], b2, other, "07:10"))).message).toContain("play_sessions_one_pet_per_yard");
     // Back to back in the same yard: fine.
-    await add(yards[0], b2, k.pets[1], "07:20");
+    await add(yards[0], b2, other, "07:20");
     // Same pet in another yard at the same time: refused.
     expect((await errorOf(() => add(yards[1], b1, k.pets[0], "07:05"))).message).toContain("play_sessions_one_yard_per_pet");
     // A skipped session frees its slot.
@@ -300,7 +303,7 @@ describe("only owners and managers decide what a stay costs", () => {
   it("lets a manager turn boarding into day boarding, and then holds the kennel the day-boarding way", async () => {
     const id = await book(db, k, { pet: k.pets[0], start: "2028-02-01", end: "2028-02-02", kennel: k.kennels[0] }, manager);
     // As boarding the stay leaves on 2 February, so another pet may arrive in that kennel that day.
-    const next = await book(db, k, { pet: k.pets[1], start: "2028-02-02", end: "2028-02-04", kennel: k.kennels[0] }, manager);
+    const next = await book(db, k, { pet: await strangerPet(db, k), start: "2028-02-02", end: "2028-02-04", kennel: k.kennels[0] }, manager);
     // As day boarding it would hold the kennel all of the 2nd too, which that pet now has.
     const e = await errorOf(() => as(db, user(manager), () => db.query("update public.bookings set kind = 'daycare', rate_minor = 72000 where id = $1", [id])));
     expect(e.message).toContain("bookings_no_kennel_overlap");
@@ -399,7 +402,7 @@ describe("families, requests and overstays", () => {
 
   it("lets a request sit in a taken kennel without holding it, and refuses to confirm it there", async () => {
     await book(db, k, { pet: k.pets[0], start: "2027-08-01", end: "2027-08-05", kennel: k.kennels[0] });
-    const request = await book(db, k, { pet: k.pets[1], start: "2027-08-02", end: "2027-08-04", kennel: k.kennels[0], status: "requested" });
+    const request = await book(db, k, { pet: await strangerPet(db, k), start: "2027-08-02", end: "2027-08-04", kennel: k.kennels[0], status: "requested" });
     // The request does not hold space: the other kennel can still take a confirmed booking for those nights.
     await book(db, k, { pet: k.pets[2], start: "2027-08-02", end: "2027-08-04", kennel: k.kennels[1] });
     const e = await errorOf(() => as(db, user(k.owner), () => db.query("update public.bookings set status = 'confirmed' where id = $1", [request])));
@@ -408,7 +411,7 @@ describe("families, requests and overstays", () => {
 
   it("extends an overstaying pet to today, unless its kennel is promised to someone else", async () => {
     const stay = await book(db, k, { pet: k.pets[0], start: "2027-09-01", end: "2027-09-03", kennel: k.kennels[0], status: "checked_in" });
-    await book(db, k, { pet: k.pets[1], start: "2027-09-05", end: "2027-09-07", kennel: k.kennels[0] });
+    await book(db, k, { pet: await strangerPet(db, k), start: "2027-09-05", end: "2027-09-07", kennel: k.kennels[0] });
     // Two days late, the kennel is free until the 5th: fine.
     await as(db, user(k.owner), () => db.query("update public.bookings set end_date = '2027-09-05' where id = $1", [stay]));
     // One more day runs into the next pet's stay: refused, and nothing changes.

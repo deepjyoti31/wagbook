@@ -183,7 +183,7 @@ counts is in its comment, and so in [reference/schema.md](reference/schema.md).
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,
 requested dates) and the full `payload` as JSON. A submission is inert. `accept_intake()` is the only thing that turns
 one into a client and pets, and only staff can call it. `upload_token` is returned to the sender only, and lets them
-add one vaccination certificate per pet to `{org_id}/intake/{id}/pet-N` in Storage within the hour
+add a vaccination certificate for each of a pet's two vaccines to `{org_id}/intake/{id}/pet-N` and `pet-N-2` in Storage within the hour
 (`intake_upload_allowed`); accepting puts that file on the pet's new vaccinations.
 
 The payload has a version (`v: 1`). Its shape is defined once in SQL (`submit_intake` validates it) and once in

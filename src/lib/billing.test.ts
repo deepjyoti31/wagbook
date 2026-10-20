@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billForBooking, taxContext } from "./billing";
+import { billForBooking, billForFamily, taxContext } from "./billing";
 
 const org = { tax_mode: "none" as const, gst_state_code: null, prices_include_tax: false, round_invoice_totals: true };
 
@@ -27,5 +27,23 @@ describe("a booking's bill", () => {
     const gst = { ...org, tax_mode: "gst_india" as const, gst_state_code: "29" };
     expect(taxContext(gst).placeOfSupplyStateCode).toBe("29");
     expect(taxContext(gst, "27").placeOfSupplyStateCode).toBe("27");
+  });
+});
+
+describe("a family's bill", () => {
+  const stay = { kind: "boarding" as const, start_date: "2027-04-14", end_date: "2027-04-17", discount_minor: 0, tax_rate_bp: 0, sac_code: null };
+  it("puts each pet's stay and then its extras on one bill, saying whose each extra is", () => {
+    const bill = billForFamily(org, [
+      { petName: "Bruno", booking: { ...stay, rate_minor: 120000 }, items: [{ description: "Bath", quantity: 1, unit_price_minor: 50000, tax_rate_bp: 0, sac_code: null }] },
+      { petName: "Coco", booking: { ...stay, rate_minor: 90000 }, items: [] },
+    ]);
+    expect(bill.lines.map((l) => [l.quantity, l.unitPriceMinor])).toEqual([
+      [3, 120000],
+      [1, 50000],
+      [3, 90000],
+    ]);
+    expect(bill.lines[1].description).toBe("Bruno: Bath");
+    expect(bill.lines[2].description).toContain("Coco");
+    expect(bill.totalMinor).toBe(360000 + 50000 + 270000);
   });
 });

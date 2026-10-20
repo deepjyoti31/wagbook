@@ -2,9 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Nav } from "@/components/nav";
 import { OfflineSync } from "@/components/offline-sync";
-import { Notice } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { IS_DEMO } from "@/lib/demo";
 import { getAppI18n } from "@/lib/i18n-server";
 
 /**
@@ -33,11 +31,6 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
         <Suspense fallback={null}>
           <Offline />
         </Suspense>
-        {IS_DEMO ? (
-          <Suspense fallback={null}>
-            <DemoBanner />
-          </Suspense>
-        ) : null}
         {children}
       </main>
     </div>
@@ -47,15 +40,6 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
 async function MainNav() {
   const { m, language } = await getAppI18n();
   return <Nav words={m.nav} lang={language} />;
-}
-
-async function DemoBanner() {
-  const { m } = await getAppI18n();
-  return (
-    <div className="mb-4">
-      <Notice tone="info">{m.demo.banner}</Notice>
-    </div>
-  );
 }
 
 async function Offline() {

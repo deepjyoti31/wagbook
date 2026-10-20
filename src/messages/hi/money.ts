@@ -1,4 +1,5 @@
 import type { moneyArea as English } from "../en/money";
+import { historyFields } from "./fields";
 
 /** Hindi words for bills, payments, the parent's bill, reports, expenses and the history of changes. First draft, to be checked by a native speaker. */
 export const moneyArea: typeof English = {
@@ -82,7 +83,6 @@ export const moneyArea: typeof English = {
       cancelManagers: "सिर्फ़ मालिक या मैनेजर बिल रद्द कर सकते हैं।",
       sayWhy: "बताएं कि बिल क्यों रद्द हो रहा है।",
       reasonTooLong: "कारण 500 अक्षरों से कम रखें।",
-      deleteManagers: "सिर्फ़ मालिक या मैनेजर ड्राफ़्ट बिल मिटा सकते हैं।",
       onlyDraftDeleted: "सिर्फ़ ड्राफ़्ट बिल मिटाया जा सकता है।",
     },
     updated: "बिल अपडेट हो गया।",
@@ -214,6 +214,7 @@ export const moneyArea: typeof English = {
     },
   },
   expenses: {
+    deleteWarning: "इसे वापस नहीं लाया जा सकता। रसीद भी मिट जाएगी।",
     title: "खर्च",
     managersOnly: "खर्च सिर्फ़ मालिक और मैनेजर के लिए हैं।",
     removed: "खर्च हटा दिया गया।",
@@ -280,6 +281,8 @@ export const moneyArea: typeof English = {
     kennel: "केनेल {name}",
     // Words inside each change (src/lib/history.ts).
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "बुकिंग",
         booking_items: "बुकिंग पर एक्स्ट्रा",

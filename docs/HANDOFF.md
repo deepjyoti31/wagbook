@@ -2,19 +2,20 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 16 October 2026, after milestones M9 and M10 and a round of rough edges.
+Last updated: 19 October 2026, after milestones M11 (families), M12 (naming kennels) and M13 (rough edges).
 
 ## In one paragraph
 
-Every milestone on the roadmap is built: M2 to M8 (bookings, care, bills, photos, pets and people, reports, languages,
-offline), M9 (a script policy with nonces, rate limits, two-step sign-in enforced by the database, downloading and
-erasing a parent's details, certificates on the intake form, a backup and restore drill, a second security review) and
-M10 (running it on your own server with Docker Compose, a public demo that resets nightly, templates, code of conduct,
-changelog, release process, and a guide for kennel owners with pictures). The database rules are tested in-process (182
-database tests, 125 unit tests), and the whole day is walked in a real browser at 360 pixels wide against a **local**
-Supabase (`npm run test:e2e`, 34 tests). What has still never happened: a **hosted** Supabase project (the rest of M1),
-a real phone, and a server for the public demo. **The Hindi and Kannada are first drafts.** The licence (M10, item 5)
-waits for the owner.
+Every milestone on the roadmap is built, M2 to M13. The latest: two pets of one parent can share a kennel (never three,
+never another parent's pet), the second at a shared kennel price the kennel sets, and a family booked together pays on
+one bill (M11, D27); kennels can be named freely and reordered (M12); New booking searches pets on the server, staff no
+longer see the owners' menu items, History of changes names fields in the reader's language, the intake form takes a
+second vaccine with its own card, managers can correct an incident, and only owners delete anything, after a second
+tap (M13, D29). The owner confirmed the licence (AGPL),
+dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
+kennel. The database rules are tested in-process (202 database tests, 134 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 36 tests). What has still never
+happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
 
@@ -60,12 +61,26 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Races 6 and 16 from the first review | `scripts/race-checks.sh` with two live sessions on the local Supabase's Postgres 17 | High |
 | Backup and restore: 61 tables, invoice numbering, 90 policies, 24 tables with row level security, 6 public functions, 75 triggers and every file survive a dump and restore | `scripts/backup-drill.sh` on the local Supabase | High locally; the hosted round trip not done |
 | The Docker image and `deploy/compose.yml` with Caddy: both addresses, sign-in, main screens, demo notices | Built and run here against the CLI's Supabase (`docs/14-self-hosting.md`, "What has been verified") | High for that setup |
-| `deploy/demo-reset.sh` | Run against the local Supabase | Medium |
 | New booking: the pet search (name, breed, parent, phone digits) and only free kennels offered for the dates typed | `src/lib/core/bookings.test.ts`; end-to-end (K05 hidden while Coco holds it, offered again from the day she leaves; a pet found by phone digits); screenshot at 360 pixels, 16 October 2026 | High |
 | Currency and financial year start fixed once a bill is issued, including a cancelled one (`WB052`); drafts do not count | `tests/db/billing.test.ts` (the trigger removed once to see it fail); Settings shows both locked and still saves, checked in a browser at 360 pixels against the local Supabase | High |
 | Hiding a pet or parent: owners and managers only, refused with a stay requested, confirmed or in house, a parent's pets go and come back with them (not ones hidden before), a pet waits for its parent | `tests/db/people.test.ts` (the triggers removed once to see the tests fail); end-to-end: a manager hides a new pet, it leaves search, is found under Hidden pets and shown again, and a pet with a stay to come is refused with the sentence | High |
 | Owners and managers change a booking between boarding and day boarding; the kennel overlap then follows the new kind | `tests/db/bookings.test.ts` (staff refused with `WB022` already tested there); end-to-end: a manager turns a request into day boarding and back | High |
+| Two pets of one parent share a kennel; never three (`WB027`, even with overbooking allowed), never another parent's pet; capacity counts kennels in use; a sibling's kennel is offered while it has room; the occupancy report counts kennels used | `tests/db/families.test.ts`; each rule removed once to see its test fail | High |
+| The shared kennel price: staff may book it only for a pet really sharing (`WB023` otherwise); only on stays, not extras | `tests/db/families.test.ts` (the check removed once to see it fail) | High |
+| A family booked together pays on one bill: a pet of it is never billed alone (`WB053`), one live bill per family, staff issue it only as the bookings price it, cancelled pets left off, advances on any pet count; a family stays the family it was booked as (`WB026`); merging parents keeps a family together, play sessions included | `tests/db/families.test.ts`; rules removed once to see the tests fail. Merging a parent with a family booking used to be refused (`WB024` mid-merge); fixed | High |
+| Siblings play together; different parents never share a yard; the planner gives siblings sharing a kennel the same slots | `tests/db/families.test.ts`, `src/lib/core/core.test.ts` | High |
+| New booking "One kennel together", the shared price, "Shares K09 with Luna", both pets in K09's square on the calendar, the family bill with both pets | End-to-end; screenshots at 360 pixels, 19 October 2026 | High for the local stack |
+| Naming kennels: add one with its own name, rename, move to the top; a taken name refused | End-to-end at 360 pixels | High |
+| Incidents corrected only by owners and managers (`WB080`); staff still mark told and dealt with | `tests/db/care.test.ts` (the rule removed once to see it fail); end-to-end | High |
+| A second vaccine and card on the intake form: `pet-N-2` accepted, `pet-N-3` refused, each card on its own vaccination after accepting | `tests/db/privacy.test.ts` (the matching removed once to see it fail); end-to-end through real Storage | High |
+| New booking finds a pet not in its starting list, by parent's name and by phone digits | Checked by hand against the local Supabase with 41 extra parents, 19 October 2026 (not an automated test) | Medium |
+| Staff do not see Reports, Expenses or History of changes under More | End-to-end | High |
+| Only owners delete: every kind of record, a person (anyone may still leave), a file, and erasing a parent (`WB074`); managers and staff touch nothing | `tests/db/deletion.test.ts`; the rules removed once to see the tests fail | High |
+| Deleting takes two taps, and an expense takes its receipt with it; a manager is not offered Remove | End-to-end (the receipt's link stops working); screenshot at 360 pixels, 20 October 2026 | High |
+| History of changes in the reader's language | `src/lib/history.test.ts`; end-to-end ("Price per night or day: was ...") | High |
+| `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
+| `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
 
 ## What is NOT verified
 
@@ -73,7 +88,6 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | --- | --- | --- |
 | A hosted Supabase project, and `docs/10-setup-and-deploy.md` followed end to end | Needs a person with a Supabase account | The local stack is the same software, so schema problems are unlikely. Settings screens, email templates and menu names in the guide may be off. |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
-| `.github/workflows/ci.yml` on GitHub | Never run there. The `e2e` job is new. | It runs exactly what passed here; image pulls in CI may be slow |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
 | "A full meal round for twenty dogs in under two minutes" (M3), "billed, sent, paid and marked paid from a phone in under a minute" (M4), "today's photo within seconds on a slow connection" (M5) | Not timed on a phone or a throttled connection | Each step is one round trip; the stay page loads small copies (480 pixels) of photos. Probably fine; slow networks are M8 |
 | The CSV downloads opened in Excel, Google Sheets and LibreOffice | Checked as text in tests: byte order mark, quoting, CRLF | Low; an accountant opening one would settle it |
@@ -84,7 +98,6 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Storage upload paths and policies in use | No screen uses storage yet | Covered structurally by tests only |
 | The Claude Code cloud SessionStart hook in a fresh container | Two sessions in a row found an old `node_modules` (`jsqr`, `qrcode-generator`, `@playwright/test` missing), because the hook skipped `npm ci` whenever the folder existed. On 16 October 2026 it was changed to install again when `package-lock.json` differs from the last install, and run by hand twice (installs, then skips) | If `npm run check` fails on missing modules, run `npm ci` and say so here |
 | Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
-| The public demo running somewhere | No server | `deploy/demo-reset.sh` was tried locally only |
 | The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
 | Rate limits on Vercel | Each copy of the app counts on its own | Add a Vercel Firewall rule (`10`, "Rate limits") |
 | Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
@@ -92,17 +105,14 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 ## Do this next
 
-1. **Finish M1** (needs the owner): create a development Supabase project (Mumbai), follow
+1. **Finish M1** (needs the owner), if the kennel will run on a hosted Supabase: create a project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
-   email confirmation, and walk the first run. Then let CI run on GitHub once and fix anything in the `e2e` job. Check
-   the script policy header and the rate limits on the hosted deploy (`10`, "Looking after it").
-2. **Decide the licence** (M10, item 5; D2) and the code of conduct's contact address, before any public announcement.
+   email confirmation, and walk the first run. Check the script policy header and the rate limits on the hosted deploy
+   (`10`, "Looking after it"). Then record the migration freeze below.
+2. **Switch on "Private vulnerability reporting"** in the GitHub repository's settings, so `SECURITY.md` works.
 3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
 4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
-5. **Put up the public demo** on its own small server ([14-self-hosting.md](14-self-hosting.md), "The public demo"),
-   and link it from the README.
-6. **Ask a person outside the project for a security review**, and take the erasure rules (D25) and question 8 in `06`
-   to a lawyer and an accountant.
+5. **Ask a person outside the project for a security review**, and take question 8 in `06` to an accountant.
 
 After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
@@ -132,16 +142,16 @@ migration. Add new files."
 
 | Decision | Where | Default taken |
 | --- | --- | --- |
-| Licence: AGPL-3.0-or-later, or something more permissive | [09-decisions.md](09-decisions.md), D2 | AGPL. Confirm before the first public release; changing later needs every contributor's consent. |
-| Should the reference kennel be named in `13-reference-deployment.md`? | That file | Unnamed. |
-| Where the public repository lives, and under which GitHub account or organisation | | Private for now |
 | Whether a bill may be in Hindi or Kannada (question 9 for the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md) | Bills say "Tax invoice" in English with the translation in brackets |
-| The contact address for the code of conduct (and so for conduct reports) | `CODE_OF_CONDUCT.md`, "Contact" | None yet: set one before the first public release |
 | Whether owners must use two-step sign-in, rather than be reminded | D24 | Reminded, not forced |
-| Where the public demo runs, and who pays for it | [14-self-hosting.md](14-self-hosting.md) | Not running |
 | Invoice prefix and the GST questions | [06-billing-and-gst.md](06-billing-and-gst.md), "Questions to take to an accountant" | Tax off, prefix `WB` |
 
-Decided: only owners and managers set or change a price (D15), extended to bills in M4.
+Decided: only owners and managers set or change a price (D15), extended to bills in M4. The licence is AGPL-3.0-or-later
+(D2, confirmed 19 October 2026). The repository is public on the owner's GitHub account; conduct reports go to the owner
+there. No public demo (D28). The example kennel in `13` is never named, and Wagbook is independent of any kennel.
+Overstays stay manual (Extend to today). A family booked together pays on one bill, and two pets of one parent may share
+a kennel at a shared price the kennel sets, two at most; siblings may play together (D27). Erasing a parent stays; only
+owners delete anything, with a second tap, and a deleted expense takes its receipt with it (D29, 20 October 2026).
 
 ## Translations waiting for a native speaker
 
@@ -163,6 +173,11 @@ Drafted in M9 and M10, also unchecked: the two-step sign-in screens (दो-च�
 words for "authenticator app" (kept close to English in both), "erase" (मिटाएं, ಅಳಿಸಿ), the export and erase section
 of the parent page, the certificate field on the intake form, the rate limit sentence, and the demo notices.
 
+Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केनेल में साथ, ಒಂದೇ ಕೆನೆಲ್‌ನಲ್ಲಿ; "shared kennel
+price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
+correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
+changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
 Drafted on 16 October 2026, also unchecked: hiding from lists (सूचियों से छिपाएं, ಪಟ್ಟಿಗಳಿಂದ ಮರೆಮಾಡಿ) and the hidden
 pets list, "Find a pet" on New booking, the sentence about taken kennels, the hint that the currency and year start
 are fixed, and the hint under Stay on a booking.
@@ -171,16 +186,18 @@ are fixed, and the hint under Stay on a booking.
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
 
-- A pet that stays past its check-out date does not hold its kennel unless someone presses Extend to today. It is shown
-  in red on Today, its booking and the calendar, and it keeps getting care tasks. Should it instead block the kennel
-  automatically?
 - Cancelling records a reason but no refund decision (bills are M4).
 - Staff cannot remove an extra added by mistake; a manager has to. Right?
 - Staff may add a one-off item at any price (for a vet bill paid for the parent). Right?
-- In a family booking only the first pet gets the chosen kennel; the others get theirs at check-in.
+- In a family booking of "a kennel each", only the first pet gets the chosen kennel; the others get theirs at
+  check-in. "One kennel together" is offered only for exactly two pets.
+- A second pet keeps its shared kennel price if its sibling leaves early or moves kennel; a manager changes the price.
+  Should the database refuse the shared price for a pet left alone?
+- Siblings booked separately (not together) can still share a kennel, but each is billed on its own and the second is
+  at the usual price unless a manager changes it.
+- A pet cannot be added to a family after it is booked (`WB026`); it is booked and billed on its own.
 - A pet's play sessions are at least two hours apart (`PLAY_GAP_MINUTES`). Should this be a setting?
 - Skipping a task other than a medicine needs no note.
-- A family booking is billed pet by pet (one bill per booking). Should the family get one bill?
 - Staff can make and edit a draft bill but cannot issue an edited one. Should staff see the line editor at all? (They
   do not today.)
 - A bill made before check-out is not rebuilt when the stay changes afterwards; Make bill on the draft brings it back
@@ -220,19 +237,14 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ## Known rough edges in what is built
 
-- `care_items.requires_photo` is not offered or enforced: proof photos on tasks are not built.
-- New booking still loads every pet into one list (capped at 2,000) and narrows it in the browser as you type.
-- Incidents cannot be edited once written; add a new one or ask a manager.
+- Proof photos on care tasks are not built (the unused field was removed in M13).
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
+- The calendar's top row counts kennels in use; when siblings share, the number of pets is shown under it.
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
 - Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
   of kennels going in or out of service.
 - A pet that overstays counts in the occupancy report only up to its check-out date unless someone pressed Extend.
-- Removing an expense leaves its receipt file in storage (see `05`, known limitations).
-- More lists Reports, Expenses and History of changes to staff too; staff who open them get a sentence saying they are
-  for owners and managers.
-- History of changes names fields by their database column names, in English, in every language.
 - Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
 - History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
@@ -250,7 +262,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 307 tests, build
+npm run check        # dash check, lint, typecheck, 336 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -260,6 +272,11 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 20 October 2026. Only owners delete (D29): every delete policy, erasing a parent (`WB074`), a second tap on every
+  deletion, and a deleted expense removes its receipt.
+- 19 October 2026. The owner's decisions recorded (licence, no demo, independent of any kennel). M11: shared kennels
+  with a shared price and one bill per family; siblings play together. M12: kennels named freely. M13: server pet
+  search, staff menu, history field names, second intake card, incident corrections. e2e walk extended to 36 tests.
 - 16 October 2026. Rough edges: the cloud session hook reinstalls when `package-lock.json` changes; bill stay lines
   read "14 Apr 2027"; New booking searches pets and offers only free kennels; currency and financial year start fixed
   once a bill is issued (`WB052`); pets and parents hidden from lists and shown again (`WB019`); a booking's kind of

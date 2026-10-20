@@ -11,8 +11,9 @@
 --     staff     daily operations: clients, pets, bookings, care, updates,
 --               incidents, draft invoices, recording payments
 --     manager   plus the rate card, kennels, settings, expenses, people,
---               deleting things, voiding invoices, reading the audit log
---     owner     plus other owners and deleting the organisation
+--               voiding invoices, reading the audit log
+--     owner     plus deleting things (the owner's decision, 19 October 2026:
+--               D29), other owners and deleting the organisation
 --
 -- RULE: every new table must enable row level security and add its policies
 -- in the same migration that creates it. tests/db/security.test.ts fails the
@@ -97,11 +98,9 @@ create policy memberships_update on public.memberships for update to authenticat
     org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[]))
     or (role <> 'owner' and org_id in (select public.my_org_ids_with_role(array['manager']::public.member_role[])))
   );
+-- Removing a person is a deletion, so it is for owners (D29).
 create policy memberships_delete on public.memberships for delete to authenticated
-  using (
-    org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[]))
-    or (role <> 'owner' and org_id in (select public.my_org_ids_with_role(array['manager']::public.member_role[])))
-  );
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 -- Anyone can leave an organisation. The last owner cannot (protect_last_owner).
 create policy memberships_delete_self on public.memberships for delete to authenticated
   using (user_id = (select auth.uid()));
@@ -142,7 +141,7 @@ begin
       'create policy %I on public.%I for update to authenticated using (org_id in (select public.my_org_ids())) with check (org_id in (select public.my_org_ids()))',
       t || '_update', t);
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (org_id in (select public.my_org_ids_with_role(array[''owner'', ''manager'']::public.member_role[])))',
+'create policy %I on public.%I for delete to authenticated using (org_id in (select public.my_org_ids_with_role(array[''owner'']::public.member_role[])))',
       t || '_delete', t);
   end loop;
 end;
@@ -192,7 +191,7 @@ begin
       'create policy %I on public.%I for update to authenticated using (org_id in (select public.my_org_ids_with_role(array[''owner'', ''manager'']::public.member_role[]))) with check (org_id in (select public.my_org_ids_with_role(array[''owner'', ''manager'']::public.member_role[])))',
       t || '_update', t);
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (org_id in (select public.my_org_ids_with_role(array[''owner'', ''manager'']::public.member_role[])))',
+'create policy %I on public.%I for delete to authenticated using (org_id in (select public.my_org_ids_with_role(array[''owner'']::public.member_role[])))',
       t || '_delete', t);
   end loop;
 end;
@@ -217,10 +216,10 @@ create policy care_items_update_for_pet on public.care_items for update to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -233,7 +232,7 @@ create policy invoices_update on public.invoices for update to authenticated
   using (org_id in (select public.my_org_ids()))
   with check (org_id in (select public.my_org_ids()));
 create policy invoices_delete on public.invoices for delete to authenticated
-  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 create policy invoice_lines_select on public.invoice_lines for select to authenticated
   using (org_id in (select public.my_org_ids()));
@@ -267,20 +266,26 @@ create policy payments_update on public.payments for update to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
   with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 create policy payments_delete on public.payments for delete to authenticated
-  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
--- expenses: owners and managers only, for everything.
+-- expenses: owners and managers only. Deleting one is for owners (D29).
 -- ---------------------------------------------------------------------------
 grant select, insert, update, delete on public.expenses to authenticated;
 
-create policy expenses_all on public.expenses for all to authenticated
+create policy expenses_select on public.expenses for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy expenses_insert on public.expenses for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy expenses_update on public.expenses for update to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
   with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy expenses_delete on public.expenses for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
 -- intake_submissions: written only by submit_intake(). Members read and
--- review; managers delete. What the parent sent can never be edited: only the
+-- review; owners delete. What the parent sent can never be edited: only the
 -- status and the matched client are writable, and a trigger records the
 -- reviewer and refuses a second change of status.
 -- ---------------------------------------------------------------------------
@@ -293,7 +298,7 @@ create policy intake_submissions_update on public.intake_submissions for update 
   using (org_id in (select public.my_org_ids()))
   with check (org_id in (select public.my_org_ids()));
 create policy intake_submissions_delete on public.intake_submissions for delete to authenticated
-  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
 -- audit_log: owners and managers read. Nobody writes; the trigger does.
@@ -349,7 +354,7 @@ grant execute on function public.accept_invitation_link(text) to authenticated;
 grant execute on function public.set_my_language(text) to authenticated;
 grant execute on function public.merge_clients(uuid, uuid) to authenticated;
 grant execute on function public.occupancy_by_day(uuid, date, date) to authenticated;
-grant execute on function public.available_kennels(uuid, public.booking_kind, date, date) to authenticated;
+grant execute on function public.available_kennels(uuid, public.booking_kind, date, date, uuid, integer) to authenticated;
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;

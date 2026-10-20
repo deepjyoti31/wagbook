@@ -27,6 +27,8 @@ export const careArea: typeof English = {
     noteTooLong: "नोट 500 अक्षरों से छोटा रखें।",
   },
   play: {
+    clearWarning: "आज के बचे हुए सभी सेशन हट जाएंगे। इसे वापस नहीं लाया जा सकता।",
+    yesClear: "हां, हटाएं",
     title: "खेल",
     // {done} and {total} are drawn in bold.
     sessionsDone: { one: "{date}। {total} में से {done} सेशन पूरे।", other: "{date}। {total} में से {done} सेशन पूरे।" },
@@ -63,7 +65,6 @@ export const careArea: typeof English = {
     timeLike: "समय 10:40 जैसे भरें।",
     onlyPendingMove: "सिर्फ़ वही सेशन बदला जा सकता है जो अभी होना बाकी है।",
     moved: "{time} पर कर दिया।",
-    clearOnlyManagers: "प्लान सिर्फ़ मालिक या मैनेजर हटा सकते हैं। इसकी जगह सेशन एक-एक करके छोड़ें।",
     cleared: "आज के बाकी सेशन हटा दिए। जो सेशन हो चुके हैं वे रहेंगे। तैयार हों तो फिर से प्लान बनाएँ।",
   },
   routines: {

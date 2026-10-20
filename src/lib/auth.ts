@@ -30,6 +30,8 @@ export interface OrgContext {
   language: Language;
   /** True for owners and managers. */
   canManage: boolean;
+  /** True for owners: only they delete things (D29). */
+  canDelete: boolean;
 }
 
 /** Cookie remembering which organisation a person with several is working in. */
@@ -108,6 +110,7 @@ export const requireOrg = cache(async (): Promise<OrgContext> => {
     displayName: chosen.display_name,
     language: isLanguage(chosen.language) ? chosen.language : "en",
     canManage: chosen.role === "owner" || chosen.role === "manager",
+    canDelete: chosen.role === "owner",
   };
 });
 

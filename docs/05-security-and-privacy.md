@@ -37,23 +37,23 @@ It follows that:
 ## Who can do what
 
 The complete model is `supabase/migrations/20261008000800_row_level_security.sql`, written to be read top to bottom.
-In summary:
+In summary (deleting anything is for owners, D29):
 
 | Data | Staff | Manager | Owner |
 | --- | --- | --- | --- |
-| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Also delete | Same as manager |
+| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Same as staff | Also delete |
 | The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
-| A pet's own care routine | Read, add, edit | Also delete | Same |
-| House routines, kennels, rate card, peak periods, play yards | Read | Add, edit, delete | Same |
+| A pet's own care routine | Read, add, edit | Same as staff | Also delete |
+| House routines, kennels, rate card, peak periods, play yards | Read | Add, edit | Also delete |
 | Kennel settings | Read | Edit | Also delete the kennel |
-| Draft invoices and their lines | Read, add, edit; remove lines from a draft | Also delete whole drafts | Same |
+| Draft invoices and their lines | Read, add, edit; remove lines from a draft | Same as staff | Also delete whole drafts |
 | Issue an invoice | Only one whose lines are exactly what its booking says (`WB050`) | Any draft | Same |
-| Files (photos, certificates) | Add; never replace or remove | Also replace and remove | Same |
+| Files (photos, certificates) | Add; never replace or remove | Also replace | Also remove |
 | Void an invoice | No | Yes, with a reason | Yes |
-| Payments received | Read, add | Also refunds, corrections, removal | Same |
-| Expenses, and their receipt files | Nothing | Everything | Everything |
+| Payments received | Read, add | Also refunds and corrections | Also removal |
+| Expenses, and their receipt files | Nothing | Read, add, edit | Also delete (with the receipt file) |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
-| Forms from parents | Read; accept or decline, once | Also delete | Same |
+| Forms from parents | Read; accept or decline, once | Same as staff | Also delete |
 | A parent's details: download everything, erase on request | No (`WB070`) | Yes (`export_client`, `erase_client`) | Same |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
@@ -76,7 +76,7 @@ is changed on purpose.
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
-| `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
+| `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
 
 **Certificates with the intake form (milestone M9).** `submit_intake` hands back a 64 character secret made for that
 form. The app sends each certificate to Storage as the anonymous role with the secret in the `x-wagbook-intake`
@@ -336,9 +336,9 @@ These are real. Do not describe Wagbook as free of them.
 | Scripts from the same site are allowed (`'self'`) | A script file that is not the build's, served from Wagbook's address, would run | Nothing visitors send is served from that address (D23) |
 | The script policy needs the build's manifest | If `.next/build-manifest.json` cannot be read, pages are sent with no script rule (logged) | Check the header after deploying (`10-setup-and-deploy.md`) |
 | Posts to signed-in pages and the intake form may be 12 MB | Needed for photos and certificates | Everything else is capped at 1 MB at the edge |
-| A photo replaced by a new one, a draft's update that failed, or a removed expense can leave a file nobody points at | Storage use grows a little; staff cannot delete files by design | M9: a manager's clean-up |
+| A photo replaced by a new one, or a draft's update that failed, can leave a file nobody points at | Storage use grows a little; only owners delete files, by design (D29) | An owner's clean-up. A deleted expense now takes its receipt with it |
 | A photo sent without JavaScript is stored as taken (only its hidden data removed) | It may show sideways and is larger | Most phones run the page's JavaScript; the photo still works |
-| Anyone holding a form's upload secret can add its certificates for an hour | Only the sender has it; the files can only be added, one per pet | By design |
+| Anyone holding a form's upload secret can add its certificates for an hour | Only the sender has it; the files can only be added, at most two per pet | By design |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
 | An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | Invitation links (M6) need no lookup; the email invitation stays for people who already have an account. Remove it if this matters more than the convenience. |

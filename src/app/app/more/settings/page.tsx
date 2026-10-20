@@ -46,7 +46,7 @@ async function Settings() {
   const s = m.settings;
   const supabase = await createClient();
   const [services, issued] = await Promise.all([
-    supabase.from("services").select("kind, price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
+    supabase.from("services").select("kind, price_minor, shared_price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
     supabase.from("invoices").select("id", { count: "exact", head: true }).eq("org_id", org.id).neq("status", "draft"),
   ]);
   if (services.error || issued.error) throw new Error("Could not load prices.");
@@ -55,6 +55,10 @@ async function Settings() {
   const price = (kind: string) => {
     const found = services.data.find((x) => x.kind === kind);
     return found ? toDecimalString(found.price_minor).replace(/\.00$/, "") : "";
+  };
+  const sharedPrice = (kind: string) => {
+    const found = services.data.find((x) => x.kind === kind)?.shared_price_minor;
+    return found == null ? "" : toDecimalString(found).replace(/\.00$/, "");
   };
 
   return (
@@ -108,6 +112,12 @@ async function Settings() {
             </Field>
             <Field label={s.prices.daycare}>
               <Input name="price_daycare" inputMode="decimal" defaultValue={price("daycare")} />
+            </Field>
+            <Field label={s.prices.sharedBoarding} hint={s.prices.sharedHint}>
+              <Input name="shared_price_boarding" inputMode="decimal" defaultValue={sharedPrice("boarding")} />
+            </Field>
+            <Field label={s.prices.sharedDaycare} hint={s.prices.sharedHint}>
+              <Input name="shared_price_daycare" inputMode="decimal" defaultValue={sharedPrice("daycare")} />
             </Field>
           </div>
         </Group>

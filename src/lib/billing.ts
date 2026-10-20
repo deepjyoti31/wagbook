@@ -60,6 +60,46 @@ export function billForBooking(org: OrgTax, petName: string, b: BillableBooking,
   return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
 }
 
+/**
+ * The stays of a family booking that go on its bill: not requests, not
+ * cancellations. Must match invoice_bookings() in the database.
+ */
+export const BILLABLE_IN_FAMILY = ["confirmed", "checked_in", "checked_out", "no_show"] as const satisfies readonly Enums<"booking_status">[];
+
+export interface FamilyMember {
+  petName: string;
+  booking: BillableBooking;
+  items: readonly BillableItem[];
+}
+
+/**
+ * The bill for pets booked together: each pet's stay and then its extras, in
+ * the order given, on one bill. An extra says whose it is. Exactly what
+ * invoice_expected_lines() expects for the family, so staff can issue it.
+ */
+export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): InvoiceTotals {
+  const lines = members.flatMap(({ petName, booking: b, items }) =>
+    stayLines({
+      kind: b.kind,
+      petName,
+      startDate: b.start_date,
+      endDate: b.end_date,
+      rateMinor: b.rate_minor,
+      discountMinor: b.discount_minor,
+      taxRateBp: b.tax_rate_bp,
+      sacCode: b.sac_code,
+      addOns: items.map((i) => ({
+        description: `${petName}: ${i.description}`.slice(0, 300),
+        quantity: Number(i.quantity),
+        unitPriceMinor: i.unit_price_minor,
+        taxRateBp: i.tax_rate_bp,
+        sacCode: i.sac_code,
+      })),
+    }),
+  );
+  return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
+}
+
 /** Recompute a bill from edited lines. */
 export function billFromLines(org: OrgTax, lines: readonly LineInput[], placeOfSupply?: string | null): InvoiceTotals {
   return computeInvoice(lines, taxContext(org, placeOfSupply), { roundToWholeUnit: org.round_invoice_totals });

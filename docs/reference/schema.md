@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 62.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 67.
 
 ## Contents
 
@@ -117,14 +117,14 @@ Add-ons charged on top of the stay: grooming, pick-up and drop, a vet bill paid 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `booking_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `booking_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `booking_items_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `booking_items_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `booking_items_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### bookings
 
-One pet's stay: overnight boarding or day boarding. Siblings staying together are separate bookings sharing a group_id.
+One pet's stay: overnight boarding or day boarding. Siblings booked together are separate bookings sharing a group_id; they may share a kennel and are billed together.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -136,7 +136,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 | `status` | `booking_status` | yes | `'confirmed'::booking_status` |  |
 | `start_date` | `date` | yes |  | Check-in date (calendar date at the kennel). |
 | `end_date` | `date` | yes |  | Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date). |
-| `kennel_id` | `uuid` |  |  | The kennel assigned. May stay empty until check-in; capacity is still checked. |
+| `kennel_id` | `uuid` |  |  | The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel). |
 | `rate_minor` | `bigint` | yes |  | Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history. |
 | `discount_minor` | `bigint` | yes | `0` | Discount on the stay itself, before tax. |
 | `tax_rate_bp` | `integer` | yes | `0` | Tax rate for the stay, copied when booked. |
@@ -155,7 +155,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 | `vaccinations_checked_by` | `uuid` |  |  | Who confirmed the vaccinations at check-in. Stamped by the database. |
 | `notes` | `text` |  |  |  |
 | `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. |
-| `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. |
+| `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill. |
 | `public_token` | `text` | yes | `new_token()` | Secret in the parent's stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else. |
 | `created_by` | `uuid` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -175,7 +175,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
 - Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
-- Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
+- Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&, client_id WITH <>) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
 - Check `bookings_at_most_a_year`: `CHECK (((end_date - start_date) <= 366))`
 - Check `bookings_boarding_has_a_night`: `CHECK (((kind <> 'boarding'::booking_kind) OR (end_date > start_date)))`
@@ -198,6 +198,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
+- `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
 - `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
 - `bookings_set_updated_at` (before update) runs `set_updated_at()`
@@ -207,7 +208,7 @@ One pet's stay: overnight boarding or day boarding. Siblings staying together ar
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `bookings_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `bookings_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `bookings_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -225,7 +226,6 @@ A routine that repeats every day. With no pet it is the house routine for every 
 | `label` | `text` | yes |  |  |
 | `details` | `text` |  |  | How to do it: "200 g kibble with warm water", "1 tablet with food". |
 | `due_time` | `time without time zone` | yes |  |  |
-| `requires_photo` | `boolean` | yes | `false` | When true the app asks for a photo before the task can be marked done. Useful for medication. |
 | `is_active` | `boolean` | yes | `true` |  |
 | `sort_order` | `integer` | yes | `0` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -251,7 +251,7 @@ A routine that repeats every day. With no pet it is the house routine for every 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `care_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `care_items_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `care_items_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `care_items_insert_for_pet` (insert): new values must satisfy `((pet_id IS NOT NULL) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
 - `care_items_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -307,7 +307,7 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `care_tasks_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `care_tasks_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `care_tasks_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -369,7 +369,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `clients_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `clients_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `clients_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -421,7 +421,10 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `expenses_all` (all): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `expenses_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `expenses_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### incidents
 
@@ -466,6 +469,7 @@ Anything out of the ordinary: illness, injury, a fight, an escape. A written, ti
 
 - `incidents_audit` (after insert or delete or update) runs `audit_row()`
 - `incidents_forbid_org_change` (before update) runs `forbid_org_change()`
+- `incidents_guard_content` (before update) runs `incidents_guard_content()`
 - `incidents_set_updated_at` (before update) runs `set_updated_at()`
 - `incidents_stamp_actor` (before insert or update) runs `stamp_actor()`
 - `incidents_stamp_notified` (before insert or update) runs `stamp_when_set()`
@@ -473,7 +477,7 @@ Anything out of the ordinary: illness, injury, a fight, an escape. A written, ti
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `incidents_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `incidents_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `incidents_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `incidents_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `incidents_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -522,7 +526,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `intake_submissions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `intake_submissions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `intake_submissions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
@@ -662,7 +666,8 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
 | `client_id` | `uuid` | yes |  |  |
-| `booking_id` | `uuid` |  |  |  |
+| `booking_id` | `uuid` |  |  | The stay this bill is for, when it is for one pet's stay that was booked on its own. |
+| `group_id` | `uuid` |  |  | The family booking this bill is for: every pet booked together (bookings.group_id) is billed on it, each with its stay and extras. A pet of a family is never billed on its own. |
 | `status` | `invoice_status` | yes | `'draft'::invoice_status` |  |
 | `number` | `text` |  |  | Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused. |
 | `fiscal_year` | `text` |  |  | Financial year the number belongs to, e.g. 2027-28. |
@@ -715,6 +720,7 @@ CASE
     WHEN (status = 'draft'::invoice_status) THEN ((number IS NULL) AND (seq IS NULL) AND (fiscal_year IS NULL) AND (issued_on IS NULL) AND (issued_by IS NULL))
     ELSE ((number IS NOT NULL) AND (seq IS NOT NULL) AND (fiscal_year IS NOT NULL) AND (issued_on IS NOT NULL))
 END)`
+- Check `invoices_one_stay_or_one_family`: `CHECK (((booking_id IS NULL) OR (group_id IS NULL)))`
 - Check `invoices_place_of_supply_state_code_check`: `CHECK (((place_of_supply_state_code IS NULL) OR (place_of_supply_state_code ~ '^[0-9]{2}$'::text)))`
 - Check `invoices_round_off_minor_check`: `CHECK (((round_off_minor >= '-99'::integer) AND (round_off_minor <= 99)))`
 - Check `invoices_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
@@ -727,6 +733,7 @@ END)`
 **Indexes**
 
 - `CREATE UNIQUE INDEX invoices_one_live_per_booking ON public.invoices USING btree (org_id, booking_id) WHERE ((booking_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
+- `CREATE UNIQUE INDEX invoices_one_live_per_family ON public.invoices USING btree (org_id, group_id) WHERE ((group_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE INDEX invoices_org_booking_idx ON public.invoices USING btree (org_id, booking_id)`
 - `CREATE INDEX invoices_org_client_idx ON public.invoices USING btree (org_id, client_id)`
 - `CREATE INDEX invoices_org_issued_idx ON public.invoices USING btree (org_id, issued_on DESC)`
@@ -734,6 +741,7 @@ END)`
 **Triggers**
 
 - `invoices_audit` (after insert or delete or update) runs `audit_row()`
+- `invoices_check_stay` (before insert or update of booking_id, group_id, client_id) runs `invoices_check_stay()`
 - `invoices_forbid_org_change` (before update) runs `forbid_org_change()`
 - `invoices_guard` (before delete or update) runs `invoices_guard()`
 - `invoices_guard_insert` (before insert) runs `invoices_guard_insert()`
@@ -743,14 +751,14 @@ END)`
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `invoices_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `invoices_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `invoices_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### kennels
 
-A place one pet stays: a kennel, room, run or suite. The number of active kennels is the organisation's capacity.
+A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets of one parent sharing it. The number of active kennels is the organisation's capacity.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -780,7 +788,7 @@ A place one pet stays: a kennel, room, run or suite. The number of active kennel
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `kennels_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `kennels_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `kennels_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `kennels_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `kennels_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -828,7 +836,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 **Access**
 
 - Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `memberships_delete` (delete): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
+- `memberships_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `memberships_delete_self` (delete): rows where `(user_id = ( SELECT auth.uid() AS uid))`
 - `memberships_select` (select): rows where `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) OR ((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT session_meets_mfa() AS session_meets_mfa)))`
 - `memberships_update` (update): rows where `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`; new values must satisfy `((org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role)) OR ((role <> 'owner'::member_role) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['manager'::member_role]) AS my_org_ids_with_role))))`
@@ -967,7 +975,7 @@ Money received from a parent, or refunded to one. Wagbook records payments; it d
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `payments_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `payments_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `payments_insert` (insert): new values must satisfy `(((direction = 'in'::text) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
 - `payments_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `payments_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1009,7 +1017,7 @@ Busy stretches such as Diwali week or a long weekend. Used to warn about cancell
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `peak_periods_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `peak_periods_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `peak_periods_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `peak_periods_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `peak_periods_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1070,14 +1078,14 @@ An animal in the kennel's care. Belongs to one client.
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `pets_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `pets_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `pets_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### play_sessions
 
-A slot when one pet has a yard to itself. The schedule is planned by planPlaySessions in src/lib/core/play-schedule.ts; the constraints here make overlap impossible whatever the app does.
+A slot when one pet, or siblings of one parent together, have a yard to themselves. The schedule is planned by planPlaySessions in src/lib/core/play-schedule.ts; the constraints here make overlap impossible whatever the app does.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -1086,6 +1094,7 @@ A slot when one pet has a yard to itself. The schedule is planned by planPlaySes
 | `yard_id` | `uuid` | yes |  |  |
 | `booking_id` | `uuid` | yes |  |  |
 | `pet_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  | The pet's parent, copied from the booking by the database on every write (play_sessions_fill_client). Siblings may share a yard; different parents may not. |
 | `session_date` | `date` | yes |  |  |
 | `starts_at` | `time without time zone` | yes |  | Local clock time at the kennel. |
 | `duration_minutes` | `smallint` | yes |  |  |
@@ -1103,7 +1112,7 @@ A slot when one pet has a yard to itself. The schedule is planned by planPlaySes
 - Foreign key `play_sessions_org_id_booking_id_pet_id_fkey`: `FOREIGN KEY (org_id, booking_id, pet_id) REFERENCES bookings(org_id, id, pet_id) ON DELETE CASCADE`
 - Foreign key `play_sessions_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `play_sessions_org_id_yard_id_fkey`: `FOREIGN KEY (org_id, yard_id) REFERENCES play_yards(org_id, id) ON DELETE CASCADE`
-- Exclusion `play_sessions_one_pet_per_yard`: `EXCLUDE USING gist (yard_id WITH =, tsrange((session_date + starts_at), ((session_date + starts_at) + make_interval(mins => (duration_minutes)::integer)), '[)'::text) WITH &&) WHERE ((status <> 'skipped'::task_status))`
+- Exclusion `play_sessions_one_pet_per_yard`: `EXCLUDE USING gist (yard_id WITH =, tsrange((session_date + starts_at), ((session_date + starts_at) + make_interval(mins => (duration_minutes)::integer)), '[)'::text) WITH &&, client_id WITH <>) WHERE ((status <> 'skipped'::task_status))`
 - Exclusion `play_sessions_one_yard_per_pet`: `EXCLUDE USING gist (pet_id WITH =, tsrange((session_date + starts_at), ((session_date + starts_at) + make_interval(mins => (duration_minutes)::integer)), '[)'::text) WITH &&) WHERE ((status <> 'skipped'::task_status))`
 - Check `play_sessions_duration_minutes_check`: `CHECK (((duration_minutes >= 5) AND (duration_minutes <= 240)))`
 
@@ -1113,6 +1122,7 @@ A slot when one pet has a yard to itself. The schedule is planned by planPlaySes
 
 **Triggers**
 
+- `play_sessions_fill_client` (before insert or update) runs `play_sessions_fill_client()`
 - `play_sessions_forbid_org_change` (before update) runs `forbid_org_change()`
 - `play_sessions_set_updated_at` (before update) runs `set_updated_at()`
 - `play_sessions_stamp_done` (before insert or update) runs `stamp_done()`
@@ -1120,7 +1130,7 @@ A slot when one pet has a yard to itself. The schedule is planned by planPlaySes
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `play_sessions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `play_sessions_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `play_sessions_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_sessions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_sessions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1155,7 +1165,7 @@ A fenced area where one pet at a time plays or exercises.
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `play_yards_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `play_yards_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `play_yards_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1174,6 +1184,7 @@ The rate card. A boarding or daycare row sets the price of a stay; addon rows ar
 | `price_minor` | `bigint` | yes |  |  |
 | `tax_rate_bp` | `integer` |  |  | Tax rate for this service in basis points. Empty means use the organisation default. |
 | `sac_code` | `text` |  |  | Services Accounting Code printed on Indian tax invoices. The kennel's accountant decides the code. |
+| `shared_price_minor` | `bigint` |  |  | Boarding and day boarding only: the price per night or day for the second pet sharing a kennel with a pet of the same parent, set by the kennel. Empty: the second pet pays the usual price. |
 | `is_default` | `boolean` | yes | `false` | The service pre-selected for new bookings of its kind. At most one per kind. |
 | `is_active` | `boolean` | yes | `true` |  |
 | `sort_order` | `integer` | yes | `0` |  |
@@ -1188,6 +1199,8 @@ The rate card. A boarding or daycare row sets the price of a stay; addon rows ar
 - Check `services_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
 - Check `services_price_minor_check`: `CHECK ((price_minor >= 0))`
 - Check `services_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `services_shared_price_minor_check`: `CHECK (((shared_price_minor IS NULL) OR (shared_price_minor >= 0)))`
+- Check `services_shared_price_only_for_stays`: `CHECK (((shared_price_minor IS NULL) OR (kind <> 'addon'::service_kind)))`
 - Check `services_tax_rate_bp_check`: `CHECK (((tax_rate_bp IS NULL) OR ((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000))))`
 - Check `services_unit_check`: `CHECK ((unit = ANY (ARRAY['night'::text, 'day'::text, 'each'::text, 'hour'::text])))`
 
@@ -1205,7 +1218,7 @@ The rate card. A boarding or daycare row sets the price of a stay; addon rows ar
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `services_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `services_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `services_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `services_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `services_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
@@ -1251,7 +1264,7 @@ A note about how a pet is doing, usually with photos. Doubles as the shift hando
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `stay_updates_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `stay_updates_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `stay_updates_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `stay_updates_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `stay_updates_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1298,7 +1311,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 **Access**
 
 - Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
-- `vaccinations_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `vaccinations_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `vaccinations_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `vaccinations_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `vaccinations_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
@@ -1315,6 +1328,7 @@ Each invoice with what has been paid against it and what is still due.
 | `org_id` | `uuid` |  |  |  |
 | `client_id` | `uuid` |  |  |  |
 | `booking_id` | `uuid` |  |  |  |
+| `group_id` | `uuid` |  |  |  |
 | `status` | `invoice_status` |  |  |  |
 | `number` | `text` |  |  |  |
 | `total_minor` | `bigint` |  |  |  |
@@ -1366,14 +1380,14 @@ Trigger: appends one audit_log row per insert, update or delete, storing only wh
 ### available_kennels
 
 ```
-available_kennels(p_org uuid, p_kind booking_kind, p_start date, p_end date) returns SETOF kennels
+available_kennels(p_org uuid, p_kind booking_kind, p_start date, p_end date, p_client uuid, p_pets integer) returns SETOF kennels
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Active kennels with no booking holding them at any point in the given stay. Used to offer kennels when booking or checking in.
+Active kennels that can take p_pets more pets (1 or 2) for the whole of a stay: held by nobody, or, given a parent, held only by that parent's pets with room to spare (a kennel holds two). Used to offer kennels when booking or checking in. Must agree with freeKennels() in src/lib/core/bookings.ts.
 
 ### booking_items_guard_price
 
@@ -1397,7 +1411,7 @@ bookings_check_capacity() returns trigger
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Trigger: refuses a booking that would put more pets in house than there are active kennels on any day of the stay, and refuses a kennel that is out of service.
+Trigger: refuses a kennel that is out of service (WB021), a third pet in one kennel (WB027), and a booking that would need more kennels than are active on any day of the stay (WB020; two pets sharing a kennel need one).
 
 ### bookings_check_group
 
@@ -1409,7 +1423,19 @@ bookings_check_group() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: every booking sharing a group_id has the same client.
+Trigger: every booking sharing a group_id has the same client (WB024), and a booking's group_id never changes (WB026).
+
+### bookings_check_shared_price
+
+```
+bookings_check_shared_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a new booking made by staff at the shared kennel price must share its kennel with another pet of the same parent on overlapping days (WB023 otherwise).
 
 ### bookings_guard_price
 
@@ -1421,7 +1447,7 @@ bookings_guard_price() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list, with no discount, and cannot change the price, discount, tax or kind of an existing booking.
+Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel), with no discount, and cannot change the price, discount, tax or kind of an existing booking.
 
 ### bookings_stamp_status
 
@@ -1445,7 +1471,7 @@ check_privacy_access(p_org uuid) returns void
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first.
+Raises unless the caller is an owner or manager of the organisation. export_client and erase_client call it first; erase_client then also needs an owner (WB074).
 
 ### check_report_access
 
@@ -1529,7 +1555,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner or manager (WB070).
+Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 
@@ -1639,6 +1665,18 @@ guard_hiding() returns trigger
 
 Trigger on pets and clients: only owners and managers hide a row (deleted_at) or show it again; never while it has a stay requested, confirmed or in house (WB019); a pet is shown again only once its parent is.
 
+### incidents_guard_content
+
+```
+incidents_guard_content() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: once written, an incident's account (what, how serious, what was done, vet, when, which pet and stay) is changed only by an owner or manager (WB080). Anyone may mark the parent told or the incident dealt with.
+
 ### intake_submissions_stamp_review
 
 ```
@@ -1661,7 +1699,7 @@ intake_upload_allowed(p_name text) returns boolean
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
+PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
 
 ### invite_member_by_email
 
@@ -1675,17 +1713,29 @@ invite_member_by_email(p_org uuid, p_email text, p_role member_role, p_display_n
 
 Invites an existing account to an organisation, or corrects an invitation that has not been answered yet. Someone who is already a member is left unchanged. The person becomes a member only when they accept. Owner or manager only; only owners can invite or change owners. Returns nothing in every case.
 
-### invoice_expected_lines
+### invoice_bookings
 
 ```
-invoice_expected_lines(p_booking uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+invoice_bookings(p_org uuid, p_booking uuid, p_group uuid) returns SETOF uuid
 ```
 
 - Who may call: internal
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill for a booking should have, as quantity, unit price, discount and tax rate: the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
+The bookings a bill covers: its own booking, or the family's bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.
+
+### invoice_expected_lines
+
+```
+invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
 
 ### invoice_lines_guard
 
@@ -1698,6 +1748,18 @@ invoice_lines_guard() returns trigger
 - Volatility: volatile
 
 Trigger: invoice lines can only change while the invoice is a draft.
+
+### invoices_check_stay
+
+```
+invoices_check_stay() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pet booked with others is billed only on the family's bill (WB053), and a family's bill names a family booking of that parent (WB054).
 
 ### invoices_guard
 
@@ -1733,7 +1795,7 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking says. Takes in advances paid for the booking.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings) says. Takes in advances paid for those stays.
 
 ### merge_clients
 
@@ -1798,14 +1860,14 @@ A 64 character random token (244 random bits) for unguessable public links such 
 ### occupancy_by_day
 
 ```
-occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occupied integer, capacity integer)
+occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occupied integer, capacity integer, pets integer)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.
+For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.
 
 ### organizations_lock_billing_settings
 
@@ -1830,6 +1892,18 @@ paths_in_org(p_paths text[], p_org uuid) returns boolean
 - Volatility: immutable
 
 True when every path that is set is inside the given organisation's folder. Empty paths are allowed.
+
+### play_sessions_fill_client
+
+```
+play_sessions_fill_client() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: copies the parent of a play session's booking onto the session, whatever was sent.
 
 ### protect_last_owner
 
@@ -1870,14 +1944,14 @@ For each month in the period: what was billed (issued bills by bill date; cancel
 ### report_occupancy
 
 ```
-report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boarding integer, day_boarding integer, capacity integer)
+report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boarding integer, day_boarding integer, capacity integer, kennels_used integer)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each day: pets staying the night (boarding), pets in for the day (day boarding), and kennels in service today. Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
+For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service today, and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
 
 ### report_tax
 

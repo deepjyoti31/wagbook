@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/auth";
-import { IS_DEMO } from "@/lib/demo";
 import { text, type FormState, type TwoStepSetup } from "@/lib/forms";
 import { getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -14,8 +13,6 @@ import { createClient } from "@/lib/supabase/server";
 export async function startTwoStep(): Promise<TwoStepSetup> {
   await requireOrg();
   const { m } = await getAppI18n();
-  // Everyone shares the demo's accounts: one visitor must not lock the rest out.
-  if (IS_DEMO) return { error: m.demo.noTwoStep };
   const supabase = await createClient();
   const listed = await supabase.auth.mfa.listFactors();
   for (const f of listed.data?.all ?? []) {

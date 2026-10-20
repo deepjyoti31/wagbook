@@ -130,10 +130,10 @@ describe("a bill is what its booking says, unless a manager says otherwise", () 
     const edited = await makeDraft(staff, cheaper, { booking });
     expect((await errorOf(() => issue(staff, edited))).message).toContain("WB050");
 
-    await as(db, user(manager), () => db.query("delete from public.invoices where id = $1", [edited]));
+    await as(db, user(k.owner), () => db.query("delete from public.invoices where id = $1", [edited]));
     const missing = await makeDraft(staff, computeInvoice([lines[0]], { mode: "none" }, { roundToWholeUnit: true }), { booking });
     expect((await errorOf(() => issue(staff, missing))).message).toContain("WB050");
-    await as(db, user(manager), () => db.query("delete from public.invoices where id = $1", [missing]));
+    await as(db, user(k.owner), () => db.query("delete from public.invoices where id = $1", [missing]));
 
     const loose = await makeDraft(staff, computeInvoice(lines, { mode: "none" }, { roundToWholeUnit: true }));
     expect((await errorOf(() => issue(staff, loose))).message).toContain("WB050");

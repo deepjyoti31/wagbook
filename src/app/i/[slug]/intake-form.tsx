@@ -148,6 +148,20 @@ export function IntakeForm({
               <PhotoInput name={`pets.${key}.certificate`} label={w.certificate} accept="image/*,application/pdf" words={shared.photos} />
               <p className="mt-1 text-sm text-slate">{w.certificateHint}</p>
             </div>
+            <details className="sm:col-span-2">
+              <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.anotherVaccine}</summary>
+              <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                <Field label={w.secondVaccine}>
+                  <Input name={`pets.${key}.vaccine2`} maxLength={60} />
+                </Field>
+                <Field label={w.validUntil}>
+                  <Input name={`pets.${key}.vaccine2_valid_until`} type="date" />
+                </Field>
+                <div className="sm:col-span-2">
+                  <PhotoInput name={`pets.${key}.certificate2`} label={w.certificate} accept="image/*,application/pdf" words={shared.photos} />
+                </div>
+              </div>
+            </details>
             <Field label={w.vet}>
               <Input name={`pets.${key}.vet_name`} maxLength={200} />
             </Field>

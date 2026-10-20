@@ -43,12 +43,12 @@ async function Intake() {
 
   const intakeUrl = `${origin}/i/${org.slug}`;
 
-  // Certificates parents sent with their forms: {org}/intake/{form}/pet-N.
-  // Only those that exist come back with a link.
-  const certificatePath = (submission: string, i: number) => `${org.id}/intake/${submission}/pet-${i + 1}`;
+  // Certificates parents sent with their forms: {org}/intake/{form}/pet-N, and
+  // pet-N-2 for a pet's second vaccine. Only those that exist come back with a link.
+  const certificatePaths = (submission: string, i: number) => [`${org.id}/intake/${submission}/pet-${i + 1}`, `${org.id}/intake/${submission}/pet-${i + 1}-2`];
   const certificates = await signedUrls(
     supabase,
-    data.flatMap((s) => (Array.isArray((s.payload as { pets?: unknown }).pets) ? ((s.payload as { pets: unknown[] }).pets.map((_, i) => certificatePath(s.id, i))) : [])),
+    data.flatMap((s) => (Array.isArray((s.payload as { pets?: unknown }).pets) ? ((s.payload as { pets: unknown[] }).pets.flatMap((_, i) => certificatePaths(s.id, i))) : [])),
   );
 
   // Which of these parents is already a client? Accepting adds their new pets
@@ -150,11 +150,13 @@ async function Intake() {
                         ) : (
                           <p className="text-slate">{k.noVaccines}</p>
                         )}
-                        {certificates.get(certificatePath(s.id, i)) ? (
-                          <a href={certificates.get(certificatePath(s.id, i))} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center underline underline-offset-4">
-                            {fill(k.certificate, { pet: p.name })}
-                          </a>
-                        ) : null}
+                        {certificatePaths(s.id, i).map((path) =>
+                          certificates.get(path) ? (
+                            <a key={path} href={certificates.get(path)} target="_blank" rel="noreferrer" className="mr-4 inline-flex min-h-12 items-center underline underline-offset-4">
+                              {fill(k.certificate, { pet: p.name })}
+                            </a>
+                          ) : null,
+                        )}
                       </li>
                     ))}
                   </ul>

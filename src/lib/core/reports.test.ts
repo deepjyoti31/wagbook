@@ -40,6 +40,11 @@ describe("occupancy summary", () => {
     expect(s).toEqual({ nights: 9, days: 2, busiest: { day: "2026-10-02", pets: 4 }, percentFull: 69 });
   });
 
+  it("counts two siblings sharing a kennel as one kennel used", () => {
+    const s = summariseOccupancy([{ day: "2026-10-01", boarding: 2, dayBoarding: 0, capacity: 2, kennelsUsed: 1 }]);
+    expect(s).toEqual({ nights: 2, days: 0, busiest: { day: "2026-10-01", pets: 2 }, percentFull: 50 });
+  });
+
   it("says nothing about a busiest day or fullness when there is nothing to say", () => {
     expect(summariseOccupancy([{ day: "2026-10-01", boarding: 0, dayBoarding: 0, capacity: 0 }])).toEqual({
       nights: 0, days: 0, busiest: null, percentFull: null,

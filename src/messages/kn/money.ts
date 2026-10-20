@@ -1,4 +1,5 @@
 import type { moneyArea as English } from "../en/money";
+import { historyFields } from "./fields";
 
 /** Kannada words for bills, payments, the parent's bill, reports, expenses and the history of changes. First draft, to be checked by a native speaker. */
 export const moneyArea: typeof English = {
@@ -78,7 +79,6 @@ export const moneyArea: typeof English = {
       cancelManagers: "ಮಾಲೀಕ ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಮಾತ್ರ ಬಿಲ್ ರದ್ದುಮಾಡಬಹುದು.",
       sayWhy: "ಬಿಲ್ ಯಾಕೆ ರದ್ದಾಗುತ್ತಿದೆ ಎಂದು ಬರೆಯಿರಿ.",
       reasonTooLong: "ಕಾರಣವನ್ನು 500 ಅಕ್ಷರಗಳ ಒಳಗೆ ಬರೆಯಿರಿ.",
-      deleteManagers: "ಮಾಲೀಕ ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಮಾತ್ರ ಡ್ರಾಫ್ಟ್ ಬಿಲ್ ಅಳಿಸಬಹುದು.",
       onlyDraftDeleted: "ಡ್ರಾಫ್ಟ್ ಬಿಲ್ ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
     },
     updated: "ಬಿಲ್ ಅಪ್‌ಡೇಟ್ ಆಗಿದೆ.",
@@ -200,6 +200,7 @@ export const moneyArea: typeof English = {
     },
   },
   expenses: {
+    deleteWarning: "ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ. ರಸೀದಿಯೂ ಅಳಿಯುತ್ತದೆ.",
     title: "ಖರ್ಚು",
     managersOnly: "ಖರ್ಚು ಮಾಲೀಕರು ಮತ್ತು ಮ್ಯಾನೇಜರ್‌ಗಳಿಗೆ ಮಾತ್ರ.",
     removed: "ಖರ್ಚು ತೆಗೆಯಲಾಗಿದೆ.",
@@ -259,6 +260,8 @@ export const moneyArea: typeof English = {
     older: "ಹಳೆಯ ಬದಲಾವಣೆಗಳು",
     kennel: "ಕೆನೆಲ್ {name}",
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "ಬುಕಿಂಗ್",
         booking_items: "ಬುಕಿಂಗ್‌ನ ಹೆಚ್ಚುವರಿ",

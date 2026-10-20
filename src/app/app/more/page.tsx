@@ -7,15 +7,17 @@ import { getMemberships, requireOrg } from "@/lib/auth";
 import { fill, LANGUAGE_NAMES, LANGUAGES, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
+import type { Messages } from "@/messages";
 import { signOut } from "@/app/login/actions";
 import { setMyLanguage } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.more.title);
 
-const LINKS = [
+// Reports, expenses and the history are for owners and managers (D20), so staff are not shown them.
+const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; managers?: boolean }[] = [
   { href: "/app/bills", key: "bills" },
-  { href: "/app/more/reports", key: "reports" },
-  { href: "/app/more/expenses", key: "expenses" },
+  { href: "/app/more/reports", key: "reports", managers: true },
+  { href: "/app/more/expenses", key: "expenses", managers: true },
   { href: "/app/more/intake", key: "intake" },
   { href: "/app/more/kennels", key: "kennels" },
   { href: "/app/more/people", key: "people" },
@@ -24,8 +26,8 @@ const LINKS = [
   { href: "/app/more/extras", key: "extras" },
   { href: "/app/more/peak", key: "peak" },
   { href: "/app/more/settings", key: "settings" },
-  { href: "/app/more/history", key: "history" },
-] as const;
+  { href: "/app/more/history", key: "history", managers: true },
+];
 
 export default function MorePage({ searchParams }: PageProps<"/app/more">) {
   return (
@@ -44,13 +46,14 @@ export default function MorePage({ searchParams }: PageProps<"/app/more">) {
 
 async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams">) {
   const done = (await searchParams).done;
+  const { canManage } = await requireOrg();
   const { m } = await getAppI18n();
   return (
     <>
       <PageTitle title={m.more.title} />
       {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
       <Ledger>
-        {LINKS.map((l) => (
+        {LINKS.filter((l) => canManage || !l.managers).map((l) => (
           <li key={l.href}>
             <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
               <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>

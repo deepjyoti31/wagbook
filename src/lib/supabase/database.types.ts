@@ -260,7 +260,6 @@ export type Database = {
           label: string;
           details: string | null;
           due_time: string;
-          requires_photo: boolean;
           is_active: boolean;
           sort_order: number;
           created_at: string;
@@ -274,7 +273,6 @@ export type Database = {
           label: string;
           details?: string | null;
           due_time: string;
-          requires_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -288,7 +286,6 @@ export type Database = {
           label?: string;
           details?: string | null;
           due_time?: string;
-          requires_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -847,6 +844,7 @@ export type Database = {
           org_id: string;
           client_id: string;
           booking_id: string | null;
+          group_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           number: string | null;
           fiscal_year: string | null;
@@ -881,6 +879,7 @@ export type Database = {
           org_id: string;
           client_id: string;
           booking_id?: string | null;
+          group_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -915,6 +914,7 @@ export type Database = {
           org_id?: string;
           client_id?: string;
           booking_id?: string | null;
+          group_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1425,6 +1425,7 @@ export type Database = {
           yard_id: string;
           booking_id: string;
           pet_id: string;
+          client_id: string;
           session_date: string;
           starts_at: string;
           duration_minutes: number;
@@ -1441,6 +1442,7 @@ export type Database = {
           yard_id: string;
           booking_id: string;
           pet_id: string;
+          client_id: string;
           session_date: string;
           starts_at: string;
           duration_minutes: number;
@@ -1457,6 +1459,7 @@ export type Database = {
           yard_id?: string;
           booking_id?: string;
           pet_id?: string;
+          client_id?: string;
           session_date?: string;
           starts_at?: string;
           duration_minutes?: number;
@@ -1539,6 +1542,7 @@ export type Database = {
           price_minor: number;
           tax_rate_bp: number | null;
           sac_code: string | null;
+          shared_price_minor: number | null;
           is_default: boolean;
           is_active: boolean;
           sort_order: number;
@@ -1554,6 +1558,7 @@ export type Database = {
           price_minor: number;
           tax_rate_bp?: number | null;
           sac_code?: string | null;
+          shared_price_minor?: number | null;
           is_default?: boolean;
           is_active?: boolean;
           sort_order?: number;
@@ -1569,6 +1574,7 @@ export type Database = {
           price_minor?: number;
           tax_rate_bp?: number | null;
           sac_code?: string | null;
+          shared_price_minor?: number | null;
           is_default?: boolean;
           is_active?: boolean;
           sort_order?: number;
@@ -1710,6 +1716,7 @@ export type Database = {
           org_id: string | null;
           client_id: string | null;
           booking_id: string | null;
+          group_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"] | null;
           number: string | null;
           total_minor: number | null;
@@ -1729,7 +1736,7 @@ export type Database = {
         Returns: string;
       };
       available_kennels: {
-        Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string };
+        Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string; p_client?: string; p_pets?: number };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
       };
       check_privacy_access: {
@@ -1796,8 +1803,12 @@ export type Database = {
         Args: { p_org: string; p_email: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
         Returns: undefined;
       };
+      invoice_bookings: {
+        Args: { p_org: string; p_booking: string; p_group: string };
+        Returns: string[];
+      };
       invoice_expected_lines: {
-        Args: { p_booking: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
+        Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
         Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
       };
       issue_invoice: {
@@ -1826,7 +1837,7 @@ export type Database = {
       };
       occupancy_by_day: {
         Args: { p_org: string; p_from: string; p_to: string };
-        Returns: { day: string; occupied: number; capacity: number }[];
+        Returns: { day: string; occupied: number; capacity: number; pets: number }[];
       };
       paths_in_org: {
         Args: { p_paths: string[]; p_org: string };
@@ -1842,7 +1853,7 @@ export type Database = {
       };
       report_occupancy: {
         Args: { p_org: string; p_from: string; p_to: string };
-        Returns: { day: string; boarding: number; day_boarding: number; capacity: number }[];
+        Returns: { day: string; boarding: number; day_boarding: number; capacity: number; kennels_used: number }[];
       };
       report_tax: {
         Args: { p_org: string; p_from: string; p_to: string };

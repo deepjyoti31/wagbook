@@ -16,7 +16,6 @@ create table public.care_items (
   label text not null check (char_length(label) between 1 and 80),
   details text,
   due_time time not null,
-  requires_photo boolean not null default false,
   is_active boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -29,7 +28,6 @@ comment on table public.care_items is
   'A routine that repeats every day. With no pet it is the house routine for every boarded pet (e.g. breakfast at 9); with a pet it is that pet''s own (e.g. a tablet at 8).';
 comment on column public.care_items.pet_id is 'Empty for a house routine that applies to every pet in house.';
 comment on column public.care_items.details is 'How to do it: "200 g kibble with warm water", "1 tablet with food".';
-comment on column public.care_items.requires_photo is 'When true the app asks for a photo before the task can be marked done. Useful for medication.';
 
 create index care_items_org_pet_idx on public.care_items (org_id, pet_id);
 
@@ -168,6 +166,7 @@ create table public.play_sessions (
   yard_id uuid not null,
   booking_id uuid not null,
   pet_id uuid not null,
+  client_id uuid not null,
   session_date date not null,
   starts_at time not null,
   duration_minutes smallint not null check (duration_minutes between 5 and 240),
@@ -180,10 +179,12 @@ create table public.play_sessions (
   foreign key (org_id, yard_id) references public.play_yards (org_id, id) on delete cascade,
   foreign key (org_id, booking_id, pet_id) references public.bookings (org_id, id, pet_id) on delete cascade,
 
-  -- THE no-group-play guard: a yard holds one pet at a time.
+  -- THE no-group-play guard: a yard holds one family at a time. Pets of one
+  -- parent (siblings) may play together; pets of different parents never meet.
   constraint play_sessions_one_pet_per_yard exclude using gist (
     yard_id with =,
-    tsrange(session_date + starts_at, session_date + starts_at + make_interval(mins => duration_minutes::integer), '[)') with &&
+    tsrange(session_date + starts_at, session_date + starts_at + make_interval(mins => duration_minutes::integer), '[)') with &&,
+    client_id with <>
   ) where (status <> 'skipped'),
 
   -- And a pet cannot be in two yards at once.
@@ -193,8 +194,10 @@ create table public.play_sessions (
   ) where (status <> 'skipped')
 );
 
+comment on column public.play_sessions.client_id is
+  'The pet''s parent, copied from the booking by the database on every write (play_sessions_fill_client). Siblings may share a yard; different parents may not.';
 comment on table public.play_sessions is
-  'A slot when one pet has a yard to itself. The schedule is planned by planPlaySessions in src/lib/core/play-schedule.ts; the constraints here make overlap impossible whatever the app does.';
+  'A slot when one pet, or siblings of one parent together, have a yard to themselves. The schedule is planned by planPlaySessions in src/lib/core/play-schedule.ts; the constraints here make overlap impossible whatever the app does.';
 comment on column public.play_sessions.starts_at is 'Local clock time at the kennel.';
 
 create index play_sessions_org_date_idx on public.play_sessions (org_id, session_date, starts_at);
@@ -206,6 +209,26 @@ create trigger play_sessions_set_updated_at
 create trigger play_sessions_stamp_done
   before insert or update on public.play_sessions
   for each row execute function public.stamp_done();
+
+-- The parent comes from the booking on every write, so the app can never send
+-- the wrong one. Merging two parents touches the sessions to bring it up to date.
+create function public.play_sessions_fill_client()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  select b.client_id into new.client_id
+  from public.bookings b
+  where b.org_id = new.org_id and b.id = new.booking_id;
+  return new;
+end;
+$$;
+comment on function public.play_sessions_fill_client() is 'Trigger: copies the parent of a play session''s booking onto the session, whatever was sent.';
+
+create trigger play_sessions_fill_client
+  before insert or update on public.play_sessions
+  for each row execute function public.play_sessions_fill_client();
 
 -- ---------------------------------------------------------------------------
 -- Updates for parents and incidents
@@ -285,3 +308,33 @@ create trigger incidents_stamp_actor
 create trigger incidents_stamp_notified
   before insert or update on public.incidents
   for each row execute function public.stamp_when_set('parent_notified_at', 'parent_notified_by');
+
+-- What an incident says is a record the kennel may need later, so once it is
+-- written only an owner or manager corrects it (the history of changes keeps
+-- what it said before). Anyone may still mark the parent told or the incident
+-- dealt with. With no signed-in user (the database's own work) it is let through.
+create function public.incidents_guard_content()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null
+     or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+  then
+    return new;
+  end if;
+  if (new.category, new.severity, new.description, new.action_taken, new.vet_visited, new.occurred_at, new.pet_id, new.booking_id)
+     is distinct from (old.category, old.severity, old.description, old.action_taken, old.vet_visited, old.occurred_at, old.pet_id, old.booking_id)
+  then
+    raise exception 'WB080: only an owner or manager can change what an incident says' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.incidents_guard_content() is
+  'Trigger: once written, an incident''s account (what, how serious, what was done, vet, when, which pet and stay) is changed only by an owner or manager (WB080). Anyone may mark the parent told or the incident dealt with.';
+
+create trigger incidents_guard_content
+  before update on public.incidents
+  for each row execute function public.incidents_guard_content();

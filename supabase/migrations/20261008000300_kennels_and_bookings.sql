@@ -17,7 +17,7 @@ create table public.kennels (
 );
 
 comment on table public.kennels is
-  'A place one pet stays: a kennel, room, run or suite. The number of active kennels is the organisation''s capacity.';
+  'A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets of one parent sharing it. The number of active kennels is the organisation''s capacity.';
 comment on column public.kennels.name is 'Short label painted on the door, e.g. K07 or "Suite 2".';
 comment on column public.kennels.zone is 'Optional grouping such as a block or wing, for sorting the board.';
 comment on column public.kennels.is_active is 'False takes the kennel out of service (repairs, deep cleaning) and out of the capacity count.';
@@ -41,12 +41,14 @@ create table public.services (
   price_minor bigint not null check (price_minor >= 0),
   tax_rate_bp integer check (tax_rate_bp is null or tax_rate_bp between 0 and 10000),
   sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
+  shared_price_minor bigint check (shared_price_minor is null or shared_price_minor >= 0),
   is_default boolean not null default false,
   is_active boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (org_id, id)
+  unique (org_id, id),
+  constraint services_shared_price_only_for_stays check (shared_price_minor is null or kind <> 'addon')
 );
 
 comment on table public.services is
@@ -54,6 +56,8 @@ comment on table public.services is
 comment on column public.services.unit is 'What one quantity means: night for boarding, day for day boarding, each or hour for add-ons.';
 comment on column public.services.tax_rate_bp is 'Tax rate for this service in basis points. Empty means use the organisation default.';
 comment on column public.services.sac_code is 'Services Accounting Code printed on Indian tax invoices. The kennel''s accountant decides the code.';
+comment on column public.services.shared_price_minor is
+  'Boarding and day boarding only: the price per night or day for the second pet sharing a kennel with a pet of the same parent, set by the kennel. Empty: the second pet pays the usual price.';
 comment on column public.services.is_default is 'The service pre-selected for new bookings of its kind. At most one per kind.';
 
 create unique index services_one_default_per_kind on public.services (org_id, kind) where is_default and is_active;
@@ -167,11 +171,14 @@ create table public.bookings (
   constraint bookings_boarding_has_a_night check (kind <> 'boarding' or end_date > start_date),
   constraint bookings_at_most_a_year check (end_date - start_date <= 366),
 
-  -- THE double-booking guard. Two bookings that hold space can never overlap
-  -- in the same kennel. See stay_range() for exactly which days a stay holds.
+  -- THE double-booking guard. Two bookings of different parents that hold
+  -- space can never overlap in the same kennel. Pets of one parent may share
+  -- a kennel, two at most (bookings_check_capacity counts them). See
+  -- stay_range() for exactly which days a stay holds.
   constraint bookings_no_kennel_overlap exclude using gist (
     kennel_id with =,
-    public.stay_range(kind, start_date, end_date) with &&
+    public.stay_range(kind, start_date, end_date) with &&,
+    client_id with <>
   ) where (kennel_id is not null and status in ('confirmed', 'checked_in')),
 
   -- The same pet cannot be booked twice for the same days.
@@ -182,10 +189,10 @@ create table public.bookings (
 );
 
 comment on table public.bookings is
-  'One pet''s stay: overnight boarding or day boarding. Siblings staying together are separate bookings sharing a group_id.';
+  'One pet''s stay: overnight boarding or day boarding. Siblings booked together are separate bookings sharing a group_id; they may share a kennel and are billed together.';
 comment on column public.bookings.start_date is 'Check-in date (calendar date at the kennel).';
 comment on column public.bookings.end_date is 'Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date).';
-comment on column public.bookings.kennel_id is 'The kennel assigned. May stay empty until check-in; capacity is still checked.';
+comment on column public.bookings.kennel_id is 'The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel).';
 comment on column public.bookings.rate_minor is 'Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history.';
 comment on column public.bookings.discount_minor is 'Discount on the stay itself, before tax.';
 comment on column public.bookings.tax_rate_bp is 'Tax rate for the stay, copied when booked.';
@@ -196,7 +203,7 @@ comment on column public.bookings.vaccinations_checked_at is
   'When a staff member confirmed at check-in that they had seen the pet''s vaccination certificates. Stamped by the database.';
 comment on column public.bookings.vaccinations_checked_by is 'Who confirmed the vaccinations at check-in. Stamped by the database.';
 comment on column public.bookings.source is 'staff: entered by the kennel. intake: started from the public intake form.';
-comment on column public.bookings.group_id is 'Shared by bookings made together, e.g. two dogs from one family.';
+comment on column public.bookings.group_id is 'Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill.';
 comment on column public.bookings.public_token is 'Secret in the parent''s stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else.';
 
 create index bookings_org_dates_idx on public.bookings (org_id, start_date, end_date);
@@ -300,7 +307,10 @@ begin
     return new;
   end if;
 
-  -- A new booking by staff must be priced exactly as the price list says.
+  -- A new booking by staff must be priced exactly as the price list says: the
+  -- usual price, or the shared kennel price for a pet put in a kennel with
+  -- another pet of its parent (bookings_check_shared_price checks the sharing
+  -- once the whole statement is in, because a family is inserted together).
   if new.discount_minor <> 0 or not exists (
     select 1
     from public.services s
@@ -308,7 +318,7 @@ begin
     where s.org_id = new.org_id
       and s.is_active
       and s.kind::text = new.kind::text
-      and s.price_minor = new.rate_minor
+      and (s.price_minor = new.rate_minor or (new.kennel_id is not null and s.shared_price_minor = new.rate_minor))
       and new.tax_rate_bp = case when o.tax_mode = 'none' then 0 else coalesce(s.tax_rate_bp, o.default_tax_rate_bp) end
       and new.sac_code is not distinct from s.sac_code
   ) then
@@ -318,20 +328,69 @@ begin
 end;
 $$;
 comment on function public.bookings_guard_price() is
-  'Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list, with no discount, and cannot change the price, discount, tax or kind of an existing booking.';
+  'Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel), with no discount, and cannot change the price, discount, tax or kind of an existing booking.';
 
 create trigger bookings_guard_price
   before insert or update on public.bookings
   for each row execute function public.bookings_guard_price();
 
+-- The other half of the staff price rule. A staff booking at the shared
+-- kennel price (and not at the usual price) must really share its kennel with
+-- another pet of the same parent on its days. Runs after the statement's rows
+-- are all in, so the two pets of a family booked together see each other.
+create function public.bookings_check_shared_price()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null
+     or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+     or exists (
+       select 1 from public.services s
+       where s.org_id = new.org_id and s.is_active and s.kind::text = new.kind::text and s.price_minor = new.rate_minor
+     )
+  then
+    return null;
+  end if;
+  if new.kennel_id is null or not exists (
+    select 1 from public.bookings b
+    where b.org_id = new.org_id
+      and b.id <> new.id
+      and b.client_id = new.client_id
+      and b.kennel_id = new.kennel_id
+      and b.status in ('requested', 'confirmed', 'checked_in')
+      and public.stay_range(b.kind, b.start_date, b.end_date) && public.stay_range(new.kind, new.start_date, new.end_date)
+  ) then
+    raise exception 'WB023: only an owner or manager can book at a price that is not on your price list' using errcode = '42501';
+  end if;
+  return null;
+end;
+$$;
+comment on function public.bookings_check_shared_price() is
+  'Trigger: a new booking made by staff at the shared kennel price must share its kennel with another pet of the same parent on overlapping days (WB023 otherwise).';
+
+create trigger bookings_check_shared_price
+  after insert on public.bookings
+  for each row execute function public.bookings_check_shared_price();
+
 -- Bookings made together (a family of pets) belong to one parent, so they can
--- be shown, confirmed and billed together.
+-- be shown, confirmed and billed together. The family is fixed when it is
+-- booked: a pet moved into or out of it could be billed twice, or not at all.
 create function public.bookings_check_group()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
+  if tg_op = 'UPDATE' and new.group_id is distinct from old.group_id then
+    raise exception 'WB026: a pet cannot be moved into or out of a family booking. Book it on its own instead.' using errcode = '23514';
+  end if;
+  -- Merging two parents moves every pet and booking one at a time, so a
+  -- family is briefly split between the two; merge_clients() keeps them together.
+  if coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    return new;
+  end if;
   if new.group_id is not null and exists (
     select 1 from public.bookings b
     where b.org_id = new.org_id and b.group_id = new.group_id and b.client_id <> new.client_id
@@ -341,15 +400,17 @@ begin
   return new;
 end;
 $$;
-comment on function public.bookings_check_group() is 'Trigger: every booking sharing a group_id has the same client.';
+comment on function public.bookings_check_group() is 'Trigger: every booking sharing a group_id has the same client (WB024), and a booking''s group_id never changes (WB026).';
 
 create trigger bookings_check_group
   before insert or update of group_id, client_id on public.bookings
   for each row execute function public.bookings_check_group();
 
--- Capacity guard. The kennel-overlap constraint above only protects bookings
--- that already have a kennel. This protects the house as a whole: more pets
--- than active kennels on any day is refused, kennel assigned or not.
+-- Capacity guard. The kennel-overlap constraint above keeps different parents
+-- apart. This adds the two counts it cannot: at most two pets in a kennel, and
+-- for the house as a whole, no more kennels in use than active kennels on any
+-- day. Two pets sharing a kennel use one kennel; a pet with no kennel yet will
+-- need one of its own.
 create function public.bookings_check_capacity()
 returns trigger
 language plpgsql
@@ -378,6 +439,30 @@ begin
   -- bookings for the last free kennel cannot both pass.
   perform pg_advisory_xact_lock(hashtextextended(new.org_id::text, 0));
 
+  -- Two pets of one parent may share a kennel; never three. Checked even when
+  -- overbooking is allowed, because it is about the kennel, not the house.
+  if new.kennel_id is not null then
+    select d.day::date, count(*)
+      into v_day, v_count
+    from generate_series(
+           lower(public.stay_range(new.kind, new.start_date, new.end_date))::timestamp,
+           (upper(public.stay_range(new.kind, new.start_date, new.end_date)) - 1)::timestamp,
+           interval '1 day'
+         ) as d (day)
+    join public.bookings b
+      on b.org_id = new.org_id
+     and b.kennel_id = new.kennel_id
+     and b.status in ('confirmed', 'checked_in')
+     and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date
+    group by d.day
+    having count(*) > 2
+    order by d.day
+    limit 1;
+    if v_day is not null then
+      raise exception 'WB027: a kennel holds two pets at most, both of one parent' using errcode = '23P01';
+    end if;
+  end if;
+
   select o.allow_overbooking into v_allow from public.organizations o where o.id = new.org_id;
   if v_allow then
     return null;
@@ -389,7 +474,7 @@ begin
     return null;
   end if;
 
-  select d.day::date, count(*)
+  select d.day::date, count(distinct coalesce(b.kennel_id, b.id))
     into v_day, v_count
   from generate_series(
          lower(public.stay_range(new.kind, new.start_date, new.end_date))::timestamp,
@@ -401,7 +486,7 @@ begin
    and b.status in ('confirmed', 'checked_in')
    and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date
   group by d.day
-  having count(*) > v_capacity
+  having count(distinct coalesce(b.kennel_id, b.id)) > v_capacity
   order by d.day
   limit 1;
 
@@ -413,7 +498,7 @@ begin
 end;
 $$;
 comment on function public.bookings_check_capacity() is
-  'Trigger: refuses a booking that would put more pets in house than there are active kennels on any day of the stay, and refuses a kennel that is out of service.';
+  'Trigger: refuses a kennel that is out of service (WB021), a third pet in one kennel (WB027), and a booking that would need more kennels than are active on any day of the stay (WB020; two pets sharing a kennel need one).';
 
 create trigger bookings_check_capacity
   after insert or update of status, start_date, end_date, kind, kennel_id on public.bookings
@@ -509,26 +594,42 @@ create trigger booking_items_guard_price
 -- ---------------------------------------------------------------------------
 
 create function public.occupancy_by_day(p_org uuid, p_from date, p_to date)
-returns table (day date, occupied integer, capacity integer)
+returns table (day date, occupied integer, capacity integer, pets integer)
 language sql
 stable
 set search_path = ''
 as $$
   select
     d.day::date,
-    (select count(*)::integer
+    -- Kennels in use: two pets sharing one count once; a pet with no kennel yet will need one.
+    (select count(distinct coalesce(b.kennel_id, b.id))::integer
        from public.bookings b
       where b.org_id = p_org
         and b.status in ('confirmed', 'checked_in')
         and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date),
-    (select count(*)::integer from public.kennels k where k.org_id = p_org and k.is_active)
+    (select count(*)::integer from public.kennels k where k.org_id = p_org and k.is_active),
+    (select count(*)::integer
+       from public.bookings b
+      where b.org_id = p_org
+        and b.status in ('confirmed', 'checked_in')
+        and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date)
   from generate_series(p_from::timestamp, p_to::timestamp, interval '1 day') as d (day)
   where p_to >= p_from and p_to - p_from <= 400;
 $$;
 comment on function public.occupancy_by_day(uuid, date, date) is
-  'Pets in house and total kennels for each day in a range (at most 400 days). Powers the occupancy calendar.';
+  'For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.';
 
-create function public.available_kennels(p_org uuid, p_kind public.booking_kind, p_start date, p_end date)
+-- A kennel is offered for a stay when, on every day of the stay, nobody else
+-- holds it, or (when p_client is given) only that parent's pets hold it and
+-- there is still room for p_pets more of them.
+create function public.available_kennels(
+  p_org uuid,
+  p_kind public.booking_kind,
+  p_start date,
+  p_end date,
+  p_client uuid default null,
+  p_pets integer default 1
+)
 returns setof public.kennels
 language sql
 stable
@@ -538,6 +639,7 @@ as $$
   from public.kennels k
   where k.org_id = p_org
     and k.is_active
+    and p_pets between 1 and 2
     and not exists (
       select 1
       from public.bookings b
@@ -545,11 +647,27 @@ as $$
         and b.kennel_id = k.id
         and b.status in ('confirmed', 'checked_in')
         and public.stay_range(b.kind, b.start_date, b.end_date) && public.stay_range(p_kind, p_start, p_end)
+        and b.client_id is distinct from p_client
+    )
+    and not exists (
+      select 1
+      from generate_series(
+             lower(public.stay_range(p_kind, p_start, p_end))::timestamp,
+             (upper(public.stay_range(p_kind, p_start, p_end)) - 1)::timestamp,
+             interval '1 day'
+           ) as d (day)
+      join public.bookings b
+        on b.org_id = p_org
+       and b.kennel_id = k.id
+       and b.status in ('confirmed', 'checked_in')
+       and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date
+      group by d.day
+      having count(*) + p_pets > 2
     )
   order by k.sort_order, k.name;
 $$;
-comment on function public.available_kennels(uuid, public.booking_kind, date, date) is
-  'Active kennels with no booking holding them at any point in the given stay. Used to offer kennels when booking or checking in.';
+comment on function public.available_kennels(uuid, public.booking_kind, date, date, uuid, integer) is
+  'Active kennels that can take p_pets more pets (1 or 2) for the whole of a stay: held by nobody, or, given a parent, held only by that parent''s pets with room to spare (a kennel holds two). Used to offer kennels when booking or checking in. Must agree with freeKennels() in src/lib/core/bookings.ts.';
 
 -- ---------------------------------------------------------------------------
 -- Hiding pets and parents from lists

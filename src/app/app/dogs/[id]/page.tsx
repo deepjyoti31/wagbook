@@ -157,6 +157,11 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
                       </SubmitButton>
                     </ActionForm>
                   ) : null}
+                  {canManage ? (
+                    <Link href={`/app/dogs/${pet.id}/incident?correct=${i.id}`} className={buttonStyles.quiet}>
+                      {m.pet.correctIncident}
+                    </Link>
+                  ) : null}
                 </div>
               </li>
             ))}

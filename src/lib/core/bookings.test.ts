@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeKennels, petMatches, stayFromForm, type KennelHold } from "./bookings";
+import { freeKennels, petMatches, sharedWith, stayFromForm, type KennelHold } from "./bookings";
 
 describe("the stay a booking form describes", () => {
   it("reads an empty check-out as one day of day boarding", () => {
@@ -42,6 +42,30 @@ describe("free kennels", () => {
   });
 });
 
+describe("free kennels for a family", () => {
+  const kennels = [{ id: "a" }, { id: "b" }];
+  const stay = { kind: "boarding", startDate: "2027-05-02", endDate: "2027-05-04" } as const;
+  const sibling: KennelHold = { kennelId: "a", kind: "boarding", startDate: "2027-05-01", endDate: "2027-05-05", clientId: "p1" };
+
+  it("offers a kennel a sibling holds while it has room for one more", () => {
+    expect(freeKennels(kennels, [sibling], stay, { clientId: "p1" }).map((k) => k.id)).toEqual(["a", "b"]);
+  });
+  it("never offers it to another parent, or when the parent is not known", () => {
+    expect(freeKennels(kennels, [sibling], stay, { clientId: "p2" }).map((k) => k.id)).toEqual(["b"]);
+    expect(freeKennels(kennels, [sibling], stay).map((k) => k.id)).toEqual(["b"]);
+  });
+  it("offers only empty kennels to two pets sharing", () => {
+    expect(freeKennels(kennels, [sibling], stay, { clientId: "p1", pets: 2 }).map((k) => k.id)).toEqual(["b"]);
+  });
+  it("never offers a kennel that already holds two on any day of the stay", () => {
+    const second: KennelHold = { ...sibling, startDate: "2027-05-03", endDate: "2027-05-04" };
+    expect(freeKennels(kennels, [sibling, second], stay, { clientId: "p1" }).map((k) => k.id)).toEqual(["b"]);
+    // Once the second has gone home on the 4th, there is room again from that day.
+    const later = { kind: "boarding", startDate: "2027-05-04", endDate: "2027-05-05" } as const;
+    expect(freeKennels(kennels, [sibling, second], later, { clientId: "p1" }).map((k) => k.id)).toEqual(["a", "b"]);
+  });
+});
+
 describe("finding a pet", () => {
   const bruno = { name: "Bruno", breed: "Indie", parentName: "Asha Rao", parentPhone: "+919876543210" };
   it("matches name, breed and parent, in any case and order", () => {
@@ -59,5 +83,18 @@ describe("finding a pet", () => {
     expect(petMatches(bruno, "  ")).toBe(true);
     expect(petMatches({ name: "Milo", breed: null, parentName: null, parentPhone: null }, "milo")).toBe(true);
     expect(petMatches({ name: "Milo", breed: null, parentName: null, parentPhone: null }, "987")).toBe(false);
+  });
+});
+
+describe("who a kennel would be shared with", () => {
+  const stay = { id: "me", clientId: "p1", kind: "boarding", startDate: "2027-05-02", endDate: "2027-05-04" } as const;
+  it("names the parent's other pets in kennels held on the stay's days, and nobody else", () => {
+    const holds = [
+      { id: "me", kennelId: "a", clientId: "p1", kind: "boarding", startDate: "2027-05-02", endDate: "2027-05-04", petName: "Me" },
+      { id: "b1", kennelId: "a", clientId: "p1", kind: "boarding", startDate: "2027-05-01", endDate: "2027-05-03", petName: "Bruno" },
+      { id: "b2", kennelId: "b", clientId: "p2", kind: "boarding", startDate: "2027-05-01", endDate: "2027-05-03", petName: "Stranger" },
+      { id: "b3", kennelId: "c", clientId: "p1", kind: "boarding", startDate: "2027-05-04", endDate: "2027-05-06", petName: "Later" },
+    ] as const;
+    expect([...sharedWith(stay, holds)]).toEqual([["a", ["Bruno"]]]);
   });
 });

@@ -40,7 +40,8 @@ export function OccupancyChart({
         <div className="flex h-full items-end gap-[2px] border-b border-rule">
           {days.map((d) => {
             const pets = d.boarding + d.dayBoarding;
-            const over = d.capacity > 0 && pets > d.capacity;
+            // Siblings sharing a kennel may make pets more than kennels; only kennels in use can overfill.
+            const over = d.capacity > 0 && (d.kennelsUsed ?? pets) > d.capacity;
             return (
               <div key={d.day} title={text(d)} className="flex h-full min-w-0 flex-1 items-end">
                 <div

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/messages/en";
+import { hi } from "@/messages/hi";
 import { describeEntry, fieldLabel, historyLink, HISTORY_TABLES, idsIn, valueText, type HistoryFormat, type HistoryWords } from "./history";
 
 const booking = "11111111-2222-4333-8444-555555555555";
@@ -17,6 +18,13 @@ describe("history in words", () => {
     expect(fieldLabel("rate_minor")).toBe("Rate");
     expect(fieldLabel("kennel_id")).toBe("Kennel");
     expect(fieldLabel("checked_in_at")).toBe("Checked in at");
+  });
+
+  it("names fields in the reader's language when the messages have them", () => {
+    expect(fieldLabel("end_date", en.history.log)).toBe("Check-out date");
+    expect(fieldLabel("end_date", hi.history.log)).toBe("चेक आउट की तारीख");
+    // A column with no name falls back to one made from it.
+    expect(fieldLabel("brand_new_column", en.history.log)).toBe("Brand new column");
   });
 
   it("shows money, rates, yes and no, lists and empty values as a person reads them", () => {
@@ -44,7 +52,7 @@ describe("history in words", () => {
     expect(d).toEqual({
       title: "Booking changed",
       fields: [
-        { label: "Rate", was: "Rs 1200.00", now: "Rs 1000.00" },
+        { label: "Price per night or day", was: "Rs 1200.00", now: "Rs 1000.00" },
         { label: "Notes", was: "empty", now: "Regular" },
       ],
     });
@@ -60,6 +68,7 @@ describe("history in words", () => {
   it("says it all in the words it is given", () => {
     // A made-up language: every word must come from the words passed in, none from the code.
     const words: HistoryWords = {
+      fields: Object.fromEntries(Object.keys(en.history.log.fields).map((f) => [f, `F:${f}`])) as HistoryWords["fields"],
       tables: Object.fromEntries(HISTORY_TABLES.map((t) => [t, `T:${t}`])) as HistoryWords["tables"],
       added: "+{what}",
       changed: "~{what}",
@@ -75,6 +84,7 @@ describe("history in words", () => {
     expect(valueText("is_active", true, w)).toBe("Y");
     expect(valueText("is_active", false, w)).toBe("N");
     expect(valueText("kennel_id", booking, w)).toBe("(gone)");
+    expect(describeEntry({ action: "update", table_name: "bookings", row_id: booking, old_data: { end_date: "2026-10-14" }, new_data: { end_date: "2026-10-15" } }, w).fields[0].label).toBe("F:end_date");
     expect(describeEntry({ action: "insert", table_name: "payments", row_id: booking, old_data: null, new_data: { note: null } }, w)).toEqual({ title: "+T:payments", fields: [] });
     expect(describeEntry({ action: "update", table_name: "invoices", row_id: booking, old_data: {}, new_data: {} }, w).title).toBe("~T:invoices");
     expect(describeEntry({ action: "delete", table_name: "memberships", row_id: booking, old_data: {}, new_data: null }, w).title).toBe("-T:memberships");

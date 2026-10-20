@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
 import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
@@ -24,7 +25,7 @@ export default function PlayPage() {
 }
 
 async function Play() {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const { m, language, locale } = await getAppI18n();
   const title = (
     <PageTitle title={m.play.title}>
@@ -86,11 +87,9 @@ async function Play() {
         <ActionForm action={planToday} className="w-full space-y-2">
           <SubmitButton pendingLabel={m.play.planning}>{live.length === 0 ? m.play.planToday : m.play.planRest}</SubmitButton>
         </ActionForm>
-        {canManage && sessions.data.some((s) => s.status === "pending") ? (
+        {canDelete && sessions.data.some((s) => s.status === "pending") ? (
           <ActionForm action={clearPlan} className="contents">
-            <SubmitButton variant="quiet" pendingLabel={m.play.clearing}>
-              {m.play.clear}
-            </SubmitButton>
+            <ConfirmStep label={m.play.clear} warning={m.play.clearWarning} confirm={m.play.yesClear} pending={m.play.clearing} />
           </ActionForm>
         ) : null}
       </div>

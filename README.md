@@ -6,7 +6,7 @@ Wagbook is for the person who runs a kennel with a notebook, a WhatsApp group an
 come up twenty times a day: who is arriving, who is in which kennel, has Bruno eaten, has this stay been paid for. It is
 built for India first (UPI, GST, WhatsApp, lakh and crore) and works anywhere.
 
-It is built by a kennel for its own daily use, so it has to work on a cheap phone, in a noisy yard, with one hand.
+It is built for daily use in a real kennel, so it has to work on a cheap phone, in a noisy yard, with one hand.
 
 > Status: every planned feature is built and tested, in a real browser at phone width against a local Supabase. It
 > has not yet run on a hosted Supabase project or on a real phone. Read [docs/HANDOFF.md](docs/HANDOFF.md) for exactly
@@ -14,9 +14,10 @@ It is built by a kennel for its own daily use, so it has to work on a cheap phon
 
 ## What it does
 
-- **Bookings** for boarding and day boarding. Two pets can never share a kennel on the same night, and a kennel never
-  takes more pets than it has kennels. The database enforces both, so no screen can get it wrong. Families, requests,
-  peak periods, a calendar.
+- **Bookings** for boarding and day boarding. Pets of different families never share a kennel, a kennel takes two pets
+  of one family at most, and the house never takes more than it has kennels. The database enforces all three, so no
+  screen can get it wrong. Families booked together (sharing a kennel at a price you set for the second pet, and paying
+  on one bill), requests, peak periods, a calendar.
 - **Today**: who arrives, who is in, who goes home, what care is still to do. Check-in with a checklist.
 - **The care round**: meals, medicines, cleaning and walks in one tap each, safe to tap twice, and kept on the phone
   when the connection drops. Solo play planned yard by yard.
@@ -41,7 +42,24 @@ It is built by a kennel for its own daily use, so it has to work on a cheap phon
 | Styling | Tailwind CSS 4 | Small, no component library to learn. |
 | Tests | Vitest, PGlite | The whole database is tested in-process. No Docker, no account. |
 
-## Run it
+## Try it on your own computer
+
+You need Node.js 22 or newer and Docker. This runs Wagbook with a local Supabase and an invented demo kennel:
+
+```bash
+git clone https://github.com/deepjyoti31/wagbook.git && cd wagbook
+npm install
+npx -y supabase@2.120.0 start   # the database, sign-in and files, with the demo kennel loaded
+npm run setup:local             # writes .env.local for the local Supabase
+npm run dev                     # http://localhost:3000
+```
+
+Sign in as `owner@demo.wagbook.test`, `manager@demo.wagbook.test` or `staff@demo.wagbook.test`, with the password
+`wagbook-demo`, to see it as each role. Emails the app sends (sign-up, invitations) land in the local mailbox at
+http://127.0.0.1:54324. `npx -y supabase@2.120.0 stop` stops the database; `npx -y supabase@2.120.0 db reset` puts the
+demo kennel back as it was.
+
+## Run it for a kennel
 
 You need Node.js 22 or newer and a free Supabase project. The full walk-through, with every click, is
 [docs/10-setup-and-deploy.md](docs/10-setup-and-deploy.md); to run everything on your own server with Docker, see

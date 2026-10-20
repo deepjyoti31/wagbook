@@ -219,10 +219,10 @@ describe("certificates sent with the intake form", () => {
   let folder: string;
   let token: string;
 
-  const form = (pets: { name: string; vaccine?: string }[]) => ({
+  const form = (pets: { name: string; vaccine?: string | string[] }[]) => ({
     v: 1,
     parent: { name: "Pia Parent", phone: `+9197${String(Date.now()).slice(-8)}` },
-    pets: pets.map((p) => ({ name: p.name, vaccinations: p.vaccine ? [{ vaccine: p.vaccine, given_on: null, valid_until: "2027-01-01" }] : [] })),
+    pets: pets.map((p) => ({ name: p.name, vaccinations: [p.vaccine ?? []].flat().map((vaccine) => ({ vaccine, given_on: null, valid_until: "2027-01-01" })) })),
     stay: {},
     consent: true,
   });
@@ -246,13 +246,15 @@ describe("certificates sent with the intake form", () => {
   beforeAll(async () => {
     k = await seedKennel(db);
     await as(db, user(k.owner), () => db.query("update public.organizations set intake_enabled = true where id = $1", [k.org]));
-    ({ folder, upload_token: token } = await submit(form([{ name: "Rex", vaccine: "rabies" }, { name: "Mia" }])));
+    ({ folder, upload_token: token } = await submit(form([{ name: "Rex", vaccine: ["rabies", "DHPPi"] }, { name: "Mia" }])));
   });
 
-  it("lets whoever sent the form add one file per pet on it", async () => {
+  it("lets whoever sent the form add a file for each of a pet's two vaccines", async () => {
     await upload(`${folder}/pet-1`);
+    await upload(`${folder}/pet-1-2`);
     await upload(`${folder}/pet-2`);
     expect(await refused(`${folder}/pet-1`)).toMatch(/duplicate key|unique/);
+    expect(await refused(`${folder}/pet-1-3`)).toMatch(/row-level security/);
   });
 
   it("refuses everyone else, and every other name", async () => {
@@ -276,7 +278,7 @@ describe("certificates sent with the intake form", () => {
     } finally {
       await db.query("select set_config('request.headers', '', false)");
     }
-    expect(Number((await db.query<{ n: string }>("select count(*) as n from storage.objects where name like $1", [`${folder}/%`])).rows[0].n)).toBe(2);
+    expect(Number((await db.query<{ n: string }>("select count(*) as n from storage.objects where name like $1", [`${folder}/%`])).rows[0].n)).toBe(3);
   });
 
   it("closes an hour after the form was sent, or once staff have dealt with it", async () => {
@@ -289,19 +291,22 @@ describe("certificates sent with the intake form", () => {
     expect(await refused(`${declined.folder}/pet-1`, declined.upload_token)).toMatch(/row-level security/);
   });
 
-  it("puts the certificate on the pet's vaccinations when the form is accepted", async () => {
+  it("puts each certificate on its vaccine when the form is accepted", async () => {
     const id = folder.split("/").pop();
     await as(db, user(k.owner), () => db.query("select public.accept_intake($1)", [id]));
     const rows = (await db.query<{ certificate_path: string; name: string }>(
-      "select v.certificate_path, p.name from public.vaccinations v join public.pets p on p.id = v.pet_id where v.org_id = $1", [k.org],
+      "select v.certificate_path, p.name, v.vaccine from public.vaccinations v join public.pets p on p.id = v.pet_id where v.org_id = $1 order by v.vaccine desc", [k.org],
     )).rows;
-    expect(rows).toEqual([{ certificate_path: `${folder}/pet-1`, name: "Rex" }]);
+    expect(rows).toEqual([
+      { certificate_path: `${folder}/pet-1`, name: "Rex", vaccine: "rabies" },
+      { certificate_path: `${folder}/pet-1-2`, name: "Rex", vaccine: "DHPPi" },
+    ]);
   });
 
   it("lets the kennel's staff see the files, and nobody else", async () => {
     const staff = await addMember(db, k, "staff");
     const other = await createUser(db, "stranger-mfa@example.test");
-    expect(await count(user(staff), "select count(*) as n from storage.objects where name like $1", [`${folder}/%`])).toBe(2);
+    expect(await count(user(staff), "select count(*) as n from storage.objects where name like $1", [`${folder}/%`])).toBe(3);
     expect(await count(user(other), "select count(*) as n from storage.objects where name like $1", [`${folder}/%`])).toBe(0);
   });
 });

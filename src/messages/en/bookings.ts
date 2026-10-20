@@ -40,6 +40,10 @@ export const bookingsArea = {
     sendConfirmation: "Send confirmation",
     openIt: "Open it",
     bookedTogetherTitle: "Booked together",
+    // A kennel offered for sharing: {kennel} is its name, {pets} the names of the pets of the same parent already in it.
+    kennelWith: "{kennel}, with {pets}",
+    // On a booking whose kennel holds a sibling too.
+    sharesWith: "Shares {kennel} with {pets}.",
     costs: {
       title: "What it costs",
       // {what} is "Boarding", "Day boarding" or the name of an extra.
@@ -75,6 +79,9 @@ export const bookingsArea = {
       noneYet: "No bill yet. Make it at check-out, or now if the parent pays in advance.",
       make: "Make bill",
       making: "Making the bill",
+      // For pets booked together, after goneHome or noneYet.
+      familyNote: "The pets booked together share one bill.",
+      makeFamily: "Make the family bill",
     },
     // Money taken before the bill. {method} is UPI, Cash and so on; {reference} is what was typed, like a UTR.
     payment: {
@@ -171,6 +178,8 @@ export const bookingsArea = {
       choosePet: "Choose a pet.",
       atMostSix: "Book at most six pets together.",
       sameParent: "Only pets of the same parent can be booked together.",
+      shareTwo: "Only two pets can share a kennel. Choose two pets, or a kennel each.",
+      shareKennel: "Choose the kennel the two pets will share.",
       priceNumber: "Enter the price as a number, like 1200 or 1200.50.",
       priceWhole: "Enter the price as a number, like 1200.",
       discountNumber: "Enter the discount as a number, like 200, or leave it empty.",
@@ -200,7 +209,6 @@ export const bookingsArea = {
       extraOrDescribe: "Choose an extra from the list, or describe a one-off item.",
       descriptionLong: "Keep the description under 200 characters.",
       itemPrice: "Enter the price of the item, like 500.",
-      removeExtra: "Only an owner or manager can remove an extra.",
       extraNotFound: "That extra could not be found.",
     },
     saved: "Booking saved.",
@@ -225,6 +233,14 @@ export const bookingsArea = {
     decideAtCheckIn: "Decide at check-in",
     // Before kennelHint, when the dates make some kennels taken.
     kennelsTaken: "Kennels taken on these dates are left out.",
+    // When two pets of one parent are chosen.
+    kennels: "Kennels",
+    kennelEach: "A kennel each",
+    kennelTogether: "One kennel together",
+    chooseKennel: "Choose a kennel",
+    shareHint: "Both pets stay in the kennel you choose.",
+    // {price} is the shared kennel price from Settings, like "₹900".
+    sharedPriceNote: "The second pet is at your shared kennel price, {price}.",
     price: "Price",
     // The usual prices, put into {usual} in the sentences below.
     usualBoarding: "{boarding} a night",
@@ -271,6 +287,8 @@ export const bookingsArea = {
     region: "Kennels by day",
     kennel: "Kennel",
     inHouse: "In house",
+    // Under the kennels in use on a day when siblings share; {n} is always two or more.
+    petsShort: "{n} pets",
     pet: "Pet",
     // For screen readers on an empty square. {day} is a short date like "14 Apr".
     bookFrom: "Book {kennel} from {day}",

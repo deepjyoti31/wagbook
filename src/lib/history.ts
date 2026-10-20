@@ -5,8 +5,8 @@ import { fill } from "./i18n";
  * The audit log, in words a manager can read: who added, changed or removed
  * what, and for a change, each field as it was and as it is now.
  * Pure, so it is unit tested (history.test.ts). The words come in with the
- * format (m.history.log), in the reader's language. Field names are made from
- * the column names and stay in English.
+ * format (m.history.log), in the reader's language, field names included
+ * (m.history.log.fields); a column with no name there is named from itself.
  */
 
 /** The words inside each change: m.history.log. */
@@ -49,10 +49,16 @@ export interface HistoryField {
   now: string | null;
 }
 
-/** "tax_rate_bp" becomes "Tax rate", "checked_in_at" becomes "Checked in at". */
-export function fieldLabel(key: string): string {
-  const words = key.replace(/_(minor|bp)$/, "").replace(/_id$/, "").replace(/_/g, " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
+/**
+ * A field's name in the reader's language: "end_date" is "Check-out date". A
+ * column with no name in the messages is named from itself: "tax_rate_bp"
+ * becomes "Tax rate".
+ */
+export function fieldLabel(key: string, words?: Pick<HistoryWords, "fields">): string {
+  const named = words ? (words.fields as Record<string, string>)[key] : undefined;
+  if (named) return named;
+  const plain = key.replace(/_(minor|bp)$/, "").replace(/_id$/, "").replace(/_/g, " ");
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
 }
 
 /** How to show money, moments and the records an id points at, and the words to use. */
@@ -98,7 +104,7 @@ export function describeEntry(entry: HistoryEntry, fmt: HistoryFormat): { title:
   const keys = [...new Set([...Object.keys(entry.action === "delete" ? was : now), ...Object.keys(was)])].filter((k) => !HIDDEN.has(k));
   const fields = keys
     .map((key) => ({
-      label: fieldLabel(key),
+      label: fieldLabel(key, w),
       was: entry.action === "insert" ? null : valueText(key, was[key], fmt),
       now: entry.action === "delete" ? null : valueText(key, now[key], fmt),
     }))

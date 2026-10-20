@@ -1,6 +1,6 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, book, seedKennel, type Kennel } from "./fixtures";
+import { addMember, book, seedKennel, strangerPet, type Kennel } from "./fixtures";
 import { anon, as, createTestDb, errorOf, user } from "./harness";
 
 let db: PGlite;
@@ -80,8 +80,9 @@ describe("play hours", () => {
   });
 
   it("lets staff move a session, and refuses a move onto another pet's slot", async () => {
+    const other = await strangerPet(db, k);
     const b1 = await book(db, k, { pet: k.pets[0], start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
-    const b2 = await book(db, k, { pet: k.pets[1], start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
+    const b2 = await book(db, k, { pet: other, start: "2027-05-14", end: "2027-05-17", status: "checked_in" });
     const yard = await as(db, user(k.owner), async () => (await db.query<{ id: string }>("insert into public.play_yards (org_id, name) values ($1, 'Yard A') returning id", [k.org])).rows[0].id);
     const add = (booking: string, pet: string, at: string) =>
       as(db, user(staff), async () =>
@@ -91,10 +92,28 @@ describe("play hours", () => {
         )).rows[0].id,
       );
     await add(b1, k.pets[0], "08:00");
-    const s2 = await add(b2, k.pets[1], "08:20");
+    const s2 = await add(b2, other, "08:20");
     expect((await errorOf(() => as(db, user(staff), () => db.query("update public.play_sessions set starts_at = '08:10' where id = $1", [s2])))).message).toContain(
       "play_sessions_one_pet_per_yard",
     );
     await as(db, user(staff), () => db.query("update public.play_sessions set starts_at = '09:00' where id = $1", [s2]));
+  });
+});
+
+describe("incidents", () => {
+  it("are corrected only by owners and managers once written, while anyone marks them told or dealt with", async () => {
+    const k = await seedKennel(db, { kennels: 1, pets: 1 });
+    const staff = await addMember(db, k, "staff");
+    const manager = await addMember(db, k, "manager");
+    const id = await as(db, user(staff), async () =>
+      (await db.query<{ id: string }>("insert into public.incidents (org_id, pet_id, category, severity, description) values ($1, $2, 'injury', 'low', 'Limping') returning id", [k.org, k.pets[0]])).rows[0].id,
+    );
+    const asStaff = (q: string) => as(db, user(staff), () => db.query(q, [id]));
+    expect((await errorOf(() => asStaff("update public.incidents set description = 'Nothing happened' where id = $1"))).message).toContain("WB080");
+    expect((await errorOf(() => asStaff("update public.incidents set severity = 'high' where id = $1"))).message).toContain("WB080");
+    await asStaff("update public.incidents set parent_notified_at = now(), resolved_at = now() where id = $1");
+    await as(db, user(manager), () => db.query("update public.incidents set description = 'Limping on the left front leg', severity = 'medium' where id = $1", [id]));
+    const row = await db.query<{ description: string; severity: string }>("select description, severity from public.incidents where id = $1", [id]);
+    expect(row.rows[0]).toEqual({ description: "Limping on the left front leg", severity: "medium" });
   });
 });

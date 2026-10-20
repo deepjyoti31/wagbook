@@ -6,12 +6,12 @@ import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
-import { addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, todayIn, vaccinationWarnings, whatsappLink } from "@/lib/core";
+import { addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, sharedWith, todayIn, vaccinationWarnings, whatsappLink } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, type I18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
-import { bookingCards, type BookingCard } from "@/lib/queries";
+import { bookingCards, familyHolds, type BookingCard } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
 import { extendToToday } from "./bookings/actions";
@@ -82,13 +82,25 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     return { kind, done: mine.filter((t) => t.status === "done").length, total: mine.length };
   }).filter((c) => c.total > 0);
 
-  // Kennels free for each arrival's whole stay.
-  const freeKennels = await Promise.all(
-    arrivals.map(async (b) => {
-      const { data } = await supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date });
-      return (data ?? []).map((k) => ({ id: k.id, name: k.name }));
-    }),
-  );
+  // Kennels free for each arrival's whole stay, including one a sibling is in with room to share.
+  const [freeKennels, siblingHolds] = await Promise.all([
+    Promise.all(
+      arrivals.map(async (b) => {
+        const { data } = await supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date, p_client: b.clients?.id });
+        return (data ?? []).map((k) => ({ id: k.id, name: k.name }));
+      }),
+    ),
+    arrivals.length > 0
+      ? familyHolds(supabase, org.id, [...new Set(arrivals.flatMap((b) => (b.clients ? [b.clients.id] : [])))], today, addDays(today, 400))
+      : Promise.resolve({ data: [] }),
+  ]);
+  const holds = (siblingHolds.data ?? []).map((h) => ({
+    id: h.id, kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date, petName: h.pets?.name ?? m.booking.pet,
+  }));
+  const kennelLabel = (b: BookingCard, k: { id: string; name: string }) => {
+    const names = b.clients ? sharedWith({ id: b.id, clientId: b.clients.id, kind: b.kind, startDate: b.start_date, endDate: b.end_date }, holds).get(k.id) : undefined;
+    return names ? fill(m.booking.kennelWith, { kennel: k.name, pets: names.join(", ") }) : k.name;
+  };
 
   return (
     <>
@@ -193,12 +205,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                     <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
                     <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
                       <option value="">{m.today.noKennelYet}</option>
-                      {b.kennels ? <option value={b.kennels.id}>{b.kennels.name}</option> : null}
+                      {b.kennels ? <option value={b.kennels.id}>{kennelLabel(b, b.kennels)}</option> : null}
                       {freeKennels[i]
                         .filter((k) => k.id !== b.kennel_id)
                         .map((k) => (
                           <option key={k.id} value={k.id}>
-                            {k.name}
+                            {kennelLabel(b, k)}
                           </option>
                         ))}
                     </Select>

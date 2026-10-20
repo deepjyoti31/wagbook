@@ -12,6 +12,10 @@ The first release will be 0.1.0. Everything below is in it.
 
 - Bookings for boarding and day boarding, with no double booking and no overfilling, enforced by the database.
   Families booked together, requests, peak periods, a calendar, extras and prices.
+- Only an owner can delete anything (an expense with its receipt, a draft bill, an extra, a person, a parent's
+  details), and every deletion asks "Yes, delete it" first.
+- Two pets of one parent can share a kennel, the second at a shared kennel price you set; never three, and never pets
+  of different parents. Pets booked together are billed together on one bill, and siblings play together.
 - Today: arrivals, pets in house, check-outs, overstays, incidents to deal with. Check-in with a checklist.
 - The care round (meals, medicines, walks) in one tap, safe to tap twice, and ticks made offline sent later. Solo play
   planned yard by yard.
@@ -30,7 +34,9 @@ The first release will be 0.1.0. Everything below is in it.
 - Limits on how often one address may sign in or send forms, and a Content Security Policy with a fresh nonce for
   every page.
 - Running it on your own server with Docker Compose, Caddy and Supabase's self-hosting setup
-  ([docs/14-self-hosting.md](docs/14-self-hosting.md)), and a public demo that resets every night.
+  ([docs/14-self-hosting.md](docs/14-self-hosting.md)).
+- Trying it on your own computer with a local Supabase and an invented kennel: `npm run setup:local` (see the
+  README).
 - A backup and restore drill ([docs/15-backup-and-restore.md](docs/15-backup-and-restore.md)).
 
 ### Database changes

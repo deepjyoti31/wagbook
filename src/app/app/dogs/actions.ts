@@ -224,6 +224,37 @@ export async function addIncident(_state: FormState, form: FormData): Promise<Fo
   redirect(`/app/dogs/${petId.data}?done=incident`);
 }
 
+/**
+ * Correct what an incident says. Owners and managers: the database refuses
+ * anyone else (WB080), and the history of changes keeps what it said before.
+ */
+export async function correctIncident(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.errors.codes.WB080 };
+  const id = Id.safeParse(form.get("incidentId"));
+  if (!id.success) return { error: t.m.incident.errors.notFound };
+  const parsed = incident(t.m).safeParse({
+    category: form.get("category"),
+    severity: form.get("severity"),
+    description: text(form, "description") ?? "",
+    actionTaken: text(form, "actionTaken"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const i = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("incidents")
+    .update({ category: i.category, severity: i.severity, description: i.description, action_taken: i.actionTaken, vet_visited: checked(form, "vetVisited") })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .select("pet_id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.incident.errors.notFound };
+  revalidatePath("/app", "layout");
+  redirect(`/app/dogs/${data[0].pet_id}?done=corrected`);
+}
+
 /** Mark that the parent was told, or that the incident is over. */
 export async function updateIncident(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();

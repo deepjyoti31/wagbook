@@ -7,6 +7,7 @@ import { requireOrg } from "@/lib/auth";
 import { formatDate, isISODate, parseMoney, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
+import { searchPets, type PetChoice } from "@/lib/pet-search";
 import { fill } from "@/lib/i18n";
 import { getAppI18n, type I18n } from "@/lib/i18n-server";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
@@ -49,8 +50,10 @@ function typedMoney(form: FormData, name: string): number | null | undefined {
 /**
  * Book one pet, or several pets of one parent together. Several pets share a
  * group_id and are inserted in one statement, so either all are booked or
- * none is. Staff book at the usual price; only owners and managers can type a
- * different one (the database refuses anything else, see bookings_guard_price).
+ * none is. Two of them may share one kennel: then both get the chosen kennel,
+ * and the second the shared kennel price, if the price list has one. Staff
+ * book at the usual price; only owners and managers can type a different one
+ * (the database refuses anything else, see bookings_guard_price).
  */
 export async function createBooking(_state: FormState, form: FormData): Promise<FormState> {
   const { org, canManage } = await requireOrg();
@@ -71,6 +74,9 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const b = { ...parsed.data, ...stay.data };
+  const together = form.get("sharing") === "together";
+  if (together && b.petIds.length !== 2) return { error: e.shareTwo };
+  if (together && !b.kennelId) return { error: e.shareKennel };
 
   const supabase = await createClient();
 
@@ -83,7 +89,7 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
 
   const service = await supabase
     .from("services")
-    .select("price_minor, tax_rate_bp, sac_code")
+    .select("price_minor, shared_price_minor, tax_rate_bp, sac_code")
     .eq("org_id", org.id)
     .eq("kind", b.kind)
     .eq("is_default", true)
@@ -108,9 +114,9 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
         status: b.status,
         start_date: b.startDate,
         end_date: b.endDate,
-        // A kennel is one pet's: the others are given theirs at check-in.
-        kennel_id: i === 0 ? b.kennelId : null,
-        rate_minor: rateMinor,
+        // Two sharing get the one kennel. Otherwise it is the first pet's, and the others are given theirs at check-in.
+        kennel_id: i === 0 || together ? b.kennelId : null,
+        rate_minor: together && i === 1 ? (service.data?.shared_price_minor ?? rateMinor) : rateMinor,
         tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
         sac_code: service.data?.sac_code ?? null,
         notes: b.notes,
@@ -323,10 +329,11 @@ export async function addExtra(_state: FormState, form: FormData): Promise<FormS
   return { ok: fill(t.m.booking.added, { item: item.description }) };
 }
 
+/** Delete an extra from a booking. Owners only (D29). */
 export async function removeExtra(_state: FormState, form: FormData): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.booking.errors.removeExtra };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const id = Id.safeParse(form.get("itemId"));
   if (!id.success) return { error: t.m.booking.errors.extraNotFound };
   const supabase = await createClient();
@@ -335,4 +342,18 @@ export async function removeExtra(_state: FormState, form: FormData): Promise<Fo
   if (data.length === 0) return { error: t.m.booking.errors.extraNotFound };
   revalidatePath("/app", "layout");
   return { ok: t.m.booking.extraRemoved };
+}
+
+/**
+ * Pets matching what was typed in New booking's search box, with their
+ * families. Called by the picker as the person types; nothing changes.
+ */
+export async function findPets(query: string): Promise<PetChoice[]> {
+  const { org } = await requireOrg();
+  if (typeof query !== "string") return [];
+  try {
+    return await searchPets(await createClient(), org.id, query);
+  } catch {
+    return [];
+  }
 }

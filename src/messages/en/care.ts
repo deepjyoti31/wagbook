@@ -25,6 +25,8 @@ export const careArea = {
     noteTooLong: "Keep the note under 500 characters.",
   },
   play: {
+    clearWarning: "Every session still to happen today goes. This cannot be undone.",
+    yesClear: "Yes, clear them",
     title: "Play",
     // {done} and {total} are drawn in bold; the form follows {total}.
     sessionsDone: { one: "{date}. {done} of {total} sessions done.", other: "{date}. {done} of {total} sessions done." },
@@ -61,7 +63,6 @@ export const careArea = {
     timeLike: "Enter a time like 10:40.",
     onlyPendingMove: "Only a session still to happen can be moved.",
     moved: "Moved to {time}.",
-    clearOnlyManagers: "Only an owner or manager can clear the plan. Skip sessions one by one instead.",
     cleared: "Cleared the sessions still to happen today. Sessions already done stay. Plan again when ready.",
   },
   routines: {

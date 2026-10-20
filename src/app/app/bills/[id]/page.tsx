@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { InvoiceView } from "@/components/invoice-view";
 import { PaymentForm } from "@/components/payment-form";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
+import { BILLABLE_IN_FAMILY } from "@/lib/billing";
 import { billMessage, formatDate, formatMoney, formatPhone, todayIn, toDecimalString, whatsappLink } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
@@ -29,7 +31,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const { id } = await params;
   const doneKey = (await searchParams).done;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale } = t;
   const done = typeof doneKey === "string" && doneKey in m.bill.done ? m.bill.done[doneKey as keyof typeof m.bill.done] : undefined;
@@ -38,7 +40,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, currency, booking_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, currency, booking_id, group_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -47,7 +49,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   if (!res.data) notFound();
   const inv = res.data;
 
-  const [lines, payments, balance, origin] = await Promise.all([
+  const [lines, payments, balance, family, origin] = await Promise.all([
     supabase
       .from("invoice_lines")
       .select("description, sac_code, quantity, unit_price_minor, discount_minor, taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor")
@@ -56,16 +58,21 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
       .order("sort_order"),
     supabase.from("payments").select("id, direction, amount_minor, method, reference, received_on, note").eq("org_id", org.id).eq("invoice_id", id).order("received_on"),
     supabase.from("invoice_balances").select("paid_minor, due_minor").eq("org_id", org.id).eq("invoice_id", id).maybeSingle(),
+    // A family's bill covers each pet booked together.
+    inv.group_id
+      ? supabase.from("bookings").select("id, pets(name)").eq("org_id", org.id).eq("group_id", inv.group_id).in("status", [...BILLABLE_IN_FAMILY]).order("created_at").order("id")
+      : Promise.resolve({ data: [], error: null }),
     siteOrigin(),
   ]);
-  if (lines.error || payments.error || balance.error) throw new Error("Could not load the bill.");
+  if (lines.error || payments.error || balance.error || family.error) throw new Error("Could not load the bill.");
+  const stays = inv.bookings ? [inv.bookings] : family.data;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale, trimZeros: true });
   const due = balance.data?.due_minor ?? 0;
   const paid = balance.data?.paid_minor ?? 0;
   // The WhatsApp message is for the parent, in the kennel's language for parents.
   const p = parentI18n(org.parent_language, org.locale);
-  const pet = inv.bookings?.pets?.name ?? p.m.bill.yourPet;
+  const pet = stays.map((b) => b.pets?.name).filter(Boolean).join(", ") || p.m.bill.yourPet;
   const link = `${origin}/inv/${inv.public_token}`;
   const editable = inv.status === "draft" && canManage;
   const decimal = (minor: number) => toDecimalString(minor).replace(/\.00$/, "");
@@ -100,11 +107,14 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         ) : null}
         <p className="text-slate">
           {inv.issued_on ? `${fill(m.bill.issuedOn, { date: formatDate(inv.issued_on, locale) })} ` : ""}
-          {inv.bookings ? (
-            <Link href={`/app/bookings/${inv.bookings.id}`} className="underline underline-offset-4">
-              {inv.bookings.pets?.name ? fill(m.bill.petBooking, { pet: inv.bookings.pets.name }) : m.bill.theBooking}
-            </Link>
-          ) : null}
+          {stays.map((b, i) => (
+            <span key={b.id}>
+              {i > 0 ? ", " : null}
+              <Link href={`/app/bookings/${b.id}`} className="underline underline-offset-4">
+                {b.pets?.name ? fill(m.bill.petBooking, { pet: b.pets.name }) : m.bill.theBooking}
+              </Link>
+            </span>
+          ))}
         </p>
         {inv.status === "void" && inv.void_reason ? <p className="text-slate">{fill(m.bill.cancelledBecause, { reason: inv.void_reason })}</p> : null}
       </div>
@@ -221,9 +231,9 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
             <LineForm m={m} invoiceId={inv.id} />
           </details>
         ) : null}
-        {inv.status === "draft" && inv.booking_id ? (
+        {inv.status === "draft" && stays.length > 0 ? (
           <ActionForm action={makeBill} className="mt-3">
-            <input type="hidden" name="bookingId" value={inv.booking_id} />
+            <input type="hidden" name="bookingId" value={stays[0].id} />
             <SubmitButton variant="quiet" pendingLabel={m.bill.rebuilding}>
               {m.bill.rebuild}
             </SubmitButton>
@@ -281,12 +291,10 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         </Section>
       ) : null}
 
-      {inv.status === "draft" && canManage ? (
+      {inv.status === "draft" && canDelete ? (
         <ActionForm action={deleteDraft}>
           <input type="hidden" name="invoiceId" value={inv.id} />
-          <SubmitButton variant="quiet" pendingLabel={m.bill.deleting}>
-            {m.bill.deleteDraft}
-          </SubmitButton>
+          <ConfirmStep label={m.bill.deleteDraft} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.bill.deleting} />
         </ActionForm>
       ) : null}
     </>

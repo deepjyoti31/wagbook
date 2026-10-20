@@ -31,7 +31,7 @@ export async function planToday(): Promise<FormState> {
     supabase.from("play_yards").select("id").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     supabase
       .from("bookings")
-      .select("id, pet_id, kennels(sort_order, name)")
+      .select("id, pet_id, client_id, kennel_id, kennels(sort_order, name)")
       .eq("org_id", org.id)
       .eq("status", "checked_in")
       .lte("start_date", today)
@@ -47,13 +47,16 @@ export async function planToday(): Promise<FormState> {
   const pets = [...inHouse.data].sort(
     (a, b) => (a.kennels?.sort_order ?? 1e9) - (b.kennels?.sort_order ?? 1e9) || (a.kennels?.name ?? "").localeCompare(b.kennels?.name ?? ""),
   );
-  const bookingOf = new Map(pets.map((p) => [p.pet_id, p.id]));
+  const bookingOf = new Map(pets.map((p) => [p.pet_id, p]));
+  // Two pets in one kennel are siblings (the database allows nothing else), and siblings play together.
+  const inKennel = new Map<string, number>();
+  for (const p of pets) if (p.kennel_id) inKennel.set(p.kennel_id, (inKennel.get(p.kennel_id) ?? 0) + 1);
   const minutes = playMinutesOn(today, org.play_session_minutes, (peaks.data ?? []).map(toPeak));
 
   let plan;
   try {
     plan = planPlaySessions({
-      dogs: pets.map((p) => ({ id: p.pet_id })),
+      dogs: pets.map((p) => ({ id: p.pet_id, together: p.kennel_id && inKennel.get(p.kennel_id)! > 1 ? p.kennel_id : null })),
       yards: yards.data,
       windows: playWindows(org.play_day_start, org.play_day_end, org.play_break_start, org.play_break_end),
       sessionMinutes: minutes,
@@ -76,8 +79,10 @@ export async function planToday(): Promise<FormState> {
       plan.sessions.map((s) => ({
         org_id: org.id,
         yard_id: s.yardId,
-        booking_id: bookingOf.get(s.dogId)!,
+        booking_id: bookingOf.get(s.dogId)!.id,
         pet_id: s.dogId,
+        // The database copies it from the booking whatever is sent.
+        client_id: bookingOf.get(s.dogId)!.client_id,
         session_date: today,
         starts_at: s.start,
         duration_minutes: minutes,
@@ -142,11 +147,11 @@ export async function moveSession(_state: FormState, form: FormData): Promise<Fo
   return { ok: fill(t.m.play.moved, { time: start }) };
 }
 
-/** Clear today's sessions still to happen, to plan again from scratch. Owners and managers. */
+/** Clear today's sessions still to happen, to plan again from scratch. Owners only: it deletes (D29). */
 export async function clearPlan(): Promise<FormState> {
-  const { org, canManage } = await requireOrg();
+  const { org, canDelete } = await requireOrg();
   const t = await getAppI18n();
-  if (!canManage) return { error: t.m.play.clearOnlyManagers };
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
   const today = todayIn(org.time_zone);
   const supabase = await createClient();
   const { error } = await supabase.from("play_sessions").delete().eq("org_id", org.id).eq("session_date", today).eq("status", "pending");

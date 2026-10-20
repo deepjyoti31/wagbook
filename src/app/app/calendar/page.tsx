@@ -133,6 +133,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                   >
                     {o.occupied}
                     <span className="font-normal text-slate">/{o.capacity}</span>
+                    {o.pets > o.occupied ? <span className="block text-xs font-normal text-slate">{fill(w.petsShort, { n: o.pets })}</span> : null}
                   </td>
                 ))}
               </tr>
@@ -141,21 +142,27 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                   <th scope="row" className="sticky left-0 z-10 border-b border-r border-rule bg-paper px-2 text-left">
                     <span className="door-tag">{k.name}</span>
                   </th>
-                  {grid.byKennel.get(k.id)!.map((stay, i) => {
+                  {grid.byKennel.get(k.id)!.map((cell, i) => {
                     const day = days[i];
-                    if (stay) {
-                      const starts = stay.startDate === day || i === 0;
+                    if (cell.length > 0) {
+                      // Two siblings sharing the kennel are one above the other, each a full-height link.
                       return (
-                        <td key={day} className="h-12 border-b border-rule p-0">
-                          <Link
-                            href={`/app/bookings/${stay.id}`}
-                            className={`flex h-12 items-center overflow-hidden whitespace-nowrap px-1 font-semibold ${
-                              stay.overstay ? "bg-alert-soft text-alert" : stay.status === "checked_in" ? "bg-leaf-soft text-leaf" : "bg-ground text-ink"
-                            }`}
-                            title={stay.pet}
-                          >
-                            {starts ? stay.pet.slice(0, 9) : <span className="sr-only">{stay.pet}</span>}
-                          </Link>
+                        <td key={day} className="border-b border-rule p-0">
+                          {cell.map((stay) => {
+                            const starts = stay.startDate === day || i === 0;
+                            return (
+                              <Link
+                                key={stay.id}
+                                href={`/app/bookings/${stay.id}`}
+                                className={`flex h-12 items-center overflow-hidden whitespace-nowrap px-1 font-semibold ${
+                                  stay.overstay ? "bg-alert-soft text-alert" : stay.status === "checked_in" ? "bg-leaf-soft text-leaf" : "bg-ground text-ink"
+                                }`}
+                                title={stay.pet}
+                              >
+                                {starts ? stay.pet.slice(0, 9) : <span className="sr-only">{stay.pet}</span>}
+                              </Link>
+                            );
+                          })}
                         </td>
                       );
                     }

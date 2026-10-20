@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { Rich } from "@/components/rich";
@@ -18,11 +19,11 @@ import { flagText, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
   bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
-  todayIn, toDecimalString, vaccinationWarnings, whatsappLink,
+  sharedWith, todayIn, toDecimalString, vaccinationWarnings, whatsappLink,
 } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
-import { peakPeriods, toPeak } from "@/lib/queries";
+import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { addExtra, cancelBooking, confirmRequest, extendToToday, markNoShow, removeExtra, updateBooking } from "../actions";
@@ -45,7 +46,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const query = await searchParams;
   const justBooked = query.new === "1";
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale } = t;
   const w = m.booking;
@@ -61,17 +62,25 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, vaccinations, routines, bill, advances, updates, origin] = await Promise.all([
+  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, origin] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
     b.group_id
       ? supabase.from("bookings").select("id, status, pets(name)").eq("org_id", org.id).eq("group_id", b.group_id).neq("id", b.id)
       : Promise.resolve({ data: [], error: null }),
-    supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date }),
+    supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date, p_client: parent?.id }),
+    parent ? familyHolds(supabase, org.id, [parent.id], b.start_date, b.end_date) : Promise.resolve({ data: [], error: null }),
     supabase.from("vaccinations").select("id, vaccine, valid_until, certificate_path").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
     supabase.from("care_items").select("id, kind, label, details, due_time").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
-    supabase.from("invoice_balances").select("invoice_id, status, number, total_minor, due_minor").eq("org_id", org.id).eq("booking_id", id).neq("status", "void").maybeSingle(),
+    // A pet booked with others is billed with them, on the family's bill.
+    supabase
+      .from("invoice_balances")
+      .select("invoice_id, status, number, total_minor, due_minor")
+      .eq("org_id", org.id)
+      .eq(b.group_id ? "group_id" : "booking_id", b.group_id ?? id)
+      .neq("status", "void")
+      .maybeSingle(),
     supabase
       .from("payments")
       .select("id, direction, amount_minor, method, received_on, reference")
@@ -88,7 +97,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       .limit(20),
     siteOrigin(),
   ]);
-  if (items.error || extras.error || peaks.error || family.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error) {
+  if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error) {
     throw new Error("Could not load the booking.");
   }
 
@@ -104,7 +113,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const noRefund = touching.filter((p) => p.noRefund);
   const overstay = isOverstaying({ status: b.status, endDate: b.end_date }, today);
   const stayUrl = `${origin}/s/${b.public_token}`;
-  const freeKennels = [...(b.kennels ? [{ id: b.kennels.id, name: b.kennels.name }] : []), ...(kennels.data ?? []).filter((k) => k.id !== b.kennel_id)];
+  // Kennels a sibling is already in say so: "K05, with Coco".
+  const sharing = parent
+    ? sharedWith(
+        { id: b.id, clientId: parent.id, kind: b.kind, startDate: b.start_date, endDate: b.end_date },
+        (siblingHolds.data ?? []).map((h) => ({ id: h.id, kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date, petName: h.pets?.name ?? w.pet })),
+      )
+    : new Map<string, string[]>();
+  const kennelLabel = (k: { id: string; name: string }) => {
+    const names = sharing.get(k.id);
+    return { id: k.id, name: names ? fill(w.kennelWith, { kennel: k.name, pets: names.join(", ") }) : k.name };
+  };
+  const freeKennels = [...(b.kennels ? [b.kennels] : []), ...(kennels.data ?? []).filter((k) => k.id !== b.kennel_id)].map(kennelLabel);
+  const sharesWith = b.kennel_id ? sharing.get(b.kennel_id) : undefined;
 
   const quote = quoteStay(
     {
@@ -175,6 +196,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           ))}
         </p>
         <p className="text-lg">{stayText(t, b.kind, b.start_date, b.end_date)}</p>
+        {sharesWith && b.kennels ? <p className="font-semibold">{fill(w.sharesWith, { kennel: b.kennels.name, pets: sharesWith.join(", ") })}</p> : null}
         {parent ? (
           <p className="text-slate">
             {parent.full_name},{" "}
@@ -258,12 +280,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 })}
               </span>
               <span className="font-semibold">{money(l.totalMinor)}</span>
-              {i > 0 && canManage && open ? (
+              {i > 0 && canDelete && open ? (
                 <ActionForm action={removeExtra} className="contents">
                   <input type="hidden" name="itemId" value={items.data[i - 1].id} />
-                  <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
-                    {m.common.remove}
-                  </SubmitButton>
+                  <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.common.removing} />
                 </ActionForm>
               ) : null}
             </LedgerRow>
@@ -346,9 +366,12 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           ) : (
             <ActionForm action={makeBill} className="space-y-2">
               <input type="hidden" name="bookingId" value={b.id} />
-              <p>{b.status === "checked_out" ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet }) : w.bill.noneYet}</p>
+              <p>
+                {b.status === "checked_out" ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet }) : w.bill.noneYet}
+                {family.data.length > 0 ? ` ${w.bill.familyNote}` : ""}
+              </p>
               <SubmitButton variant={b.status === "checked_out" ? "primary" : "secondary"} pendingLabel={w.bill.making}>
-                {w.bill.make}
+                {family.data.length > 0 ? w.bill.makeFamily : w.bill.make}
               </SubmitButton>
             </ActionForm>
           )}

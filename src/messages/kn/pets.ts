@@ -29,6 +29,7 @@ export const petsArea: typeof English = {
       incident: "ಘಟನೆ ಬರೆದಿಡಲಾಗಿದೆ.",
       told: "ತಿಳಿಸಲಾಗಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ.",
       resolved: "ಸರಿಪಡಿಸಲಾಗಿದೆ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ.",
+      corrected: "ಘಟನೆಯನ್ನು ತಿದ್ದಲಾಗಿದೆ. ಮೊದಲು ಏನು ಬರೆದಿತ್ತು ಎಂಬುದು ಬದಲಾವಣೆಗಳ ಇತಿಹಾಸದಲ್ಲಿದೆ.",
     },
     incidents: "ಘಟನೆಗಳು",
     noIncidents: "ಅಸಾಮಾನ್ಯವಾದದ್ದು ಏನೂ ಬರೆದಿಲ್ಲ.",
@@ -39,6 +40,7 @@ export const petsArea: typeof English = {
     whatWeDid: "ನಾವು ಮಾಡಿದ್ದು: {action}",
     markTold: "ಪೇರೆಂಟ್‌ಗೆ ತಿಳಿಸಲಾಗಿದೆ",
     markDealtWith: "ಸರಿಪಡಿಸಲಾಗಿದೆ",
+    correctIncident: "ತಿದ್ದಿ",
     writeIncident: "ಘಟನೆ ಬರೆದಿಡಿ",
     vaccinations: "ಲಸಿಕೆಗಳು",
     stays: "ವಾಸ್ತವ್ಯಗಳು",
@@ -93,6 +95,8 @@ export const petsArea: typeof English = {
   incident: {
     title: "ಘಟನೆ ಬರೆದಿಡಿ",
     pageTitle: "ಘಟನೆ: {pet}",
+    correctTitle: "ಘಟನೆ ತಿದ್ದಿ: {pet}",
+    correctAbout: "ತಪ್ಪಾಗಿರುವುದನ್ನು ಬದಲಿಸಿ. ಮೊದಲು ಏನು ಬರೆದಿತ್ತು ಎಂಬುದು ಬದಲಾವಣೆಗಳ ಇತಿಹಾಸದಲ್ಲಿ ಉಳಿಯುತ್ತದೆ.",
     back: "{pet} ಪುಟಕ್ಕೆ ಹಿಂತಿರುಗಿ",
     whatHappened: "ಏನಾಯಿತು",
     howSerious: "ಎಷ್ಟು ಗಂಭೀರ",
@@ -206,6 +210,8 @@ export const petsArea: typeof English = {
   },
   // The people who work at the kennel, and inviting more.
   people: {
+    yesRemove: "ಹೌದು, ತೆಗೆಯಿರಿ",
+    yesWithdraw: "ಹೌದು, ಆಹ್ವಾನ ಹಿಂಪಡೆಯಿರಿ",
     title: "ಜನರು",
     whoWorks: "{kennel} ನಲ್ಲಿ ಕೆಲಸ ಮಾಡುವವರು",
     invited: "ಆಹ್ವಾನಿಸಲಾಗಿದೆ, ಇನ್ನೂ ಒಪ್ಪಿಲ್ಲ",

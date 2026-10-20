@@ -1,3 +1,4 @@
+import { historyFields } from "./fields";
 /** English words for bills, payments, the parent's bill, reports, expenses and the history of changes. Part of en.ts. */
 export const moneyArea = {
   // The list of bills.
@@ -80,7 +81,6 @@ export const moneyArea = {
       cancelManagers: "Only an owner or manager can cancel a bill.",
       sayWhy: "Say why the bill is cancelled.",
       reasonTooLong: "Keep the reason under 500 characters.",
-      deleteManagers: "Only an owner or manager can delete a draft bill.",
       onlyDraftDeleted: "Only a draft bill can be deleted.",
     },
     updated: "Bill updated.",
@@ -212,6 +212,7 @@ export const moneyArea = {
     },
   },
   expenses: {
+    deleteWarning: "This cannot be undone. The receipt is deleted too.",
     title: "Expenses",
     managersOnly: "Expenses are for owners and managers.",
     removed: "Expense removed.",
@@ -278,6 +279,8 @@ export const moneyArea = {
     kennel: "kennel {name}",
     // Words inside each change (src/lib/history.ts).
     log: {
+      // Field names by database column (fields.ts).
+      fields: historyFields,
       tables: {
         bookings: "Booking",
         booking_items: "Extra on a booking",
