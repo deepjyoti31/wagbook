@@ -103,6 +103,8 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
   if (rateMinor === null) return { error: (canManage ? e.noPriceManager : e.noPriceStaff)[b.kind] };
 
   const groupId = b.petIds.length > 1 ? crypto.randomUUID() : null;
+  // The second of two sharing pays the shared kennel price, and the usual price for any night it has the kennel to itself.
+  const sharedMinor = together ? (service.data?.shared_price_minor ?? null) : null;
   const { data, error } = await supabase
     .from("bookings")
     .insert(
@@ -116,7 +118,8 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
         end_date: b.endDate,
         // Two sharing get the one kennel. Otherwise it is the first pet's, and the others are given theirs at check-in.
         kennel_id: i === 0 || together ? b.kennelId : null,
-        rate_minor: together && i === 1 ? (service.data?.shared_price_minor ?? rateMinor) : rateMinor,
+        rate_minor: i === 1 && sharedMinor !== null ? sharedMinor : rateMinor,
+        alone_rate_minor: i === 1 && sharedMinor !== null ? rateMinor : null,
         tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
         sac_code: service.data?.sac_code ?? null,
         notes: b.notes,
@@ -143,7 +146,7 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
   if (!id.success) return { error: t.m.errors.bookingNotFound };
 
   const supabase = await createClient();
-  const current = await supabase.from("bookings").select("kind, status").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  const current = await supabase.from("bookings").select("kind, status, boarding_from, alone_rate_minor").eq("org_id", org.id).eq("id", id.data).maybeSingle();
   if (current.error) return { error: friendlyError(current.error, t) };
   if (!current.data) return { error: t.m.errors.bookingNotFound };
   if (!["requested", "confirmed", "checked_in"].includes(current.data.status)) return { error: e.finished };
@@ -162,7 +165,8 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
   for (const time of [arrival, departure]) if (time !== null && !clock.safeParse(time).success) return { error: e.clock };
 
   const update: TablesUpdate<"bookings"> = {
-    ...(kind !== current.data.kind ? { kind } : {}),
+    // A new kind of stay applies to the whole stay, so any part that was day boarding goes.
+    ...(kind !== current.data.kind ? { kind, boarding_from: null, day_rate_minor: null } : {}),
     start_date: stay.data.startDate,
     end_date: stay.data.endDate,
     kennel_id: kennel,
@@ -178,6 +182,17 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
     if (discount === undefined) return { error: e.discountNumber };
     update.rate_minor = rate;
     update.discount_minor = discount ?? 0;
+    // The price for nights alone, on a pet booked at the shared kennel price. Empty: the price above throughout.
+    if (current.data.alone_rate_minor !== null && form.has("aloneRate")) {
+      const alone = typedMoney(form, "aloneRate");
+      if (alone === undefined) return { error: e.priceWhole };
+      update.alone_rate_minor = alone;
+    }
+    if (current.data.boarding_from !== null && kind === current.data.kind && form.has("dayRate")) {
+      const day = typedMoney(form, "dayRate");
+      if (day === undefined || day === null) return { error: e.priceWhole };
+      update.day_rate_minor = day;
+    }
   }
 
   const { data, error } = await supabase.from("bookings").update(update).eq("org_id", org.id).eq("id", id.data).select("id");
@@ -186,6 +201,58 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
 
   revalidatePath("/app", "layout");
   return { ok: t.m.booking.saved };
+}
+
+/**
+ * Day boarding that now stays nights. The days before the first night stay
+ * day boarding at their price, the nights from it on are boarding at the
+ * price per night, and both go on the bill (stay_charges() in the database).
+ * A first night on or before the first day turns the whole stay into
+ * boarding. Owners and managers only (the database refuses staff, WB022).
+ */
+export async function switchToBoarding(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.booking.errors;
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: t.m.errors.bookingNotFound };
+  const firstNight = text(form, "firstNight");
+  const endDate = text(form, "endDate");
+  if (!isISODate(firstNight)) return { error: e.firstNight };
+  if (!isISODate(endDate)) return { error: e.validDate };
+  if (endDate <= firstNight) return { error: e.checkOutAfterNight };
+  const rate = typedMoney(form, "rate");
+  if (rate === undefined || rate === null) return { error: e.priceWhole };
+
+  const supabase = await createClient();
+  const current = await supabase.from("bookings").select("kind, status, start_date, rate_minor").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  if (current.error) return { error: friendlyError(current.error, t) };
+  if (!current.data) return { error: t.m.errors.bookingNotFound };
+  if (!["requested", "confirmed", "checked_in"].includes(current.data.status)) return { error: e.finished };
+  if (current.data.kind !== "daycare") return { error: e.onlyDaycare };
+
+  const split = firstNight > current.data.start_date;
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({
+      kind: "boarding",
+      end_date: endDate,
+      rate_minor: rate,
+      boarding_from: split ? firstNight : null,
+      day_rate_minor: split ? current.data.rate_minor : null,
+      // A price for nights alone belonged to the day boarding price; the new price per night is the manager's.
+      alone_rate_minor: null,
+    })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .eq("kind", "daycare")
+    .select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: e.changed };
+
+  revalidatePath("/app", "layout");
+  // The form goes once the stay is boarding, and its message with it; the page says what happened instead.
+  redirect(`/app/bookings/${id.data}?done=boarding`);
 }
 
 /**

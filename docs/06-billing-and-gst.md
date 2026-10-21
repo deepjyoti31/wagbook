@@ -176,13 +176,82 @@ crore. It takes the names of the currency units as arguments for other currencie
 
 ## Building a bill from a stay
 
-`stayLines()` in `src/lib/core/stay.ts` turns a booking into lines: one for the nights or days at the booked rate
-(less any discount), then one per extra. `quoteStay()` runs them through `computeInvoice()`. The M4 screen should:
+What a stay costs is worked out in one place, `stay_charges()` in the database (D32). Usually it is one line, every
+night (or day) at the booked rate. It splits in two cases:
 
-1. Build lines with `stayLines()` and totals with `computeInvoice()`, using the tax context from the kennel.
-2. Insert the draft invoice and its lines with exactly those numbers.
-3. Call `issue_invoice()`. If it raises `WB037`, the TypeScript and SQL arithmetic disagree: that is a bug to fix, not
+- **A pet at the shared kennel price** (`alone_rate_minor` set): the nights its kennel holds a sibling at the shared
+  price, and the nights it has the kennel to itself at the usual price. A sibling checked out early counts up to the
+  day it went home.
+- **Day boarding that turned into boarding** (`boarding_from` set): the days before the first night at the day price
+  (`day_rate_minor`), then the nights at the booked rate.
+
+The booking's discount goes on the stay's largest line. `stayLines()` in `src/lib/core/stay.ts` turns those charges
+(or, without them, the whole stay at the booked rate) into lines with descriptions, then one per extra. `quoteStay()`
+runs them through `computeInvoice()`. Make bill:
+
+1. Reads the charges with `stay_charges()`, builds lines with `stayLines()` and totals with `computeInvoice()`, using
+   the tax context from the kennel.
+2. Inserts the draft invoice and its lines with exactly those numbers.
+3. Calls `issue_invoice()`. If it raises `WB037`, the TypeScript and SQL arithmetic disagree: that is a bug to fix, not
    an error to show the user.
+
+## The language of a bill
+
+A bill is in English (D31). For a parent who asks, the parent page's Bills choice adds Hindi or Kannada: every heading
+is followed by its translation in brackets ("Tax invoice (टैक्स इनवॉइस)"), and lines with amounts stay in English. We
+found no rule on the language of a tax invoice in Rule 46 of the CGST Rules; English is what accountants and tax
+officers read.
+
+## What the law says, as far as we could find
+
+Read on 21 October 2026 from public commentary on the CGST Act and Rules, not from an accountant and not from the
+official texts (the CBIC site could not be reached from where this was written). Each point names where it came
+from. Take them to your accountant; Wagbook still ships no rate and no code.
+
+**Registering.** A business supplying services must register once its turnover passes ₹20 lakh in a year (₹10 lakh in
+some north-eastern and hill states). A small service business may instead choose the composition scheme for services
+(section 10(2A)): up to ₹50 lakh turnover in the year before, tax at 6% (3% CGST and 3% SGST) on turnover, no input
+credit, and it issues a bill of supply, not a tax invoice
+([BUSY](https://busy.in/gst/gst-for-traders-vs-service-providers-key-differences-in-2026/),
+[TIOL](https://taxindiaonline.com/gst/news/details/NDQ5)). Wagbook has no composition mode: such a kennel uses "No
+tax", and the words a bill of supply must carry are not printed yet.
+
+**Rate and SAC for boarding.** Not settled in what we found. The explanatory notes to the services classification
+put pet kennels, grooming and training with "other animal husbandry services", code 998612, like the UN code it comes
+from ([taxreply](https://taxreply.com/gst-rate-service-hsn-99861),
+[UN CPC 86129](https://unstats.un.org/unsd/classifications/Econ/Detail/EN/1074/86129)). One forum answer reads that as
+nil rated; others say the exemption for animal husbandry does not cover pets and the rate is 18%, and one recent note
+puts boarding under accommodation, 996311
+([TaxTMI](https://www.taxmanagementindia.com/web/View_discussions_detail.asp?ID=117039),
+[caclubindia](https://www.caclubindia.com/forum/pets-grooming-taxable--593165.asp),
+[CA Sahuja](https://www.casahuja.com/2025/12/gst-classification-and-taxability.html)). Ask the accountant for the
+rate and code, in writing.
+
+**Invoice numbers.** Rule 46(b): a consecutive serial number, at most 16 characters, unique in the financial year,
+using letters, digits, hyphen and slash; a business may run more than one series
+([cleartax](https://cleartax.in/s/invoice-number),
+[IRIS](https://irisgst.com/effective-1st-april-2026-reset-the-invoice-number-series/)). `PREFIX/YY-YY/NNNN` fits:
+`WB/27-28/0001` is 13 characters, and `formatInvoiceNumber()` refuses one over 16.
+
+**The buyer on the bill.** For a buyer who is not registered, the name, address and state go on the bill when it is
+₹50,000 or more, or when the buyer asks (Rule 46(e) and (f),
+[gimbooks](https://www.gimbooks.com/blog/gst-invoice-mandatory-fields-rule-46-checklist/)). Wagbook prints what it has.
+
+**Cancelling an issued bill (questions 6 and 8).** As commonly practised: a bill not yet reported in the month's
+GSTR-1 can be cancelled and reported as cancelled in the documents summary. Once reported, it is not cancelled but
+undone with a credit note under section 34, declared in the return for the month the credit note is issued, by
+30 November after the end of the financial year (or the annual return, if earlier). The earlier month's figure stays
+as filed; the reduction shows in the month of the credit note
+([TaxTMI](https://www.taxtmi.com/forum/issue?id=113574),
+[taxguru](https://taxguru.in/goods-and-service-tax/adjustment-tax-liability-refund-gst-credit-note.html),
+[fintaxblog](https://fintaxblog.com/section-34-of-cgst-act-2017-credit-and-debit-notes/)). So for a registered kennel,
+Wagbook's tax by rate report is right only for a bill cancelled in the same month: it drops a bill cancelled later
+from the month it was issued, where the return already counted it. Credit notes are not built (see "Not built").
+
+**Keeping records (question 7).** Section 36 of the CGST Act: 72 months from the due date of the annual return for the
+year; longer while an appeal or proceeding is open
+([KnowYourGST](https://www.knowyourgst.com/gstlaw/cgst-act/36-period-of-retention-of-accounts-36/)). This is why erasing
+a parent keeps issued bills (D25).
 
 ## Questions to take to an accountant
 
@@ -193,13 +262,16 @@ Write the answers in your own records, not in this repository.
 3. Which SAC or HSN code goes on each?
 4. Are my listed prices inclusive or exclusive of tax, and how should I show that to parents?
 5. Is `PREFIX/YY-YY/NNNN` acceptable as my invoice series?
-6. Does a voided invoice need a credit note instead once I am registered? (Wagbook does not produce credit notes yet.)
+6. Does a voided invoice need a credit note instead once I am registered? (What we found says yes once the bill is in
+   a filed return; see above. Wagbook does not produce credit notes yet.)
 7. What must I keep, and for how long?
-8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. Is that
-   the figure my return needs, or should a cancellation count in the month it happened?
-9. When the parent's bill is shown in Hindi or Kannada, it says "Tax invoice" in English with the translation in
-   brackets, and the place of supply and tax lines in that language. Is a bill in Hindi or Kannada acceptable, and must
-   "Tax invoice" and the other required details also appear in English?
+8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. What we
+   found says a bill cancelled after its month's return should count in that month and come off, by credit note, in
+   the month it was cancelled. Is that right for me, and do I need credit notes in Wagbook?
+9. Bills are in English, with the headings also in Hindi or Kannada in brackets when a parent asks (D31). Is that
+   acceptable on a tax invoice?
+10. Which rate and SAC apply to boarding, day boarding and grooming (998612, 996311 or another), and is any of it
+    exempt?
 
 ## Not built
 

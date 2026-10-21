@@ -449,7 +449,7 @@ two inline scripts staying as they are; the unit tests say when they change.
 
 ## D24. Two-step sign-in is enforced by the database
 
-**Status:** Decided, 15 October 2026 (milestone M9).
+**Status:** Decided, 15 October 2026 (milestone M9). Not forced on owners: confirmed by the owner, 21 October 2026.
 
 **Situation.** The roadmap asks for two-step sign-in for owners. Supabase Auth supports authenticator apps (TOTP): a
 session that has given the code is at assurance level `aal2`. Nothing stops a client with only the password (`aal1`)
@@ -470,7 +470,8 @@ it on in one browser is asked for the code in the others when the database next 
 
 ## D25. Erasing a parent keeps the bills, empties everything else
 
-**Status:** Decided, 15 October 2026 (milestone M9). Check with an accountant and a lawyer.
+**Status:** Decided, 15 October 2026 (milestone M9). Changed by D30: the pets now stay. Check with an accountant and a
+lawyer.
 
 **Situation.** India's DPDP Act lets a parent ask a kennel to erase their details. GST law requires a business to keep
 its tax invoices, with the buyer's name, for years. Bills, payments and reports rest on the parent, pet and stay rows.
@@ -529,8 +530,8 @@ the same slots.
 arithmetic on the bill: the database checks a family's bill with the same rules as any other (`WB050`). Sharing is
 decided by the parent, not the booking, so a sibling booked later can still join its brother.
 
-**Cost.** A second pet keeps its shared price if its sibling leaves early; a manager changes it by hand. Which pet is
-"the second" is whichever was chosen second at booking. A pet cannot be added to a family after booking; it is booked
+**Cost.** Which pet is "the second" is whichever was chosen second at booking. (A second pet used to keep its shared
+price when its sibling left early; since D32 those nights are billed at the usual price.) A pet cannot be added to a family after booking; it is booked
 on its own and billed on its own.
 
 ## D28. No public demo; people try Wagbook on their own computer
@@ -567,3 +568,87 @@ stays with managers.
 **Cost.** A kennel run day to day by a manager needs the owner for every clean-up. Erasing a parent at their request
 waits for the owner.
 
+## D30. Erasing a parent keeps their pets
+
+**Status:** Decided, 21 October 2026, by the owner. Amends D25.
+
+**Situation.** Erasing a parent (D25) also emptied their pets and deleted the pets' vaccinations, routines and
+incidents. A bite or an injury is something the kennel may need to know about later, and a pet's health and habits are
+the kennel's record of the animal, not the parent's contact details.
+
+**Decision.** `erase_client()` keeps the pets as they are: details, photo, vaccinations, routines, incidents, care
+tasks and play sessions, hidden from lists because their parent is gone. It still empties the parent, the notes on
+their stays (belongings, what was said at the gate, notes, the reason for cancelling, times), deletes the updates sent
+to the parent (with their photos), their intake forms (with their files) and draft bills, and takes the stays' notes
+out of the history of changes. Vaccination certificate files are deleted and the vaccination rows keep their dates,
+because a vaccination card usually shows the owner's name and address.
+
+**Why.** The owner's call. The law asks for the parent's personal data to go; an animal's record that no longer names
+its parent is not that.
+
+**Cost.** Free text kept on a pet or incident can mention the parent ("mum says he bites"); it is not searched or
+emptied. A microchip number can be traced to its owner through a registry. Both are questions for the lawyer
+(`HANDOFF.md`). The pets cannot be shown in lists again, because their erased parent stays hidden.
+
+## D31. Bills are in English; a parent may ask for their language alongside
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** The parent's bill was shown in the kennel's language for parents (D21), with "Tax invoice" in English
+and the translation in brackets. Bills are documents for tax, and the owner wants them in English.
+
+**Decision.** `/inv/{token}` is in English. On the parent's page, Bills offers "English only" (the default), "English
+and हिन्दी" or "English and ಕನ್ನಡ" (`clients.bill_translation`); with a language chosen, every heading of the bill is
+followed by its translation in brackets (`billWords()` in `src/lib/bill-words.ts`). Lines that carry amounts stay in
+English only, so no amount is printed twice. Bill lines were already stored in English. The WhatsApp message that
+sends the bill stays in the kennel's language for parents; it is a message, not the bill. The staff screens of a bill
+stay in each person's own language.
+
+**Why.** English is what an accountant and a tax officer read. A parent who reads Hindi or Kannada better can still
+have the headings in their language, on request.
+
+**Cost.** The choice is per parent, not per bill. A bill shows the parent's current choice, not the one at the time
+it was issued (it is a display choice; nothing on the bill changes).
+
+## D32. A stay is priced in parts when it changes on the way
+
+**Status:** Decided, 21 October 2026, by the owner. Amends D27.
+
+**Situation.** A pet at the shared kennel price kept that price when its sibling went home early, and a stay that began
+as day boarding and turned into boarding could only be priced as one or the other for the whole stay.
+
+**Decision.** `stay_charges()` in the database prices every stay, and both the app's bills and the staff check on
+issuing (`invoice_expected_lines`, `WB050`) use it:
+
+- A pet booked at the shared price carries the usual price for nights alone (`bookings.alone_rate_minor`, filled in by
+  New booking; staff cannot book the shared price without it, `WB023`). Each night (or day) its kennel holds a sibling
+  of the same parent is billed at the shared price; each other night at the usual price. A sibling checked out early
+  counts only up to the day it went home; one cancelled, not arrived, or in another kennel does not count.
+- Day boarding that turns into boarding records the first night (`bookings.boarding_from`) and the day price
+  (`day_rate_minor`): the days before the first night are billed as day boarding, the nights from it as boarding. The
+  booking is boarding from then on, and holds its kennel for the whole stay, as before. Owners and managers do this
+  from the booking page (Staying overnight); staff cannot (`WB022`).
+- The discount goes on the stay's largest line.
+
+**Why.** The bill follows what happened, and staff can still issue it without a manager, because the database worked
+out the same lines.
+
+**Cost.** A pet moved to another kennel counts as alone for its whole stay, because a booking has one kennel. A pet
+whose sibling left early still pays its own booked nights in full; refunding the sibling's unused nights stays a
+manager's change of dates or price. Only day boarding turning into boarding is handled; the other way round is a change
+of the whole stay's kind.
+
+## D33. Only owners and managers change a parent's phone numbers
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** Any member could change any detail of a parent, including the mobile number, which is how a parent is
+recognised, messaged on WhatsApp and matched when they send a form.
+
+**Decision.** `clients_guard_phone` refuses a change to `phone` or `alt_phone` by staff (`WB002`). Staff still add new
+parents with their numbers, and change everything else, including the emergency contact's number. The parent page
+shows staff a line saying who can change the numbers, instead of the boxes.
+
+**Why.** A wrong number sends a parent's updates and bills to someone else.
+
+**Cost.** A staff member who takes a new number from a parent at the gate asks a manager to put it in.

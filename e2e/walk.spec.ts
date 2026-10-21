@@ -991,3 +991,74 @@ test("a manager adds a kennel with its own name, renames it and moves it to the 
   await page.getByRole("button", { name: "Add kennel", exact: true }).click();
   await expect(page.getByText("A kennel with that name already exists.")).toBeVisible();
 });
+
+test("a sibling leaves early, and the pet left on its own pays the usual price for those nights", async ({ page }) => {
+  await signIn(page, "manager");
+  // Rocky and Luna share K09 for three nights (booked above); Rocky goes home a night early.
+  await page.goto(`/app/calendar?from=${day(50)}`);
+  await page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) }).getByRole("link", { name: "Rocky" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Rocky" })).toBeVisible();
+  await page.getByLabel("Check-out date").fill(day(52));
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Booking saved.")).toBeVisible();
+
+  await page.getByRole("link", { name: /Luna/ }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Luna" })).toBeVisible();
+  await expect(page.getByText("Boarding, sharing a kennel, 2 x ₹900")).toBeVisible();
+  await expect(page.getByText("Boarding, kennel to itself, 1 x ₹1,200")).toBeVisible();
+  await expect(page.getByLabel(en.booking.change.aloneRate)).toHaveValue("1200");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test("day boarding turns into boarding, and is priced as days and then nights", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  await page.locator("select[name=kind]").selectOption("daycare");
+  await page.getByLabel("Check-in date").fill(day(70));
+  await page.getByLabel("Check-out date").fill(day(70));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+
+  // The parent asks for Tofu to stay the night of the 71st and the 72nd.
+  const overnight = page.locator("form").filter({ has: page.getByRole("button", { name: en.booking.overnight.save }) });
+  await overnight.getByLabel(en.booking.overnight.firstNight).fill(day(71));
+  await overnight.getByLabel(en.booking.overnight.checkOut).fill(day(73));
+  await overnight.getByLabel(en.booking.overnight.pricePerNight).fill("1200");
+  await overnight.getByRole("button", { name: en.booking.overnight.save }).click();
+  await page.waitForURL(/done=boarding/);
+  await expect(page.getByText(en.booking.done.boarding)).toBeVisible();
+  await expect(page.getByText(/^Day boarding until .*, then staying nights from /)).toBeVisible();
+  await expect(page.getByText("Day boarding, 1 x ₹720")).toBeVisible();
+  await expect(page.getByText("Boarding, 2 x ₹1,200")).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.booking.overnight.title })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+test("staff cannot change a parent's phone numbers, and a parent who asks gets their bill's headings in Hindi too", async ({ page, browser }) => {
+  await signIn(page, "staff");
+  await openPet(page, "Biscuit");
+  await page.getByRole("link", { name: "Priya Demo" }).click();
+  await expect(page.getByText(en.parent.phoneByManager)).toBeVisible();
+  await expect(page.locator("input[name=phone]")).toHaveCount(0);
+  await page.getByLabel("City").fill("Mysuru");
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  await signIn(page, "manager");
+  await openPet(page, "Mango");
+  await page.getByRole("link", { name: "Arjun Sample" }).click();
+  await page.locator("select[name=bill_translation]").selectOption("hi");
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  // Mango's bill, issued earlier in the walk, from the parent's page.
+  await page.getByRole("link", { name: /WB\// }).first().click();
+  const link = (await page.getByRole("link", { name: "Open it" }).getAttribute("href"))!;
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link);
+  await expect(parent.page.getByRole("heading", { name: `Bill (${hi.invoice.bill})`, exact: true })).toBeVisible();
+  await expect(parent.page.getByRole("heading", { name: `Billed to (${hi.invoice.billedTo})` })).toBeVisible();
+  expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await parent.context.close();
+});

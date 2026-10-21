@@ -20,18 +20,18 @@ afterAll(() => db.close());
 /** Book several pets of one parent together, in one statement, as New booking does. */
 async function bookFamily(
   k: Kennel,
-  pets: { pet: string; kennel?: string | null; rate?: number }[],
+  pets: { pet: string; kennel?: string | null; rate?: number; alone?: number | null }[],
   stay: { start: string; end: string; status?: string },
   actor: string = k.owner,
 ): Promise<{ group: string; ids: string[] }> {
   return as(db, user(actor), async () => {
     const group = (await db.query<{ id: string }>("select gen_random_uuid() as id")).rows[0].id;
-    // $1 to $6 are the same for every pet; then three for each pet: the pet, its kennel and its price.
-    const rows = pets.map((_, i) => `($1, $2, $${7 + i * 3}, 'boarding', $4, $5, $6, $${8 + i * 3}, $${9 + i * 3}, $3)`).join(", ");
+    // $1 to $6 are the same for every pet; then four for each pet: the pet, its kennel, its price and its price alone.
+    const rows = pets.map((_, i) => `($1, $2, $${7 + i * 4}, 'boarding', $4, $5, $6, $${8 + i * 4}, $${9 + i * 4}, $${10 + i * 4}::bigint, $3)`).join(", ");
     const params: unknown[] = [k.org, k.client, group, stay.status ?? "confirmed", stay.start, stay.end];
-    params.push(...pets.flatMap((p) => [p.pet, p.kennel ?? null, p.rate ?? 120000]));
+    params.push(...pets.flatMap((p) => [p.pet, p.kennel ?? null, p.rate ?? 120000, p.alone ?? null]));
     const r = await db.query<{ id: string }>(
-      `insert into public.bookings (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, group_id)
+      `insert into public.bookings (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor, group_id)
        values ${rows} returning id`,
       params,
     );
@@ -139,8 +139,17 @@ describe("the shared kennel price", () => {
     expect(e.message).toContain("services_shared_price_only_for_stays");
   });
 
-  it("lets staff book the second pet of a shared kennel at it", async () => {
-    await bookFamily(k, [{ pet: k.pets[0], kennel: k.kennels[0] }, { pet: k.pets[1], kennel: k.kennels[0], rate: 90000 }], { start: "2027-09-01", end: "2027-09-04" }, staff);
+  it("lets staff book the second pet of a shared kennel at it, with the usual price for nights alone", async () => {
+    await bookFamily(k, [{ pet: k.pets[0], kennel: k.kennels[0] }, { pet: k.pets[1], kennel: k.kennels[0], rate: 90000, alone: 120000 }], { start: "2027-09-01", end: "2027-09-04" }, staff);
+  });
+
+  it("refuses staff the shared price without the usual price for nights alone, or with another", async () => {
+    for (const alone of [null, 90000]) {
+      const e = await errorOf(() =>
+        bookFamily(k, [{ pet: k.pets[0], kennel: k.kennels[2] }, { pet: k.pets[1], kennel: k.kennels[2], rate: 90000, alone }], { start: "2027-09-20", end: "2027-09-22" }, staff),
+      );
+      expect(e.message).toContain("WB023");
+    }
   });
 
   it("refuses staff the shared price for a pet that is alone in its kennel, or has none", async () => {
@@ -148,7 +157,7 @@ describe("the shared kennel price", () => {
     expect((await errorOf(() => book(db, k, { pet: k.pets[2], start: "2027-09-10", end: "2027-09-12", rate: 90000 }, staff))).message).toContain("WB023");
     // Two siblings in different kennels are not sharing either.
     const e = await errorOf(() =>
-      bookFamily(k, [{ pet: k.pets[0], kennel: k.kennels[1] }, { pet: k.pets[1], kennel: k.kennels[2], rate: 90000 }], { start: "2027-10-01", end: "2027-10-03" }, staff),
+      bookFamily(k, [{ pet: k.pets[0], kennel: k.kennels[1] }, { pet: k.pets[1], kennel: k.kennels[2], rate: 90000, alone: 120000 }], { start: "2027-10-01", end: "2027-10-03" }, staff),
     );
     expect(e.message).toContain("WB023");
   });

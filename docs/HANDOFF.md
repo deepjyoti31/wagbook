@@ -2,19 +2,21 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 19 October 2026, after milestones M11 (families), M12 (naming kennels) and M13 (rough edges).
+Last updated: 21 October 2026, after milestone M14 (the owner's answers).
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M13. The latest: two pets of one parent can share a kennel (never three,
-never another parent's pet), the second at a shared kennel price the kennel sets, and a family booked together pays on
-one bill (M11, D27); kennels can be named freely and reordered (M12); New booking searches pets on the server, staff no
-longer see the owners' menu items, History of changes names fields in the reader's language, the intake form takes a
-second vaccine with its own card, managers can correct an incident, and only owners delete anything, after a second
-tap (M13, D29). The owner confirmed the licence (AGPL),
+Every milestone on the roadmap is built, M2 to M14. The latest (M14, the owner's answers of 21 October 2026): a pet at
+the shared kennel price pays the usual price for the nights it has the kennel to itself, and day boarding that turns
+into boarding is billed as days and then nights, both priced by the database (`stay_charges`, D32); only owners and
+managers change a parent's phone numbers (D33); erasing a parent keeps their pets' records (D30); bills are in English,
+with the parent's language in brackets on request (D31); and what the law says on GST invoices, cancelling bills,
+keeping records and erasure is written up for the accountant and the lawyer (`06`, `05`). Before that: shared
+kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
+owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (202 database tests, 134 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 36 tests). What has still never
+kennel. The database rules are tested in-process (215 database tests, 140 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 39 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
@@ -78,6 +80,12 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Only owners delete: every kind of record, a person (anyone may still leave), a file, and erasing a parent (`WB074`); managers and staff touch nothing | `tests/db/deletion.test.ts`; the rules removed once to see the tests fail | High |
 | Deleting takes two taps, and an expense takes its receipt with it; a manager is not offered Remove | End-to-end (the receipt's link stops working); screenshot at 360 pixels, 20 October 2026 | High |
 | History of changes in the reader's language | `src/lib/history.test.ts`; end-to-end ("Price per night or day: was ...") | High |
+| A pet at the shared price: nights shared at that price, nights alone at the usual price; a sibling checked out early counts up to that day; one cancelled or in another kennel does not; the discount on the largest line; staff must book the usual price for nights alone (`WB023`) and cannot change it (`WB022`); staff issue the split bill and not the unsplit one (`WB050`) | `tests/db/stay-charges.test.ts`, `tests/db/families.test.ts`; the split and the staff rule each removed once to see the tests fail | High |
+| Day boarding turned into boarding: days then nights, each at its price; first night inside the stay and a day price (`bookings_boarding_from_inside_stay`, `bookings_day_part_has_a_price`); staff refused (`WB022`); staff issue it only as days then nights | `tests/db/stay-charges.test.ts` | High |
+| The booking page's split costs, Staying overnight, and a sibling leaving early | End-to-end at 360 pixels, 21 October 2026 | High for the local stack |
+| Only owners and managers change a parent's phone or other number (`WB002`); staff still change the rest and add parents | `tests/db/people.test.ts` (the rule removed once to see it fail); end-to-end: staff see no phone box | High |
+| Erasing keeps the pets (details, photo, vaccinations without the card, routines, incidents), deletes updates, forms and certificate files | `tests/db/privacy.test.ts`; end-to-end (the certificate's link stops working) | High |
+| Bills in English; the parent's language in brackets after each heading when asked (`clients.bill_translation`) | `src/lib/bill-words.test.ts`, `tests/db/languages.test.ts`; end-to-end ("Bill (बिल)") | High |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -112,7 +120,13 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 2. **Switch on "Private vulnerability reporting"** in the GitHub repository's settings, so `SECURITY.md` works.
 3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
 4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
-5. **Ask a person outside the project for a security review**, and take question 8 in `06` to an accountant.
+5. **Ask a person outside the project for a security review.**
+6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, credit notes, the tax by rate report),
+   and **the erasure questions in `05` to a lawyer** (Rule 8(3), pets' free text, microchips). The research in both
+   is a starting point, read from public commentary, not advice.
+7. **If the accountant confirms credit notes are needed** (likely, once GST registered): build them as the next
+   milestone. A bill cancelled after its month's GSTR-1 should stay in that month's tax figure and come off in the
+   month of the credit note; Reports does not do that today (`06`, "What the law says").
 
 After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
@@ -142,9 +156,8 @@ migration. Add new files."
 
 | Decision | Where | Default taken |
 | --- | --- | --- |
-| Whether a bill may be in Hindi or Kannada (question 9 for the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md) | Bills say "Tax invoice" in English with the translation in brackets |
-| Whether owners must use two-step sign-in, rather than be reminded | D24 | Reminded, not forced |
-| Invoice prefix and the GST questions | [06-billing-and-gst.md](06-billing-and-gst.md), "Questions to take to an accountant" | Tax off, prefix `WB` |
+| Rate and SAC for boarding, day boarding and grooming; whether to build credit notes (after the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md), "What the law says" and the questions | Tax off, prefix `WB`, no credit notes |
+| Whether erasure must wait a year under DPDP Rule 8(3) (after the lawyer; the Rule starts around 13 May 2027) | [05-security-and-privacy.md](05-security-and-privacy.md), "What the law says" | Erased at once |
 
 Decided: only owners and managers set or change a price (D15), extended to bills in M4. The licence is AGPL-3.0-or-later
 (D2, confirmed 19 October 2026). The repository is public on the owner's GitHub account; conduct reports go to the owner
@@ -152,6 +165,10 @@ there. No public demo (D28). The example kennel in `13` is never named, and Wagb
 Overstays stay manual (Extend to today). A family booked together pays on one bill, and two pets of one parent may share
 a kennel at a shared price the kennel sets, two at most; siblings may play together (D27). Erasing a parent stays; only
 owners delete anything, with a second tap, and a deleted expense takes its receipt with it (D29, 20 October 2026).
+On 21 October 2026: bills in English, a parent's language in brackets only when they ask (D31); two-step sign-in
+reminded, not forced (D24); erasing a parent keeps the pets' records (D30); only owners and managers change a parent's
+phone numbers (D33); a pet left alone in a shared kennel pays the usual price for those nights, and day boarding that
+turns into boarding is billed as days then nights (D32).
 
 ## Translations waiting for a native speaker
 
@@ -178,6 +195,11 @@ price" as साझा केनेल का दाम and ಹಂಚಿಕೊ�
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
 
+Drafted on 21 October 2026, also unchecked: sharing a kennel and having it to oneself on a bill (केनेल साझा, केनेल में
+अकेले; ಕೆನೆಲ್ ಹಂಚಿಕೊಂಡು, ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿ), Staying overnight (रात को रुकना, ರಾತ್ರಿ ಉಳಿಯುವುದು), the line saying only
+managers change phone numbers, the Bills choice on the parent page, the new erase wording, and the plain titles of a
+tax invoice now shown in brackets after the English (टैक्स इनवॉइस, ಟ್ಯಾಕ್ಸ್ ಇನ್‌ವಾಯ್ಸ್).
+
 Drafted on 16 October 2026, also unchecked: hiding from lists (सूचियों से छिपाएं, ಪಟ್ಟಿಗಳಿಂದ ಮರೆಮಾಡಿ) and the hidden
 pets list, "Find a pet" on New booking, the sentence about taken kennels, the hint that the currency and year start
 are fixed, and the hint under Stay on a booking.
@@ -191,8 +213,13 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Staff may add a one-off item at any price (for a vet bill paid for the parent). Right?
 - In a family booking of "a kennel each", only the first pet gets the chosen kennel; the others get theirs at
   check-in. "One kennel together" is offered only for exactly two pets.
-- A second pet keeps its shared kennel price if its sibling leaves early or moves kennel; a manager changes the price.
-  Should the database refuse the shared price for a pet left alone?
+- A pet whose sibling leaves early pays the usual price for the nights alone (D32), but the sibling that left still
+  pays its own booked nights in full; refunding them is a manager's change of dates. Should check-out before the
+  date shorten the stay by itself?
+- A pet at the shared price that moves kennel counts as alone for its whole stay, because a booking has one kennel.
+- Only day boarding turning into boarding is split; boarding that turns into day boarding is a change of the whole
+  stay's kind.
+- A parent's bill translation is per parent, and a bill shows the current choice, not the one when it was issued.
 - Siblings booked separately (not together) can still share a kennel, but each is billed on its own and the second is
   at the usual price unless a manager changes it.
 - A pet cannot be added to a family after it is booked (`WB026`); it is booked and billed on its own.
@@ -206,12 +233,9 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Invitation links are not tied to an email or phone: whoever holds one can join, once (D19). Right for how kennels
   hire?
 - Merging parents keeps the record you are on and hides the other. There is no "unmerge".
-- Changing a booking between boarding and day boarding keeps the price that is in the box; the manager changes it by
-  hand (a hint says so). Should it switch to the usual price for the new kind instead?
 - Hiding a pet or parent from lists is for owners and managers only, and hiding a parent hides their pets too. A
   hidden parent has no list of their own: they are reached from their pets (under Hidden pets) or a past stay. Right?
-- Any member can edit any detail of a pet or parent, including phone numbers. Should changing a parent's phone be for
-  managers only?
+- Staff may still change the emergency contact's number; only the parent's own numbers are for managers (D33).
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
 - A person can own at most five kennels on one installation. Enough?
 - Forms from parents stay "new" until someone deals with them; there is no expiry.
@@ -222,20 +246,21 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The daily summary is a button the owner presses. Should it be sent by itself each evening (it would need WhatsApp's
   paid Business API, which `07` explains Wagbook does not use)?
 - Reports are for owners and managers only (D20), including how full the kennel was. Should staff see occupancy?
-- Tax by rate counts issued bills by their bill date and leaves cancelled ones out. A bill cancelled in a later month
-  disappears from the earlier month's figure. Is that what the accountant wants for GST returns, or should a
-  cancellation show in the month it happened? (A question for the accountant.)
+- Tax by rate counts issued bills by their bill date and leaves cancelled ones out. What we found (`06`) says a bill
+  cancelled after its month's return stays in that month and comes off by credit note in the month it was cancelled.
+  The report is right only for bills cancelled in their own month. For the accountant, then credit notes.
 - "Received less spent" is money in and out in the month, not profit: it ignores what is owed and when bills fall.
-- Erasing a parent keeps their issued bills, payments and the stays' dates and prices, and empties everything else
-  (D25). Is that what the DPDP Act and GST law ask, no more and no less? (For a lawyer.)
-- Erasing also deletes the pets' incidents. A bite incident might matter to the kennel later. Keep incidents, emptied of
-  names, instead?
+- Erasing a parent keeps their issued bills, payments, the stays' dates and prices, and the pets (D25, D30). What we
+  found (`05`) says tax law's 72 months covers the bills; DPDP Rule 8(3) may ask for a year's hold before erasing; free
+  text on pets and microchip numbers may still point at the parent. (For a lawyer.)
 - Two-step sign-in has no recovery codes; a lost phone needs an administrator (`10`). Enough for a small kennel?
 - The intake form accepts one certificate per pet. Some parents have two cards (rabies, and the yearly shot).
 - The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
   signs in from one connection at shift change should not reach 20; tell us if it does.
 
 ## Known rough edges in what is built
+
+- No credit notes, and no composition scheme mode (a bill of supply's own words are not printed).
 
 - Proof photos on care tasks are not built (the unused field was removed in M13).
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
@@ -249,7 +274,8 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
 - History of changes shows an added row's fields collapsed and names only people, pets, parents, kennels and price list
   rows; other ids read "a record no longer here". An erasure shows as a change to "clients".
-- An erased parent and their pets appear as "Erased" (stored in English) where a past stay or bill names them.
+- An erased parent appears as "Erased" (stored in English) where a past stay or bill names them. Their pets keep their
+  names but are hidden for good, because their parent stays hidden.
 - The export names photos and certificates by their storage paths; it does not include the files.
 - A certificate sent with the intake form is lost if the form arrives but the upload fails: the parent is told to send
   it on WhatsApp.
@@ -262,7 +288,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 336 tests, build
+npm run check        # dash check, lint, typecheck, 355 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -271,6 +297,10 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 21 October 2026. M14, the owner's answers: stays priced in parts (`stay_charges`: nights alone, day boarding then
+  boarding), parents' phone numbers for managers, erasure keeps pets, bills in English with a translation on request,
+  and GST and DPDP research for the accountant and lawyer. e2e walk extended to 39 tests.
 
 - 20 October 2026. Only owners delete (D29): every delete policy, erasing a parent (`WB074`), a second tap on every
   deletion, and a deleted expense removes its receipt.

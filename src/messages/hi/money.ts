@@ -113,10 +113,11 @@ export const moneyArea: typeof English = {
       issuedOnly: "भुगतान किसी जारी बिल पर दर्ज करें, या बुकिंग पर एडवांस के रूप में।",
     },
   },
-  // A bill's lines and totals (staff and parent), and the parent's bill page. In the parent language.
+  // A bill's lines and totals (staff and parent), and the parent's bill page. Bills are in English; a parent who asks sees
+  // these after each heading, in brackets (src/lib/bill-words.ts). Lines with {values} stay in English there.
   invoice: {
     title: "आपका बिल",
-    taxInvoice: "Tax invoice (टैक्स इनवॉइस)",
+    taxInvoice: "टैक्स इनवॉइस",
     bill: "बिल",
     // {id} is drawn in bold.
     sellerGstin: "GSTIN: {id}",

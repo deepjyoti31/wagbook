@@ -94,6 +94,8 @@ export const core: typeof English = {
       peak_periods_check: "आखिरी दिन, पहले दिन से पहले नहीं हो सकता।",
       play_yards_org_id_name_key: "इस नाम का यार्ड पहले से है।",
       services_shared_price_only_for_stays: "साझा केनेल का दाम सिर्फ़ बोर्डिंग और डे बोर्डिंग के लिए है।",
+      bookings_boarding_from_inside_stay: "पहली रात डे बोर्डिंग के पहले दिन के बाद और चेक आउट से पहले होनी चाहिए।",
+      bookings_day_part_has_a_price: "डे बोर्डिंग के दिनों के लिए प्रति दिन दाम लिखें।",
       invoices_one_live_per_booking: "इस स्टे का बिल पहले से है। उसे बुकिंग से खोलें।",
       invoices_one_live_per_family: "इस परिवार का बिल पहले से है। उसे बुकिंग से खोलें।",
     },

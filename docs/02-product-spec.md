@@ -178,7 +178,10 @@ birth, weight, colour, microchip, food, health, allergies, behaviour, flags, vet
 
 `/app/clients/{id}`: phone numbers, what they owe in all, WhatsApp; their pets, stays and bills with what is due; every
 detail editable (name, phones, email, address, emergency contact, GSTIN and state, notes, consent if none is on record).
-For owners and managers, "What we hold about them": download their details; owners can also erase them (B8).
+The parent's own numbers (mobile and another number) are changed by owners and managers only (`WB002`,
+`clients_guard_phone`); staff see a line saying so instead of the boxes, and still add new parents with their numbers
+(D33). **Bills**: "English only" (the default), or "English and हिन्दी" or "English and ಕನ್ನಡ" for a parent who asks
+(D31, E2). For owners and managers, "What we hold about them": download their details; owners can also erase them (B8).
 
 **Merging (B9, M6).** For owners and managers: "Same person as another parent?" finds another record by its phone
 number and merges it into this one. Pets, their stays, bills (issued ones keep the buyer printed on them), payments and
@@ -220,14 +223,15 @@ On the parent page, for owners and managers (`WB070` for anyone else); erasing i
   vaccinations, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
   lines, payments, the intake forms they sent, and the storage paths of their photos and certificates (the file names
   them; it does not contain them).
-- **Erase their details**, after ticking "I understand that this cannot be undone" (`erase_client`): deletes their
-  pets' vaccinations, routines and incidents, every update, care task and play session of their stays, their intake
-  forms, draft bills, and every photo and certificate file; empties every personal detail on the parent, their pets and
-  their stays (the parent and pets are then shown as "Erased" where a past stay or bill names them); and takes the
-  personal text out of the history of changes. Issued and cancelled bills stay, with the buyer printed on them, and so
-  do payments and the stays' dates and prices, because tax law requires the kennel to keep them. Refused while a pet is
-  in house (`WB071`) or a stay is still to come (`WB072`). The erasure itself is in the history of changes. The phone
-  number is free for a new record afterwards.
+- **Erase their details**, after ticking "I understand that this cannot be undone" (`erase_client`): empties every
+  personal detail on the parent (the parent is then shown as "Erased" where a past stay or bill names them) and the
+  notes on their stays; deletes the updates sent to them (with their photos), their intake forms (with their files),
+  draft bills, and the vaccination certificate files, because a card carries the owner's name and address; and takes
+  the stays' notes out of the history of changes. **The pets stay** (D30): their details, photo, vaccinations (without
+  the card), routines, incidents, care tasks and play, hidden from lists. Issued and cancelled bills stay, with the
+  buyer printed on them, and so do payments and the stays' dates and prices, because tax law requires the kennel to
+  keep them. Refused while a pet is in house (`WB071`) or a stay is still to come (`WB072`). The erasure itself is in
+  the history of changes. The phone number is free for a new record afterwards.
 
 ---
 
@@ -280,11 +284,21 @@ cancelling happens. A Calendar button opens C5.
   estimated total).
 - **Booked together**: the other pets of a family booking.
 - **What it costs**: the stay and its extras as lines with an estimated total (tax included where the kennel charges
-  it); add an extra from the price list or a one-off item; owners can remove one, after a second tap.
+  it); add an extra from the price list or a one-off item; owners can remove one, after a second tap. The stay is
+  priced by the database (`stay_charges`, D32): one line, or "Boarding, sharing a kennel" and "Boarding, kennel to
+  itself" for a pet at the shared price, or "Day boarding" then "Boarding" for a stay that turned into boarding.
 - **Change this booking**: dates, kennel (free ones offered), expected drop-off and pick-up times, belongings, notes;
   price per night or day, a discount, and boarding or day boarding (the kind of stay) for owners and managers only
-  (`WB022` for staff). Changing the kind leaves the price as typed, with a hint to check it; the kennel and pet
-  overlap rules apply to the new kind at once.
+  (`WB022` for staff). Changing the kind applies to the whole stay and leaves the price as typed, with a hint to check
+  it; the kennel and pet overlap rules apply to the new kind at once. Owners and managers also see the price with the
+  kennel to itself (a pet at the shared price) and the price per day before the first night (a stay that turned into
+  boarding).
+- **Staying overnight** (owners and managers, on day boarding that is still open): first night (today by default),
+  check-out date and price per night (the usual boarding price by default). Change to boarding keeps the days before
+  the first night as day boarding at their own price and makes the nights from it boarding (`boarding_from`,
+  `day_rate_minor`, D32). A first night on the first day turns the whole stay into boarding. The booking then says
+  "Day boarding until 15 Apr, then staying nights from 16 Apr." The database refuses a first night outside the stay
+  (`bookings_boarding_from_inside_stay`).
 - **The pet's own routines** (D2) and what the parent said about food, health, allergies and behaviour.
 - **Cancel**, with a reason (required), and a warning when the stay touches a no-refund peak period.
 
@@ -298,7 +312,10 @@ group that mixes parents (`WB024`), and a family stays as it was booked (`WB026`
 
 With two pets ticked, Kennels offers "A kennel each" (the first pet gets the chosen kennel, the other gets one at
 check-in) or "One kennel together": then a kennel must be chosen, only kennels with room for both are offered, both
-pets get it, and the second is booked at the shared kennel price from Settings (when one is set). A kennel holds two
+pets get it, and the second is booked at the shared kennel price from Settings (when one is set), carrying the usual
+price for any night it has the kennel to itself (`alone_rate_minor`, D32): when its sibling leaves early (checked out
+before its date, or its dates shortened), comes late or moves kennel, those nights are billed at the usual price. Staff
+can book the shared price only with the usual price for nights alone (`WB023`). A kennel holds two
 pets of one parent at most, never pets of different parents (D27); Today, the booking page and the calendar offer and
 label a sibling's kennel ("K05, with Coco"), and the booking page says "Shares K05 with Coco." The calendar shows both in
 the kennel's square, and its top row counts kennels in use, with the number of pets when siblings share.
@@ -418,8 +435,10 @@ Details in [06-billing-and-gst.md](06-billing-and-gst.md).
 
 ### E1. Bills. Built.
 
-Make bill, on the booking page (and offered after check-out), builds a draft from the booking: the stay at its booked
-rate, discount and tax, then each extra (`billForBooking()`, `stayLines()`, `computeInvoice()`), saved in one go
+Make bill, on the booking page (and offered after check-out), builds a draft from the booking: the stay as the
+database prices it (`stay_charges`: at its booked rate, or split into nights shared and nights alone, or days and then
+nights, D32), with its discount on the largest line and its tax, then each extra (`billForBooking()`, `stayLines()`,
+`computeInvoice()`), saved in one go
 (`save_invoice_draft`). A stay has one live bill; pressing Make bill again brings a draft back in line with the booking
 or opens the issued bill. Owners and managers can change, add and remove lines of a draft. Issue checks every sum
 (`issue_invoice`), gives the next number for the financial year and freezes it; staff can issue only a bill exactly as
@@ -433,7 +452,9 @@ on its own (`WB053`); advances on any of the pets count against the family's bil
 
 ### E2. Bill for the parent. Built.
 
-`/inv/{token}`: titled Tax invoice or Bill; the kennel's name, legal name, address, GSTIN or tax number and state; the
+`/inv/{token}`: in English (D31). For a parent who asked for their language (Bills, on the parent page), every heading is
+followed by its Hindi or Kannada in brackets, "Tax invoice (टैक्स इनवॉइस)"; lines with amounts stay in English only.
+Titled Tax invoice or Bill; the kennel's name, legal name, address, GSTIN or tax number and state; the
 number and date; who is billed; place of supply under GST; each line with its SAC, quantity, price, discount and tax
 (CGST and SGST, IGST, or the kennel's one tax); totals, round off, and the amount in words; what is paid and what is
 due. While money is due and the bill carries a UPI ID: "Pay with UPI" on phones and a QR code everywhere, drawn on the

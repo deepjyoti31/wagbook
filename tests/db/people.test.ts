@@ -215,3 +215,24 @@ describe("hiding pets and parents from lists", () => {
     expect(e.message).toContain("clients_org_phone_key");
   });
 });
+
+describe("a parent's phone numbers", () => {
+  const set = (actor: string, column: "phone" | "alt_phone" | "emergency_phone" | "notes", value: string) =>
+    as(db, user(actor), () => db.query(`update public.clients set ${column} = $2 where id = $1`, [k.client, value]));
+
+  it("are changed only by owners and managers", async () => {
+    for (const column of ["phone", "alt_phone"] as const) {
+      expect((await errorOf(() => set(staff, column, "+919444400001"))).message).toContain("WB002");
+    }
+    await set(manager, "phone", "+919444400002");
+    await set(k.owner, "alt_phone", "+919444400003");
+    const now = await db.query<{ phone: string; alt_phone: string }>("select phone, alt_phone from public.clients where id = $1", [k.client]);
+    expect(now.rows[0]).toEqual({ phone: "+919444400002", alt_phone: "+919444400003" });
+  });
+
+  it("do not stop staff changing the rest, or adding a new parent with a number", async () => {
+    await set(staff, "notes", "Calls after six");
+    await set(staff, "emergency_phone", "+919444400004");
+    await as(db, user(staff), () => db.query("insert into public.clients (org_id, full_name, phone) values ($1, 'New parent', '+919444400005')", [k.org]));
+  });
+});

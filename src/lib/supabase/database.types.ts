@@ -129,6 +129,9 @@ export type Database = {
           end_date: string;
           kennel_id: string | null;
           rate_minor: number;
+          alone_rate_minor: number | null;
+          boarding_from: string | null;
+          day_rate_minor: number | null;
           discount_minor: number;
           tax_rate_bp: number;
           sac_code: string | null;
@@ -163,6 +166,9 @@ export type Database = {
           end_date: string;
           kennel_id?: string | null;
           rate_minor: number;
+          alone_rate_minor?: number | null;
+          boarding_from?: string | null;
+          day_rate_minor?: number | null;
           discount_minor?: number;
           tax_rate_bp?: number;
           sac_code?: string | null;
@@ -197,6 +203,9 @@ export type Database = {
           end_date?: string;
           kennel_id?: string | null;
           rate_minor?: number;
+          alone_rate_minor?: number | null;
+          boarding_from?: string | null;
+          day_rate_minor?: number | null;
           discount_minor?: number;
           tax_rate_bp?: number;
           sac_code?: string | null;
@@ -408,6 +417,7 @@ export type Database = {
           notes: string | null;
           consent_at: string | null;
           consent_source: string | null;
+          bill_translation: string | null;
           created_by: string | null;
           deleted_at: string | null;
           erased_at: string | null;
@@ -431,6 +441,7 @@ export type Database = {
           notes?: string | null;
           consent_at?: string | null;
           consent_source?: string | null;
+          bill_translation?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
@@ -454,6 +465,7 @@ export type Database = {
           notes?: string | null;
           consent_at?: string | null;
           consent_source?: string | null;
+          bill_translation?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
@@ -1878,6 +1890,10 @@ export type Database = {
       set_my_language: {
         Args: { p_language: string };
         Returns: undefined;
+      };
+      stay_charges: {
+        Args: { p_org: string; p_bookings: string[] };
+        Returns: { booking_id: string; part: string; quantity: number; unit_price_minor: number; discount_minor: number }[];
       };
       stay_media_visible: {
         Args: { p_name: string };

@@ -9,7 +9,7 @@ import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, S
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, whatsappLink } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, LANGUAGE_NAMES } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +37,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
   const res = await supabase
     .from("clients")
-    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at, erased_at")
+    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, deleted_at, erased_at")
     .eq("org_id", org.id)
     .eq("id", id)
     .maybeSingle();
@@ -168,12 +168,18 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
             <Input name="full_name" required maxLength={120} defaultValue={c.full_name} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={f.mobile} hint={f.mobileHint}>
-              <Input name="phone" type="tel" required defaultValue={c.phone} />
-            </Field>
-            <Field label={f.altPhone}>
-              <Input name="alt_phone" type="tel" defaultValue={c.alt_phone ?? ""} />
-            </Field>
+            {canManage ? (
+              <>
+                <Field label={f.mobile} hint={f.mobileHint}>
+                  <Input name="phone" type="tel" required defaultValue={c.phone} />
+                </Field>
+                <Field label={f.altPhone}>
+                  <Input name="alt_phone" type="tel" defaultValue={c.alt_phone ?? ""} />
+                </Field>
+              </>
+            ) : (
+              <p className="text-slate sm:col-span-2">{p.phoneByManager}</p>
+            )}
             <Field label={f.email}>
               <Input name="email" type="email" defaultValue={c.email ?? ""} />
             </Field>
@@ -203,6 +209,16 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                 {Object.entries(GST_STATES).map(([code, state]) => (
                   <option key={code} value={code}>
                     {code} {state}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={f.billLanguage} hint={f.billLanguageHint}>
+              <Select name="bill_translation" defaultValue={c.bill_translation ?? ""}>
+                <option value="">{f.billEnglishOnly}</option>
+                {(["hi", "kn"] as const).map((l) => (
+                  <option key={l} value={l}>
+                    {fill(f.billWith, { language: LANGUAGE_NAMES[l] })}
                   </option>
                 ))}
               </Select>

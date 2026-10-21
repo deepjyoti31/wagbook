@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { BILLABLE_IN_FAMILY, billForBooking, billForFamily, billFromLines, draftPayload, PAYMENT_METHODS } from "@/lib/billing";
-import { isISODate, parseMoney, todayIn, type LineInput } from "@/lib/core";
+import { isISODate, parseMoney, todayIn, toStayCharges, type LineInput } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { getAppI18n } from "@/lib/i18n-server";
@@ -35,7 +35,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   // The stays this bill covers: the booking, or its family.
   const stays = await supabase
     .from("bookings")
-    .select("id, client_id, kind, start_date, end_date, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
+    .select("id, client_id, kind, start_date, end_date, boarding_from, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
     .eq("org_id", org.id)
     .in(group ? "group_id" : "id", [group ?? booking.data.id])
     .in("status", group ? [...BILLABLE_IN_FAMILY] : ["confirmed", "checked_in", "checked_out", "no_show"])
@@ -44,7 +44,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   if (stays.error) return { error: friendlyError(stays.error, t) };
   if (stays.data.length === 0) return { error: t.m.bill.errors.nothingToBill };
 
-  const [items, existing] = await Promise.all([
+  const [items, existing, charges] = await Promise.all([
     supabase
       .from("booking_items")
       .select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code")
@@ -58,17 +58,20 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
       .eq(group ? "group_id" : "booking_id", group ?? booking.data.id)
       .neq("status", "void")
       .maybeSingle(),
+    // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
+    supabase.rpc("stay_charges", { p_org: org.id, p_bookings: stays.data.map((b) => b.id) }),
   ]);
-  if (items.error || existing.error) return { error: friendlyError(items.error ?? existing.error, t) };
+  if (items.error || existing.error || charges.error) return { error: friendlyError(items.error ?? existing.error ?? charges.error, t) };
+  const billable = stays.data.map((b) => ({ ...b, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
   if (existing.data?.status === "issued") redirect(`/app/bills/${existing.data.id}`);
 
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
   const totals = group
     ? billForFamily(
         org,
-        stays.data.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
+        billable.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
       )
-    : billForBooking(org, stays.data[0].pets?.name ?? "Pet", stays.data[0], items.data);
+    : billForBooking(org, billable[0].pets?.name ?? "Pet", billable[0], items.data);
   let invoiceId = existing.data?.id;
   if (!invoiceId) {
     const created = await supabase

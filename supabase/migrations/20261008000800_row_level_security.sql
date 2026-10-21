@@ -152,21 +152,21 @@ $$;
 -- stamp_actor, give their own answer.)
 revoke insert, update on public.clients from authenticated;
 grant insert (org_id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
-              emergency_name, emergency_phone, notes, consent_at, consent_source, created_by, deleted_at)
+              emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, created_by, deleted_at)
   on public.clients to authenticated;
 grant update (org_id, created_by, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
-              emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at)
+              emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, deleted_at)
   on public.clients to authenticated;
 
 -- Bookings: the "who and when" stamps, the creator and the secret link token
 -- are written only by the database, so they are not in the list of columns a
 -- client may send.
 revoke insert, update on public.bookings from authenticated;
-grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
+grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
+              boarding_from, day_rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
   on public.bookings to authenticated;
-grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
+grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
+              boarding_from, day_rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
               vaccinations_checked_at, notes, group_id)
   on public.bookings to authenticated;
 -- Who may change a price is decided by a trigger, not here: owners, managers
@@ -359,6 +359,7 @@ grant execute on function public.generate_care_tasks(uuid, date) to authenticate
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
 grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
+grant execute on function public.stay_charges(uuid, uuid[]) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;

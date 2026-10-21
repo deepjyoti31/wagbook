@@ -25,6 +25,7 @@ export const bookingsArea: typeof English = {
       cancelled: "बुकिंग रद्द हो गई। जगह फिर से खाली है।",
       no_show: "नहीं आया, ऐसा लिख दिया। जगह फिर से खाली है।",
       extended: "ठहराव आज तक बढ़ा दिया।",
+      boarding: "अब बोर्डिंग है। पहली रात से पहले के दिन डे बोर्डिंग के रूप में बिल होंगे।",
     },
     peakNoRefund: "{name}, कोई रिफ़ंड नहीं",
     cancelledBecause: "रद्द: {reason}",
@@ -38,6 +39,8 @@ export const bookingsArea: typeof English = {
     bookedTogetherTitle: "एक साथ बुक हुए",
     kennelWith: "{kennel}, {pets} के साथ",
     sharesWith: "{pets} के साथ {kennel} में।",
+    // A stay that began as day boarding and now stays nights. {date} is the last day of day boarding, {night} the first night.
+    dayThenBoarding: "{date} तक डे बोर्डिंग, फिर {night} से रात को रुकना।",
     costs: {
       title: "कितना खर्च होगा",
       line: "{what}, {quantity} x {price}",
@@ -45,6 +48,9 @@ export const bookingsArea: typeof English = {
       total: "अंदाज़न कुल",
       totalWithTax: "अंदाज़न कुल, {tax} टैक्स के साथ",
       note: "यह अंदाज़ा है। बिल इन्हीं लाइनों से बनता है, ज़्यादातर चेक आउट के समय।",
+      // A pet at the shared kennel price: nights with its sibling, and nights it had the kennel to itself. {what} is "Boarding" or "Day boarding".
+      shared: "{what}, केनेल साझा",
+      alone: "{what}, केनेल में अकेले",
     },
     extra: {
       title: "एक्स्ट्रा जोड़ें",
@@ -100,6 +106,19 @@ export const bookingsArea: typeof English = {
       belongings: "सामान",
       belongingsHint: "बिस्तर, पट्टा, खाना, दवाएं। ताकि सब कुछ वापस घर जाए।",
       notes: "स्टाफ़ के लिए नोट",
+      aloneRate: "केनेल में अकेले होने पर दाम",
+      aloneRateHint: "प्रति रात या दिन, जब साथ वाला पालतू केनेल में न हो। खाली छोड़ें तो ऊपर वाला दाम हर रात लगेगा।",
+      dayRate: "पहली रात से पहले, प्रति दिन दाम",
+    },
+    // Day boarding that now stays nights: the days so far stay day boarding.
+    overnight: {
+      title: "रात को रुकना",
+      text: "अगर {pet} अब रात को रुकेगा, तो अब तक के दिन डे बोर्डिंग रहेंगे और पहली रात से आगे की रातें बोर्डिंग, हर एक अपने दाम पर।",
+      firstNight: "पहली रात",
+      checkOut: "चेक आउट की तारीख",
+      pricePerNight: "प्रति रात दाम",
+      save: "बोर्डिंग में बदलें",
+      saving: "बदल रहे हैं",
     },
     routines: {
       title: "{pet} के अपने रूटीन",
@@ -194,6 +213,9 @@ export const bookingsArea: typeof English = {
       descriptionLong: "जानकारी 200 अक्षरों से कम रखें।",
       itemPrice: "चीज़ की कीमत लिखें, जैसे 500।",
       extraNotFound: "वह एक्स्ट्रा नहीं मिला।",
+      firstNight: "पहली रात की तारीख चुनें।",
+      checkOutAfterNight: "चेक आउट पहली रात के बाद होना चाहिए।",
+      onlyDaycare: "सिर्फ़ डे बोर्डिंग वाला ठहराव ही बोर्डिंग में बदल सकता है।",
     },
     saved: "बुकिंग सेव हो गई।",
     alreadyToday: "यह ठहराव पहले से आज तक है।",

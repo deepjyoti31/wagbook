@@ -110,7 +110,7 @@ export const moneyArea: typeof English = {
   },
   invoice: {
     title: "ನಿಮ್ಮ ಬಿಲ್",
-    taxInvoice: "Tax invoice (ಟ್ಯಾಕ್ಸ್ ಇನ್‌ವಾಯ್ಸ್)",
+    taxInvoice: "ಟ್ಯಾಕ್ಸ್ ಇನ್‌ವಾಯ್ಸ್",
     bill: "ಬಿಲ್",
     sellerGstin: "GSTIN: {id}",
     sellerGstinState: "GSTIN: {id}. ರಾಜ್ಯ: {state}",

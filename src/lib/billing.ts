@@ -1,4 +1,4 @@
-import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type TaxContext } from "./core";
+import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type StayCharge, type TaxContext } from "./core";
 import type { Enums, Tables } from "./supabase/database.types";
 import type { Messages } from "@/messages";
 
@@ -30,6 +30,10 @@ export interface BillableBooking {
   discount_minor: number;
   tax_rate_bp: number;
   sac_code: string | null;
+  /** The first night of a stay that began as day boarding. */
+  boarding_from?: string | null;
+  /** The stay's lines from stay_charges() in the database. Without them, every night at rate_minor. */
+  charges?: readonly StayCharge[];
 }
 
 export interface BillableItem {
@@ -41,8 +45,8 @@ export interface BillableItem {
 }
 
 /**
- * The bill a booking should get: its stay at the booked rate, discount and
- * tax, then each extra. Exactly what invoice_expected_lines() in the database
+ * The bill a booking should get: its stay (at the booked rate, or split as
+ * stay_charges() says), discount and tax, then each extra. Exactly what invoice_expected_lines() in the database
  * expects, so staff can issue it.
  */
 export function billForBooking(org: OrgTax, petName: string, b: BillableBooking, items: readonly BillableItem[]): InvoiceTotals {
@@ -55,6 +59,8 @@ export function billForBooking(org: OrgTax, petName: string, b: BillableBooking,
     discountMinor: b.discount_minor,
     taxRateBp: b.tax_rate_bp,
     sacCode: b.sac_code,
+    boardingFrom: b.boarding_from,
+    charges: b.charges,
     addOns: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp, sacCode: i.sac_code })),
   });
   return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
@@ -88,6 +94,8 @@ export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): In
       discountMinor: b.discount_minor,
       taxRateBp: b.tax_rate_bp,
       sacCode: b.sac_code,
+      boardingFrom: b.boarding_from,
+      charges: b.charges,
       addOns: items.map((i) => ({
         description: `${petName}: ${i.description}`.slice(0, 300),
         quantity: Number(i.quantity),

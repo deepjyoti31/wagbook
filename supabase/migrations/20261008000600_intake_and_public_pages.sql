@@ -425,7 +425,8 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
-    'language', o.parent_language,
+    -- Bills are in English; a parent who asked sees the headings in their language too.
+    'translation', c.bill_translation,
     'locale', o.locale,
     'number', i.number,
     'status', i.status,
@@ -466,9 +467,10 @@ as $$
   )
   from public.invoices i
   join public.organizations o on o.id = i.org_id
+  left join public.clients c on c.org_id = i.org_id and c.id = i.client_id
   where char_length(p_token) = 64
     and i.public_token = p_token
     and i.status in ('issued', 'void');
 $$;
 comment on function public.get_public_invoice(text) is
-  'PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, and the kennel''s UPI details for a pay link. Drafts are never shown.';
+  'PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, the kennel''s UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.';

@@ -338,10 +338,29 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M14. The owner's answers
+
+- [x] Finished 21 October 2026.
+
+**Build**
+
+1. [x] A pet at the shared kennel price pays the usual price for nights it has the kennel to itself; a sibling
+   checked out early counts up to the day it left (`stay_charges`, D32).
+2. [x] Day boarding that turns into boarding is billed as days and then nights, each at its price (Staying overnight
+   on the booking page, D32).
+3. [x] Only owners and managers change a parent's phone numbers (`WB002`, D33).
+4. [x] Erasing a parent keeps their pets' records (D30).
+5. [x] Bills are in English, with a parent's language in brackets on request (D31).
+6. [x] What the law says on GST invoices, cancelling bills, record keeping and erasure, written up for the accountant
+   and the lawyer (`06`, `05`).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
+- Credit notes, for a bill cancelled after its month's GST return (`06`, "What the law says").
 - Recurring day boarding (every weekday).
 - Waiting list when full.
 - Packages and prepaid passes.

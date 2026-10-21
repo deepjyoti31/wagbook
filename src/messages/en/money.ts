@@ -111,7 +111,8 @@ export const moneyArea = {
       issuedOnly: "Record a payment against an issued bill, or as an advance on the booking.",
     },
   },
-  // A bill's lines and totals (staff and parent), and the parent's bill page. In the parent language.
+  // A bill's lines and totals (staff and parent), and the parent's bill page. Bills are in English; a parent who asks sees
+  // these after each heading, in brackets (src/lib/bill-words.ts). Lines with {values} stay in English there.
   invoice: {
     title: "Your bill",
     taxInvoice: "Tax invoice",

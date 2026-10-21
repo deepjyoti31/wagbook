@@ -137,6 +137,9 @@ create table public.bookings (
   end_date date not null,
   kennel_id uuid,
   rate_minor bigint not null check (rate_minor >= 0),
+  alone_rate_minor bigint check (alone_rate_minor is null or alone_rate_minor >= 0),
+  boarding_from date,
+  day_rate_minor bigint check (day_rate_minor is null or day_rate_minor >= 0),
   discount_minor bigint not null default 0 check (discount_minor >= 0),
   tax_rate_bp integer not null default 0 check (tax_rate_bp between 0 and 10000),
   sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
@@ -170,6 +173,13 @@ create table public.bookings (
   constraint bookings_dates_in_order check (end_date >= start_date),
   constraint bookings_boarding_has_a_night check (kind <> 'boarding' or end_date > start_date),
   constraint bookings_at_most_a_year check (end_date - start_date <= 366),
+  -- A stay that began as day boarding and became boarding: the days before
+  -- boarding_from are day boarding at day_rate_minor, the nights from it on are
+  -- boarding at rate_minor. Both set or neither.
+  constraint bookings_day_part_has_a_price check ((boarding_from is null) = (day_rate_minor is null)),
+  constraint bookings_boarding_from_inside_stay check (
+    boarding_from is null or (kind = 'boarding' and boarding_from > start_date and boarding_from < end_date)
+  ),
 
   -- THE double-booking guard. Two bookings of different parents that hold
   -- space can never overlap in the same kennel. Pets of one parent may share
@@ -194,7 +204,12 @@ comment on column public.bookings.start_date is 'Check-in date (calendar date at
 comment on column public.bookings.end_date is 'Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date).';
 comment on column public.bookings.kennel_id is 'The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel).';
 comment on column public.bookings.rate_minor is 'Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history.';
-comment on column public.bookings.discount_minor is 'Discount on the stay itself, before tax.';
+comment on column public.bookings.alone_rate_minor is
+  'For a pet booked at the shared kennel price: the price per night or day for the nights or days it has the kennel to itself (its sibling left early or came late), usually the kennel''s usual price. Empty: rate_minor applies throughout. See stay_charges().';
+comment on column public.bookings.boarding_from is
+  'For a stay that began as day boarding and became boarding: the first night. The days before it are billed as day boarding at day_rate_minor, the nights from it at rate_minor. Empty for every other stay.';
+comment on column public.bookings.day_rate_minor is 'With boarding_from: the price per day for the days of day boarding before the first night.';
+comment on column public.bookings.discount_minor is 'Discount on the stay itself, before tax. On a bill it goes on the stay''s largest line (stay_charges()).';
 comment on column public.bookings.tax_rate_bp is 'Tax rate for the stay, copied when booked.';
 comment on column public.bookings.expected_arrival is 'When the parent said they would drop off. For planning the day; not enforced.';
 comment on column public.bookings.belongings is 'What came with the pet (bed, leash, food, medicines) so it all goes home again.';
@@ -301,6 +316,9 @@ begin
        or new.tax_rate_bp is distinct from old.tax_rate_bp
        or new.sac_code is distinct from old.sac_code
        or new.kind is distinct from old.kind
+       or new.alone_rate_minor is distinct from old.alone_rate_minor
+       or new.boarding_from is distinct from old.boarding_from
+       or new.day_rate_minor is distinct from old.day_rate_minor
     then
       raise exception 'WB022: only an owner or manager can change the price or the kind of stay' using errcode = '42501';
     end if;
@@ -311,14 +329,17 @@ begin
   -- usual price, or the shared kennel price for a pet put in a kennel with
   -- another pet of its parent (bookings_check_shared_price checks the sharing
   -- once the whole statement is in, because a family is inserted together).
-  if new.discount_minor <> 0 or not exists (
+  -- A pet at the shared price pays the usual price for nights it has the
+  -- kennel to itself, so that price goes with it.
+  if new.discount_minor <> 0 or new.boarding_from is not null or not exists (
     select 1
     from public.services s
     join public.organizations o on o.id = s.org_id
     where s.org_id = new.org_id
       and s.is_active
       and s.kind::text = new.kind::text
-      and (s.price_minor = new.rate_minor or (new.kennel_id is not null and s.shared_price_minor = new.rate_minor))
+      and ((s.price_minor = new.rate_minor and new.alone_rate_minor is null)
+           or (new.kennel_id is not null and s.shared_price_minor = new.rate_minor and new.alone_rate_minor = s.price_minor))
       and new.tax_rate_bp = case when o.tax_mode = 'none' then 0 else coalesce(s.tax_rate_bp, o.default_tax_rate_bp) end
       and new.sac_code is not distinct from s.sac_code
   ) then
@@ -328,7 +349,7 @@ begin
 end;
 $$;
 comment on function public.bookings_guard_price() is
-  'Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel), with no discount, and cannot change the price, discount, tax or kind of an existing booking.';
+  'Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel, with the usual price for nights alone), with no discount, and cannot change the price, discount, tax or kind of an existing booking, or when it turns from day boarding into boarding.';
 
 create trigger bookings_guard_price
   before insert or update on public.bookings

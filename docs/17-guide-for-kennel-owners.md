@@ -55,15 +55,17 @@ Press **New booking** on Today. Choose the pet (or add a new one with its parent
 it. Wagbook will not let two pets share a kennel on the same night, and will not let you take more pets than you have
 kennels. If something clashes, it tells you in a sentence what and when.
 
-Two pets of one family can be booked together. A booking can also start as a **request**, which holds no kennel until
-you confirm it.
+Two pets of one family can be booked together, in a kennel each or in one kennel, the second at your shared kennel
+price. If one goes home early, the nights the other has the kennel to itself are billed at your usual price. A booking
+can also start as a **request**, which holds no kennel until you confirm it.
 
 Every booking has its own page:
 
 <img src="guide/04-booking.jpg" alt="A booking: check out, updates, the parent's link" width="270">
 
 From here you check the pet in and out, write updates for the parent, add extras (a bath, a pick-up), and send the
-parent their link.
+parent their link. If a pet in day boarding stays the night after all, an owner or manager uses **Staying overnight**:
+the days so far stay day boarding, and the nights are boarding, each at its own price on the bill.
 
 ## The care round
 
@@ -84,7 +86,8 @@ If the phone loses its connection, ticks are kept on the phone and sent when it 
 
 **Pets** finds any pet by its name, its parent's name or a phone number. A pet's page has its photo, food, health,
 vaccinations (with a warning when one has run out or will run out during a stay), incidents and stays. Anyone on the
-team can keep these up to date.
+team can keep these up to date. A parent's phone numbers are changed only by an owner or manager, because a wrong
+number sends their updates and bills to someone else.
 
 ### The form parents fill in
 
@@ -141,18 +144,22 @@ downloaded for your accountant.
 ## When a parent asks about their details
 
 India's data protection law lets a parent ask what you hold about them, and ask you to delete it. On the parent's page
-(open a pet, then its parent), owners and managers find **What we hold about them**:
+(open a pet, then its parent), owners and managers find **What we hold about them** (only an owner can erase):
 
 - **Download their details** gives you one file with everything. Send it to the parent.
-- **Erase their details** deletes their pets' notes, photos, vaccinations, updates, forms and certificates, and
-  empties their name, phone and address. Bills you already issued stay, because tax law requires you to keep them.
+- **Erase their details** empties their name, phone numbers, address and notes, and deletes the updates you sent
+  them, their forms and the vaccination cards (a card shows the owner's name). Their pets' records stay, hidden: the
+  pet's details, photo, vaccinations, routines and incidents. Bills you already issued stay, because tax law requires
+  you to keep them.
   This cannot be undone, so Wagbook asks you to tick a box first. It is refused while their pet is still with you or a
   stay is booked.
 
 ## Languages
 
 Each person chooses the language Wagbook speaks to them under **More**: English, Hindi or Kannada. Under **Settings**
-you choose the language of the pages and messages parents get.
+you choose the language of the pages and messages parents get. Bills are always in English; if a parent asks, choose
+**Bills: English and हिन्दी** (or ಕನ್ನಡ) on their page, and the headings of their bills show in that language too, in
+brackets.
 
 ## Getting help
 

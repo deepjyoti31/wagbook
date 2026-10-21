@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 67.
+Migrations applied: 11. Tables: 24. Views: 1. Functions: 69.
 
 ## Contents
 
@@ -138,7 +138,10 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `end_date` | `date` | yes |  | Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date). |
 | `kennel_id` | `uuid` |  |  | The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel). |
 | `rate_minor` | `bigint` | yes |  | Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history. |
-| `discount_minor` | `bigint` | yes | `0` | Discount on the stay itself, before tax. |
+| `alone_rate_minor` | `bigint` |  |  | For a pet booked at the shared kennel price: the price per night or day for the nights or days it has the kennel to itself (its sibling left early or came late), usually the kennel's usual price. Empty: rate_minor applies throughout. See stay_charges(). |
+| `boarding_from` | `date` |  |  | For a stay that began as day boarding and became boarding: the first night. The days before it are billed as day boarding at day_rate_minor, the nights from it at rate_minor. Empty for every other stay. |
+| `day_rate_minor` | `bigint` |  |  | With boarding_from: the price per day for the days of day boarding before the first night. |
+| `discount_minor` | `bigint` | yes | `0` | Discount on the stay itself, before tax. On a bill it goes on the stay's largest line (stay_charges()). |
 | `tax_rate_bp` | `integer` | yes | `0` | Tax rate for the stay, copied when booked. |
 | `sac_code` | `text` |  |  |  |
 | `expected_arrival` | `time without time zone` |  |  | When the parent said they would drop off. For planning the day; not enforced. |
@@ -177,9 +180,13 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&, client_id WITH <>) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
+- Check `bookings_alone_rate_minor_check`: `CHECK (((alone_rate_minor IS NULL) OR (alone_rate_minor >= 0)))`
 - Check `bookings_at_most_a_year`: `CHECK (((end_date - start_date) <= 366))`
+- Check `bookings_boarding_from_inside_stay`: `CHECK (((boarding_from IS NULL) OR ((kind = 'boarding'::booking_kind) AND (boarding_from > start_date) AND (boarding_from < end_date))))`
 - Check `bookings_boarding_has_a_night`: `CHECK (((kind <> 'boarding'::booking_kind) OR (end_date > start_date)))`
 - Check `bookings_dates_in_order`: `CHECK ((end_date >= start_date))`
+- Check `bookings_day_part_has_a_price`: `CHECK (((boarding_from IS NULL) = (day_rate_minor IS NULL)))`
+- Check `bookings_day_rate_minor_check`: `CHECK (((day_rate_minor IS NULL) OR (day_rate_minor >= 0)))`
 - Check `bookings_discount_minor_check`: `CHECK ((discount_minor >= 0))`
 - Check `bookings_rate_minor_check`: `CHECK ((rate_minor >= 0))`
 - Check `bookings_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
@@ -334,6 +341,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 | `notes` | `text` |  |  |  |
 | `consent_at` | `timestamp with time zone` |  |  | When the parent agreed to the kennel holding their details. Evidence for DPDP. |
 | `consent_source` | `text` |  |  | intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent. |
+| `bill_translation` | `text` |  |  | Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only. |
 | `created_by` | `uuid` |  |  |  |
 | `deleted_at` | `timestamp with time zone` |  |  | Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense. |
 | `erased_at` | `timestamp with time zone` |  |  | When the parent's details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it. |
@@ -347,6 +355,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 - Foreign key `clients_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `clients_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `clients_alt_phone_check`: `CHECK (((alt_phone IS NULL) OR (alt_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
+- Check `clients_bill_translation_check`: `CHECK (((bill_translation IS NULL) OR (bill_translation = ANY (ARRAY['hi'::text, 'kn'::text]))))`
 - Check `clients_consent_source_check`: `CHECK (((consent_source IS NULL) OR (consent_source = ANY (ARRAY['intake_form'::text, 'staff'::text]))))`
 - Check `clients_erased_stay_hidden`: `CHECK (((erased_at IS NULL) OR (deleted_at IS NOT NULL)))`
 - Check `clients_full_name_check`: `CHECK (((char_length(full_name) >= 1) AND (char_length(full_name) <= 120)))`
@@ -362,6 +371,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 
 - `clients_forbid_org_change` (before update) runs `forbid_org_change()`
 - `clients_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
+- `clients_guard_phone` (before update) runs `clients_guard_phone()`
 - `clients_hide_pets` (after update of deleted_at) runs `clients_hide_pets()`
 - `clients_set_updated_at` (before update) runs `set_updated_at()`
 - `clients_stamp_actor` (before insert or update) runs `stamp_actor()`
@@ -886,7 +896,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
 | `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
-| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page, bill and WhatsApp messages. en, hi or kn. |
+| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request). |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -1447,7 +1457,7 @@ bookings_guard_price() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel), with no discount, and cannot change the price, discount, tax or kind of an existing booking.
+Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel, with the usual price for nights alone), with no discount, and cannot change the price, discount, tax or kind of an existing booking, or when it turns from day boarding into boarding.
 
 ### bookings_stamp_status
 
@@ -1496,6 +1506,18 @@ client_file_paths(p_client uuid) returns text[]
 - Volatility: stable
 
 Paths in the pet-media bucket that hold this parent's pets' photos and certificates, photos from their stays, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.
+
+### clients_guard_phone
+
+```
+clients_guard_phone() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only owners and managers change a parent's phone number or other number (WB002). Anyone may add a parent.
 
 ### clients_hide_pets
 
@@ -1555,7 +1577,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
+Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 
@@ -1639,7 +1661,7 @@ get_public_invoice(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, and the kennel's UPI details for a pay link. Drafts are never shown.
+PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, the kennel's UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.
 
 ### get_public_stay
 
@@ -1735,7 +1757,7 @@ invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.
 
 ### invoice_lines_guard
 
@@ -2072,6 +2094,18 @@ stamp_when_set() returns trigger
 - Volatility: volatile
 
 Trigger for a pair of "when" and "who" columns (named in the two trigger arguments) that record a one-off confirmation, such as a certificate being checked. Sending any time marks it; the database then records the real time and the signed-in user, and later edits cannot change them. Sending null clears both.
+
+### stay_charges
+
+```
+stay_charges(p_org uuid, p_bookings uuid[]) returns TABLE(booking_id uuid, part text, quantity integer, unit_price_minor bigint, discount_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).
 
 ### stay_media_visible
 

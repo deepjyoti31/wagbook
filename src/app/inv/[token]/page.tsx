@@ -7,6 +7,7 @@ import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Loading } from "@/components/ui";
 import { formatDate, formatMoney, GST_STATES, qrMatrix, qrSvgPath, upiLink, type ISODate } from "@/lib/core";
 import { fill } from "@/lib/i18n";
+import { billWords } from "@/lib/bill-words";
 import { parentI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
@@ -27,8 +28,8 @@ interface PublicLine {
 }
 
 interface PublicInvoice {
-  /** The kennel's language for parents. */
-  language: string;
+  /** The language the parent asked for alongside English (hi or kn), or null. */
+  translation: string | null;
   /** The kennel's locale, such as en-IN: its region formats amounts and dates. */
   locale: string | null;
   number: string;
@@ -76,10 +77,10 @@ const loadInvoice = cache(async (token: string): Promise<PublicInvoice | null> =
   return data as unknown as PublicInvoice;
 });
 
-/** The tab title in the kennel's language for parents. */
+/** The tab title: English, with the parent's language in brackets if they asked for it. */
 export async function generateMetadata({ params }: PageProps<"/inv/[token]">): Promise<Metadata> {
   const inv = await loadInvoice((await params).token);
-  return { title: parentI18n(inv?.language).m.invoice.title, robots: { index: false } };
+  return { title: billWords(inv?.translation).invoice.title, robots: { index: false } };
 }
 
 /** The bill a parent opens from the link the kennel sent them. No sign-in. Prints as a clean A4 invoice. */
@@ -99,8 +100,9 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
   const { token } = await params;
   const inv = await loadInvoice(token);
   if (!inv) notFound();
-  // In the kennel's language for parents, with amounts and dates in the kennel's region.
-  const { m, locale } = parentI18n(inv.language, inv.locale);
+  // In English, with the headings in the parent's language too if they asked (D31); amounts and dates in the kennel's region.
+  const m = billWords(inv.translation);
+  const { locale } = parentI18n("en", inv.locale);
   const w = m.invoice;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale });

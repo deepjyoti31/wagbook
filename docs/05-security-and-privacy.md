@@ -41,7 +41,7 @@ In summary (deleting anything is for owners, D29):
 
 | Data | Staff | Manager | Owner |
 | --- | --- | --- | --- |
-| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Same as staff | Also delete |
+| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete), but not a parent's own phone numbers (`WB002`, D33) | Also a parent's phone numbers | Also delete |
 | The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
 | A pet's own care routine | Read, add, edit | Same as staff | Also delete |
 | House routines, kennels, rate card, peak periods, play yards | Read | Add, edit | Also delete |
@@ -54,7 +54,7 @@ In summary (deleting anything is for owners, D29):
 | Expenses, and their receipt files | Nothing | Read, add, edit | Also delete (with the receipt file) |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
 | Forms from parents | Read; accept or decline, once | Same as staff | Also delete |
-| A parent's details: download everything, erase on request | No (`WB070`) | Yes (`export_client`, `erase_client`) | Same |
+| A parent's details: download everything, erase on request | No (`WB070`) | Download (`export_client`) | Also erase (`erase_client`, `WB074`, D29) |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
 | Audit log (History of changes) | Nothing | Read | Read |
@@ -178,14 +178,47 @@ What the software does:
 
 - **Gives a parent their details.** On the parent page, owners and managers download everything held about the parent
   as one file (`export_client`).
-- **Erases on request** (`erase_client`, D25). Contact details, consent, notes, pets' details, vaccinations, routines,
-  incidents, updates, care tasks, play, intake forms, draft bills and every file are deleted or emptied, and the
-  personal text that the history of changes had copied is taken out of it. What tax law makes the kennel keep stays:
-  issued and cancelled bills with the buyer printed on them, payments, and the stays' dates and prices. Refused while
-  a pet is in house or a stay is still to come.
+- **Erases on request** (`erase_client`, D25 and D30). The parent's contact details, consent and notes, the notes on
+  their stays, the updates sent to them, their intake forms, draft bills, and the files among those (with vaccination
+  certificates, because a card shows the owner) are deleted or emptied, and the stays' notes that the history of
+  changes had copied are taken out of it. The pets stay, hidden, with their health, routines, incidents, care and
+  play: the kennel's record of the animal (D30). What tax law makes the kennel keep stays: issued and cancelled bills
+  with the buyer printed on them, payments, and the stays' dates and prices. Refused while a pet is in house or a stay
+  is still to come.
 
 What erasing does not reach: backups made before it (they age out on the backup schedule), a duplicate record merged
-into the parent earlier, the description of a bill line or extra (such as "Vet visit for Bruno"), and payment notes.
+into the parent earlier, the description of a bill line or extra (such as "Vet visit for Bruno"), payment notes, and
+anything about the parent typed into a pet's notes or an incident.
+
+### What the law says, as far as we could find
+
+Read on 21 October 2026 from public commentary, not from a lawyer, and not from the official texts themselves (the
+Gazette sites could not be reached from where this was written). Take it to a lawyer before relying on it.
+
+- **When it applies.** The Digital Personal Data Protection Rules, 2025 were notified on 13 or 14 November 2025 (sources
+  differ). Most duties, erasure and retention among them (Rules 3 and 5 to 16), start eighteen months later, around
+  13 May 2027 ([Bar and Bench](https://www.barandbench.com/view-point/meity-notifies-final-digital-personal-data-protection-rules-2025),
+  [Mondaq](https://www.mondaq.com/india/data-protection/1708164/digital-personal-data-protection-rules-2025-notified)).
+- **Erasure.** Section 8(7) of the Act: erase personal data when consent is withdrawn or the purpose is no longer
+  served, unless keeping it is necessary to comply with a law. Section 12(3) gives the person a right to ask for
+  erasure, with the same exception ([DSCI FAQ](https://www.dsci.in/files/content/documents/2025/faq-on-data-retention-and-data-erasure-v2.pdf),
+  [K S and K](https://ksandk.com/data-protection-and-data-privacy/data-retention-deletion-dpdp-act-india/)).
+- **Tax law is such a law.** Section 36 of the CGST Act: a registered business keeps its accounts and records,
+  invoices included, for 72 months from the due date of the annual return for that year
+  ([KnowYourGST](https://www.knowyourgst.com/gstlaw/cgst-act/36-period-of-retention-of-accounts-36/)). So issued bills
+  with the buyer's name stay, as D25 has it. Payments are part of the accounts too.
+- **Deletion after a period with 48 hours' notice** (Rule 8(1) and (2), Third Schedule) is for named classes of large
+  platforms (e-commerce, gaming, social media), not for a kennel.
+- **A question for the lawyer: Rule 8(3).** It asks every Data Fiduciary to keep personal data, the related traffic
+  data and logs of processing for at least one year from the processing, for the purposes in the Seventh Schedule
+  (mostly the State's). Commentators read it differently: some as a duty for every business, which would mean an
+  erasure request must wait, or keep a sealed copy, for a year; some as limited to processing for those purposes
+  ([NALSAR Tech Law Forum](https://techlawforum.nalsar.ac.in/privacy-with-a-footnote-data-retention-under-the-dpdp-framework/),
+  [S.S. Rana](https://ssrana.in/articles/meity-notifies-final-digital-personal-data-protection-rules-2025/)). Wagbook
+  erases at once. If the lawyer says Rule 8(3) applies, erasure needs a year's sealed hold before May 2027.
+- **Pets.** The Act covers data about an individual who can be identified. A pet's record that no longer names its
+  parent is not that, as far as we can tell (D30). Free text that mentions the parent, and a microchip number (which a
+  registry links to its owner), are questions for the lawyer.
 
 For a kennel in India, choose Supabase's Mumbai region so the data stays in the country.
 

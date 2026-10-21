@@ -326,6 +326,87 @@ $$;
 comment on function public.invoice_bookings(uuid, uuid, uuid) is
   'The bookings a bill covers: its own booking, or the family''s bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.';
 
+-- What a stay costs, as the lines of a bill. Usually one: every night (or
+-- day) at the booked rate. Two more cases split it:
+--   * a stay that began as day boarding and became boarding (boarding_from):
+--     the days before the first night at the day price, then the nights;
+--   * a pet booked at the shared kennel price (alone_rate_minor set): the
+--     nights it shared its kennel with a pet of the same parent at that price,
+--     and the nights it had the kennel to itself at the usual price. A sibling
+--     that went home early shares only up to the day it was checked out.
+-- The discount goes on the largest line (the first, if two are equal).
+create function public.stay_charges(p_org uuid, p_bookings uuid[])
+returns table (booking_id uuid, part text, quantity integer, unit_price_minor bigint, discount_minor bigint)
+language sql
+stable
+set search_path = ''
+as $$
+  with b as (
+    select bk.*, o.time_zone
+    from public.bookings bk
+    join public.organizations o on o.id = bk.org_id
+    where bk.org_id = p_org and bk.id = any (p_bookings)
+  ),
+  -- The nights (boarding) or days (day boarding) at the stay's own rate.
+  units as (
+    select b.id, d::date as day
+    from b, generate_series(
+      coalesce(b.boarding_from, b.start_date)::timestamp,
+      (case when b.kind = 'daycare' then b.end_date else b.end_date - 1 end)::timestamp,
+      interval '1 day') d
+  ),
+  counted as (
+    select
+      b.id,
+      count(u.day)::integer as total,
+      (count(u.day) filter (where exists (
+        select 1
+        from public.bookings s
+        where s.org_id = b.org_id
+          and s.client_id = b.client_id
+          and s.id <> b.id
+          and s.kennel_id = b.kennel_id
+          and s.status in ('confirmed', 'checked_in', 'checked_out')
+          and public.stay_range(
+                s.kind,
+                s.start_date,
+                case when s.status = 'checked_out' and s.checked_out_at is not null
+                     then greatest(s.start_date, least(s.end_date, (s.checked_out_at at time zone b.time_zone)::date))
+                     else s.end_date end
+              ) @> u.day
+      )))::integer as shared
+    from b
+    left join units u on u.id = b.id
+    group by b.id
+  ),
+  parts as (
+    select b.id, 1 as position, 'days'::text as part, (b.boarding_from - b.start_date) as quantity, b.day_rate_minor as unit_price_minor
+    from b
+    where b.boarding_from is not null
+    union all
+    select b.id, 2, case when b.alone_rate_minor is null then 'stay' else 'shared' end,
+           case when b.alone_rate_minor is null then c.total else c.shared end, b.rate_minor
+    from b
+    join counted c on c.id = b.id
+    union all
+    select b.id, 3, 'alone', c.total - c.shared, b.alone_rate_minor
+    from b
+    join counted c on c.id = b.id
+    where b.alone_rate_minor is not null
+  ),
+  kept as (
+    select p.*, row_number() over (partition by p.id order by p.quantity * p.unit_price_minor desc, p.position) as rank
+    from parts p
+    where p.quantity > 0
+  )
+  select k.id, k.part, k.quantity, k.unit_price_minor, case when k.rank = 1 then b.discount_minor else 0 end
+  from kept k
+  join b on b.id = k.id
+  order by array_position(p_bookings, k.id), k.position;
+$$;
+comment on function public.stay_charges(uuid, uuid[]) is
+  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
+
 create function public.invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 language sql
@@ -333,19 +414,20 @@ stable
 set search_path = ''
 as $$
   select
-    (case when b.kind = 'daycare' then b.end_date - b.start_date + 1 else b.end_date - b.start_date end)::numeric(10, 2),
-    b.rate_minor,
-    b.discount_minor,
+    sc.quantity::numeric(10, 2),
+    sc.unit_price_minor,
+    sc.discount_minor,
     case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end
   from public.bookings b
-  where b.org_id = p_org and b.id in (select public.invoice_bookings(p_org, p_booking, p_group))
+  join public.stay_charges(p_org, array(select public.invoice_bookings(p_org, p_booking, p_group))) sc on sc.booking_id = b.id
+  where b.org_id = p_org
   union all
   select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
   from public.booking_items bi
   where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group));
 $$;
 comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.';
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.';
 
 create function public.issue_invoice(p_invoice uuid)
 returns public.invoices

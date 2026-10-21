@@ -29,6 +29,7 @@ export const bookingsArea: typeof English = {
       cancelled: "ಬುಕಿಂಗ್ ರದ್ದಾಗಿದೆ. ಜಾಗ ಮತ್ತೆ ಖಾಲಿ ಇದೆ.",
       no_show: "ಬರಲಿಲ್ಲ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ. ಜಾಗ ಮತ್ತೆ ಖಾಲಿ ಇದೆ.",
       extended: "ವಾಸ್ತವ್ಯವನ್ನು ಇಂದಿನವರೆಗೆ ಹೆಚ್ಚಿಸಲಾಗಿದೆ.",
+      boarding: "ಈಗ ಬೋರ್ಡಿಂಗ್. ಮೊದಲ ರಾತ್ರಿಗೆ ಮುಂಚಿನ ದಿನಗಳಿಗೆ ಡೇ ಬೋರ್ಡಿಂಗ್ ಆಗಿ ಬಿಲ್.",
     },
     // {name} is the name of a busy period the kennel set, like "Diwali".
     peakNoRefund: "{name}, ಮರುಪಾವತಿ ಇಲ್ಲ",
@@ -44,6 +45,8 @@ export const bookingsArea: typeof English = {
     bookedTogetherTitle: "ಒಟ್ಟಿಗೆ ಬುಕ್ ಆಗಿರುವವು",
     kennelWith: "{kennel}, {pets} ಜೊತೆ",
     sharesWith: "{pets} ಜೊತೆ {kennel} ಹಂಚಿಕೊಂಡಿದೆ.",
+    // A stay that began as day boarding and now stays nights. {date} is the last day of day boarding, {night} the first night.
+    dayThenBoarding: "{date} ವರೆಗೆ ಡೇ ಬೋರ್ಡಿಂಗ್, ನಂತರ {night} ರಿಂದ ರಾತ್ರಿ ಉಳಿಯುವುದು.",
     costs: {
       title: "ಎಷ್ಟು ಆಗುತ್ತದೆ",
       // {what} is "Boarding", "Day boarding" or the name of an extra.
@@ -52,6 +55,9 @@ export const bookingsArea: typeof English = {
       total: "ಅಂದಾಜು ಒಟ್ಟು",
       totalWithTax: "ಅಂದಾಜು ಒಟ್ಟು, {tax} ತೆರಿಗೆ ಸೇರಿ",
       note: "ಇದು ಅಂದಾಜು ಮಾತ್ರ. ಬಿಲ್ ಈ ಸಾಲುಗಳಿಂದಲೇ ಮಾಡಲಾಗುತ್ತದೆ, ಸಾಮಾನ್ಯವಾಗಿ ಚೆಕ್ ಔಟ್ ಸಮಯದಲ್ಲಿ.",
+      // A pet at the shared kennel price: nights with its sibling, and nights it had the kennel to itself. {what} is "Boarding" or "Day boarding".
+      shared: "{what}, ಕೆನೆಲ್ ಹಂಚಿಕೊಂಡು",
+      alone: "{what}, ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿ",
     },
     extra: {
       title: "ಹೆಚ್ಚುವರಿ ಸೇರಿಸಿ",
@@ -110,6 +116,19 @@ export const bookingsArea: typeof English = {
       belongings: "ಸಾಮಾನುಗಳು",
       belongingsHint: "ಬೆಡ್, ಲೀಶ್, ಆಹಾರ, ಔಷಧಿ. ಎಲ್ಲವೂ ಮತ್ತೆ ಮನೆಗೆ ಹೋಗಲಿ ಎಂದು.",
       notes: "ಸಿಬ್ಬಂದಿಗೆ ಟಿಪ್ಪಣಿ",
+      aloneRate: "ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿಯಾಗಿದ್ದಾಗ ಬೆಲೆ",
+      aloneRateHint: "ರಾತ್ರಿಗೆ ಅಥವಾ ದಿನಕ್ಕೆ, ಜೊತೆಯ ಸಾಕುಪ್ರಾಣಿ ಕೆನೆಲ್‌ನಲ್ಲಿ ಇಲ್ಲದಾಗ. ಖಾಲಿ ಬಿಟ್ಟರೆ ಮೇಲಿನ ಬೆಲೆ ಎಲ್ಲ ರಾತ್ರಿಗೂ.",
+      dayRate: "ಮೊದಲ ರಾತ್ರಿಗೆ ಮುಂಚೆ, ದಿನಕ್ಕೆ ಬೆಲೆ",
+    },
+    // Day boarding that now stays nights: the days so far stay day boarding.
+    overnight: {
+      title: "ರಾತ್ರಿ ಉಳಿಯುವುದು",
+      text: "{pet} ಈಗ ರಾತ್ರಿ ಉಳಿದರೆ, ಇಲ್ಲಿಯವರೆಗಿನ ದಿನಗಳು ಡೇ ಬೋರ್ಡಿಂಗ್ ಆಗಿಯೇ ಉಳಿಯುತ್ತವೆ, ಮೊದಲ ರಾತ್ರಿಯಿಂದ ಮುಂದಿನ ರಾತ್ರಿಗಳು ಬೋರ್ಡಿಂಗ್, ಪ್ರತಿಯೊಂದೂ ತನ್ನದೇ ಬೆಲೆಯಲ್ಲಿ.",
+      firstNight: "ಮೊದಲ ರಾತ್ರಿ",
+      checkOut: "ಚೆಕ್ ಔಟ್ ದಿನಾಂಕ",
+      pricePerNight: "ರಾತ್ರಿಗೆ ಬೆಲೆ",
+      save: "ಬೋರ್ಡಿಂಗ್‌ಗೆ ಬದಲಿಸಿ",
+      saving: "ಬದಲಿಸಲಾಗುತ್ತಿದೆ",
     },
     routines: {
       title: "{pet}: ತನ್ನದೇ ದಿನಚರಿಗಳು",
@@ -209,6 +228,9 @@ export const bookingsArea: typeof English = {
       descriptionLong: "ವಿವರಣೆಯನ್ನು 200 ಅಕ್ಷರಗಳ ಒಳಗೆ ಬರೆಯಿರಿ.",
       itemPrice: "ವಸ್ತುವಿನ ದರ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 500.",
       extraNotFound: "ಆ ಹೆಚ್ಚುವರಿ ಸಿಗಲಿಲ್ಲ.",
+      firstNight: "ಮೊದಲ ರಾತ್ರಿಯ ದಿನಾಂಕ ಆರಿಸಿ.",
+      checkOutAfterNight: "ಚೆಕ್ ಔಟ್ ಮೊದಲ ರಾತ್ರಿಯ ನಂತರ ಇರಬೇಕು.",
+      onlyDaycare: "ಡೇ ಬೋರ್ಡಿಂಗ್ ವಾಸ್ತವ್ಯ ಮಾತ್ರ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಬದಲಾಗಬಹುದು.",
     },
     saved: "ಬುಕಿಂಗ್ ಉಳಿಸಲಾಗಿದೆ.",
     alreadyToday: "ಈ ವಾಸ್ತವ್ಯ ಈಗಾಗಲೇ ಇಂದಿನವರೆಗೆ ಇದೆ.",

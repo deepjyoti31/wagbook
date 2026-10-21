@@ -93,6 +93,8 @@ export const core = {
       peak_periods_check: "The last day cannot be before the first day.",
       play_yards_org_id_name_key: "A yard with that name already exists.",
       services_shared_price_only_for_stays: "A shared kennel price is only for boarding and day boarding.",
+      bookings_boarding_from_inside_stay: "The first night must be after the first day of day boarding and before check-out.",
+      bookings_day_part_has_a_price: "Enter a price per day for the days of day boarding.",
       invoices_one_live_per_booking: "This stay already has a bill. Open it from the booking.",
       invoices_one_live_per_family: "This family already has a bill. Open it from the booking.",
     },

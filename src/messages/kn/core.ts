@@ -94,6 +94,8 @@ export const core: typeof English = {
       peak_periods_check: "ಕೊನೆಯ ದಿನ ಮೊದಲ ದಿನಕ್ಕಿಂತ ಮುಂಚೆ ಇರಬಾರದು.",
       play_yards_org_id_name_key: "ಆ ಹೆಸರಿನ ಯಾರ್ಡ್ ಈಗಾಗಲೇ ಇದೆ.",
       services_shared_price_only_for_stays: "ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ ಬೋರ್ಡಿಂಗ್ ಮತ್ತು ಡೇ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಮಾತ್ರ.",
+      bookings_boarding_from_inside_stay: "ಮೊದಲ ರಾತ್ರಿ ಡೇ ಬೋರ್ಡಿಂಗ್‌ನ ಮೊದಲ ದಿನದ ನಂತರ ಮತ್ತು ಚೆಕ್ ಔಟ್‌ಗೆ ಮುಂಚೆ ಇರಬೇಕು.",
+      bookings_day_part_has_a_price: "ಡೇ ಬೋರ್ಡಿಂಗ್ ದಿನಗಳಿಗೆ ದಿನಕ್ಕೆ ಬೆಲೆ ಬರೆಯಿರಿ.",
       invoices_one_live_per_booking: "ಈ ವಾಸ್ತವ್ಯಕ್ಕೆ ಈಗಾಗಲೇ ಬಿಲ್ ಇದೆ. ಅದನ್ನು ಬುಕಿಂಗ್‌ನಿಂದ ತೆರೆಯಿರಿ.",
       invoices_one_live_per_family: "ಈ ಕುಟುಂಬಕ್ಕೆ ಈಗಾಗಲೇ ಬಿಲ್ ಇದೆ. ಅದನ್ನು ಬುಕಿಂಗ್‌ನಿಂದ ತೆರೆಯಿರಿ.",
     },

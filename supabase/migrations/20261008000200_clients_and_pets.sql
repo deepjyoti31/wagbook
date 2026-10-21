@@ -19,6 +19,7 @@ create table public.clients (
   notes text,
   consent_at timestamptz,
   consent_source text check (consent_source is null or consent_source in ('intake_form', 'staff')),
+  bill_translation text check (bill_translation is null or bill_translation in ('hi', 'kn')),
   created_by uuid references auth.users (id) on delete set null,
   deleted_at timestamptz,
   erased_at timestamptz,
@@ -39,6 +40,8 @@ comment on column public.clients.tax_id is 'Buyer''s GSTIN, for business custome
 comment on column public.clients.emergency_name is 'Someone to call when the parent cannot be reached during a stay.';
 comment on column public.clients.consent_at is 'When the parent agreed to the kennel holding their details. Evidence for DPDP.';
 comment on column public.clients.consent_source is 'intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent.';
+comment on column public.clients.bill_translation is
+  'Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only.';
 comment on column public.clients.deleted_at is 'Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense.';
 comment on column public.clients.erased_at is
   'When the parent''s details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it.';
@@ -54,6 +57,32 @@ create trigger clients_set_updated_at
 create trigger clients_stamp_actor
   before insert or update on public.clients
   for each row execute function public.stamp_actor('created_by');
+
+-- A parent's phone numbers are how they are recognised, messaged on WhatsApp
+-- and matched when they send a form, so changing one is for owners and
+-- managers. Staff add new parents with their numbers. A database session with
+-- no signed-in user (migrations, the seed) is let through, as for prices.
+create function public.clients_guard_phone()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is not null
+     and (new.phone is distinct from old.phone or new.alt_phone is distinct from old.alt_phone)
+     and new.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+  then
+    raise exception 'WB002: only an owner or manager can change a parent''s phone number' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.clients_guard_phone() is
+  'Trigger: only owners and managers change a parent''s phone number or other number (WB002). Anyone may add a parent.';
+
+create trigger clients_guard_phone
+  before update on public.clients
+  for each row execute function public.clients_guard_phone();
 
 -- ---------------------------------------------------------------------------
 
