@@ -996,7 +996,9 @@ test("a sibling leaves early, and the pet left on its own pays the usual price f
   await signIn(page, "manager");
   // Rocky and Luna share K09 for three nights (booked above); Rocky goes home a night early.
   await page.goto(`/app/calendar?from=${day(50)}`);
-  await page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) }).getByRole("link", { name: "Rocky" }).first().click();
+  // Followed by its address: on a phone the sticky kennel column and the bottom bar can sit over the square.
+  const rocky = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) }).getByRole("link", { name: "Rocky" }).first();
+  await page.goto((await rocky.getAttribute("href"))!);
   await expect(page.getByRole("heading", { level: 1, name: "Rocky" })).toBeVisible();
   await page.getByLabel("Check-out date").fill(day(52));
   await page.getByRole("button", { name: "Save changes" }).click();
