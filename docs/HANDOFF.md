@@ -2,8 +2,8 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after the roadmap was extended to M44 (D44: appointments, a kitchen, food
-subscriptions and deliveries). No code changed in that session.
+Last updated: 21 October 2026, after milestone M25 (groundwork for more than boarding: what the kennel offers,
+parents' addresses, areas served, skills, weights).
 
 ## In one paragraph
 
@@ -12,7 +12,11 @@ kennel's business before going to production, so the roadmap now runs to M44 (D4
 portions, subscriptions, the cook plan, delivery runs and food ordering (Phase 1, M25 to M33); services by appointment,
 grooming, swimming, training, parties and packages (Phase 2, M34 to M37); cancellation credit, pick-up from home,
 health papers, a public booking form and reviews (Phase 3, M38 to M42); and the rota and rough edges (Phase 4, M43 and
-M44). None of it is started. The latest built work, asked for by the owner on 21 October 2026: a pet going
+M44). M25 is built: three switches in Settings for what the kennel offers (all off by default, and with them off
+Wagbook looks as before), parents' delivery addresses matched to the areas served by PIN code, people's skills, and
+weights over time in grams with a target (`pets.weight_kg` became `weight_g`, kept by the database). The owner's
+answers to the five planning questions are in the roadmap (M28, M29, M31, M35, M38). Before M25, the latest built
+work, asked for by the owner on 21 October 2026: a pet going
 home early is billed to today or as booked, an issued bill whose stays got shorter is credited for the difference, and a
 refund can never give back more than was paid over (M20, D40, `WB120` to `WB122`); a request can wait on a waiting list
 in order, and Today offers it when a kennel frees up (M21, D42); requests and the waiting list show on the calendar
@@ -34,7 +38,7 @@ keeping records and erasure is written up for the accountant and the lawyer (`06
 kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
 owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (257 database tests, 166 unit tests), and the whole day is walked in a
+kennel. The database rules are tested in-process (271 database tests, 176 unit tests), and the whole day is walked in a
 real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 48 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
@@ -118,6 +122,12 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A series billed by the month: one line for each price, extras with their dates, staff issue it, a day never billed alone (`WB055`), one live bill a month, a series of the bill's parent (`WB056`), advances taken in, a billed day kept in its month (`WB057`) | `tests/db/series-bills.test.ts`; the `WB055` rule removed once to see the test fail; end-to-end: Make the bill for the month and issue it | High |
 | A photo taken off an update only by an owner (`WB081`), and the stay page stops showing it | `tests/db/media.test.ts` (the rule removed once to see it fail); end-to-end through real Storage | High |
 | Recovery codes: made only at `aal2` with a factor (`WB005`, `WB006`), ten, hashed, sealed; one lets one session in, once; a used or wrong one refused (`WB007`); new codes void old ones; a new authenticator voids codes and the sessions they let in | `tests/db/recovery-codes.test.ts` (the session check removed once to see it fail); end-to-end against the local Supabase Auth (its tokens carry `session_id`) | High for the local stack |
+| What the kennel offers: off for a new kennel, delivery refused without the kitchen, switched by owners and managers only; the intake form told whether to ask for an address | `tests/db/groundwork.test.ts`; the rule removed once to see it fail; end-to-end: the database's sentence, then saved | High |
+| A parent's addresses: anyone adds, owners and managers change, owners delete, PIN code and https map link checked, never another kennel's parent; in the export, moved on merge, deleted on erasure; a new parent's intake address becomes their home | `tests/db/groundwork.test.ts`, `tests/db/intake.test.ts` (the update policy, the merge and the erasure line each removed once to see the tests fail); end-to-end: added, "We deliver here", staff not offered Change | High |
+| Areas served: one row a PIN code, no negative charge, staff refused | `tests/db/groundwork.test.ts`; end-to-end: added and shown | High |
+| Skills: set by owners and managers from the list, not by staff | `tests/db/groundwork.test.ts`; end-to-end: Cook set on People | High |
+| Weights in grams: the pet carries the latest by date whatever is written to it, corrected by owners and managers, removed by owners; in the export; the intake form's weight is the first weighing | `tests/db/groundwork.test.ts`, `tests/db/intake.test.ts` (the trigger and the delete policy each removed once to see the tests fail); `src/lib/core/groundwork.test.ts`; end-to-end: trend, target and a new weight | High |
+| M25 screens at 360 pixels (Settings, Areas you serve, a parent's addresses, a pet's weight, People with skills) | End-to-end checks no sideways scroll; screenshots taken 21 October 2026 | Medium: desktop Chromium at phone size |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -165,10 +175,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: start M25** (groundwork for more than boarding), then go through Phase 1 in order (M26 to M33). Each
-milestone first writes its section in `02-product-spec.md`. The owner has said production is not soon, so the launch
-steps above can wait and migrations stay editable in place until then. Steps 1 to 8 need the owner; M25 onwards
-does not.
+**Building: start M26** (stock), then go through Phase 1 in order (M27 to M33). Each milestone first writes its
+section in `02-product-spec.md`. The owner has said production is not soon, so the launch steps above can wait and
+migrations stay editable in place until then. Steps 1 to 8 need the owner; M26 onwards does not.
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -235,6 +244,11 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 21 October 2026 (M25), also unchecked: the whole of `src/messages/hi/beyond.ts` and
+`src/messages/kn/beyond.ts` (what the kennel offers, areas served, addresses, weights, skills), the intake form's
+address, area and PIN code, and the four new constraint sentences. "Rider" was drafted as डिलीवरी राइडर and
+ಡೆಲಿವರಿ ರೈಡರ್; "body condition" as शरीर की हालत and ದೇಹ ಸ್ಥಿತಿ.
 
 Drafted on 21 October 2026 (M20 to M24), also unchecked: the waiting list (वेटिंग लिस्ट, ಕಾಯುವ ಪಟ್ಟಿ), the WhatsApp
 message telling a parent a kennel is free (parents read it), going home early and the two check-out buttons, "The stay
@@ -314,16 +328,22 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
   signs in from one connection at shift change should not reach 20; tell us if it does.
 
-Raised by the plan for M25 to M44 (21 October 2026), to answer before or during each milestone:
+Chosen in M25 as the simplest thing:
 
-- Do boarders always eat kitchen food, or does a parent choose (own food stays possible)? M30 assumes a choice per
-  pet, with kitchen food the default when the kitchen is on.
-- Riders get a fourth role that sees only their run (M31). Or are riders always staff who see everything?
-- Is a food subscription paid weekly in advance only, or monthly too? M29 allows both, weekly by default.
-- Does credit from a cancellation (M38) expire silently after 12 months, or does the parent get a reminder first?
-- Grooming prices by size or by coat (M35): which does the kennel use? Boarding is the same price for every size.
+- Anyone adds an address for a parent; only owners and managers change one (as phone numbers, D33). Staff who take
+  down a new address at the gate are not stopped, but cannot correct a typo afterwards.
+- Accepting an intake form makes a home address only for a new parent. A returning parent's addresses are left as
+  they are, as the rest of their record is; staff add the new one by hand.
+- Areas served are matched by PIN code alone. A PIN code that covers places the kennel serves and places it does not
+  is all or nothing.
+- A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
+  last week does not replace a newer one.
 
 ## Known rough edges in what is built
+
+- Settings switches for what the kennel offers have nothing behind Appointments and Kitchen yet except the skills on
+  People; Food delivery turns on addresses and areas. The rest arrives with M26 onwards.
+- Managers may correct a weighing through the database, but the pet page offers only Remove (owners).
 
 - A no-show uses a pack day. A series that runs across two months gets a bill for each month; days paid from a pack
   show on the month's bill at ₹0.
@@ -363,7 +383,7 @@ Raised by the plan for M25 to M44 (21 October 2026), to answer before or during 
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 423 tests, build
+npm run check        # dash check, lint, typecheck, 447 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -373,6 +393,9 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 21 October 2026. M25: what the kennel offers, parents' addresses and areas served, skills, weights in grams (D44).
+  The owner's answers on boarders' food, riders, monthly payment, credit reminders and grooming prices recorded in
+  the roadmap.
 - 21 October 2026. Roadmap extended to M44 for appointments, the kitchen and food subscriptions (D44); the example
   kennel's public rules for those added to `13`; questions 13 to 15 added for the accountant in `06`. Docs only.
 

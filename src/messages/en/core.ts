@@ -103,6 +103,10 @@ export const core = {
       invoices_one_live_per_series_month: "This month of the series already has a bill. Open it from the booking.",
       invoices_series_month: "A month's bill is named by the first day of the month.",
       bookings_waitlist_is_a_request: "Only a request can be on the waiting list.",
+      organizations_delivery_needs_kitchen: "Switch on the kitchen before food delivery: the food comes from it.",
+      service_areas_org_id_postal_code_key: "That PIN code is already on your list.",
+      client_addresses_postal_code_check: "Enter a PIN code of six digits.",
+      pet_weights_weight_g_check: "Enter the weight in kg, like 34.5.",
     },
     // In English the database's own sentence is shown. Other languages show
     // these, one per code (docs/reference/error-codes.md).

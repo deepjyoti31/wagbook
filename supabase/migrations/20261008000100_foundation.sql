@@ -24,6 +24,10 @@ create type public.tax_mode as enum ('none', 'simple', 'gst_india');
 comment on type public.tax_mode is
   'none: no tax charged. simple: one tax at one rate (VAT, sales tax). gst_india: CGST+SGST within a state, IGST across states.';
 
+create type public.staff_skill as enum ('cook', 'groomer', 'trainer', 'swim_supervisor', 'rider');
+comment on type public.staff_skill is
+  'What a person can be given to do, beyond their role: cook (the kitchen), groomer, trainer and swim_supervisor (appointments), rider (deliveries and pick-ups). Skills choose who is offered a job; access stays with the role.';
+
 -- ---------------------------------------------------------------------------
 -- Shared helpers
 -- ---------------------------------------------------------------------------
@@ -176,8 +180,13 @@ create table public.organizations (
   requests_enabled boolean not null default true,
   intake_notice text,
   parent_language text not null default 'en' check (parent_language in ('en', 'hi', 'kn')),
+  offers_appointments boolean not null default false,
+  offers_kitchen boolean not null default false,
+  offers_food_delivery boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  -- Food is delivered from the kennel's own kitchen (D44).
+  constraint organizations_delivery_needs_kitchen check (not offers_food_delivery or offers_kitchen),
   constraint organizations_gst_needs_registration
     check (tax_mode <> 'gst_india' or (tax_id is not null and gst_state_code is not null)),
   constraint organizations_play_hours_in_order check (play_day_end > play_day_start),
@@ -218,6 +227,12 @@ comment on column public.organizations.play_break_end is 'End of the optional br
 comment on column public.organizations.intake_enabled is 'Whether the public intake form at /i/{slug} accepts submissions.';
 comment on column public.organizations.requests_enabled is 'Whether parents can ask for stays through their own booking link (/b/{token}, submit_booking_request).';
 comment on column public.organizations.intake_notice is 'Privacy and consent text shown on the intake form, in the kennel''s own words. A default, in the parent pages'' language, is used when empty.';
+comment on column public.organizations.offers_appointments is
+  'Whether the kennel books services by the hour: grooming, swimming, training, parties (D44). Off: none of it is shown.';
+comment on column public.organizations.offers_kitchen is
+  'Whether the kennel cooks food in its own kitchen, for boarders and to sell (D44). Off: none of it is shown.';
+comment on column public.organizations.offers_food_delivery is
+  'Whether the kennel delivers its food to parents at home (D44). Needs offers_kitchen. Turns on parents'' addresses and the areas served.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 
 create trigger organizations_set_updated_at
@@ -253,6 +268,7 @@ create table public.memberships (
   display_name text not null check (char_length(display_name) between 1 and 80),
   phone text check (phone is null or phone ~ '^\+[1-9][0-9]{7,14}$'),
   language text not null default 'en' check (language in ('en', 'hi', 'kn')),
+  skills public.staff_skill[] not null default '{}',
   is_active boolean not null default false,
   accepted_at timestamptz,
   invited_by uuid references auth.users (id) on delete set null,
@@ -271,6 +287,8 @@ comment on column public.memberships.is_active is
 comment on column public.memberships.accepted_at is
   'When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it.';
 comment on column public.memberships.invited_by is 'Who sent the invitation.';
+comment on column public.memberships.skills is
+  'What this person can be given to do in this kennel (staff_skill), set by owners and managers. Decides who is offered a job, not what they may see.';
 comment on column public.memberships.language is 'The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once.';
 
 create index memberships_user_id_idx on public.memberships (user_id);

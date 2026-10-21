@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 30. Views: 2. Functions: 83.
+Migrations applied: 11. Tables: 33. Views: 2. Functions: 85.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [service_areas](#service_areas), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
 - Views: [invoice_balances](#invoice_balances), [pass_balances](#pass_balances)
 - [Functions](#functions)
 
@@ -19,6 +19,7 @@ Migrations applied: 11. Tables: 30. Views: 2. Functions: 83.
 
 | Type | Values | Meaning |
 | --- | --- | --- |
+| `address_kind` | `home`, `work`, `other` | What a parent's address is, so it is named in the reader's language: home, work or other. |
 | `booking_kind` | `boarding`, `daycare` | boarding: overnight, charged per night. daycare: day boarding with no night, charged per day. |
 | `booking_status` | `requested`, `confirmed`, `checked_in`, `checked_out`, `cancelled`, `no_show` | requested: asked for, not yet accepted, holds no space. confirmed: space is held. checked_in: the pet is in house. checked_out: gone home. cancelled and no_show: space released. |
 | `care_kind` | `meal`, `medication`, `walk`, `play`, `cleaning`, `other` | What sort of care a routine or task is. Used to group and count tasks. |
@@ -29,6 +30,7 @@ Migrations applied: 11. Tables: 30. Views: 2. Functions: 83.
 | `payment_method` | `upi`, `cash`, `card`, `bank_transfer`, `other` | How money moved. Wagbook records this; it does not process payments. |
 | `pet_sex` | `male`, `female`, `unknown` | unknown is the honest default when nobody has said. |
 | `service_kind` | `boarding`, `daycare`, `addon` | boarding: an overnight stay, priced per night. daycare: day boarding, priced per day. addon: an extra such as grooming. |
+| `staff_skill` | `cook`, `groomer`, `trainer`, `swim_supervisor`, `rider` | What a person can be given to do, beyond their role: cook (the kitchen), groomer, trainer and swim_supervisor (appointments), rider (deliveries and pick-ups). Skills choose who is offered a job; access stays with the role. |
 | `task_status` | `pending`, `done`, `skipped` | pending: still to do. done: completed (who and when are stamped). skipped: deliberately not done, with a note saying why. |
 | `tax_mode` | `none`, `simple`, `gst_india` | none: no tax charged. simple: one tax at one rate (VAT, sales tax). gst_india: CGST+SGST within a state, IGST across states. |
 
@@ -330,6 +332,56 @@ One thing to do for one pet on one day. The Tasks screen is this table, grouped 
 - `care_tasks_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `care_tasks_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### client_addresses
+
+A place a parent wants food delivered or a pet picked up. Personal data, like a phone number: owners and managers change one, it is in the export, and erasing the parent deletes it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  |  |
+| `kind` | `address_kind` | yes | `'home'::address_kind` |  |
+| `line` | `text` | yes |  | House or flat number, building and street, as the parent wrote it. |
+| `area` | `text` |  |  | The area or locality, as people there name it. |
+| `postal_code` | `text` | yes |  | PIN code in India (six digits), or the postal code elsewhere (with at least one digit). Matched against service_areas. |
+| `map_url` | `text` |  |  | A map link the parent shared (https only), for whoever delivers. |
+| `door_note` | `text` |  |  | For whoever delivers: gate code, floor, leave with the guard. |
+| `created_by` | `uuid` |  |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `client_addresses_pkey`: `PRIMARY KEY (id)`
+- Unique `client_addresses_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `client_addresses_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `client_addresses_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE CASCADE`
+- Foreign key `client_addresses_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `client_addresses_area_check`: `CHECK (((area IS NULL) OR (char_length(area) <= 120)))`
+- Check `client_addresses_door_note_check`: `CHECK (((door_note IS NULL) OR (char_length(door_note) <= 300)))`
+- Check `client_addresses_line_check`: `CHECK (((char_length(line) >= 1) AND (char_length(line) <= 300)))`
+- Check `client_addresses_map_url_check`: `CHECK (((map_url IS NULL) OR ((map_url ~ '^https://'::text) AND (char_length(map_url) <= 500))))`
+- Check `client_addresses_postal_code_check`: `CHECK (((postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$'::text) AND (postal_code ~ '[0-9]'::text)))`
+
+**Indexes**
+
+- `CREATE INDEX client_addresses_org_client_idx ON public.client_addresses USING btree (org_id, client_id)`
+
+**Triggers**
+
+- `client_addresses_forbid_org_change` (before update) runs `forbid_org_change()`
+- `client_addresses_set_updated_at` (before update) runs `set_updated_at()`
+- `client_addresses_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `client_addresses_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `client_addresses_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `client_addresses_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `client_addresses_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### clients
 
@@ -681,7 +733,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 | `parent_phone` | `text` | yes |  |  |
 | `requested_start` | `date` |  |  |  |
 | `requested_end` | `date` |  |  |  |
-| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}. |
+| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}. |
 | `consent_at` | `timestamp with time zone` | yes |  |  |
 | `consent_text` | `text` | yes |  | The exact consent wording the parent agreed to, kept as evidence. |
 | `client_id` | `uuid` |  |  | The client created or matched when the submission was accepted. |
@@ -998,6 +1050,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 | `display_name` | `text` | yes |  | Name shown next to this person's actions, e.g. "Ravi". |
 | `phone` | `text` |  |  |  |
 | `language` | `text` | yes | `'en'::text` | The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once. |
+| `skills` | `staff_skill[]` | yes | `'{}'::staff_skill[]` | What this person can be given to do in this kennel (staff_skill), set by owners and managers. Decides who is offered a job, not what they may see. |
 | `is_active` | `boolean` | yes | `false` | Whether this person can use the organisation right now. False while an invitation is pending, and set false again to cut off access at once without losing the history of who did what. |
 | `accepted_at` | `timestamp with time zone` |  |  | When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it. |
 | `invited_by` | `uuid` |  |  | Who sent the invitation. |
@@ -1081,6 +1134,9 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `requests_enabled` | `boolean` | yes | `true` | Whether parents can ask for stays through their own booking link (/b/{token}, submit_booking_request). |
 | `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
 | `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request). |
+| `offers_appointments` | `boolean` | yes | `false` | Whether the kennel books services by the hour: grooming, swimming, training, parties (D44). Off: none of it is shown. |
+| `offers_kitchen` | `boolean` | yes | `false` | Whether the kennel cooks food in its own kitchen, for boarders and to sell (D44). Off: none of it is shown. |
+| `offers_food_delivery` | `boolean` | yes | `false` | Whether the kennel delivers its food to parents at home (D44). Needs offers_kitchen. Turns on parents' addresses and the areas served. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -1091,6 +1147,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_country_code_check`: `CHECK ((country_code ~ '^[A-Z]{2}$'::text))`
 - Check `organizations_currency_check`: `CHECK ((currency ~ '^[A-Z]{3}$'::text))`
 - Check `organizations_default_tax_rate_bp_check`: `CHECK (((default_tax_rate_bp >= 0) AND (default_tax_rate_bp <= 10000)))`
+- Check `organizations_delivery_needs_kitchen`: `CHECK (((NOT offers_food_delivery) OR offers_kitchen))`
 - Check `organizations_fiscal_year_start_month_check`: `CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12)))`
 - Check `organizations_gst_needs_registration`: `CHECK (((tax_mode <> 'gst_india'::tax_mode) OR ((tax_id IS NOT NULL) AND (gst_state_code IS NOT NULL))))`
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
@@ -1267,6 +1324,52 @@ Busy stretches such as Diwali week or a long weekend. Used to warn about cancell
 - `peak_periods_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `peak_periods_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### pet_weights
+
+A pet weighed on a day. The latest is copied to pets.weight_g; food portions are worked out from it (M28).
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `pet_id` | `uuid` | yes |  |  |
+| `weighed_on` | `date` | yes |  | The day the pet was weighed, in the kennel's time zone. |
+| `weight_g` | `integer` | yes |  | Weight in grams: 34.5 kg is 34500. |
+| `body_condition` | `smallint` |  |  | Body condition score from 1 (very thin) to 9 (very heavy); 4 and 5 are ideal for a dog. Empty when not scored. |
+| `notes` | `text` |  |  |  |
+| `recorded_by` | `uuid` |  |  | Who wrote the weight down. Set by the database. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `pet_weights_pkey`: `PRIMARY KEY (id)`
+- Foreign key `pet_weights_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `pet_weights_org_id_pet_id_fkey`: `FOREIGN KEY (org_id, pet_id) REFERENCES pets(org_id, id) ON DELETE CASCADE`
+- Foreign key `pet_weights_recorded_by_fkey`: `FOREIGN KEY (recorded_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `pet_weights_body_condition_check`: `CHECK (((body_condition >= 1) AND (body_condition <= 9)))`
+- Check `pet_weights_notes_check`: `CHECK (((notes IS NULL) OR (char_length(notes) <= 500)))`
+- Check `pet_weights_weight_g_check`: `CHECK (((weight_g >= 1) AND (weight_g <= 199999)))`
+
+**Indexes**
+
+- `CREATE INDEX pet_weights_org_pet_idx ON public.pet_weights USING btree (org_id, pet_id, weighed_on DESC, created_at DESC)`
+
+**Triggers**
+
+- `pet_weights_forbid_org_change` (before update) runs `forbid_org_change()`
+- `pet_weights_refresh_pet` (after insert or delete or update) runs `pet_weights_refresh_pet()`
+- `pet_weights_set_updated_at` (before update) runs `set_updated_at()`
+- `pet_weights_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `pet_weights_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `pet_weights_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `pet_weights_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `pet_weights_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
 ### pets
 
 An animal in the kennel's care. Belongs to one client.
@@ -1282,7 +1385,8 @@ An animal in the kennel's care. Belongs to one client.
 | `sex` | `pet_sex` | yes | `'unknown'::pet_sex` |  |
 | `is_neutered` | `boolean` |  |  |  |
 | `date_of_birth` | `date` |  |  |  |
-| `weight_kg` | `numeric(5,2)` |  |  |  |
+| `weight_g` | `integer` |  |  | The latest weight in grams, from pet_weights. Kept by the database (pets_latest_weight): whatever is written here is replaced. |
+| `target_weight_g` | `integer` |  |  | The weight the pet should get to, in grams, when it has one. Food portions (M28) use it. |
 | `color` | `text` |  |  |  |
 | `microchip` | `text` |  |  |  |
 | `photo_path` | `text` |  |  | Path of the profile photo inside the pet-media storage bucket. |
@@ -1307,7 +1411,7 @@ An animal in the kennel's care. Belongs to one client.
 - Check `pets_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
 - Check `pets_photo_in_org`: `CHECK (paths_in_org(ARRAY[photo_path], org_id))`
 - Check `pets_species_check`: `CHECK ((species = ANY (ARRAY['dog'::text, 'cat'::text, 'other'::text])))`
-- Check `pets_weight_kg_check`: `CHECK (((weight_kg IS NULL) OR ((weight_kg > (0)::numeric) AND (weight_kg < (200)::numeric))))`
+- Check `pets_target_weight_g_check`: `CHECK (((target_weight_g IS NULL) OR ((target_weight_g >= 1) AND (target_weight_g <= 199999))))`
 
 **Indexes**
 
@@ -1318,6 +1422,7 @@ An animal in the kennel's care. Belongs to one client.
 
 - `pets_forbid_org_change` (before update) runs `forbid_org_change()`
 - `pets_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
+- `pets_latest_weight` (before insert or update) runs `pets_latest_weight()`
 - `pets_set_updated_at` (before update) runs `set_updated_at()`
 
 **Access**
@@ -1482,6 +1587,42 @@ A reminder a person sent a parent from Today, on WhatsApp from their own phone: 
 - `reminders_sent_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `reminders_sent_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `reminders_sent_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### service_areas
+
+A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `postal_code` | `text` | yes |  |  |
+| `name` | `text` | yes |  | What the kennel calls the area, e.g. Indiranagar. |
+| `delivery_charge_minor` | `bigint` |  |  | What a delivery or trip there costs the parent, in minor units. Empty: free. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `service_areas_pkey`: `PRIMARY KEY (id)`
+- Unique `service_areas_org_id_postal_code_key`: `UNIQUE (org_id, postal_code)`
+- Foreign key `service_areas_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `service_areas_delivery_charge_minor_check`: `CHECK (((delivery_charge_minor IS NULL) OR (delivery_charge_minor >= 0)))`
+- Check `service_areas_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `service_areas_postal_code_check`: `CHECK (((postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$'::text) AND (postal_code ~ '[0-9]'::text)))`
+
+**Triggers**
+
+- `service_areas_forbid_org_change` (before update) runs `forbid_org_change()`
+- `service_areas_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `service_areas_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `service_areas_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `service_areas_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `service_areas_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### services
 
@@ -1687,7 +1828,7 @@ accept_intake(p_submission uuid) returns uuid
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any. Returns the client id. Creating the booking is a separate step.
+Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. Returns the client id. Creating the booking is a separate step.
 
 ### accept_invitation_link
 
@@ -1939,7 +2080,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
+Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 
@@ -1951,7 +2092,7 @@ export_client(p_client uuid) returns jsonb
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
+Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
 ### fiscal_year_label
 
@@ -2023,7 +2164,7 @@ get_public_intake_form(p_slug text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times and consent wording.
+PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, and whether it delivers (so the form asks for an address with a PIN code).
 
 ### get_public_invoice
 
@@ -2227,7 +2368,7 @@ merge_clients(p_keep uuid, p_merge uuid) returns uuid
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
+Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments, forms and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
 
 ### my_invitations
 
@@ -2336,6 +2477,30 @@ payments_check_refund() returns trigger
 - Volatility: volatile
 
 Trigger: a refund names a bill or a stay (WB120) and gives back no more than was paid over what the bill now comes to after credit notes (WB121), or than the advance paid for a stay with no bill (WB122).
+
+### pet_weights_refresh_pet
+
+```
+pet_weights_refresh_pet() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: after a weighing is added, corrected or removed, the pet's latest weight is worked out again.
+
+### pets_latest_weight
+
+```
+pets_latest_weight() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: pets.weight_g is always the latest of the pet's weighings, whatever was written to it.
 
 ### play_sessions_fill_client
 

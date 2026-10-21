@@ -220,19 +220,65 @@ that was hidden on its own before. Merging and erasing hide rows the same way.
 
 On the parent page, for owners and managers (`WB070` for anyone else); erasing is for owners only (`WB074`):
 
-- **Download their details** gives one JSON file (`export_client`): the parent and their consent, each pet with its
-  vaccinations, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
+- **Download their details** gives one JSON file (`export_client`): the parent and their consent, their addresses, each
+  pet with its vaccinations, weights, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
   lines, payments, the intake forms they sent, and the storage paths of their photos and certificates (the file names
   them; it does not contain them).
 - **Erase their details**, after ticking "I understand that this cannot be undone" (`erase_client`): empties every
   personal detail on the parent (the parent is then shown as "Erased" where a past stay or bill names them) and the
-  notes on their stays; deletes the updates sent to them (with their photos), their intake forms (with their files),
+  notes on their stays; deletes their addresses, the updates sent to them (with their photos), their intake forms (with their files),
   draft bills, and the vaccination certificate files, because a card carries the owner's name and address; and takes
   the stays' notes out of the history of changes. **The pets stay** (D30): their details, photo, vaccinations (without
   the card), routines, incidents, care tasks and play, hidden from lists. Issued and cancelled bills stay, with the
   buyer printed on them, and so do payments and the stays' dates and prices, because tax law requires the kennel to
   keep them. Refused while a pet is in house (`WB071`) or a stay is still to come (`WB072`). The erasure itself is in
   the history of changes. The phone number is free for a new record afterwards.
+
+### B10. What the kennel offers. Built (M25, D44).
+
+Settings, **What this kennel offers**: three switches, all off for a new kennel. Boarding is always on.
+
+| Switch | Turns on |
+| --- | --- |
+| Appointments: grooming, swimming, training and parties | The skills groomer, trainer and swim supervisor (M34 onwards adds the rest) |
+| A kitchen that cooks fresh food | The skill cook (M26 onwards adds the rest) |
+| Food delivered to parents' homes | Parents' addresses, Areas you serve under More, the address and PIN code on the intake form, and the skill rider |
+
+Delivery needs the kitchen: the database refuses delivery without it (`organizations_delivery_needs_kitchen`). With
+every switch off, Wagbook looks as it did before M25.
+
+### B11. A parent's addresses. Built (M25).
+
+On the parent page, while the kennel delivers: **Addresses**, each Home, Work or Other, with the house or flat number,
+building and street, the area, a PIN code (six digits in India), an optional map link (https only) and a note for
+whoever delivers. Each says **We deliver here: Indiranagar, ₹50 a delivery** when its PIN code is in the areas served,
+or **Not in the areas you serve**. Anyone adds an address; only owners and managers change one, because it is
+personal data like a phone number (D33); owners remove one. The intake form asks for the address, area and PIN code
+when the kennel delivers, and accepting the form of a new parent makes it their home address. Addresses are in the
+parent's export, move when parents are merged, and are deleted when the parent is erased.
+
+### B12. Areas you serve. Built (M25).
+
+More, **Areas you serve** (shown while the kennel delivers): one row a PIN code, with the area's name and an optional
+delivery charge (empty is free). Owners and managers add and change them; owners remove them. A PIN code appears once
+(`service_areas_org_id_postal_code_key`). Delivery runs (M31) and pick-ups from home (M39) use them.
+
+### B13. Weights. Built (M25).
+
+On the pet page, **Weight**: the latest weight and its date, how it changed since the weighing before ("Down 1.3 kg
+since 14 Oct 2026"), the body condition score if one was given (1 very thin to 9 very heavy), and the target weight.
+**Write down a weight** takes the kilos (34.5 or 34,5), the day (today or earlier) and an optional score and note;
+anyone may write one. The list of weights opens below; owners remove one written by mistake, and managers may correct
+one through the database. Weights are kept in grams. The pet's weight on lists is always the latest weighing: the
+database keeps it, and nothing else can write it. The weight given on the intake form, or when adding a pet, is its
+first weighing. Food portions (M28) are worked out from the latest weight and the target.
+
+### B14. Skills. Built (M25).
+
+On People, owners and managers mark what each person can be given to do: cook, groomer, trainer, swim supervisor or
+rider, showing only the skills for what the kennel offers. Skills choose who is offered a job (the cook plan, the
+delivery run, an appointment); they never change what a person can see, which stays with their role. Only owners set
+an owner's skills.
 
 ---
 

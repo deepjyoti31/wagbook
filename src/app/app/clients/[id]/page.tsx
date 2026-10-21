@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { HidePanel } from "@/components/hide-panel";
 import { PetAvatar } from "@/components/pet-avatar";
@@ -9,13 +10,13 @@ import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
+import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
 import { fill, LANGUAGE_NAMES } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import { eraseClient, mergeClient, renewRequestLink, sellPack, setParentHidden, updateClient } from "../actions";
+import { addAddress, changeAddress, eraseClient, mergeClient, removeAddress, renewRequestLink, sellPack, setParentHidden, updateClient } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.parent.title);
 
@@ -162,6 +163,8 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           </ul>
         )}
       </Section>
+
+      {org.offers_food_delivery ? <Addresses t={t} org={org} clientId={c.id} canManage={canManage} canDelete={canDelete} /> : null}
 
       <Packs t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
 
@@ -414,6 +417,122 @@ async function Packs({
           </ActionForm>
         )
       ) : null}
+    </Section>
+  );
+}
+
+/** Where to deliver food or pick up a pet (M25), shown while the kennel delivers. Anyone adds one; owners and managers change one. */
+async function Addresses({
+  t,
+  org,
+  clientId,
+  canManage,
+  canDelete,
+}: {
+  t: Awaited<ReturnType<typeof getAppI18n>>;
+  org: { id: string; currency: string; country_code: string };
+  clientId: string;
+  canManage: boolean;
+  canDelete: boolean;
+}) {
+  const { m } = t;
+  const w = m.addresses;
+  const supabase = await createClient();
+  const [addresses, areas] = await Promise.all([
+    supabase.from("client_addresses").select("id, kind, line, area, postal_code, map_url, door_note").eq("org_id", org.id).eq("client_id", clientId).order("created_at"),
+    supabase.from("service_areas").select("postal_code, name, delivery_charge_minor").eq("org_id", org.id),
+  ]);
+  if (addresses.error || areas.error) throw new Error("Could not load addresses.");
+  const charge = (minor: number | null) =>
+    minor === null || minor === 0 ? m.areas.free : fill(m.areas.perDelivery, { amount: formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true }) });
+  const numeric = org.country_code === "IN" ? "numeric" : "text";
+
+  const fields = (x?: (typeof addresses.data)[number]) => (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={w.which}>
+          <Select name="kind" defaultValue={x?.kind ?? "home"}>
+            {(["home", "work", "other"] as const).map((k) => (
+              <option key={k} value={k}>
+                {w.kind[k]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={w.pin}>
+          <Input name="postalCode" inputMode={numeric} maxLength={10} required defaultValue={x?.postal_code ?? ""} />
+        </Field>
+      </div>
+      <Field label={w.line}>
+        <Input name="line" maxLength={300} required defaultValue={x?.line ?? ""} />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={w.area}>
+          <Input name="area" maxLength={120} defaultValue={x?.area ?? ""} />
+        </Field>
+        <Field label={w.map} hint={w.mapHint}>
+          <Input name="mapUrl" type="url" maxLength={500} defaultValue={x?.map_url ?? ""} autoCapitalize="none" spellCheck={false} />
+        </Field>
+      </div>
+      <Field label={w.doorNote} hint={w.doorNoteHint}>
+        <Input name="doorNote" maxLength={300} defaultValue={x?.door_note ?? ""} />
+      </Field>
+    </>
+  );
+
+  return (
+    <Section title={w.title} count={addresses.data.length}>
+      <p className="mb-3 text-slate">{w.about}</p>
+      {addresses.data.length === 0 ? (
+        <Empty>{w.none}</Empty>
+      ) : (
+        <ul className="space-y-3">
+          {addresses.data.map((x) => {
+            const area = areaFor(x.postal_code, areas.data);
+            return (
+              <li key={x.id} className="rounded-xl border border-rule bg-paper p-4">
+                <p className="font-bold">{w.kind[x.kind]}</p>
+                <p>{x.line}</p>
+                <p className="text-slate">{[x.area, x.postal_code].filter(Boolean).join(", ")}</p>
+                <p className="mt-1">
+                  {area ? <Badge tone="good">{fill(w.served, { area: area.name, charge: charge(area.delivery_charge_minor) })}</Badge> : <Badge tone="attention">{w.notServed}</Badge>}
+                </p>
+                {x.door_note ? <p className="mt-1 text-slate">{x.door_note}</p> : null}
+                {x.map_url ? (
+                  <a href={x.map_url} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+                    {w.openMap}
+                  </a>
+                ) : null}
+                {canManage ? (
+                  <details className="mt-1">
+                    <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.common.change}</summary>
+                    <ActionForm action={changeAddress} className="mt-2 space-y-4">
+                      <input type="hidden" name="addressId" value={x.id} />
+                      {fields(x)}
+                      <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
+                    </ActionForm>
+                    {canDelete ? (
+                      <ActionForm action={removeAddress} className="mt-3">
+                        <input type="hidden" name="addressId" value={x.id} />
+                        <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={w.yesRemove} pending={m.common.removing} />
+                      </ActionForm>
+                    ) : null}
+                  </details>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {canManage ? null : <p className="mt-3 text-sm text-slate">{w.byManagers}</p>}
+      <details className="mt-3">
+        <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.add}</summary>
+        <ActionForm action={addAddress} className="mt-2 space-y-4 rounded-xl border border-rule bg-paper p-4">
+          <input type="hidden" name="clientId" value={clientId} />
+          {fields()}
+          <SubmitButton pendingLabel={m.common.adding}>{w.addButton}</SubmitButton>
+        </ActionForm>
+      </details>
     </Section>
   );
 }

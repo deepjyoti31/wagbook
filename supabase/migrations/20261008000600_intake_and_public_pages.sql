@@ -37,7 +37,7 @@ create table public.intake_submissions (
 comment on table public.intake_submissions is
   'What a parent typed into the public intake form, kept exactly as sent until staff accept it. Nothing here is trusted until a person has reviewed it.';
 comment on column public.intake_submissions.payload is
-  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}.';
+  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}.';
 comment on column public.intake_submissions.consent_text is 'The exact consent wording the parent agreed to, kept as evidence.';
 comment on column public.intake_submissions.client_id is 'The client created or matched when the submission was accepted.';
 comment on column public.intake_submissions.upload_token is
@@ -138,13 +138,14 @@ as $$
     'check_out_time', to_char(o.check_out_time, 'HH24:MI'),
     'intake_enabled', o.intake_enabled,
     'language', o.parent_language,
+    'delivers', o.offers_food_delivery,
     'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language))
   )
   from public.organizations o
   where o.slug = lower(btrim(p_slug));
 $$;
 comment on function public.get_public_intake_form(text) is
-  'PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times and consent wording.';
+  'PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, and whether it delivers (so the form asks for an address with a PIN code).';
 
 create function public.submit_intake(p_slug text, p_payload jsonb)
 returns jsonb
@@ -250,6 +251,9 @@ declare
   v_certificate text;
   v_certificate2 text;
   v_vax_index bigint;
+  v_weight numeric;
+  v_postal text;
+  v_sent_on date;
 begin
   select * into v_sub from public.intake_submissions s where s.id = p_submission for update;
   if v_sub.id is null then
@@ -269,18 +273,36 @@ begin
   from public.clients c
   where c.org_id = v_sub.org_id and c.phone = v_sub.parent_phone and c.deleted_at is null;
 
+  -- The day the form was sent, at the kennel: the day its weights were taken.
+  select (v_sub.created_at at time zone o.time_zone)::date,
+         -- A PIN code in India is six digits; elsewhere a postal code has at least one digit.
+         case when o.country_code = 'IN' then '^[1-9][0-9]{5}$' else '^(?=.*[0-9])[A-Z0-9][A-Z0-9 -]{1,8}[A-Z0-9]$' end
+    into v_sent_on, v_postal
+  from public.organizations o where o.id = v_sub.org_id;
+  v_postal := case when upper(btrim(coalesce(v_sub.payload #>> '{parent,postal_code}', ''))) ~ v_postal
+                   then upper(btrim(v_sub.payload #>> '{parent,postal_code}')) end;
+
   if v_client is null then
     insert into public.clients
-      (org_id, full_name, phone, email, address, city, emergency_name, emergency_phone, consent_at, consent_source)
+      (org_id, full_name, phone, email, address, city, postal_code, emergency_name, emergency_phone, consent_at, consent_source)
     values
       (v_sub.org_id, left(v_sub.parent_name, 120), v_sub.parent_phone,
        nullif(left(btrim(v_sub.payload #>> '{parent,email}'), 200), ''),
        nullif(left(btrim(v_sub.payload #>> '{parent,address}'), 200), ''),
        nullif(left(btrim(v_sub.payload #>> '{parent,city}'), 200), ''),
+       v_postal,
        nullif(left(btrim(v_sub.payload #>> '{parent,emergency_name}'), 200), ''),
        nullif(left(btrim(v_sub.payload #>> '{parent,emergency_phone}'), 200), ''),
        v_sub.consent_at, 'intake_form')
     returning id into v_client;
+
+    -- A new parent who gave an address with a PIN code has a home to deliver
+    -- to. A known parent's addresses are left alone, as their record is.
+    if v_postal is not null and nullif(btrim(v_sub.payload #>> '{parent,address}'), '') is not null then
+      insert into public.client_addresses (org_id, client_id, kind, line, area, postal_code)
+      values (v_sub.org_id, v_client, 'home', left(btrim(v_sub.payload #>> '{parent,address}'), 300),
+              nullif(left(btrim(v_sub.payload #>> '{parent,area}'), 120), ''), v_postal);
+    end if;
   end if;
 
   for v_pet in select * from jsonb_array_elements(v_sub.payload -> 'pets') loop
@@ -293,7 +315,7 @@ begin
 
     if v_pet_id is null then
       insert into public.pets
-        (org_id, client_id, name, species, breed, sex, is_neutered, date_of_birth, weight_kg,
+        (org_id, client_id, name, species, breed, sex, is_neutered, date_of_birth,
          food_notes, medical_notes, allergies, behaviour_notes, vet_name, vet_phone)
       values
         (v_sub.org_id, v_client, left(btrim(v_pet ->> 'name'), 80),
@@ -302,9 +324,6 @@ begin
          case when v_pet ->> 'sex' in ('male', 'female') then (v_pet ->> 'sex')::public.pet_sex else 'unknown' end,
          case when v_pet ->> 'is_neutered' in ('true', 'false') then (v_pet ->> 'is_neutered')::boolean end,
          public.safe_date(v_pet ->> 'date_of_birth'),
-         case when v_pet ->> 'weight_kg' ~ '^[0-9]{1,3}([.][0-9]{1,2})?$' and (v_pet ->> 'weight_kg')::numeric > 0
-                   and (v_pet ->> 'weight_kg')::numeric < 200
-              then (v_pet ->> 'weight_kg')::numeric end,
          nullif(left(btrim(v_pet ->> 'food_notes'), 2000), ''),
          nullif(left(btrim(v_pet ->> 'medical_notes'), 2000), ''),
          nullif(left(btrim(v_pet ->> 'allergies'), 200), ''),
@@ -312,6 +331,15 @@ begin
          nullif(left(btrim(v_pet ->> 'vet_name'), 200), ''),
          nullif(left(btrim(v_pet ->> 'vet_phone'), 200), ''))
       returning id into v_pet_id;
+
+      -- The weight the parent gave, in kilos with up to two decimals, as the
+      -- pet's first weighing.
+      v_weight := case when v_pet ->> 'weight_kg' ~ '^[0-9]{1,3}([.][0-9]{1,2})?$'
+                       then (v_pet ->> 'weight_kg')::numeric end;
+      if v_weight > 0 and v_weight < 200 then
+        insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, notes)
+        values (v_sub.org_id, v_pet_id, v_sent_on, round(v_weight * 1000)::integer, null);
+      end if;
 
       -- The certificates the parent sent for this pet: pet-N for its first
       -- vaccine and pet-N-2 for its second. A vaccine with no card of its own
@@ -348,7 +376,7 @@ begin
 end;
 $$;
 comment on function public.accept_intake(uuid) is
-  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any. Returns the client id. Creating the booking is a separate step.';
+  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. Returns the client id. Creating the booking is a separate step.';
 
 -- ---------------------------------------------------------------------------
 -- Parent-facing read-only pages

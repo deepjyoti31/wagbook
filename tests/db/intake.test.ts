@@ -38,7 +38,7 @@ describe("the public intake form", () => {
     await as(db, anon, async () => {
       const res = await db.query<{ v: Record<string, unknown> }>("select public.get_public_intake_form($1) as v", [slug.toUpperCase()]);
       expect(Object.keys(res.rows[0].v).sort()).toEqual(
-        ["check_in_time", "check_out_time", "city", "intake_enabled", "language", "name", "notice", "whatsapp_phone"],
+        ["check_in_time", "check_out_time", "city", "delivers", "intake_enabled", "language", "name", "notice", "whatsapp_phone"],
       );
       expect(String(res.rows[0].v.notice)).toContain("Test Kennel");
       expect((await db.query<{ v: unknown }>("select public.get_public_intake_form('no-such-kennel') as v")).rows[0].v).toBeNull();
@@ -114,13 +114,18 @@ describe("accepting a submission", () => {
     );
     expect(client.rows[0]).toMatchObject({ full_name: "Asha Rao", email: "asha@example.test", consent_source: "intake_form", emergency_name: "Ravi" });
 
-    const pets = await db.query<{ name: string; species: string; sex: string; weight_kg: string | null; is_neutered: boolean | null; allergies: string | null }>(
-      "select name, species, sex, weight_kg, is_neutered, allergies from public.pets where client_id = $1 order by name", [clientId],
+    // The weight the parent gave is the pet's first weighing, in grams.
+    const pets = await db.query<{ name: string; species: string; sex: string; weight_g: number | null; is_neutered: boolean | null; allergies: string | null }>(
+      "select name, species, sex, weight_g, is_neutered, allergies from public.pets where client_id = $1 order by name", [clientId],
     );
     expect(pets.rows).toEqual([
-      { name: "Bruno", species: "dog", sex: "male", weight_kg: "34.50", is_neutered: true, allergies: "chicken" },
-      { name: "Coco", species: "dog", sex: "unknown", weight_kg: null, is_neutered: null, allergies: null },
+      { name: "Bruno", species: "dog", sex: "male", weight_g: 34500, is_neutered: true, allergies: "chicken" },
+      { name: "Coco", species: "dog", sex: "unknown", weight_g: null, is_neutered: null, allergies: null },
     ]);
+    const weighings = await db.query<{ n: number }>(
+      "select count(*)::int as n from public.pet_weights w join public.pets p on p.id = w.pet_id where p.client_id = $1", [clientId],
+    );
+    expect(weighings.rows[0].n).toBe(1);
 
     const vax = await db.query<{ vaccine: string; valid_until: string }>(
       "select v.vaccine, v.valid_until::text from public.vaccinations v join public.pets p on p.id = v.pet_id where p.client_id = $1", [clientId],

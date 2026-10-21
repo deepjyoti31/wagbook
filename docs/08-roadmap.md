@@ -486,19 +486,20 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M25. Groundwork for more than boarding
 
-- [ ] Not started.
+- [x] Finished 21 October 2026 (B10 to B14 in `02`).
 
 **Build**
 
-1. Settings, "What this kennel offers": Appointments, Kitchen, Food delivery, each on or off. The bottom bar, More and
-   Today show only what is on.
-2. Addresses for parents: more than one (home, office), each with area, pincode, a map link and a note for whoever
+1. [x] Settings, "What this kennel offers": Appointments, Kitchen, Food delivery, each on or off. The bottom bar, More and
+   Today show only what is on. (Only More has something to hide so far: Areas you serve.)
+2. [x] Addresses for parents: more than one (home, office), each with area, pincode, a map link and a note for whoever
    delivers. On the parent page and the intake form.
-3. Areas served: the pincodes the kennel delivers to and picks up from, each with an optional delivery charge.
-4. People's skills: cook, groomer, trainer, swim supervisor, rider. Used to offer the right person for a job, not for
+3. [x] Areas served: the pincodes the kennel delivers to and picks up from, each with an optional delivery charge.
+4. [x] People's skills: cook, groomer, trainer, swim supervisor, rider. Used to offer the right person for a job, not for
    access (access stays with roles, until M31).
-5. A pet's weight over time: weighed on a date, by whom, with an optional body condition score (1 to 9) and a target
-   weight. Shown on the pet page; the latest weight is what portions use (M28).
+5. [x] A pet's weight over time: weighed on a date, by whom, with an optional body condition score (1 to 9) and a target
+   weight. Shown on the pet page; the latest weight is what portions use (M28). `pets.weight_kg` became `weight_g`,
+   kept by the database from the weighings.
 
 **Rules**
 
@@ -580,6 +581,9 @@ in M1 can happen at any point; the migration freeze waits for it.
    own percentages (by default 3%, 2.5% and 2% of body weight for small, medium and large dogs). A manager may set the
    grams by hand with a note. Today lists portions to review a week after a pet starts.
 4. On the pet page: the plan, grams a day, foods to avoid, and the weight trend.
+5. What a boarder eats (the owner's answer, 21 October 2026): fresh food from the kitchen by default, or a kibble the
+   parent names (brand, and grams a day), or food the parent sends. Chosen per pet; the care round and the cook plan
+   follow it.
 
 **Rules**
 
@@ -600,7 +604,8 @@ in M1 can happen at any point; the migration freeze waits for it.
 **Build**
 
 1. A subscription: parent, pets, plan, grams a day, delivery days (two a week by default), a time slot, an address,
-   a start date, and how it is paid (a week in advance by default).
+   a start date, and how it is paid: weekly or monthly in advance (the owner's answer, 21 October 2026). The owner
+   sets a discount for monthly payment, as a percentage (`_bp`), in Settings.
 2. Deliveries made ahead from it: each covers the days until the next, rounded up to whole packs (pack size a
    setting, 250 g by default), with the recipe the rotation gives it.
 3. Pause (between two dates, or until resumed), change the grams, plan, days or address, or cancel. Changes close a
@@ -655,7 +660,8 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 **Build**
 
-1. The day's run: deliveries by slot and area, in an order staff can change, a map link for each stop, and the whole
+1. The day's run: one rider's deliveries for a slot, one after another (the owner's answer, 21 October 2026: a rider
+   sees their own run and nothing else), by area, in an order staff can change, a map link for each stop, and the whole
    route opened in Google Maps.
 2. A rider sees only their run: name, address, phone, packs and the note for the door. No prices, no pets' medical
    notes, no other parents.
@@ -756,7 +762,8 @@ in M1 can happen at any point; the migration freeze waits for it.
 **Build**
 
 1. The grooming menu: bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea bath, teeth; priced by
-   size or coat, with add-ons.
+   coat and breed (the owner's answer, 21 October 2026): a coat type on the pet (short, double, long, curly, wire) and
+   a price for each coat type, with a price for a named breed overriding it; add-ons on top.
 2. A grooming card on the pet: coat, the usual cut, products to use or avoid, skin conditions, how the pet behaves on
    the table, the last groom.
 3. Before and after photos sent to the parent as an update (D4, F3).
@@ -814,7 +821,8 @@ in M1 can happen at any point; the migration freeze waits for it.
 2. A cancellation rule for each kind of service: the notice needed, and what happens to each night or appointment with
    enough notice and without it (refund, or keep as credit).
 3. Credit: a parent's balance from a cancellation or a goodwill gesture, ending on a set date (12 months by default),
-   spent on any bill as a payment, never more than what is left. On the parent page and on bills.
+   spent on any bill as a payment, never more than what is left. On the parent page and on bills. A reminder goes on
+   Today's list to send (D39) a month before credit runs out (the owner's answer, 21 October 2026).
 4. On Cancel, Wagbook works out the refund and the credit night by night, shows both, and a manager confirms. The time
    the parent asked is recorded for the notice rule.
 5. When the kennel cancels, the parent chooses a refund or credit.

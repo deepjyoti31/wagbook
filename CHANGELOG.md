@@ -48,6 +48,10 @@ The first release will be 0.1.0. Everything below is in it.
 - A regular's repeating day boarding is billed once a month, on one bill.
 - Owners can take a photo posted by mistake off an update.
 - Recovery codes for two-step sign-in, for when a phone is lost.
+- Settings says what else the kennel offers: appointments, a kitchen, food delivery. All off to start, so a kennel
+  that only boards sees nothing new. With delivery on: parents' delivery addresses, matched by PIN code to the areas
+  you serve and their charge. Skills on People (cook, groomer, trainer, swim supervisor, rider). Each pet's weight
+  over time, with a target and a body condition score.
 
 ### For whoever runs it
 

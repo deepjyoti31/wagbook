@@ -102,7 +102,8 @@ create table public.pets (
   sex public.pet_sex not null default 'unknown',
   is_neutered boolean,
   date_of_birth date,
-  weight_kg numeric(5, 2) check (weight_kg is null or (weight_kg > 0 and weight_kg < 200)),
+  weight_g integer,
+  target_weight_g integer check (target_weight_g is null or target_weight_g between 1 and 199999),
   color text,
   microchip text,
   photo_path text,
@@ -124,6 +125,9 @@ create table public.pets (
 
 comment on table public.pets is 'An animal in the kennel''s care. Belongs to one client.';
 comment on column public.pets.photo_path is 'Path of the profile photo inside the pet-media storage bucket.';
+comment on column public.pets.weight_g is
+  'The latest weight in grams, from pet_weights. Kept by the database (pets_latest_weight): whatever is written here is replaced.';
+comment on column public.pets.target_weight_g is 'The weight the pet should get to, in grams, when it has one. Food portions (M28) use it.';
 comment on column public.pets.food_notes is 'What the pet eats, how much and when, in the parent''s words.';
 comment on column public.pets.flags is
   'Short warning tags staff must see at a glance, e.g. escape_risk, bite_history, dog_reactive, anxious, on_medication, senior.';
@@ -134,6 +138,158 @@ create index pets_org_name_idx on public.pets (org_id, lower(name));
 
 create trigger pets_set_updated_at
   before update on public.pets
+  for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Weights over time (M25). Grams, never a decimal.
+-- ---------------------------------------------------------------------------
+
+create table public.pet_weights (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  pet_id uuid not null,
+  weighed_on date not null,
+  weight_g integer not null check (weight_g between 1 and 199999),
+  body_condition smallint check (body_condition between 1 and 9),
+  notes text check (notes is null or char_length(notes) <= 500),
+  recorded_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (org_id, pet_id) references public.pets (org_id, id) on delete cascade
+);
+
+comment on table public.pet_weights is
+  'A pet weighed on a day. The latest is copied to pets.weight_g; food portions are worked out from it (M28).';
+comment on column public.pet_weights.weighed_on is 'The day the pet was weighed, in the kennel''s time zone.';
+comment on column public.pet_weights.weight_g is 'Weight in grams: 34.5 kg is 34500.';
+comment on column public.pet_weights.body_condition is
+  'Body condition score from 1 (very thin) to 9 (very heavy); 4 and 5 are ideal for a dog. Empty when not scored.';
+comment on column public.pet_weights.recorded_by is 'Who wrote the weight down. Set by the database.';
+
+create index pet_weights_org_pet_idx on public.pet_weights (org_id, pet_id, weighed_on desc, created_at desc);
+
+create trigger pet_weights_set_updated_at
+  before update on public.pet_weights
+  for each row execute function public.set_updated_at();
+
+create trigger pet_weights_stamp_actor
+  before insert or update on public.pet_weights
+  for each row execute function public.stamp_actor('recorded_by');
+
+create function public.pets_latest_weight()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- A new pet has no weighings yet: its first one comes after it.
+  if tg_op = 'INSERT' then
+    new.weight_g := null;
+  else
+    new.weight_g := (
+      select w.weight_g from public.pet_weights w
+      where w.org_id = new.org_id and w.pet_id = new.id
+      order by w.weighed_on desc, w.created_at desc
+      limit 1
+    );
+  end if;
+  return new;
+end;
+$$;
+comment on function public.pets_latest_weight() is
+  'Trigger: pets.weight_g is always the latest of the pet''s weighings, whatever was written to it.';
+
+create trigger pets_latest_weight
+  before insert or update on public.pets
+  for each row execute function public.pets_latest_weight();
+
+create function public.pet_weights_refresh_pet()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- Touching the pet makes pets_latest_weight look again.
+  if tg_op in ('UPDATE', 'DELETE') then
+    update public.pets p set weight_g = null where p.org_id = old.org_id and p.id = old.pet_id;
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') then
+    update public.pets p set weight_g = null where p.org_id = new.org_id and p.id = new.pet_id;
+  end if;
+  return null;
+end;
+$$;
+comment on function public.pet_weights_refresh_pet() is
+  'Trigger: after a weighing is added, corrected or removed, the pet''s latest weight is worked out again.';
+
+create trigger pet_weights_refresh_pet
+  after insert or update or delete on public.pet_weights
+  for each row execute function public.pet_weights_refresh_pet();
+
+-- ---------------------------------------------------------------------------
+-- Where a parent wants things delivered or a pet picked up (M25, D44).
+-- ---------------------------------------------------------------------------
+
+create type public.address_kind as enum ('home', 'work', 'other');
+comment on type public.address_kind is 'What a parent''s address is, so it is named in the reader''s language: home, work or other.';
+
+create table public.client_addresses (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  client_id uuid not null,
+  kind public.address_kind not null default 'home',
+  line text not null check (char_length(line) between 1 and 300),
+  area text check (area is null or char_length(area) <= 120),
+  postal_code text not null check (postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$' and postal_code ~ '[0-9]'),
+  map_url text check (map_url is null or (map_url ~ '^https://' and char_length(map_url) <= 500)),
+  door_note text check (door_note is null or char_length(door_note) <= 300),
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id, id),
+  foreign key (org_id, client_id) references public.clients (org_id, id) on delete cascade
+);
+
+comment on table public.client_addresses is
+  'A place a parent wants food delivered or a pet picked up. Personal data, like a phone number: owners and managers change one, it is in the export, and erasing the parent deletes it.';
+comment on column public.client_addresses.line is 'House or flat number, building and street, as the parent wrote it.';
+comment on column public.client_addresses.area is 'The area or locality, as people there name it.';
+comment on column public.client_addresses.postal_code is 'PIN code in India (six digits), or the postal code elsewhere (with at least one digit). Matched against service_areas.';
+comment on column public.client_addresses.map_url is 'A map link the parent shared (https only), for whoever delivers.';
+comment on column public.client_addresses.door_note is 'For whoever delivers: gate code, floor, leave with the guard.';
+
+create index client_addresses_org_client_idx on public.client_addresses (org_id, client_id);
+
+create trigger client_addresses_set_updated_at
+  before update on public.client_addresses
+  for each row execute function public.set_updated_at();
+
+create trigger client_addresses_stamp_actor
+  before insert or update on public.client_addresses
+  for each row execute function public.stamp_actor('created_by');
+
+-- ---------------------------------------------------------------------------
+-- The places the kennel delivers to and picks up from (M25).
+-- ---------------------------------------------------------------------------
+
+create table public.service_areas (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  postal_code text not null check (postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$' and postal_code ~ '[0-9]'),
+  name text not null check (char_length(name) between 1 and 80),
+  delivery_charge_minor bigint check (delivery_charge_minor is null or delivery_charge_minor >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id, postal_code)
+);
+
+comment on table public.service_areas is
+  'A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.';
+comment on column public.service_areas.name is 'What the kennel calls the area, e.g. Indiranagar.';
+comment on column public.service_areas.delivery_charge_minor is 'What a delivery or trip there costs the parent, in minor units. Empty: free.';
+
+create trigger service_areas_set_updated_at
+  before update on public.service_areas
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------

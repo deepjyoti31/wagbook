@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { isISODate, normalizePhone } from "@/lib/core";
+import { isISODate, MAX_WEIGHT_G, normalizePhone, parseKgToGrams, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { setHidden } from "@/lib/hiding";
@@ -19,7 +19,7 @@ const newPet = (m: Messages) =>
     petName: z.string().min(1, m.pet.errors.petName).max(80),
     species: z.enum(["dog", "cat", "other"]),
     sex: z.enum(["male", "female", "unknown"]),
-    weightKg: z.number().positive().lt(200).nullable(),
+    weightG: z.number().int().min(1).max(MAX_WEIGHT_G).nullable(),
   });
 
 /**
@@ -42,9 +42,10 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
     petName: text(form, "petName") ?? "",
     species: form.get("species"),
     sex: form.get("sex"),
-    weightKg: weightText === null ? null : Number(weightText),
+    // An unreadable weight becomes 0, which the schema refuses with its own sentence.
+    weightG: weightText === null ? null : (parseKgToGrams(weightText) ?? 0),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? m.pet.errors.weight : parsed.error.issues[0].message };
+  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightG" ? m.pet.errors.weight : parsed.error.issues[0].message };
   const p = parsed.data;
 
   const supabase = await createClient();
@@ -65,7 +66,7 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
   }
 
   const neutered = form.get("isNeutered");
-  const { error } = await supabase.from("pets").insert({
+  const created = await supabase.from("pets").insert({
     org_id: org.id,
     client_id: clientId,
     name: p.petName,
@@ -73,14 +74,18 @@ export async function createPet(_state: FormState, form: FormData): Promise<Form
     sex: p.sex,
     breed: text(form, "breed"),
     is_neutered: neutered === "yes" ? true : neutered === "no" ? false : null,
-    weight_kg: p.weightKg,
     food_notes: text(form, "foodNotes"),
     medical_notes: text(form, "medicalNotes"),
     allergies: text(form, "allergies"),
     behaviour_notes: text(form, "behaviourNotes"),
     flags: PET_FLAGS.filter((f) => checked(form, `flag_${f}`)),
-  });
-  if (error) return { error: friendlyError(error, t) };
+  }).select("id").single();
+  if (created.error) return { error: friendlyError(created.error, t) };
+  // The weight given at the gate is the pet's first weighing (M25).
+  if (p.weightG !== null) {
+    const weighed = await supabase.from("pet_weights").insert({ org_id: org.id, pet_id: created.data.id, weighed_on: todayIn(org.time_zone), weight_g: p.weightG });
+    if (weighed.error) return { error: friendlyError(weighed.error, t) };
+  }
 
   revalidatePath("/app", "layout");
   redirect("/app/dogs");
@@ -98,7 +103,6 @@ const petDetails = (m: Messages) => {
     color: z.string().max(80).nullable(),
     microchip: z.string().max(40).nullable(),
     dateOfBirth: z.string().refine(isISODate, m.pet.errors.dateOfBirth).nullable(),
-    weightKg: z.number().positive().lt(200).nullable(),
     foodNotes: long,
     medicalNotes: long,
     allergies: long,
@@ -115,7 +119,6 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
   const { m } = t;
   const petId = Id.safeParse(form.get("petId"));
   if (!petId.success) return { error: m.errors.petNotFound };
-  const weight = text(form, "weightKg");
   const parsed = petDetails(m).safeParse({
     name: text(form, "name") ?? "",
     species: form.get("species"),
@@ -124,7 +127,6 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
     color: text(form, "color"),
     microchip: text(form, "microchip"),
     dateOfBirth: text(form, "dateOfBirth"),
-    weightKg: weight === null ? null : Number(weight),
     foodNotes: text(form, "foodNotes"),
     medicalNotes: text(form, "medicalNotes"),
     allergies: text(form, "allergies"),
@@ -132,7 +134,7 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
     vetName: text(form, "vetName"),
     vetPhone: text(form, "vetPhone"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "weightKg" ? m.pet.errors.weight : parsed.error.issues[0].message };
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
   const p = parsed.data;
   const neutered = form.get("isNeutered");
 
@@ -147,7 +149,6 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
       color: p.color,
       microchip: p.microchip,
       date_of_birth: p.dateOfBirth,
-      weight_kg: p.weightKg,
       is_neutered: neutered === "yes" ? true : neutered === "no" ? false : null,
       food_notes: p.foodNotes,
       medical_notes: p.medicalNotes,
@@ -272,4 +273,76 @@ export async function updateIncident(_state: FormState, form: FormData): Promise
   revalidatePath("/app", "layout");
   // The button that was pressed goes away, and its message with it: say so on the page.
   redirect(`/app/dogs/${data[0].pet_id}?done=${what}`);
+}
+
+const weighing = (m: Messages, today: string) => {
+  const w = m.weights.errors;
+  return z.object({
+    petId: z.uuid(m.errors.petNotFound),
+    weightG: z.number(w.weight).int().min(1, w.weight).max(MAX_WEIGHT_G, w.weight),
+    weighedOn: z.string().refine((d) => isISODate(d) && d <= today, w.date),
+    bodyCondition: z.number().int().min(1, w.condition).max(9, w.condition).nullable(),
+    notes: z.string().max(500, w.note).nullable(),
+  });
+};
+
+/** Write down a pet's weight (M25). Any member: pets are weighed at the gate and on the round. */
+export async function addWeight(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const today = todayIn(org.time_zone);
+  const condition = text(form, "bodyCondition");
+  const parsed = weighing(t.m, today).safeParse({
+    petId: form.get("petId"),
+    weightG: parseKgToGrams(text(form, "weightKg") ?? "") ?? 0,
+    weighedOn: text(form, "weighedOn") ?? today,
+    bodyCondition: condition === null ? null : Number(condition),
+    notes: text(form, "notes"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const w = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.from("pet_weights").insert({
+    org_id: org.id,
+    pet_id: w.petId,
+    weighed_on: w.weighedOn,
+    weight_g: w.weightG,
+    body_condition: w.bodyCondition,
+    notes: w.notes,
+  });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.weights.saved };
+}
+
+/** The weight a pet should get to, or none. Any member, as for the pet's other details. */
+export async function setTargetWeight(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const petId = Id.safeParse(form.get("petId"));
+  if (!petId.success) return { error: t.m.errors.petNotFound };
+  const typed = text(form, "targetKg");
+  const target = typed === null ? null : parseKgToGrams(typed);
+  if (typed !== null && target === null) return { error: t.m.weights.errors.weight };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("pets").update({ target_weight_g: target }).eq("org_id", org.id).eq("id", petId.data).select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.errors.petNotFound };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.weights.targetSaved };
+}
+
+/** Remove a weight written down by mistake. Owners only (D29); the policy decides. */
+export async function removeWeight(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canDelete } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
+  const id = Id.safeParse(form.get("weightId"));
+  if (!id.success) return { error: t.m.weights.errors.notFound };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("pet_weights").delete().eq("org_id", org.id).eq("id", id.data).select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.weights.errors.notFound };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.weights.removed };
 }

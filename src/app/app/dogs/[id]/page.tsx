@@ -2,19 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { ConfirmStep } from "@/components/confirm-step";
 import { HidePanel } from "@/components/hide-panel";
 import { AddVaccinationForm, PetPhotoForm, VaccinationList } from "@/components/pet-panels";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { formatPhone, todayIn } from "@/lib/core";
+import { formatDate, formatKg, formatPhone, todayIn, weightChange } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
-import { setPetHidden, updateIncident, updatePet } from "../actions";
+import { addWeight, removeWeight, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.pet.title);
 
@@ -30,7 +31,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const { id } = await params;
   const doneKey = (await searchParams).done;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { org, canManage } = await requireOrg();
+  const { org, canManage, canDelete } = await requireOrg();
   const t = await getAppI18n();
   const { m } = t;
   const done = typeof doneKey === "string" && Object.hasOwn(m.pet.done, doneKey) ? m.pet.done[doneKey as keyof typeof m.pet.done] : null;
@@ -40,7 +41,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const res = await supabase
     .from("pets")
     .select(
-      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_kg, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
+      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -51,7 +52,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const pet = res.data;
   const hidden = pet.deleted_at !== null;
 
-  const [stays, incidents, vaccinations] = await Promise.all([
+  const [stays, incidents, vaccinations, weights] = await Promise.all([
     supabase.from("bookings").select("id, kind, status, start_date, end_date, kennels(name)").eq("org_id", org.id).eq("pet_id", id).order("start_date", { ascending: false }).limit(50),
     supabase
       .from("incidents")
@@ -61,8 +62,16 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       .order("occurred_at", { ascending: false })
       .limit(50),
     supabase.from("vaccinations").select("id, vaccine, given_on, valid_until, certificate_path").eq("org_id", org.id).eq("pet_id", id).order("vaccine"),
+    supabase
+      .from("pet_weights")
+      .select("id, weighed_on, weight_g, body_condition, notes")
+      .eq("org_id", org.id)
+      .eq("pet_id", id)
+      .order("weighed_on", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(24),
   ]);
-  if (stays.error || incidents.error || vaccinations.error) throw new Error("Could not load the pet.");
+  if (stays.error || incidents.error || vaccinations.error || weights.error) throw new Error("Could not load the pet.");
 
   const [photo, certificates] = await Promise.all([
     signedUrls(supabase, [pet.photo_path], { small: true }),
@@ -86,7 +95,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       </PageTitle>
       <div className="mb-5 space-y-1">
         <p className="flex flex-wrap items-center gap-2">
-          {[pet.breed, pet.species !== "dog" ? ((m.pet.speciesInLine as Record<string, string>)[pet.species] ?? pet.species) : null, pet.weight_kg ? fill(m.pet.weight, { kg: pet.weight_kg }) : null].filter(Boolean).join(", ")}
+          {[pet.breed, pet.species !== "dog" ? ((m.pet.speciesInLine as Record<string, string>)[pet.species] ?? pet.species) : null, pet.weight_g ? fill(m.pet.weight, { kg: formatKg(pet.weight_g, t.locale) }) : null].filter(Boolean).join(", ")}
           {pet.flags.map((f) => (
             <Badge key={f} tone="alert">
               {flagText(m, f)}
@@ -179,6 +188,15 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         </div>
       </Section>
 
+      <WeightSection
+        t={t}
+        petId={pet.id}
+        today={today}
+        target={pet.target_weight_g}
+        weights={weights.data}
+        canDelete={canDelete}
+      />
+
       <Section title={m.pet.stays} count={stays.data.length}>
         {stays.data.length === 0 ? (
           <Empty>{m.pet.noStays}</Empty>
@@ -235,9 +253,6 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
             <Field label={f.dateOfBirth}>
               <Input name="dateOfBirth" type="date" defaultValue={pet.date_of_birth ?? ""} />
             </Field>
-            <Field label={f.weight}>
-              <Input name="weightKg" inputMode="decimal" defaultValue={pet.weight_kg === null ? "" : String(pet.weight_kg)} />
-            </Field>
             <Field label={f.colour}>
               <Input name="color" maxLength={80} defaultValue={pet.color ?? ""} />
             </Field>
@@ -282,5 +297,112 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
 
       {hidden ? null : <HidePanel action={setPetHidden} field="petId" id={pet.id} hidden={false} canManage={canManage} words={hideWords} />}
     </>
+  );
+}
+
+/** The pet's weights over time (M25): the latest, how it changed, the target, and writing a new one down. */
+function WeightSection({
+  t,
+  petId,
+  today,
+  target,
+  weights,
+  canDelete,
+}: {
+  t: Awaited<ReturnType<typeof getAppI18n>>;
+  petId: string;
+  today: string;
+  target: number | null;
+  weights: { id: string; weighed_on: string; weight_g: number; body_condition: number | null; notes: string | null }[];
+  canDelete: boolean;
+}) {
+  const { m, locale } = t;
+  const w = m.weights;
+  const kg = (g: number) => formatKg(g, locale);
+  const [latest, previous] = weights;
+  const change = latest && previous ? weightChange(previous.weight_g, latest.weight_g) : null;
+  const since = previous ? formatDate(previous.weighed_on, locale) : "";
+  return (
+    <Section title={w.title}>
+      <div className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+        {latest ? (
+          <div className="space-y-1">
+            <p className="text-lg font-bold">{fill(w.latest, { kg: kg(latest.weight_g), date: formatDate(latest.weighed_on, locale) })}</p>
+            {change === null ? null : (
+              <p className="text-slate">
+                {change === 0 ? fill(w.same, { date: since }) : fill(change < 0 ? w.down : w.up, { kg: kg(Math.abs(change)), date: since })}
+              </p>
+            )}
+            {latest.body_condition ? <p className="text-slate">{fill(w.condition, { n: latest.body_condition })}</p> : null}
+            {target ? <p className="text-slate">{fill(w.target, { kg: kg(target) })}</p> : null}
+          </div>
+        ) : (
+          <p className="text-slate">{w.none}</p>
+        )}
+
+        {weights.length > 0 ? (
+          <details>
+            <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">
+              {w.earlier} ({weights.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-rule">
+              {weights.map((x) => (
+                <li key={x.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                  <span className="tabular-nums">{formatDate(x.weighed_on, locale)}</span>
+                  <span className="font-semibold tabular-nums">{fill(m.pet.weight, { kg: kg(x.weight_g) })}</span>
+                  {x.body_condition ? <span className="text-slate">{fill(w.condition, { n: x.body_condition })}</span> : null}
+                  {x.notes ? <span className="w-full text-slate">{x.notes}</span> : null}
+                  {canDelete ? (
+                    <ActionForm action={removeWeight} className="w-full">
+                      <input type="hidden" name="weightId" value={x.id} />
+                      <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={w.yesRemove} pending={m.common.removing} />
+                    </ActionForm>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+
+        <ActionForm action={addWeight} className="space-y-4 border-t border-rule pt-4">
+          <p className="font-bold">{w.weigh}</p>
+          <input type="hidden" name="petId" value={petId} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={w.weightKg}>
+              <Input name="weightKg" inputMode="decimal" required />
+            </Field>
+            <Field label={w.weighedOn}>
+              <Input name="weighedOn" type="date" max={today} defaultValue={today} required />
+            </Field>
+            <Field label={w.bodyCondition} hint={w.bodyConditionHint}>
+              <Select name="bodyCondition" defaultValue="">
+                <option value="">{w.notScored}</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.note}>
+              <Input name="notes" maxLength={500} />
+            </Field>
+          </div>
+          <SubmitButton pendingLabel={m.common.saving}>{w.save}</SubmitButton>
+        </ActionForm>
+
+        <ActionForm action={setTargetWeight} className="flex flex-wrap items-end gap-2 border-t border-rule pt-4">
+          <input type="hidden" name="petId" value={petId} />
+          <div className="min-w-48 flex-1">
+            <Field label={w.targetLabel} hint={w.targetHint}>
+              <Input name="targetKg" inputMode="decimal" defaultValue={target ? String(target / 1000) : ""} />
+            </Field>
+          </div>
+          <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+            {w.saveTarget}
+          </SubmitButton>
+        </ActionForm>
+      </div>
+    </Section>
   );
 }

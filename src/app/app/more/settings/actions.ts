@@ -161,6 +161,10 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     requests_enabled: checked(form, "requests_enabled"),
     intake_notice: text(form, "intake_notice"),
     parent_language: parentLanguage,
+    // What else the kennel offers (D44). The database refuses delivery without the kitchen.
+    offers_appointments: checked(form, "offers_appointments"),
+    offers_kitchen: checked(form, "offers_kitchen"),
+    offers_food_delivery: checked(form, "offers_food_delivery"),
   };
 
   const supabase = await createClient();

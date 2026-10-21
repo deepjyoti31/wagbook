@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { addDays, formatDate, isGstStateCode, isISODate, isValidGstin, normalizePhone, todayIn } from "@/lib/core";
+import { addDays, formatDate, isGstStateCode, isISODate, isMapLink, isValidGstin, normalizePhone, normalizePostalCode, todayIn } from "@/lib/core";
 import { billFromLines, draftPayload } from "@/lib/billing";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
@@ -222,4 +222,69 @@ export async function sellPack(_state: FormState, form: FormData): Promise<FormS
   if (pass.error) return { error: friendlyError(pass.error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/bills/${bill.data.id}`);
+}
+
+const ADDRESS_KINDS = ["home", "work", "other"] as const;
+
+/** Read the address form. A PIN code is six digits in India; a map link must be https. */
+function readAddress(form: FormData, m: Messages, country: string) {
+  const e = m.addresses.errors;
+  const line = text(form, "line");
+  if (!line || line.length > 300) return { error: e.line } as const;
+  const postal = normalizePostalCode(text(form, "postalCode") ?? "", country);
+  if (!postal) return { error: country === "IN" ? e.pin : e.postalCode } as const;
+  const map = text(form, "mapUrl");
+  if (map !== null && !isMapLink(map)) return { error: e.map } as const;
+  const area = text(form, "area");
+  const note = text(form, "doorNote");
+  if ((area?.length ?? 0) > 120 || (note?.length ?? 0) > 300) return { error: e.tooLong } as const;
+  const kind = z.enum(ADDRESS_KINDS).catch("home").parse(form.get("kind"));
+  return { address: { kind, line, area, postal_code: postal, map_url: map, door_note: note } } as const;
+}
+
+/** Add a place to deliver to or pick up from (M25). Anyone may add one; changing one is for owners and managers. */
+export async function addAddress(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const clientId = Id.safeParse(form.get("clientId"));
+  if (!clientId.success) return { error: t.m.errors.notFound };
+  const read = readAddress(form, t.m, org.country_code);
+  if ("error" in read) return { error: read.error };
+  const supabase = await createClient();
+  const { error } = await supabase.from("client_addresses").insert({ org_id: org.id, client_id: clientId.data, ...read.address });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath(`/app/clients/${clientId.data}`);
+  return { ok: t.m.addresses.added };
+}
+
+/** Change an address. Owners and managers: an address is personal data, like a phone number (D33). */
+export async function changeAddress(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.addresses.errors.onlyManagers };
+  const id = Id.safeParse(form.get("addressId"));
+  if (!id.success) return { error: t.m.addresses.errors.notFound };
+  const read = readAddress(form, t.m, org.country_code);
+  if ("error" in read) return { error: read.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("client_addresses").update(read.address).eq("org_id", org.id).eq("id", id.data).select("client_id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.addresses.errors.onlyManagers };
+  revalidatePath(`/app/clients/${data[0].client_id}`);
+  return { ok: t.m.addresses.saved };
+}
+
+/** Remove an address. Deleting is for owners (D29). */
+export async function removeAddress(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canDelete } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canDelete) return { error: t.m.errors.ownersDelete };
+  const id = Id.safeParse(form.get("addressId"));
+  if (!id.success) return { error: t.m.addresses.errors.notFound };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("client_addresses").delete().eq("org_id", org.id).eq("id", id.data).select("client_id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.addresses.errors.notFound };
+  revalidatePath(`/app/clients/${data[0].client_id}`);
+  return { ok: t.m.addresses.removed };
 }

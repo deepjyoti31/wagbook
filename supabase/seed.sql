@@ -116,17 +116,25 @@ begin
     (v_org, 'Vikram Mock', '+919800000106', 'Bengaluru', now(), 'staff');
   select array_agg(c.id order by c.phone) into v_client from public.clients c where c.org_id = v_org;
 
-  insert into public.pets (org_id, client_id, name, breed, sex, weight_kg, food_notes, medical_notes, flags) values
-    (v_org, v_client[1], 'Biscuit', 'Labrador', 'male', 31.5, '300 g kibble, twice a day', null, '{}'),
-    (v_org, v_client[1], 'Pepper', 'Indie', 'female', 18.0, 'Same as Biscuit', null, '{}'),
-    (v_org, v_client[2], 'Mango', 'Golden Retriever', 'male', 29.0, null, 'Thyroid tablet every morning', '{on_medication}'),
-    (v_org, v_client[3], 'Coco', 'Beagle', 'female', 12.5, null, null, '{escape_risk}'),
-    (v_org, v_client[4], 'Bruno', 'German Shepherd', 'male', 36.0, null, null, '{dog_reactive}'),
-    (v_org, v_client[5], 'Tofu', 'Shih Tzu', 'female', 6.5, 'Wet food only', null, '{senior}'),
-    (v_org, v_client[6], 'Rocky', 'Indie', 'male', 22.0, null, null, '{}'),
-    (v_org, v_client[6], 'Luna', 'Indie', 'female', 19.0, null, null, '{anxious}');
+  insert into public.pets (org_id, client_id, name, breed, sex, food_notes, medical_notes, flags) values
+    (v_org, v_client[1], 'Biscuit', 'Labrador', 'male', '300 g kibble, twice a day', null, '{}'),
+    (v_org, v_client[1], 'Pepper', 'Indie', 'female', 'Same as Biscuit', null, '{}'),
+    (v_org, v_client[2], 'Mango', 'Golden Retriever', 'male', null, 'Thyroid tablet every morning', '{on_medication}'),
+    (v_org, v_client[3], 'Coco', 'Beagle', 'female', null, null, '{escape_risk}'),
+    (v_org, v_client[4], 'Bruno', 'German Shepherd', 'male', null, null, '{dog_reactive}'),
+    (v_org, v_client[5], 'Tofu', 'Shih Tzu', 'female', 'Wet food only', null, '{senior}'),
+    (v_org, v_client[6], 'Rocky', 'Indie', 'male', null, null, '{}'),
+    (v_org, v_client[6], 'Luna', 'Indie', 'female', null, null, '{anxious}');
   select array_agg(p.id order by p.name) into v_pet from public.pets p where p.org_id = v_org;
   -- In name order: 1 Biscuit, 2 Bruno, 3 Coco, 4 Luna, 5 Mango, 6 Pepper, 7 Rocky, 8 Tofu.
+
+  -- Each weighed when they first came, and Biscuit again since (he has a target).
+  insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, body_condition)
+  select v_org, v_pet[w.i], v_today - 60, w.g, null
+  from (values (1, 32800), (2, 36000), (3, 12500), (4, 19000), (5, 29000), (6, 18000), (7, 22000), (8, 6500)) as w (i, g);
+  insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, body_condition)
+  values (v_org, v_pet[1], v_today - 7, 31500, 6);
+  update public.pets set target_weight_g = 30000 where id = v_pet[1];
 
   insert into public.vaccinations (org_id, pet_id, vaccine, given_on, valid_until)
   select v_org, p, 'rabies', v_today - 200, v_today + 165 from unnest(v_pet) as p;

@@ -99,12 +99,18 @@ begin
     'kennel', (select jsonb_build_object('name', o.name, 'city', o.city, 'phone', o.phone, 'email', o.email)
                from public.organizations o where o.id = v_client.org_id),
     'parent', to_jsonb(v_client) - 'org_id',
+    'addresses', coalesce((
+      select jsonb_agg(to_jsonb(a) - 'org_id' order by a.created_at)
+      from public.client_addresses a where a.org_id = v_client.org_id and a.client_id = v_client.id
+    ), '[]'::jsonb),
     'pets', coalesce((
       select jsonb_agg(
         to_jsonb(p) - 'org_id'
         || jsonb_build_object(
           'vaccinations', coalesce((select jsonb_agg(to_jsonb(v) - 'org_id' order by v.vaccine)
                                     from public.vaccinations v where v.pet_id = p.id), '[]'::jsonb),
+          'weights', coalesce((select jsonb_agg(to_jsonb(w) - 'org_id' order by w.weighed_on, w.created_at)
+                               from public.pet_weights w where w.pet_id = p.id), '[]'::jsonb),
           'own_routine', coalesce((select jsonb_agg(to_jsonb(ci) - 'org_id' order by ci.due_time)
                                    from public.care_items ci where ci.pet_id = p.id), '[]'::jsonb),
           'incidents', coalesce((select jsonb_agg(to_jsonb(i) - 'org_id' order by i.occurred_at)
@@ -159,7 +165,7 @@ begin
 end;
 $$;
 comment on function public.export_client(uuid) is
-  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
+  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
 
 -- ---------------------------------------------------------------------------
 
@@ -229,6 +235,8 @@ begin
     select regexp_replace(path, '\.jpg$', '.small.jpg') from paths where path ~ '\.jpg$'
   ) x;
 
+  -- Where they live and work.
+  delete from public.client_addresses a where a.org_id = v_client.org_id and a.client_id = v_client.id;
   -- What was said to the parent, and the forms they sent.
   delete from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings);
   delete from public.intake_submissions s
@@ -275,7 +283,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

@@ -1,7 +1,7 @@
 "use server";
 
 import type { z } from "zod";
-import { isISODate, normalizePhone } from "@/lib/core";
+import { isISODate, normalizePhone, normalizePostalCode } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
@@ -85,6 +85,11 @@ export async function submitIntake(slug: string, kennelName: string, language: s
     certificates.push(cards);
   }
 
+  // A PIN code, when the kennel asked for one (M25). Six digits in India; the database checks again.
+  const pinTyped = text(form, "parent_postal_code");
+  const postalCode = pinTyped === null ? null : (normalizePostalCode(pinTyped, "IN") ?? normalizePostalCode(pinTyped, ""));
+  if (pinTyped !== null && postalCode === null) return { error: e.pin };
+
   const start = text(form, "start_date");
   const end = text(form, "end_date");
   const parsed = IntakePayload.safeParse({
@@ -94,6 +99,8 @@ export async function submitIntake(slug: string, kennelName: string, language: s
       phone,
       email: text(form, "parent_email"),
       address: text(form, "parent_address"),
+      area: text(form, "parent_area"),
+      postal_code: postalCode,
       city: text(form, "parent_city"),
       emergency_name: text(form, "emergency_name"),
       emergency_phone: text(form, "emergency_phone"),

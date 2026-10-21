@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Input, Ledger, LedgerRow, Loading, Notice, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
-import { formatPhone } from "@/lib/core";
+import { formatKg, formatPhone } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import type { QueryData } from "@supabase/supabase-js";
@@ -25,10 +25,10 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 60) : "";
   const { org } = await requireOrg();
-  const { m } = await getAppI18n();
+  const { m, locale } = await getAppI18n();
   const supabase = await createClient();
 
-  const PET = "id, name, breed, species, weight_kg, flags, photo_path, clients(id, full_name, phone)" as const;
+  const PET = "id, name, breed, species, weight_g, flags, photo_path, clients(id, full_name, phone)" as const;
   if (params.hidden === "1") return <HiddenPets orgId={org.id} />;
   const pets = () => supabase.from("pets").select(PET).eq("org_id", org.id).is("deleted_at", null).order("name").limit(200);
   // % and _ are wildcards in a LIKE pattern; strip them so a search is always literal.
@@ -84,7 +84,7 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
                   <Link href={`/app/dogs/${p.id}`} className="text-lg font-bold underline-offset-4 hover:underline">
                     {p.name}
                   </Link>
-                  <span className="text-slate">{[p.breed, p.weight_kg ? fill(m.pet.weight, { kg: p.weight_kg }) : null].filter(Boolean).join(", ")}</span>
+                  <span className="text-slate">{[p.breed, p.weight_g ? fill(m.pet.weight, { kg: formatKg(p.weight_g, locale) }) : null].filter(Boolean).join(", ")}</span>
                   {p.species !== "dog" ? <Badge>{(m.pet.speciesInLine as Record<string, string>)[p.species] ?? p.species}</Badge> : null}
                   {p.flags.map((f) => (
                     <Badge key={f} tone="alert">

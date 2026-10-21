@@ -10,6 +10,7 @@ import { careArea } from "./hi/care";
 import { moneyArea } from "./hi/money";
 import { petsArea } from "./hi/pets";
 import { kennelArea } from "./hi/kennel";
+import { beyondArea } from "./hi/beyond";
 
 export const hi: Messages = {
   ...core,
@@ -18,4 +19,5 @@ export const hi: Messages = {
   ...moneyArea,
   ...petsArea,
   ...kennelArea,
+  ...beyondArea,
 };
