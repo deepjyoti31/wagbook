@@ -136,4 +136,8 @@ export const historyFields = {
   consent_source: "इजाज़त किसने दर्ज की",
   deleted_at: "कब छिपाया",
   erased_at: "कब मिटाया",
+  offers_appointments: "अपॉइंटमेंट देता है",
+  offers_kitchen: "रसोई है",
+  offers_food_delivery: "खाना पहुँचाता है",
+  skills: "हुनर",
 };

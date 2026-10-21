@@ -136,4 +136,8 @@ export const historyFields = {
   consent_source: "ಒಪ್ಪಿಗೆ ದಾಖಲಿಸಿದವರು",
   deleted_at: "ಮರೆಮಾಡಿದ ಸಮಯ",
   erased_at: "ಅಳಿಸಿದ ಸಮಯ",
+  offers_appointments: "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ನೀಡುತ್ತದೆ",
+  offers_kitchen: "ಅಡುಗೆಮನೆ ಇದೆ",
+  offers_food_delivery: "ಊಟ ತಲುಪಿಸುತ್ತದೆ",
+  skills: "ಕೌಶಲ್ಯಗಳು",
 };

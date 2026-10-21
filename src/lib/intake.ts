@@ -46,6 +46,8 @@ export const IntakePayload = z.object({
     phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
     email: optional(short),
     address: optional(short),
+    area: optional(short),
+    postal_code: optional(z.string().trim().max(10)),
     city: optional(short),
     emergency_name: optional(short),
     emergency_phone: optional(short),

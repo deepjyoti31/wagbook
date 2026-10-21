@@ -136,4 +136,8 @@ export const historyFields = {
   consent_source: "Consent given by",
   deleted_at: "Hidden at",
   erased_at: "Erased at",
+  offers_appointments: "Offers appointments",
+  offers_kitchen: "Has a kitchen",
+  offers_food_delivery: "Delivers food",
+  skills: "Skills",
 };

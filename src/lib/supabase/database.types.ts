@@ -415,6 +415,66 @@ export type Database = {
           },
         ];
       };
+      client_addresses: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          kind: Database["public"]["Enums"]["address_kind"];
+          line: string;
+          area: string | null;
+          postal_code: string;
+          map_url: string | null;
+          door_note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          kind?: Database["public"]["Enums"]["address_kind"];
+          line: string;
+          area?: string | null;
+          postal_code: string;
+          map_url?: string | null;
+          door_note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          kind?: Database["public"]["Enums"]["address_kind"];
+          line?: string;
+          area?: string | null;
+          postal_code?: string;
+          map_url?: string | null;
+          door_note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_addresses_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "client_addresses_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       clients: {
         Row: {
           id: string;
@@ -1269,6 +1329,7 @@ export type Database = {
           display_name: string;
           phone: string | null;
           language: string;
+          skills: Database["public"]["Enums"]["staff_skill"][];
           is_active: boolean;
           accepted_at: string | null;
           invited_by: string | null;
@@ -1282,6 +1343,7 @@ export type Database = {
           display_name: string;
           phone?: string | null;
           language?: string;
+          skills?: Database["public"]["Enums"]["staff_skill"][];
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -1295,6 +1357,7 @@ export type Database = {
           display_name?: string;
           phone?: string | null;
           language?: string;
+          skills?: Database["public"]["Enums"]["staff_skill"][];
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -1354,6 +1417,9 @@ export type Database = {
           requests_enabled: boolean;
           intake_notice: string | null;
           parent_language: string;
+          offers_appointments: boolean;
+          offers_kitchen: boolean;
+          offers_food_delivery: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -1399,6 +1465,9 @@ export type Database = {
           requests_enabled?: boolean;
           intake_notice?: string | null;
           parent_language?: string;
+          offers_appointments?: boolean;
+          offers_kitchen?: boolean;
+          offers_food_delivery?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1444,6 +1513,9 @@ export type Database = {
           requests_enabled?: boolean;
           intake_notice?: string | null;
           parent_language?: string;
+          offers_appointments?: boolean;
+          offers_kitchen?: boolean;
+          offers_food_delivery?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1651,6 +1723,60 @@ export type Database = {
           },
         ];
       };
+      pet_weights: {
+        Row: {
+          id: string;
+          org_id: string;
+          pet_id: string;
+          weighed_on: string;
+          weight_g: number;
+          body_condition: number | null;
+          notes: string | null;
+          recorded_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          pet_id: string;
+          weighed_on: string;
+          weight_g: number;
+          body_condition?: number | null;
+          notes?: string | null;
+          recorded_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          pet_id?: string;
+          weighed_on?: string;
+          weight_g?: number;
+          body_condition?: number | null;
+          notes?: string | null;
+          recorded_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pet_weights_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pet_weights_org_id_pet_id_fkey";
+            columns: ["org_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       pets: {
         Row: {
           id: string;
@@ -1662,7 +1788,8 @@ export type Database = {
           sex: Database["public"]["Enums"]["pet_sex"];
           is_neutered: boolean | null;
           date_of_birth: string | null;
-          weight_kg: number | null;
+          weight_g: number | null;
+          target_weight_g: number | null;
           color: string | null;
           microchip: string | null;
           photo_path: string | null;
@@ -1687,7 +1814,8 @@ export type Database = {
           sex?: Database["public"]["Enums"]["pet_sex"];
           is_neutered?: boolean | null;
           date_of_birth?: string | null;
-          weight_kg?: number | null;
+          weight_g?: number | null;
+          target_weight_g?: number | null;
           color?: string | null;
           microchip?: string | null;
           photo_path?: string | null;
@@ -1712,7 +1840,8 @@ export type Database = {
           sex?: Database["public"]["Enums"]["pet_sex"];
           is_neutered?: boolean | null;
           date_of_birth?: string | null;
-          weight_kg?: number | null;
+          weight_g?: number | null;
+          target_weight_g?: number | null;
           color?: string | null;
           microchip?: string | null;
           photo_path?: string | null;
@@ -1920,6 +2049,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reminders_sent_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      service_areas: {
+        Row: {
+          id: string;
+          org_id: string;
+          postal_code: string;
+          name: string;
+          delivery_charge_minor: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          postal_code: string;
+          name: string;
+          delivery_charge_minor?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          postal_code?: string;
+          name?: string;
+          delivery_charge_minor?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "service_areas_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -2358,6 +2525,7 @@ export type Database = {
       };
     };
     Enums: {
+      address_kind: "home" | "work" | "other";
       booking_kind: "boarding" | "daycare";
       booking_status: "requested" | "confirmed" | "checked_in" | "checked_out" | "cancelled" | "no_show";
       care_kind: "meal" | "medication" | "walk" | "play" | "cleaning" | "other";
@@ -2368,6 +2536,7 @@ export type Database = {
       payment_method: "upi" | "cash" | "card" | "bank_transfer" | "other";
       pet_sex: "male" | "female" | "unknown";
       service_kind: "boarding" | "daycare" | "addon";
+      staff_skill: "cook" | "groomer" | "trainer" | "swim_supervisor" | "rider";
       task_status: "pending" | "done" | "skipped";
       tax_mode: "none" | "simple" | "gst_india";
     };

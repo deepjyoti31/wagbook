@@ -110,6 +110,24 @@ async function Settings() {
           </div>
         </Group>
 
+        <Group title={m.offers.title} about={m.offers.about}>
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="offers_appointments" defaultChecked={org.offers_appointments} className="mt-1 size-5" />
+            <span>{m.offers.appointments}</span>
+          </label>
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="offers_kitchen" defaultChecked={org.offers_kitchen} className="mt-1 size-5" />
+            <span>{m.offers.kitchen}</span>
+          </label>
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="offers_food_delivery" defaultChecked={org.offers_food_delivery} className="mt-1 size-5" />
+            <span>
+              {m.offers.delivery}
+              <span className="block text-sm text-slate">{m.offers.deliveryHint}</span>
+            </span>
+          </label>
+        </Group>
+
         <Group title={s.prices.title} about={s.prices.about}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={s.prices.boarding}>

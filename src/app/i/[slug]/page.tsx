@@ -19,6 +19,8 @@ interface PublicKennel {
   notice: string;
   check_in_time: string;
   check_out_time: string;
+  /** Whether the kennel delivers food, so the form asks for an address with a PIN code (M25). */
+  delivers?: boolean;
 }
 
 /** The kennel behind a form link, or null. Read once per request, for the title and the page. */
@@ -63,6 +65,7 @@ async function Intake({ params }: Pick<PageProps<"/i/[slug]">, "params">) {
           action={submitIntake.bind(null, slug.toLowerCase(), kennel.name, language)}
           kennelName={kennel.name}
           notice={kennel.notice}
+          askAddress={kennel.delivers === true}
           words={w}
           shared={{ species: m.labels.species, sex: m.labels.sex, yes: m.common.yes, no: m.common.no, photos: m.photos }}
         />

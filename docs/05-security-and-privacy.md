@@ -44,6 +44,10 @@ In summary (deleting anything is for owners, D29):
 | Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete), but not a parent's own phone numbers (`WB002`, D33) | Also a parent's phone numbers | Also delete |
 | The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
 | A pet's own care routine | Read, add, edit | Same as staff | Also delete |
+| A parent's delivery addresses (M25) | Read, add | Also change (personal data, like a phone number) | Also delete |
+| A pet's weights (M25) | Read, add | Also correct | Also delete |
+| Areas served (M25) | Read | Add, edit | Also delete |
+| What the kennel offers, and people's skills (M25) | Read | Change (only owners set an owner's skills) | Same |
 | House routines, kennels, rate card, peak periods, play yards | Read | Add, edit | Also delete |
 | Kennel settings | Read | Edit | Also delete the kennel |
 | Draft invoices and their lines | Read, add, edit; remove lines from a draft | Same as staff | Also delete whole drafts |
@@ -198,9 +202,9 @@ What the software does:
 - **Records who changed what.**
 
 - **Gives a parent their details.** On the parent page, owners and managers download everything held about the parent
-  as one file (`export_client`).
-- **Erases on request** (`erase_client`, D25 and D30). The parent's contact details, consent and notes, the notes on
-  their stays, the updates sent to them, their intake forms, draft bills, and the files among those (with vaccination
+  as one file (`export_client`), addresses and pets' weights included.
+- **Erases on request** (`erase_client`, D25 and D30). The parent's contact details, consent and notes, their delivery
+  addresses (M25), the notes on their stays, the updates sent to them, their intake forms, draft bills, and the files among those (with vaccination
   certificates, because a card shows the owner) are deleted or emptied, and the stays' notes that the history of
   changes had copied are taken out of it. The pets stay, hidden, with their health, routines, incidents, care and
   play: the kennel's record of the animal (D30). What tax law makes the kennel keep stays: issued and cancelled bills

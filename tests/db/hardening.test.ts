@@ -315,10 +315,10 @@ describe("the intake form", () => {
 
     const client = await db.query<{ full_name: string; consent_source: string | null }>("select full_name, consent_source from public.clients where id = $1", [clientId]);
     expect(client.rows[0]).toEqual({ full_name: "Real Name", consent_source: null });
-    const pet = await db.query<{ date_of_birth: string | null; weight_kg: string | null; len: number }>(
-      "select date_of_birth, weight_kg, char_length(medical_notes) as len from public.pets where client_id = $1", [clientId],
+    const pet = await db.query<{ date_of_birth: string | null; weight_g: number | null; len: number }>(
+      "select date_of_birth, weight_g, char_length(medical_notes) as len from public.pets where client_id = $1", [clientId],
     );
-    expect(pet.rows[0]).toEqual({ date_of_birth: null, weight_kg: null, len: 2000 });
+    expect(pet.rows[0]).toEqual({ date_of_birth: null, weight_g: null, len: 2000 });
   });
 
   it("answers a malformed consent value with its own error, not a database one", async () => {

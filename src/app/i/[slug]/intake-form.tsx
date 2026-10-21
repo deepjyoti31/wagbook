@@ -29,12 +29,15 @@ export function IntakeForm({
   action,
   kennelName,
   notice,
+  askAddress,
   words: w,
   shared,
 }: {
   action: (state: FormState, form: FormData) => Promise<FormState>;
   kennelName: string;
   notice: string;
+  /** Ask where to deliver, for a kennel that delivers food (M25). */
+  askAddress: boolean;
   words: Messages["intakeForm"];
   shared: IntakeSharedWords;
 }) {
@@ -77,6 +80,21 @@ export function IntakeForm({
             <Input name="parent_city" autoComplete="address-level2" />
           </Field>
         </div>
+        {askAddress ? (
+          <>
+            <Field label={w.address} hint={w.addressHint}>
+              <Input name="parent_address" maxLength={200} autoComplete="street-address" />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={w.area}>
+                <Input name="parent_area" maxLength={120} autoComplete="address-level3" />
+              </Field>
+              <Field label={w.pin}>
+                <Input name="parent_postal_code" inputMode="numeric" maxLength={10} autoComplete="postal-code" />
+              </Field>
+            </div>
+          </>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={w.emergency} hint={w.emergencyHint}>
             <Input name="emergency_name" />

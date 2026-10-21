@@ -4,6 +4,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Select } from "@/components/ui";
 import { switchOrganisation } from "@/app/app/actions";
 import { getMemberships, requireOrg } from "@/lib/auth";
+import type { Offers } from "@/lib/core";
 import { fill, LANGUAGE_NAMES, LANGUAGES, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +15,8 @@ import { setMyLanguage } from "./actions";
 export const generateMetadata = () => appTitle((m) => m.more.title);
 
 // Reports, expenses and the history are for owners and managers (D20), so staff are not shown them.
-const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; managers?: boolean }[] = [
+// A link with `when` shows only while the kennel offers that (D44).
+const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; managers?: boolean; when?: (o: Offers) => boolean }[] = [
   { href: "/app/bills", key: "bills" },
   { href: "/app/more/reports", key: "reports", managers: true },
   { href: "/app/more/expenses", key: "expenses", managers: true },
@@ -25,6 +27,7 @@ const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; mana
   { href: "/app/more/play", key: "play" },
   { href: "/app/more/extras", key: "extras" },
   { href: "/app/more/peak", key: "peak" },
+  { href: "/app/more/areas", key: "areas", when: (o) => o.offers_food_delivery },
   { href: "/app/more/settings", key: "settings" },
   { href: "/app/more/history", key: "history", managers: true },
 ];
@@ -46,14 +49,14 @@ export default function MorePage({ searchParams }: PageProps<"/app/more">) {
 
 async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams">) {
   const done = (await searchParams).done;
-  const { canManage } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const { m } = await getAppI18n();
   return (
     <>
       <PageTitle title={m.more.title} />
       {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
       <Ledger>
-        {LINKS.filter((l) => canManage || !l.managers).map((l) => (
+        {LINKS.filter((l) => (canManage || !l.managers) && (!l.when || l.when(org))).map((l) => (
           <li key={l.href}>
             <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
               <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>

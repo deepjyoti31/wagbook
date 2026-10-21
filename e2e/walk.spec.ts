@@ -442,9 +442,11 @@ test("search finds a pet by its parent's name or phone number", async ({ page })
 test("a pet's details change, and an incident shows on Today until it is dealt with", async ({ page }) => {
   await signIn(page, "staff");
   await openPet(page, "Bruno");
-  await page.getByLabel("Weight in kg").fill("37.5");
-  await page.getByRole("button", { name: "Save details" }).click();
-  await expect(page.getByText("Saved.")).toBeVisible();
+  // A weight is written down on its own, and the pet shows the latest (M25).
+  await page.getByLabel(en.weights.weightKg, { exact: true }).fill("37.5");
+  await page.getByRole("button", { name: en.weights.save }).click();
+  await expect(page.getByText(en.weights.saved)).toBeVisible();
+  await expect(page.getByText(/^37\.5 kg on /)).toBeVisible();
 
   await page.getByRole("link", { name: "Write down an incident" }).click();
   await page.locator("select[name=category]").selectOption("injury");
@@ -1399,4 +1401,94 @@ test("a person who lost their phone signs in with a recovery code, once", async 
   await signInWithRecovery(codes[0]);
   await expect(page.getByText(en.auth.code.recoveryWrong)).toBeVisible();
   await expect(page).toHaveURL(/\/login\/code/);
+});
+
+/** Where the 360 pixel screenshots of new screens go: SCREENSHOT_DIR, or nowhere. */
+async function shot(page: Page, name: string) {
+  const dir = process.env.SCREENSHOT_DIR;
+  if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
+}
+
+test("a kennel with a kitchen delivers: areas served, a parent's address, weights and skills", async ({ page }) => {
+  // Staff see none of it while it is off.
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await expect(page.getByRole("link", { name: new RegExp(en.more.links.areas.title) })).toHaveCount(0);
+
+  // Delivery needs the kitchen: the database says so.
+  await page.goto("/app/more/settings");
+  await page.getByLabel(en.offers.delivery).check();
+  await page.getByRole("button", { name: en.settings.save }).click();
+  await expect(page.getByText(en.errors.constraints.organizations_delivery_needs_kitchen)).toBeVisible();
+  await page.getByLabel(en.offers.kitchen).check();
+  await page.getByRole("button", { name: en.settings.save }).click();
+  await expect(page.getByText(en.settings.saved)).toBeVisible();
+  await shot(page, "m25-settings");
+
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.areas.title) }).click();
+  await page.getByLabel(en.areas.pin).fill("560 038");
+  await page.getByLabel(en.areas.name).fill("Indiranagar");
+  await page.getByLabel(en.areas.charge).fill("50");
+  await page.getByRole("button", { name: en.areas.addButton }).click();
+  await expect(page.getByText("Added Indiranagar.")).toBeVisible();
+  await expect(page.getByText("₹50 a delivery")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(page, "m25-areas");
+
+  // A parent's address, matched to the area by its PIN code.
+  await openPet(page, "Biscuit");
+  await page.getByRole("link", { name: "Priya Demo" }).click();
+  await page.getByText(en.addresses.add, { exact: true }).click();
+  // The parent's details form has a PIN code of its own, so look inside the address form.
+  const addressForm = page.locator("form").filter({ has: page.getByRole("button", { name: en.addresses.addButton }) });
+  await addressForm.getByLabel(en.addresses.line).fill("12, 4th Cross, HAL 2nd Stage");
+  await addressForm.getByLabel(en.addresses.area).fill("Indiranagar");
+  await addressForm.getByLabel(en.addresses.pin).fill("560038");
+  await addressForm.getByLabel(en.addresses.map).fill("javascript:alert(1)");
+  await addressForm.getByRole("button", { name: en.addresses.addButton }).click();
+  await expect(page.getByText(en.addresses.errors.map)).toBeVisible();
+  await addressForm.getByLabel(en.addresses.map).fill("https://maps.example.test/priya");
+  await addressForm.getByRole("button", { name: en.addresses.addButton }).click();
+  await expect(page.getByText(en.addresses.added)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("We deliver here: Indiranagar, ₹50 a delivery")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(page, "m25-parent-addresses");
+
+  // Biscuit was weighed twice: the trend and the target show.
+  await openPet(page, "Biscuit");
+  await expect(page.getByText(/^31\.5 kg on /)).toBeVisible();
+  await expect(page.getByText(/^Down 1\.3 kg since /)).toBeVisible();
+  await expect(page.getByText("Target: 30 kg")).toBeVisible();
+  await page.getByLabel(en.weights.weightKg, { exact: true }).fill("heavy");
+  await page.getByRole("button", { name: en.weights.save }).click();
+  await expect(page.getByText(en.weights.errors.weight)).toBeVisible();
+  await page.getByLabel(en.weights.weightKg, { exact: true }).fill("31,2");
+  await page.getByLabel(en.weights.bodyCondition).selectOption("5");
+  await page.getByRole("button", { name: en.weights.save }).click();
+  await expect(page.getByText(en.weights.saved)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/^31\.2 kg on /)).toBeVisible();
+  await expect(page.getByText("Body condition 5 of 9").first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(page, "m25-pet-weight");
+
+  // A cook is marked on People.
+  await page.goto("/app/more/people");
+  const staffCard = page.getByRole("listitem").filter({ hasText: "Meena" });
+  await staffCard.locator("summary", { hasText: en.skills.title }).click();
+  await staffCard.getByLabel(en.skills.names.cook).check();
+  await staffCard.getByRole("button", { name: en.skills.save }).click();
+  await expect(page.getByText(en.skills.saved)).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ hasText: "Meena" }).getByText(en.skills.names.cook, { exact: true }).first()).toBeVisible();
+  await shot(page, "m25-people-skills");
+
+  // Staff may add an address but not change one.
+  await signIn(page, "staff");
+  await openPet(page, "Biscuit");
+  await page.getByRole("link", { name: "Priya Demo" }).click();
+  await expect(page.getByText(en.addresses.byManagers)).toBeVisible();
+  await expect(page.getByText("We deliver here: Indiranagar, ₹50 a delivery")).toBeVisible();
 });

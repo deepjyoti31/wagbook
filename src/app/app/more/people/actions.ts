@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
+import { skillsOffered, STAFF_SKILLS, type StaffSkill } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import type { FormState } from "@/lib/forms";
 import { getAppI18n } from "@/lib/i18n-server";
@@ -143,4 +144,30 @@ export async function revokeInviteLink(_state: FormState, form: FormData): Promi
   if (data.length === 0) return { error: t.m.people.errors.linkGone };
   revalidatePath("/app/more/people");
   return { ok: t.m.people.linkWithdrawn };
+}
+
+/**
+ * Set what a person can be given to do (M25). Only the skills for what the
+ * kennel offers are on the form, so the others the person has are kept.
+ * Owners and managers; only owners set an owner's (the policy decides).
+ */
+export async function setSkills(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  if (!canManage) return { error: t.m.skills.errors.onlyManagers };
+  const id = z.uuid().safeParse(form.get("userId"));
+  if (!id.success) return { error: t.m.people.errors.personNotFound };
+  const offered = skillsOffered(org);
+  const supabase = await createClient();
+  const current = await supabase.from("memberships").select("skills").eq("org_id", org.id).eq("user_id", id.data).maybeSingle();
+  if (current.error) return { error: friendlyError(current.error, t) };
+  if (!current.data) return { error: t.m.people.errors.personNotFound };
+  const kept = current.data.skills.filter((s) => !offered.includes(s));
+  const chosen = offered.filter((s) => form.get(`skill_${s}`) === "on");
+  const skills: StaffSkill[] = STAFF_SKILLS.filter((s) => kept.includes(s) || chosen.includes(s));
+  const { data, error } = await supabase.from("memberships").update({ skills }).eq("org_id", org.id).eq("user_id", id.data).select("user_id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.skills.errors.onlyManagers };
+  revalidatePath("/app/more/people");
+  return { ok: t.m.skills.saved };
 }

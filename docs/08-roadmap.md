@@ -459,12 +459,481 @@ settings, security review and fixes, documentation.
 
 ---
 
+# Beyond boarding: M25 to M44
+
+Added 21 October 2026, when the owner asked for Wagbook to run the rest of a kennel's business (D44): grooming and
+other services booked by time, a kitchen that cooks for boarders and for dogs at home, and food sold as a trial, as
+one-off orders and as a subscription delivered twice a week. The kennel's public rules for all of it are in
+[13-reference-deployment.md](13-reference-deployment.md), "Beyond boarding".
+
+How these milestones work:
+
+- **Each area is switched on per kennel** (M25). A kennel that only boards sees none of it.
+- **Each milestone starts by writing its section in `02-product-spec.md`**, marked "Planned", and ends by marking it
+  "Built". Product questions the section cannot answer go under "Open questions" in `HANDOFF.md`.
+- Every rule in `CLAUDE.md` holds: rules in the database with a test, `org_id` and row level security on every table,
+  money in paise, quantities as whole numbers, every word in English, Hindi and Kannada.
+
+**The order, and why.** Phase 1, the kitchen and food, comes first. Recurring deliveries, rotating recipes and stock
+are where a notebook or spreadsheet breaks first, and nothing in Wagbook covers them yet. Phase 2, appointments, comes
+next: until then, a groom or a swim can be sold as an extra on a stay. Phase 3 brings boarding up to the public rules
+(credit on cancellation, pick-up from home, health papers, a public booking form). Phase 4 is the team. The launch work
+in M1 can happen at any point; the migration freeze waits for it.
+
+---
+
+## Phase 0. Groundwork
+
+## M25. Groundwork for more than boarding
+
+- [x] Finished 21 October 2026 (B10 to B14 in `02`).
+
+**Build**
+
+1. [x] Settings, "What this kennel offers": Appointments, Kitchen, Food delivery, each on or off. The bottom bar, More and
+   Today show only what is on. (Only More has something to hide so far: Areas you serve.)
+2. [x] Addresses for parents: more than one (home, office), each with area, pincode, a map link and a note for whoever
+   delivers. On the parent page and the intake form.
+3. [x] Areas served: the pincodes the kennel delivers to and picks up from, each with an optional delivery charge.
+4. [x] People's skills: cook, groomer, trainer, swim supervisor, rider. Used to offer the right person for a job, not for
+   access (access stays with roles, until M31).
+5. [x] A pet's weight over time: weighed on a date, by whom, with an optional body condition score (1 to 9) and a target
+   weight. Shown on the pet page; the latest weight is what portions use (M28). `pets.weight_kg` became `weight_g`,
+   kept by the database from the weighings.
+
+**Rules**
+
+- An address is a parent's personal data, like a phone number (D33): owners and managers change it, it is in the
+  export, and erasure removes it.
+- Weights are whole grams (`_g`), never a decimal.
+
+**Done when**
+
+- A kennel with everything off looks exactly as it does today (the e2e walk passes unchanged).
+- Erasure removes addresses, tested in the database.
+
+---
+
+## Phase 1. The kitchen and food
+
+## M26. Stock
+
+- [ ] Not started.
+
+**Build**
+
+1. Items kept in stock: name, unit (grams, millilitres or pieces), kind (meat, organ, egg, grain, vegetable, oil,
+   supplement, packaging, fuel, grooming product, medicine), usual supplier, a low level.
+2. Suppliers: name, phone, what they supply.
+3. Stock in: a purchase with date, supplier, quantity, cost, use-by date, the supplier's bill number and a photo of it.
+   Saving a purchase can save it as an expense (E4) in the same step.
+4. Stock out: used in cooking (written by M30, not by hand), thrown away with a reason (spoiled, past its date,
+   dropped), and a stock take that sets the counted quantity and records the difference.
+5. The stock page: what is in, what is low, what passes its use-by date in the next two days, oldest first.
+
+**Rules**
+
+- Stock is never edited. It is the sum of its movements, and the database refuses a movement that takes an item below
+  zero (a stock take is the only way to correct it).
+- Owners and managers record purchases and see costs. Staff record use, waste and stock takes, and see no cost.
+
+**Done when**
+
+- A week of buying, cooking and throwing away adds up to a stock take, in a database test.
+
+---
+
+## M27. Recipes
+
+- [ ] Not started.
+
+**Build**
+
+1. A recipe: name, what it is good for (parents read this), each stock item with its raw quantity per kilo of cooked
+   food, the cooked yield, kcal and protein per kilo, who signed it off (a veterinary nutritionist) and when, and when
+   it was last lab tested.
+2. Versions: changing a recipe makes a new version. A batch and a delivery keep the version they were made from.
+3. A rotation: recipes in order, one per delivery, repeating (by default every two weeks).
+4. Items marked "never in a recipe" (onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar): the database
+   refuses a recipe that uses one.
+5. Cost per kilo from the latest purchase prices, for owners and managers.
+
+**Rules**
+
+- Only owners and managers make or change recipes. A recipe that has been cooked is retired, never deleted.
+
+**Done when**
+
+- Two versions of one recipe, a batch of each, each costed from its own version, in a database test.
+
+---
+
+## M28. Food products and portions
+
+- [ ] Not started.
+
+**Build**
+
+1. Food in the rate card: a trial (fixed price and quantity, once per pet), subscription food per kilo, one-off orders
+   per kilo, and made-to-order items per piece (a birthday cake), each with its own tax rate and code (D35).
+2. Plans: full meal, or topper (a share of the day's food, a third by default).
+3. Portions: grams a day from the pet's latest weight, its size band and a goal (lose, keep, gain), using the kennel's
+   own percentages (by default 3%, 2.5% and 2% of body weight for small, medium and large dogs). A manager may set the
+   grams by hand with a note. Today lists portions to review a week after a pet starts.
+4. On the pet page: the plan, grams a day, foods to avoid, and the weight trend.
+5. What a boarder eats (the owner's answer, 21 October 2026): fresh food from the kitchen by default, or a kibble the
+   parent names (brand, and grams a day), or food the parent sends. Chosen per pet; the care round and the cook plan
+   follow it.
+
+**Rules**
+
+- Portion arithmetic is pure, in `src/lib/core/`, with unit tests. Grams and paise, never decimals.
+- Pet food is goods, not a service: the tax rate and code need the accountant (question in `06`) before a GST kennel
+  sells it.
+
+**Done when**
+
+- The portion for a 20 kg dog on a full meal and on a topper matches the worked example in the spec section.
+
+---
+
+## M29. Subscriptions and orders
+
+- [ ] Not started.
+
+**Build**
+
+1. A subscription: parent, pets, plan, grams a day, delivery days (two a week by default), a time slot, an address,
+   a start date, and how it is paid: weekly or monthly in advance (the owner's answer, 21 October 2026). The owner
+   sets a discount for monthly payment, as a percentage (`_bp`), in Settings.
+2. Deliveries made ahead from it: each covers the days until the next, rounded up to whole packs (pack size a
+   setting, 250 g by default), with the recipe the rotation gives it.
+3. Pause (between two dates, or until resumed), change the grams, plan, days or address, or cancel. Changes close a
+   set time before a delivery (24 hours by default); after that it is cooked.
+4. One-off orders: a trial, food by the kilo, or a made-to-order item, for a date and address.
+5. Today lists trials delivered a few days ago, to ask the parent about a subscription.
+6. Bills: a subscription's deliveries billed ahead for the week (or the month), as a series is (D41). A delivery
+   cancelled before it is cooked is credited (credit notes, D34). Unpaid weeks join the reminders (D39).
+
+**Rules**
+
+- One delivery per subscription per date. Grams, recipe and price are copied onto each delivery when it is made, so
+  changing the rate card never changes one already planned.
+- After the cut-off, staff cannot change a delivery; a manager can cancel it with a reason.
+
+**Done when**
+
+- A subscription two days a week, paused for a week, resumed, changed, cancelled, billed and credited: database tests
+  and an e2e walk.
+
+---
+
+## M30. The cook plan and batches
+
+- [ ] Not started.
+
+**Build**
+
+1. What to cook: kilos of each recipe for tomorrow's deliveries and for boarders on kitchen food (each boarder's grams
+   a day), plus a margin (a setting).
+2. The shopping list: what those recipes need less what is in stock, by supplier, to send on WhatsApp.
+3. A batch: recipe version, kilos, packs, date, cook, a batch number, and a use-by date (a setting per recipe).
+   Recording it takes its ingredients out of stock.
+4. Labels for each pack: pet, recipe, grams, batch, cooked on, use by, how to store it. A4 sheets to print.
+5. Packing: each delivery ticked packed, with the batch it was packed from.
+
+**Rules**
+
+- A delivery is packed only from a batch of its own recipe that is within its use-by date.
+- From a batch, Wagbook answers who received it (deliveries and boarders). That is the food safety question.
+
+**Done when**
+
+- The cook plan for a day of ten deliveries and six boarders equals a count by hand; a batch takes stock down; "who
+  got batch N" is answered, all in tests.
+
+---
+
+## M31. Delivery runs
+
+- [ ] Not started.
+
+**Build**
+
+1. The day's run: one rider's deliveries for a slot, one after another (the owner's answer, 21 October 2026: a rider
+   sees their own run and nothing else), by area, in an order staff can change, a map link for each stop, and the whole
+   route opened in Google Maps.
+2. A rider sees only their run: name, address, phone, packs and the note for the door. No prices, no pets' medical
+   notes, no other parents.
+3. At the door: delivered (with a photo), nobody home, or refused. "On the way" as a WhatsApp link from the rider's
+   phone.
+4. Problems: a parent reports a pack damaged, late or wrong (with a photo, within 24 hours by default). Staff replace it
+   (a new delivery at no charge) or refund it (a credit note and a refund).
+5. Pick-ups and drops of boarders (M39) join the same run.
+
+**Rules**
+
+- Riders are a fourth role with the least access of any (a new decision, D45 when built). Row level security limits
+  them to their own run for the day; a test signs in as a rider and finds nothing else.
+
+**Done when**
+
+- The rider test passes, and the e2e walk delivers a run at 360 pixels wide.
+
+---
+
+## M32. Ordering food from the kennel's website
+
+- [ ] Not started.
+
+**Build**
+
+1. A public order page, with a link a kennel can put on its own website: trial or subscription, the dog's name and
+   weight, the portion and price worked out, delivery days and slot, address and pincode.
+2. A pincode not served: the details are kept as "waiting for your area" and the parent is told nothing was charged.
+   Staff see how many wait in each pincode.
+3. Payment: the UPI QR with the amount, then "I have paid". The order lands as a request; staff confirm once the money
+   has arrived, which makes or matches the parent (by phone), the pet and the subscription.
+4. A known parent pauses, skips or orders more from their own link (as F0 does for stays).
+
+**Rules**
+
+- More anonymous functions (rule 6): each needs its line in `tests/db/security.test.ts`, a paragraph in `05`, and the
+  same rate limits as the intake form.
+
+**Done when**
+
+- An order from a private window becomes a subscription after Confirm; hostile input is refused (`hardening` tests).
+
+---
+
+## M33. Food reports
+
+- [ ] Not started.
+
+**Build**
+
+1. Active subscriptions and trials, kilos a day, deliveries per rider per day, trials that became subscriptions,
+   subscriptions ended each month, food revenue and cost per kilo (from batches and purchases), waste, and where
+   customers came from (a boarding parent, a referral, the website).
+2. CSV downloads, as in M7.
+
+**Rules**
+
+- Owners and managers only, refused in the database (as D20).
+
+---
+
+## Phase 2. Appointments
+
+## M34. Services by appointment
+
+- [ ] Not started.
+
+**Build**
+
+1. Places that take one booking at a time: the pool, a grooming table, a training ground, the party yard. Each with
+   its hours.
+2. Appointment services: name, length, the place it uses, time to clean up after, price (fixed, by size, or on quote),
+   tax rate and code, the skill it needs, and whether vaccinations are checked.
+3. Book an appointment for a pet staying in or visiting for the day: service, date and time, place and person. Free
+   times are offered.
+4. States: requested, confirmed, done, no-show, cancelled with a reason.
+5. Today lists the day's appointments. A day view shows each place as a column, at 360 pixels wide.
+6. A boarder's appointment is a line on its stay's bill; a visitor's has a bill of its own.
+
+**Rules**
+
+- The database refuses two appointments in one place at once (with clean-up time), one person in two places, and one
+  pet in two places. Times are `timestamptz`; the day is the kennel's (`todayIn()`).
+- The price is copied onto the appointment; staff cannot change it (D15).
+
+**Done when**
+
+- Two swims at overlapping times are refused with a sentence; a boarder's groom is on its bill; a visitor's groom has
+  its own.
+
+---
+
+## M35. Grooming and spa
+
+- [ ] Not started.
+
+**Build**
+
+1. The grooming menu: bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea bath, teeth; priced by
+   coat and breed (the owner's answer, 21 October 2026): a coat type on the pet (short, double, long, curly, wire) and
+   a price for each coat type, with a price for a named breed overriding it; add-ons on top.
+2. A grooming card on the pet: coat, the usual cut, products to use or avoid, skin conditions, how the pet behaves on
+   the table, the last groom.
+3. Before and after photos sent to the parent as an update (D4, F3).
+4. "Groom before going home" on a stay: booked on the last day, finished before pick-up.
+5. A reminder when a pet is due for a groom again (D39).
+
+**Done when**
+
+- A stay with a groom on its last day, and the parent sees the after photo on the stay page.
+
+---
+
+## M36. Swimming, training and parties
+
+- [ ] Not started.
+
+**Build**
+
+1. Swimming: one dog at a time (M34), with a tick for the life jacket and who supervised.
+2. Training: a course of sessions sold as a pack (as M18), priced on quote by the trainer, with notes and homework after
+   each session sent to the parent.
+3. Birthday parties: the party yard for a set time, the birthday pet and one guest dog it already knows (the guest's
+   parent and vaccinations recorded), the number of people, decorations as extras, and a cake from the kitchen.
+4. Made-to-order items: a lead time the database checks (24 hours by default), the name to write on it, and delivery on
+   a run (M31) with the area's charge.
+
+**Rules**
+
+- A guest dog meets the same vaccination rules as a boarder.
+
+---
+
+## M37. Packages
+
+- [ ] Not started.
+
+**Build**
+
+1. A package: a stay with appointments and extras included (more play, a swim, a groom before going home), at one
+   price or a price on request set by a manager.
+2. Booking a package books its parts; cancelling the stay cancels them. The bill shows the package as one line.
+
+---
+
+## Phase 3. Boarding as the public rules promise
+
+## M38. Cancellation rules and credit
+
+- [ ] Not started.
+
+**Build**
+
+1. Weekends and holidays: which weekdays count as weekend, and the kennel's list of holiday dates (built on peak
+   periods, C7).
+2. A cancellation rule for each kind of service: the notice needed, and what happens to each night or appointment with
+   enough notice and without it (refund, or keep as credit).
+3. Credit: a parent's balance from a cancellation or a goodwill gesture, ending on a set date (12 months by default),
+   spent on any bill as a payment, never more than what is left. On the parent page and on bills. A reminder goes on
+   Today's list to send (D39) a month before credit runs out (the owner's answer, 21 October 2026).
+4. On Cancel, Wagbook works out the refund and the credit night by night, shows both, and a manager confirms. The time
+   the parent asked is recorded for the notice rule.
+5. When the kennel cancels, the parent chooses a refund or credit.
+
+**Rules**
+
+- Credit is money: a ledger in paise the database keeps from going below zero or being spent after it ends.
+- Whether kept credit needs a bill or carries tax is for the accountant (question 11 in `06`).
+
+**Done when**
+
+- The night-by-night arithmetic is a pure function with unit tests for a stay across a weekend and a holiday, cancelled
+  with and without enough notice.
+
+---
+
+## M39. Pick-up and drop from home
+
+- [ ] Not started.
+
+**Build**
+
+1. On a booking: pick-up, drop or both, an address (M25) and a time.
+2. The price is the area's charge by default, changed by a manager, and is a line on the bill.
+3. Trips join the day's run (M31), and the parent is told the time on WhatsApp.
+
+---
+
+## M40. Health papers at the door
+
+- [ ] Not started.
+
+**Build**
+
+1. The kennel's rules: the vaccines it requires and how long each lasts, deworming and tick treatment within a set
+   time, and spayed or neutered above a set age.
+2. Pets get deworming and tick treatment dates and whether they are neutered; the intake form asks for them.
+3. Check-in and appointments refuse or warn (a setting), with the reason. A manager may let a pet in anyway, recorded
+   with a note. Reminders go out before a stay when something will be out of date.
+
+**Rules**
+
+- The refusal is a database rule; the override is a row, so History of changes shows who let a pet in and why.
+
+---
+
+## M41. A booking form for new parents
+
+- [ ] Not started.
+
+**Build**
+
+1. A public page for any service the kennel offers: what, when, pick-up, the dog's details, a tick for vaccinations up
+   to date, and a phone number. It shows an estimate and says nothing is charged.
+2. It lands as a request with a new parent and pet waiting for review (B4), so staff confirm in one place.
+
+**Rules**
+
+- As M32: anonymous functions listed and tested, rate limited.
+
+---
+
+## M42. Reviews from parents
+
+- [ ] Not started.
+
+**Build**
+
+1. After a stay or service ends, Today lists parents to ask for a review (D39), with a WhatsApp message carrying the
+   kennel's review link (a setting).
+2. Later, if wanted: a review page of Wagbook's own, where a parent gives stars and words and agrees to them being
+   shown, and owners choose which ones to publish.
+
+---
+
+## Phase 4. The team
+
+## M43. Rota and attendance
+
+- [ ] Not started.
+
+**Build**
+
+1. Shifts (morning, evening, night) and who works each, including who lives on site.
+2. Clocking in and out from the phone; Today shows who is on now.
+3. Leave asked for and granted, and a month's attendance sheet for pay.
+
+**Rules**
+
+- A person sees their own attendance; owners and managers see everyone's.
+
+---
+
+## M44. Rough edges before production
+
+- [ ] Not started.
+
+**Build**
+
+1. Send on a reminder asks whether the message went, instead of marking it sent on the tap.
+2. Kennels going in and out of service by date, so past occupancy is measured against the kennels there on that day.
+3. The export includes the files (photos and certificates) as well as their names.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
 - Multiple sites under one owner with combined reports.
-- Staff rota and attendance.
-- Stock of food and medicines.
-- Grooming appointments by time slot.
-- Cameras. (Probably never: cost, privacy, and it is not what a register is for.)
+- Online payments through a payment provider, and UPI Autopay for subscriptions (a cost and a new decision).
+- Treats, toys and accessories sold over the counter, from stock (M26).
+- A link to the kennel's own camera service on the stay page. (Wagbook itself never streams video: cost and privacy.)
+- Referral codes, so a boarding parent who brings a food customer is credited (M38).

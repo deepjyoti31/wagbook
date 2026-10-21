@@ -4,12 +4,12 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { formatDate, whatsappLink } from "@/lib/core";
+import { formatDate, skillsOffered, whatsappLink } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import { createInviteLink, inviteMember, removeMember, revokeInviteLink, setMemberActive, updateMember } from "./actions";
+import { createInviteLink, inviteMember, removeMember, revokeInviteLink, setMemberActive, setSkills, updateMember } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.people.title);
 
@@ -29,7 +29,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
   const w = m.people;
   const supabase = await createClient();
   const [members, links, origin] = await Promise.all([
-    supabase.from("memberships").select("user_id, role, display_name, accepted_at, is_active").eq("org_id", org.id).order("created_at"),
+    supabase.from("memberships").select("user_id, role, display_name, accepted_at, is_active, skills").eq("org_id", org.id).order("created_at"),
     canManage
       ? supabase
           .from("invitation_links")
@@ -47,6 +47,9 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
   // Mirrors the database rule: managers manage staff and managers, only owners manage owners.
   const canChange = (target: (typeof members.data)[number]) => target.user_id !== user.id && (role === "owner" || (role === "manager" && target.role !== "owner"));
   const roles = role === "owner" ? (["staff", "manager", "owner"] as const) : (["staff", "manager"] as const);
+  // Skills for what the kennel offers (M25). Owners and managers set them, their own included; only owners set an owner's.
+  const offered = skillsOffered(org);
+  const canSetSkills = (target: (typeof members.data)[number]) => offered.length > 0 && (role === "owner" || (role === "manager" && target.role !== "owner"));
 
   return (
     <>
@@ -62,7 +65,33 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                 {m.labels.role[mm.role]}
                 {!mm.accepted_at ? <Badge tone="attention">{w.invited}</Badge> : null}
                 {mm.accepted_at && !mm.is_active ? <Badge tone="alert">{w.suspended}</Badge> : null}
+                {mm.skills.filter((s) => offered.includes(s)).map((s) => (
+                  <Badge key={s}>{m.skills.names[s]}</Badge>
+                ))}
               </p>
+              {canSetSkills(mm) ? (
+                <details className="mt-2">
+                  <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">
+                    {m.skills.title}
+                    <span className="sr-only"> {mm.display_name}</span>
+                  </summary>
+                  <ActionForm action={setSkills} className="mt-2 space-y-2">
+                    <input type="hidden" name="userId" value={mm.user_id} />
+                    <p className="text-sm text-slate">{m.skills.about}</p>
+                    <div className="grid gap-1 sm:grid-cols-2">
+                      {offered.map((s) => (
+                        <label key={s} className="flex min-h-12 items-center gap-3">
+                          <input type="checkbox" name={`skill_${s}`} defaultChecked={mm.skills.includes(s)} className="size-5" />
+                          <span>{m.skills.names[s]}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+                      {m.skills.save}
+                    </SubmitButton>
+                  </ActionForm>
+                </details>
+              ) : null}
               {canChange(mm) ? (
                 <details className="mt-2">
                   <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.common.change}</summary>

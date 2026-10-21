@@ -76,6 +76,10 @@ export const core: typeof English = {
     notCheckedIn: "इस पालतू का चेक इन नहीं हुआ है। पेज रिफ़्रेश करें।",
     constraints: {
       bookings_waitlist_is_a_request: "वेटिंग लिस्ट में सिर्फ़ अनुरोध रह सकता है।",
+      organizations_delivery_needs_kitchen: "खाने की डिलीवरी से पहले रसोई चालू करें: खाना वहीं से आता है।",
+      service_areas_org_id_postal_code_key: "यह पिन कोड पहले से आपकी सूची में है।",
+      client_addresses_postal_code_check: "छह अंकों का पिन कोड लिखें।",
+      pet_weights_weight_g_check: "वज़न किलो में लिखें, जैसे 34.5।",
       invoices_series_month: "महीने के बिल पर महीने की पहली तारीख होती है।",
       invoices_one_live_per_series_month: "दोहराई जाने वाली बुकिंग के इस महीने का बिल पहले से है। उसे बुकिंग से खोलें।",
       bookings_no_kennel_overlap: "उनमें से कुछ तारीखों पर उस केनेल में किसी दूसरे पेरेंट का पालतू है। दूसरा केनेल चुनें या तारीखें बदलें।",

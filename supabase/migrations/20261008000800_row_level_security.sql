@@ -64,6 +64,9 @@ alter table public.expenses enable row level security;
 alter table public.intake_submissions enable row level security;
 alter table public.audit_log enable row level security;
 alter table public.invitation_links enable row level security;
+alter table public.pet_weights enable row level security;
+alter table public.client_addresses enable row level security;
+alter table public.service_areas enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -87,10 +90,10 @@ create policy organizations_delete on public.organizations for delete to authent
 -- owners can change or remove an owner. People are added by invitation
 -- (invite_member_by_email) and become active only by accepting
 -- (respond_to_invitation), so there is no insert policy, and only the role,
--- name, phone and active flag can be written directly.
+-- name, phone, skills and active flag can be written directly.
 -- ---------------------------------------------------------------------------
 grant select, delete on public.memberships to authenticated;
-grant update (role, display_name, phone, is_active) on public.memberships to authenticated;
+grant update (role, display_name, phone, is_active, skills) on public.memberships to authenticated;
 
 create policy memberships_select on public.memberships for select to authenticated
   using (org_id in (select public.my_org_ids()) or (user_id = (select auth.uid()) and (select public.session_meets_mfa())));
@@ -185,7 +188,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs'] loop
+  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -225,6 +228,33 @@ create policy passes_update on public.passes for update to authenticated
 create policy passes_delete on public.passes for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 grant select on public.pass_balances to authenticated;
+
+-- Weighings: any member weighs a pet and reads the weights; owners and
+-- managers correct one; owners delete (D29).
+grant select, insert, update, delete on public.pet_weights to authenticated;
+create policy pet_weights_select on public.pet_weights for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy pet_weights_insert on public.pet_weights for insert to authenticated
+  with check (org_id in (select public.my_org_ids()));
+create policy pet_weights_update on public.pet_weights for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy pet_weights_delete on public.pet_weights for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- A parent's addresses are personal data, like their phone numbers (D33):
+-- any member reads one and adds one for a parent; only owners and managers
+-- change one; owners delete (D29).
+grant select, insert, update, delete on public.client_addresses to authenticated;
+create policy client_addresses_select on public.client_addresses for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy client_addresses_insert on public.client_addresses for insert to authenticated
+  with check (org_id in (select public.my_org_ids()));
+create policy client_addresses_update on public.client_addresses for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy client_addresses_delete on public.client_addresses for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- Reminders sent: any member reads and records one; nobody changes one; owners delete.
 grant select, insert, delete on public.reminders_sent to authenticated;

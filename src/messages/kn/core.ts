@@ -76,6 +76,10 @@ export const core: typeof English = {
     notCheckedIn: "ಈ ಸಾಕುಪ್ರಾಣಿ ಚೆಕ್ ಇನ್ ಆಗಿಲ್ಲ. ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     constraints: {
       bookings_waitlist_is_a_request: "ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿ ವಿನಂತಿ ಮಾತ್ರ ಇರಬಹುದು.",
+      organizations_delivery_needs_kitchen: "ಊಟದ ಡೆಲಿವರಿಗೆ ಮೊದಲು ಅಡುಗೆಮನೆ ಆನ್ ಮಾಡಿ: ಊಟ ಅಲ್ಲಿಂದಲೇ ಬರುತ್ತದೆ.",
+      service_areas_org_id_postal_code_key: "ಈ ಪಿನ್ ಕೋಡ್ ಈಗಾಗಲೇ ನಿಮ್ಮ ಪಟ್ಟಿಯಲ್ಲಿದೆ.",
+      client_addresses_postal_code_check: "ಆರು ಅಂಕಿಗಳ ಪಿನ್ ಕೋಡ್ ಬರೆಯಿರಿ.",
+      pet_weights_weight_g_check: "ತೂಕವನ್ನು ಕೆಜಿಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 34.5.",
       invoices_series_month: "ತಿಂಗಳ ಬಿಲ್‌ಗೆ ತಿಂಗಳ ಮೊದಲ ದಿನಾಂಕ ಇರುತ್ತದೆ.",
       invoices_one_live_per_series_month: "ಪುನರಾವರ್ತಿತ ಬುಕಿಂಗ್‌ನ ಈ ತಿಂಗಳಿಗೆ ಈಗಾಗಲೇ ಬಿಲ್ ಇದೆ. ಅದನ್ನು ಬುಕಿಂಗ್‌ನಿಂದ ತೆರೆಯಿರಿ.",
       bookings_no_kennel_overlap: "ಆ ದಿನಾಂಕಗಳಲ್ಲಿ ಕೆಲವು ದಿನ ಆ ಕೆನೆಲ್‌ನಲ್ಲಿ ಬೇರೆ ಪೇರೆಂಟ್‌ನ ಸಾಕುಪ್ರಾಣಿ ಇದೆ. ಬೇರೆ ಕೆನೆಲ್ ಆರಿಸಿ ಅಥವಾ ದಿನಾಂಕಗಳನ್ನು ಬದಲಾಯಿಸಿ.",

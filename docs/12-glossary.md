@@ -14,6 +14,9 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Staff | `member_role = 'staff'` | Looks after the pets and the bookings. |
 | People | `memberships` | Everyone who works at a kennel. |
 | Invitation | a membership with no `accepted_at` | An offer to join a kennel, waiting for the person's answer. |
+| Skills | `memberships.skills` | What a person can be given to do: cook, groomer, trainer, swim supervisor, rider. Never decides what they see. |
+| Weight | `pet_weights`, `pets.weight_g` | A pet weighed on a day, in kg on screen and grams in the database. |
+| Body condition | `pet_weights.body_condition` | A score from 1 (very thin) to 9 (very heavy). |
 
 ## Places
 
@@ -23,6 +26,9 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Kennel (the room) | `kennels` | The unit one pet sleeps in. Shown as a door tag: K07. |
 | In service, out of service | `kennels.is_active` | Whether a kennel can be booked. |
 | Yard | `play_yards` | A play area used by one pet at a time. |
+| Address | `client_addresses` | Where a parent wants food delivered or a pet picked up: Home, Work or Other. Never "location". |
+| Area, areas you serve | `service_areas` | A PIN code the kennel delivers to, with its name and charge. |
+| PIN code | `postal_code` | India's six digit postal code. |
 
 ## Stays
 

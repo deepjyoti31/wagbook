@@ -1445,6 +1445,7 @@ begin
   update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
   update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
+  update public.client_addresses a set client_id = v_keep.id where a.org_id = v_keep.org_id and a.client_id = v_merge.id;
 
   -- Fill in what the kept parent is missing, and keep both sets of notes.
   update public.clients c set
@@ -1468,4 +1469,4 @@ begin
 end;
 $$;
 comment on function public.merge_clients(uuid, uuid) is
-  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments and forms, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';
+  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments, forms and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';
