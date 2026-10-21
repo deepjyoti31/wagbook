@@ -43,7 +43,7 @@ describe("every table is locked down", () => {
     expect(res.rows).toEqual([]);
   });
 
-  it("lets the anonymous role run exactly the eight public functions and nothing else", async () => {
+  it("lets the anonymous role run exactly the twelve public functions and nothing else", async () => {
     const res = await db.query<{ name: string }>(`
       select p.proname as name
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -51,7 +51,10 @@ describe("every table is locked down", () => {
       order by 1`);
     expect(res.rows.map((r) => r.name)).toEqual([
       // A known parent's own booking link: see docs/05-security-and-privacy.md.
+      "food_order_paid",
       "get_public_booking_form",
+      // The kennel's food order page (M32): see docs/05-security-and-privacy.md.
+      "get_public_food_form",
       "get_public_intake_form",
       "get_public_invoice",
       "get_public_stay",
@@ -60,6 +63,9 @@ describe("every table is locked down", () => {
       // Only reached through Storage, for photos on a stay page; see docs/05-security-and-privacy.md.
       "stay_media_visible",
       "submit_booking_request",
+      "submit_food_order",
+      // A known parent's changes to their food, from their own link.
+      "submit_food_request",
       "submit_intake",
     ]);
   });

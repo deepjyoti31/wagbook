@@ -16,9 +16,9 @@
 -- "overlapping dates", which is how double booking is made impossible.
 create extension if not exists btree_gist with schema extensions;
 
-create type public.member_role as enum ('owner', 'manager', 'staff');
+create type public.member_role as enum ('owner', 'manager', 'staff', 'rider');
 comment on type public.member_role is
-  'owner: everything, including people and deleting the organisation. manager: everything except owners. staff: daily operations.';
+  'owner: everything, including people and deleting the organisation. manager: everything except owners. staff: daily operations. rider: only their own delivery run for the day, through rider functions (D45); no table is open to them.';
 
 create type public.tax_mode as enum ('none', 'simple', 'gst_india');
 comment on type public.tax_mode is
@@ -183,10 +183,24 @@ create table public.organizations (
   offers_appointments boolean not null default false,
   offers_kitchen boolean not null default false,
   offers_food_delivery boolean not null default false,
+  portion_small_bp integer not null default 300 check (portion_small_bp between 50 and 1000),
+  portion_medium_bp integer not null default 250 check (portion_medium_bp between 50 and 1000),
+  portion_large_bp integer not null default 200 check (portion_large_bp between 50 and 1000),
+  small_dog_max_g integer not null default 10000 check (small_dog_max_g between 1000 and 100000),
+  medium_dog_max_g integer not null default 25000 check (medium_dog_max_g between 1000 and 150000),
+  topper_share_bp integer not null default 3333 check (topper_share_bp between 500 and 9000),
+  goal_change_bp integer not null default 1000 check (goal_change_bp between 0 and 3000),
+  food_pack_g integer not null default 250 check (food_pack_g between 50 and 5000 and food_pack_g % 10 = 0),
+  food_cutoff_hours smallint not null default 24 check (food_cutoff_hours between 0 and 168),
+  monthly_food_discount_bp integer not null default 0 check (monthly_food_discount_bp between 0 and 5000),
+  cook_margin_bp integer not null default 1000 check (cook_margin_bp between 0 and 5000),
+  problem_window_hours smallint not null default 24 check (problem_window_hours between 1 and 168),
+  food_orders_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Food is delivered from the kennel's own kitchen (D44).
   constraint organizations_delivery_needs_kitchen check (not offers_food_delivery or offers_kitchen),
+  constraint organizations_size_bands_in_order check (medium_dog_max_g > small_dog_max_g),
   constraint organizations_gst_needs_registration
     check (tax_mode <> 'gst_india' or (tax_id is not null and gst_state_code is not null)),
   constraint organizations_play_hours_in_order check (play_day_end > play_day_start),
@@ -233,6 +247,20 @@ comment on column public.organizations.offers_kitchen is
   'Whether the kennel cooks food in its own kitchen, for boarders and to sell (D44). Off: none of it is shown.';
 comment on column public.organizations.offers_food_delivery is
   'Whether the kennel delivers its food to parents at home (D44). Needs offers_kitchen. Turns on parents'' addresses and the areas served.';
+comment on column public.organizations.portion_small_bp is
+  'A small dog''s day of food as a share of its body weight, in basis points: 300 is 3% (M28). Medium and large have their own.';
+comment on column public.organizations.portion_medium_bp is 'A medium dog''s day of food as a share of its body weight, in basis points: 250 is 2.5%.';
+comment on column public.organizations.portion_large_bp is 'A large dog''s day of food as a share of its body weight, in basis points: 200 is 2%.';
+comment on column public.organizations.small_dog_max_g is 'Up to this weight, in grams, a dog is small for portions. 10000 is 10 kg.';
+comment on column public.organizations.medium_dog_max_g is 'Up to this weight, in grams, a dog is medium for portions; heavier is large. 25000 is 25 kg.';
+comment on column public.organizations.topper_share_bp is 'A topper plan''s share of the day''s food, in basis points: 3333 is a third.';
+comment on column public.organizations.goal_change_bp is 'How much less a dog that should lose weight eats, and more one that should gain, in basis points: 1000 is 10%.';
+comment on column public.organizations.food_pack_g is 'Grams in one pack of food. Deliveries are rounded up to whole packs. A multiple of 10 grams.';
+comment on column public.organizations.food_cutoff_hours is 'How many hours before a delivery''s slot changes to it close; after that it is being cooked.';
+comment on column public.organizations.monthly_food_discount_bp is 'Discount on food paid a month ahead, in basis points: 500 is 5%. 0 for none.';
+comment on column public.organizations.cook_margin_bp is 'Extra food the cook plan adds on top of what is needed, in basis points: 1000 is 10%.';
+comment on column public.organizations.problem_window_hours is 'How many hours after a delivery a parent may report it damaged, late or wrong.';
+comment on column public.organizations.food_orders_enabled is 'Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 
 create trigger organizations_set_updated_at
@@ -496,10 +524,23 @@ set search_path = ''
 as $$
   select m.org_id
   from public.memberships m
-  where m.user_id = (select auth.uid()) and m.is_active and public.session_meets_mfa();
+  where m.user_id = (select auth.uid()) and m.is_active and m.role <> 'rider' and public.session_meets_mfa();
 $$;
 comment on function public.my_org_ids() is
-  'Organisations the signed-in user is an active member of. The basis of tenant isolation. Empty for a session that still owes its two-step code.';
+  'Organisations the signed-in user is an active member of, other than as a rider. The basis of tenant isolation. Empty for a session that still owes its two-step code. A rider reaches only their own run, through the rider functions (D45).';
+
+create function public.my_rider_org_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select m.org_id
+  from public.memberships m
+  where m.user_id = (select auth.uid()) and m.is_active and m.role = 'rider' and public.session_meets_mfa();
+$$;
+comment on function public.my_rider_org_ids() is 'Organisations where the signed-in user is an active rider (D45).';
 
 create function public.my_org_ids_with_role(p_roles public.member_role[])
 returns setof uuid

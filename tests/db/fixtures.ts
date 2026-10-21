@@ -51,14 +51,14 @@ export async function seedKennel(db: PGlite, opts: { kennels?: number; pets?: nu
  * Add a working member with a role, the way it really happens: an owner
  * invites them by email, and they accept.
  */
-export async function addMember(db: PGlite, k: Kennel, role: "owner" | "manager" | "staff"): Promise<string> {
+export async function addMember(db: PGlite, k: Kennel, role: "owner" | "manager" | "staff" | "rider"): Promise<string> {
   const id = await inviteMember(db, k, role);
   await as(db, user(id), () => db.query("select public.respond_to_invitation($1, true)", [k.org]));
   return id;
 }
 
 /** Create an account and invite it, without accepting. Returns the invited user's id. */
-export async function inviteMember(db: PGlite, k: Kennel, role: "owner" | "manager" | "staff", inviter: string = k.owner): Promise<string> {
+export async function inviteMember(db: PGlite, k: Kennel, role: "owner" | "manager" | "staff" | "rider", inviter: string = k.owner): Promise<string> {
   const email = `${role}${++counter}@example.test`;
   const id = await createUser(db, email);
   await as(db, user(inviter), () =>

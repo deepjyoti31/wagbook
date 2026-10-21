@@ -13,7 +13,7 @@ import { getAppI18n } from "@/lib/i18n-server";
 export default function AppLayout({ children }: LayoutProps<"/app">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-paper p-2 sm:static sm:order-first sm:border-b sm:border-t-0">
+      <div className="no-print fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-paper p-2 sm:static sm:order-first sm:border-b sm:border-t-0">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-4">
           <Link href="/app" className="hidden text-lg font-extrabold tracking-tight sm:block">
             <Suspense fallback="Wagbook">

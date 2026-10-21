@@ -372,9 +372,9 @@ create trigger incidents_guard_content
 create table public.reminders_sent (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations (id) on delete cascade,
-  kind text not null check (kind in ('vaccination', 'arrival', 'pickup', 'unpaid')),
-  -- A booking (vaccination, arrival, pickup) or a bill (unpaid). Not a foreign
-  -- key, because it names rows of two tables; a reminder about a row that is
+  kind text not null check (kind in ('vaccination', 'arrival', 'pickup', 'unpaid', 'trial')),
+  -- A booking (vaccination, arrival, pickup), a bill (unpaid) or a trial
+  -- delivery (trial, M29). Not a foreign key, because it names rows of several tables; a reminder about a row that is
   -- gone is simply never matched again.
   subject_id uuid not null,
   sent_on date not null,
@@ -385,8 +385,8 @@ create table public.reminders_sent (
 comment on table public.reminders_sent is
   'A reminder a person sent a parent from Today, on WhatsApp from their own phone: so it leaves the list. Wagbook sends nothing itself.';
 comment on column public.reminders_sent.kind is
-  'vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed.';
-comment on column public.reminders_sent.subject_id is 'The booking (vaccination, arrival, pickup) or the bill (unpaid) it was about.';
+  'vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed. trial: asking a parent whose dog had the food trial about a subscription (M29).';
+comment on column public.reminders_sent.subject_id is 'The booking (vaccination, arrival, pickup), the bill (unpaid) or the trial delivery (trial) it was about.';
 comment on column public.reminders_sent.sent_on is 'The kennel''s date it was sent. An unpaid bill comes back three days later.';
 
 create index reminders_sent_org_subject_idx on public.reminders_sent (org_id, subject_id, kind);

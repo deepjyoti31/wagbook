@@ -50,6 +50,79 @@ export type Database = {
           },
         ];
       };
+      batches: {
+        Row: {
+          id: string;
+          org_id: string;
+          number: string;
+          recipe_id: string;
+          version_id: string;
+          cooked_on: string;
+          grams: number;
+          packs: number;
+          use_by: string;
+          cook_id: string | null;
+          boarders_on: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          number: string;
+          recipe_id: string;
+          version_id: string;
+          cooked_on: string;
+          grams: number;
+          packs: number;
+          use_by: string;
+          cook_id?: string | null;
+          boarders_on?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          number?: string;
+          recipe_id?: string;
+          version_id?: string;
+          cooked_on?: string;
+          grams?: number;
+          packs?: number;
+          use_by?: string;
+          cook_id?: string | null;
+          boarders_on?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "batches_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "batches_org_id_recipe_id_fkey";
+            columns: ["org_id", "recipe_id"];
+            isOneToOne: false;
+            referencedRelation: "recipes";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "batches_org_id_version_id_fkey";
+            columns: ["org_id", "version_id"];
+            isOneToOne: false;
+            referencedRelation: "recipe_versions";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       booking_items: {
         Row: {
           id: string;
@@ -767,6 +840,312 @@ export type Database = {
           },
         ];
       };
+      deliveries: {
+        Row: {
+          id: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["delivery_kind"];
+          client_id: string;
+          pet_id: string;
+          subscription_id: string | null;
+          product_id: string | null;
+          delivery_date: string;
+          slot: Database["public"]["Enums"]["delivery_slot"];
+          address_id: string | null;
+          covers_days: number | null;
+          grams: number;
+          packs: number;
+          quantity: number;
+          recipe_id: string | null;
+          version_id: string | null;
+          unit_price_minor: number;
+          price_minor: number;
+          delivery_charge_minor: number;
+          tax_rate_bp: number;
+          sac_code: string | null;
+          status: Database["public"]["Enums"]["delivery_status"];
+          cancel_reason: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          superseded: boolean;
+          batch_id: string | null;
+          packed_at: string | null;
+          packed_by: string | null;
+          run_id: string | null;
+          run_position: number | null;
+          delivered_at: string | null;
+          proof_path: string | null;
+          replaces_id: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["delivery_kind"];
+          client_id: string;
+          pet_id: string;
+          subscription_id?: string | null;
+          product_id?: string | null;
+          delivery_date: string;
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          covers_days?: number | null;
+          grams?: number;
+          packs?: number;
+          quantity?: number;
+          recipe_id?: string | null;
+          version_id?: string | null;
+          unit_price_minor?: number;
+          price_minor?: number;
+          delivery_charge_minor?: number;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          status?: Database["public"]["Enums"]["delivery_status"];
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          superseded?: boolean;
+          batch_id?: string | null;
+          packed_at?: string | null;
+          packed_by?: string | null;
+          run_id?: string | null;
+          run_position?: number | null;
+          delivered_at?: string | null;
+          proof_path?: string | null;
+          replaces_id?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kind?: Database["public"]["Enums"]["delivery_kind"];
+          client_id?: string;
+          pet_id?: string;
+          subscription_id?: string | null;
+          product_id?: string | null;
+          delivery_date?: string;
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          covers_days?: number | null;
+          grams?: number;
+          packs?: number;
+          quantity?: number;
+          recipe_id?: string | null;
+          version_id?: string | null;
+          unit_price_minor?: number;
+          price_minor?: number;
+          delivery_charge_minor?: number;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          status?: Database["public"]["Enums"]["delivery_status"];
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          superseded?: boolean;
+          batch_id?: string | null;
+          packed_at?: string | null;
+          packed_by?: string | null;
+          run_id?: string | null;
+          run_position?: number | null;
+          delivered_at?: string | null;
+          proof_path?: string | null;
+          replaces_id?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_org_id_address_id_fkey";
+            columns: ["org_id", "address_id"];
+            isOneToOne: false;
+            referencedRelation: "client_addresses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_batch_id_fkey";
+            columns: ["org_id", "batch_id"];
+            isOneToOne: false;
+            referencedRelation: "batches";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_client_id_pet_id_fkey";
+            columns: ["org_id", "client_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "client_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_product_id_fkey";
+            columns: ["org_id", "product_id"];
+            isOneToOne: false;
+            referencedRelation: "food_products";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_recipe_id_fkey";
+            columns: ["org_id", "recipe_id"];
+            isOneToOne: false;
+            referencedRelation: "recipes";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_replaces_id_fkey";
+            columns: ["org_id", "replaces_id"];
+            isOneToOne: false;
+            referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_run_id_fkey";
+            columns: ["org_id", "run_id"];
+            isOneToOne: false;
+            referencedRelation: "delivery_runs";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_subscription_id_fkey";
+            columns: ["org_id", "subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "subscriptions";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_version_id_fkey";
+            columns: ["org_id", "version_id"];
+            isOneToOne: false;
+            referencedRelation: "recipe_versions";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      delivery_problems: {
+        Row: {
+          id: string;
+          org_id: string;
+          delivery_id: string;
+          kind: Database["public"]["Enums"]["problem_kind"];
+          note: string | null;
+          photo_path: string | null;
+          reported_at: string;
+          reported_by: string | null;
+          outcome: Database["public"]["Enums"]["problem_outcome"] | null;
+          replacement_id: string | null;
+          resolved_at: string | null;
+          resolved_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          delivery_id: string;
+          kind: Database["public"]["Enums"]["problem_kind"];
+          note?: string | null;
+          photo_path?: string | null;
+          reported_at?: string;
+          reported_by?: string | null;
+          outcome?: Database["public"]["Enums"]["problem_outcome"] | null;
+          replacement_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          delivery_id?: string;
+          kind?: Database["public"]["Enums"]["problem_kind"];
+          note?: string | null;
+          photo_path?: string | null;
+          reported_at?: string;
+          reported_by?: string | null;
+          outcome?: Database["public"]["Enums"]["problem_outcome"] | null;
+          replacement_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "delivery_problems_org_id_delivery_id_fkey";
+            columns: ["org_id", "delivery_id"];
+            isOneToOne: false;
+            referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "delivery_problems_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "delivery_problems_org_id_replacement_id_fkey";
+            columns: ["org_id", "replacement_id"];
+            isOneToOne: false;
+            referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      delivery_runs: {
+        Row: {
+          id: string;
+          org_id: string;
+          run_date: string;
+          slot: Database["public"]["Enums"]["delivery_slot"];
+          rider_id: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          run_date: string;
+          slot: Database["public"]["Enums"]["delivery_slot"];
+          rider_id: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          run_date?: string;
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          rider_id?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "delivery_runs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       expenses: {
         Row: {
           id: string;
@@ -826,6 +1205,174 @@ export type Database = {
           },
           {
             foreignKeyName: "expenses_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      food_orders: {
+        Row: {
+          id: string;
+          org_id: string;
+          public_token: string;
+          kind: Database["public"]["Enums"]["food_order_kind"];
+          status: Database["public"]["Enums"]["food_order_status"];
+          client_id: string | null;
+          subscription_id: string | null;
+          parent_name: string | null;
+          phone: string | null;
+          pet_name: string | null;
+          weight_g: number | null;
+          plan: Database["public"]["Enums"]["food_plan"] | null;
+          grams_per_day: number | null;
+          weekdays: number[] | null;
+          slot: Database["public"]["Enums"]["delivery_slot"] | null;
+          line: string | null;
+          area: string | null;
+          postal_code: string | null;
+          door_note: string | null;
+          starts_on: string | null;
+          until_date: string | null;
+          grams: number | null;
+          amount_minor: number | null;
+          note: string | null;
+          consent_text: string | null;
+          paid_claimed_at: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          public_token?: string;
+          kind: Database["public"]["Enums"]["food_order_kind"];
+          status: Database["public"]["Enums"]["food_order_status"];
+          client_id?: string | null;
+          subscription_id?: string | null;
+          parent_name?: string | null;
+          phone?: string | null;
+          pet_name?: string | null;
+          weight_g?: number | null;
+          plan?: Database["public"]["Enums"]["food_plan"] | null;
+          grams_per_day?: number | null;
+          weekdays?: number[] | null;
+          slot?: Database["public"]["Enums"]["delivery_slot"] | null;
+          line?: string | null;
+          area?: string | null;
+          postal_code?: string | null;
+          door_note?: string | null;
+          starts_on?: string | null;
+          until_date?: string | null;
+          grams?: number | null;
+          amount_minor?: number | null;
+          note?: string | null;
+          consent_text?: string | null;
+          paid_claimed_at?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          public_token?: string;
+          kind?: Database["public"]["Enums"]["food_order_kind"];
+          status?: Database["public"]["Enums"]["food_order_status"];
+          client_id?: string | null;
+          subscription_id?: string | null;
+          parent_name?: string | null;
+          phone?: string | null;
+          pet_name?: string | null;
+          weight_g?: number | null;
+          plan?: Database["public"]["Enums"]["food_plan"] | null;
+          grams_per_day?: number | null;
+          weekdays?: number[] | null;
+          slot?: Database["public"]["Enums"]["delivery_slot"] | null;
+          line?: string | null;
+          area?: string | null;
+          postal_code?: string | null;
+          door_note?: string | null;
+          starts_on?: string | null;
+          until_date?: string | null;
+          grams?: number | null;
+          amount_minor?: number | null;
+          note?: string | null;
+          consent_text?: string | null;
+          paid_claimed_at?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "food_orders_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "food_orders_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "food_orders_org_id_subscription_id_fkey";
+            columns: ["org_id", "subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "subscriptions";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      food_products: {
+        Row: {
+          id: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["food_product_kind"];
+          name: string;
+          price_minor: number;
+          trial_grams: number | null;
+          tax_rate_bp: number | null;
+          sac_code: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["food_product_kind"];
+          name: string;
+          price_minor: number;
+          trial_grams?: number | null;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kind?: Database["public"]["Enums"]["food_product_kind"];
+          name?: string;
+          price_minor?: number;
+          trial_grams?: number | null;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "food_products_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -1147,6 +1694,10 @@ export type Database = {
           group_id: string | null;
           series_id: string | null;
           series_month: string | null;
+          subscription_id: string | null;
+          period_start: string | null;
+          period_end: string | null;
+          delivery_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           number: string | null;
           fiscal_year: string | null;
@@ -1185,6 +1736,10 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           series_month?: string | null;
+          subscription_id?: string | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          delivery_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1223,6 +1778,10 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           series_month?: string | null;
+          subscription_id?: string | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          delivery_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1255,6 +1814,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "invoices_delivery_fkey";
+            columns: ["org_id", "delivery_id"];
+            isOneToOne: false;
+            referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
             foreignKeyName: "invoices_org_id_booking_id_fkey";
             columns: ["org_id", "booking_id"];
             isOneToOne: false;
@@ -1274,6 +1840,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_subscription_fkey";
+            columns: ["org_id", "subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "subscriptions";
+            referencedColumns: ["org_id", "id"];
           },
         ];
       };
@@ -1420,6 +1993,19 @@ export type Database = {
           offers_appointments: boolean;
           offers_kitchen: boolean;
           offers_food_delivery: boolean;
+          portion_small_bp: number;
+          portion_medium_bp: number;
+          portion_large_bp: number;
+          small_dog_max_g: number;
+          medium_dog_max_g: number;
+          topper_share_bp: number;
+          goal_change_bp: number;
+          food_pack_g: number;
+          food_cutoff_hours: number;
+          monthly_food_discount_bp: number;
+          cook_margin_bp: number;
+          problem_window_hours: number;
+          food_orders_enabled: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -1468,6 +2054,19 @@ export type Database = {
           offers_appointments?: boolean;
           offers_kitchen?: boolean;
           offers_food_delivery?: boolean;
+          portion_small_bp?: number;
+          portion_medium_bp?: number;
+          portion_large_bp?: number;
+          small_dog_max_g?: number;
+          medium_dog_max_g?: number;
+          topper_share_bp?: number;
+          goal_change_bp?: number;
+          food_pack_g?: number;
+          food_cutoff_hours?: number;
+          monthly_food_discount_bp?: number;
+          cook_margin_bp?: number;
+          problem_window_hours?: number;
+          food_orders_enabled?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1516,6 +2115,19 @@ export type Database = {
           offers_appointments?: boolean;
           offers_kitchen?: boolean;
           offers_food_delivery?: boolean;
+          portion_small_bp?: number;
+          portion_medium_bp?: number;
+          portion_large_bp?: number;
+          small_dog_max_g?: number;
+          medium_dog_max_g?: number;
+          topper_share_bp?: number;
+          goal_change_bp?: number;
+          food_pack_g?: number;
+          food_cutoff_hours?: number;
+          monthly_food_discount_bp?: number;
+          cook_margin_bp?: number;
+          problem_window_hours?: number;
+          food_orders_enabled?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1720,6 +2332,75 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      pet_food: {
+        Row: {
+          org_id: string;
+          pet_id: string;
+          plan: Database["public"]["Enums"]["food_plan"];
+          goal: Database["public"]["Enums"]["food_goal"];
+          grams_by_hand: number | null;
+          by_hand_note: string | null;
+          boarder_food: Database["public"]["Enums"]["boarder_food"];
+          kibble_brand: string | null;
+          kibble_g_per_day: number | null;
+          avoid: string | null;
+          started_on: string | null;
+          reviewed_on: string | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          pet_id: string;
+          plan?: Database["public"]["Enums"]["food_plan"];
+          goal?: Database["public"]["Enums"]["food_goal"];
+          grams_by_hand?: number | null;
+          by_hand_note?: string | null;
+          boarder_food?: Database["public"]["Enums"]["boarder_food"];
+          kibble_brand?: string | null;
+          kibble_g_per_day?: number | null;
+          avoid?: string | null;
+          started_on?: string | null;
+          reviewed_on?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          pet_id?: string;
+          plan?: Database["public"]["Enums"]["food_plan"];
+          goal?: Database["public"]["Enums"]["food_goal"];
+          grams_by_hand?: number | null;
+          by_hand_note?: string | null;
+          boarder_food?: Database["public"]["Enums"]["boarder_food"];
+          kibble_brand?: string | null;
+          kibble_g_per_day?: number | null;
+          avoid?: string | null;
+          started_on?: string | null;
+          reviewed_on?: string | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pet_food_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pet_food_org_id_pet_id_fkey";
+            columns: ["org_id", "pet_id"];
+            isOneToOne: true;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "id"];
           },
         ];
       };
@@ -1987,6 +2668,156 @@ export type Database = {
           },
         ];
       };
+      recipe_ingredients: {
+        Row: {
+          org_id: string;
+          version_id: string;
+          item_id: string;
+          quantity_per_kg: number;
+        };
+        Insert: {
+          org_id: string;
+          version_id: string;
+          item_id: string;
+          quantity_per_kg: number;
+        };
+        Update: {
+          org_id?: string;
+          version_id?: string;
+          item_id?: string;
+          quantity_per_kg?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_org_id_item_id_fkey";
+            columns: ["org_id", "item_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_items";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "recipe_ingredients_org_id_version_id_fkey";
+            columns: ["org_id", "version_id"];
+            isOneToOne: false;
+            referencedRelation: "recipe_versions";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      recipe_versions: {
+        Row: {
+          id: string;
+          org_id: string;
+          recipe_id: string;
+          version: number;
+          good_for: string | null;
+          cooked_yield_bp: number | null;
+          kcal_per_kg: number | null;
+          protein_g_per_kg: number | null;
+          signed_off_by: string | null;
+          signed_off_on: string | null;
+          lab_tested_on: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          recipe_id: string;
+          version: number;
+          good_for?: string | null;
+          cooked_yield_bp?: number | null;
+          kcal_per_kg?: number | null;
+          protein_g_per_kg?: number | null;
+          signed_off_by?: string | null;
+          signed_off_on?: string | null;
+          lab_tested_on?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          recipe_id?: string;
+          version?: number;
+          good_for?: string | null;
+          cooked_yield_bp?: number | null;
+          kcal_per_kg?: number | null;
+          protein_g_per_kg?: number | null;
+          signed_off_by?: string | null;
+          signed_off_on?: string | null;
+          lab_tested_on?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recipe_versions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recipe_versions_org_id_recipe_id_fkey";
+            columns: ["org_id", "recipe_id"];
+            isOneToOne: false;
+            referencedRelation: "recipes";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      recipes: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          rotation_position: number | null;
+          use_by_days: number;
+          storage_note: string | null;
+          is_retired: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          rotation_position?: number | null;
+          use_by_days?: number;
+          storage_note?: string | null;
+          is_retired?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          rotation_position?: number | null;
+          use_by_days?: number;
+          storage_note?: string | null;
+          is_retired?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recipes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recovery_codes: {
         Row: {
           id: string;
@@ -2210,6 +3041,344 @@ export type Database = {
           },
         ];
       };
+      stock_costs: {
+        Row: {
+          org_id: string;
+          move_id: string;
+          cost_minor: number;
+          bill_number: string | null;
+          bill_path: string | null;
+          expense_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          org_id: string;
+          move_id: string;
+          cost_minor: number;
+          bill_number?: string | null;
+          bill_path?: string | null;
+          expense_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          move_id?: string;
+          cost_minor?: number;
+          bill_number?: string | null;
+          bill_path?: string | null;
+          expense_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_costs_org_id_expense_id_fkey";
+            columns: ["org_id", "expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stock_costs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_costs_org_id_move_id_fkey";
+            columns: ["org_id", "move_id"];
+            isOneToOne: true;
+            referencedRelation: "stock_moves";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      stock_items: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          unit: Database["public"]["Enums"]["stock_unit"];
+          kind: Database["public"]["Enums"]["stock_kind"];
+          supplier_id: string | null;
+          low_level: number | null;
+          never_in_recipe: boolean;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          unit: Database["public"]["Enums"]["stock_unit"];
+          kind: Database["public"]["Enums"]["stock_kind"];
+          supplier_id?: string | null;
+          low_level?: number | null;
+          never_in_recipe?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          unit?: Database["public"]["Enums"]["stock_unit"];
+          kind?: Database["public"]["Enums"]["stock_kind"];
+          supplier_id?: string | null;
+          low_level?: number | null;
+          never_in_recipe?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_items_org_id_supplier_id_fkey";
+            columns: ["org_id", "supplier_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      stock_moves: {
+        Row: {
+          id: string;
+          org_id: string;
+          item_id: string;
+          kind: Database["public"]["Enums"]["stock_move_kind"];
+          quantity: number;
+          happened_on: string;
+          supplier_id: string | null;
+          use_by: string | null;
+          reason: Database["public"]["Enums"]["waste_reason"] | null;
+          counted: number | null;
+          batch_id: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          item_id: string;
+          kind: Database["public"]["Enums"]["stock_move_kind"];
+          quantity: number;
+          happened_on: string;
+          supplier_id?: string | null;
+          use_by?: string | null;
+          reason?: Database["public"]["Enums"]["waste_reason"] | null;
+          counted?: number | null;
+          batch_id?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          item_id?: string;
+          kind?: Database["public"]["Enums"]["stock_move_kind"];
+          quantity?: number;
+          happened_on?: string;
+          supplier_id?: string | null;
+          use_by?: string | null;
+          reason?: Database["public"]["Enums"]["waste_reason"] | null;
+          counted?: number | null;
+          batch_id?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stock_moves_batch_fkey";
+            columns: ["org_id", "batch_id"];
+            isOneToOne: false;
+            referencedRelation: "batches";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stock_moves_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stock_moves_org_id_item_id_fkey";
+            columns: ["org_id", "item_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_items";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stock_moves_org_id_supplier_id_fkey";
+            columns: ["org_id", "supplier_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          product_id: string;
+          plan: Database["public"]["Enums"]["food_plan"];
+          grams_per_day: number;
+          weekdays: number[];
+          slot: Database["public"]["Enums"]["delivery_slot"];
+          address_id: string | null;
+          starts_on: string;
+          pay_period: Database["public"]["Enums"]["pay_period"];
+          source: Database["public"]["Enums"]["customer_source"];
+          paused_from: string | null;
+          paused_until: string | null;
+          cancelled_on: string | null;
+          cancel_reason: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          product_id: string;
+          plan?: Database["public"]["Enums"]["food_plan"];
+          grams_per_day: number;
+          weekdays: number[];
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          starts_on: string;
+          pay_period?: Database["public"]["Enums"]["pay_period"];
+          source?: Database["public"]["Enums"]["customer_source"];
+          paused_from?: string | null;
+          paused_until?: string | null;
+          cancelled_on?: string | null;
+          cancel_reason?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          pet_id?: string;
+          product_id?: string;
+          plan?: Database["public"]["Enums"]["food_plan"];
+          grams_per_day?: number;
+          weekdays?: number[];
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          starts_on?: string;
+          pay_period?: Database["public"]["Enums"]["pay_period"];
+          source?: Database["public"]["Enums"]["customer_source"];
+          paused_from?: string | null;
+          paused_until?: string | null;
+          cancelled_on?: string | null;
+          cancel_reason?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_org_id_address_id_fkey";
+            columns: ["org_id", "address_id"];
+            isOneToOne: false;
+            referencedRelation: "client_addresses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "subscriptions_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "subscriptions_org_id_client_id_pet_id_fkey";
+            columns: ["org_id", "client_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "client_id", "id"];
+          },
+          {
+            foreignKeyName: "subscriptions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "subscriptions_org_id_product_id_fkey";
+            columns: ["org_id", "product_id"];
+            isOneToOne: false;
+            referencedRelation: "food_products";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      suppliers: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          phone: string | null;
+          supplies: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          phone?: string | null;
+          supplies?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          phone?: string | null;
+          supplies?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       vaccinations: {
         Row: {
           id: string;
@@ -2305,6 +3474,34 @@ export type Database = {
         };
         Relationships: [];
       };
+      recipe_current: {
+        Row: {
+          recipe_id: string | null;
+          org_id: string | null;
+          version_id: string | null;
+          version: number | null;
+          name: string | null;
+          rotation_position: number | null;
+          is_retired: boolean | null;
+          use_by_days: number | null;
+        };
+        Relationships: [];
+      };
+      stock_levels: {
+        Row: {
+          item_id: string | null;
+          org_id: string | null;
+          name: string | null;
+          unit: Database["public"]["Enums"]["stock_unit"] | null;
+          kind: Database["public"]["Enums"]["stock_kind"] | null;
+          supplier_id: string | null;
+          low_level: number | null;
+          never_in_recipe: boolean | null;
+          is_active: boolean | null;
+          on_hand: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       accept_intake: {
@@ -2318,6 +3515,14 @@ export type Database = {
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string; p_client?: string; p_pets?: number };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
+      };
+      batch_cost: {
+        Args: { p_org: string; p_batch: string };
+        Returns: number;
+      };
+      batch_recipients: {
+        Args: { p_org: string; p_batch: string };
+        Returns: { kind: string; on_date: string; pet_id: string; pet_name: string; client_id: string; client_name: string; phone: string; delivery_id: string }[];
       };
       check_bill_line: {
         Args: { p_mode: Database["public"]["Enums"]["tax_mode"]; p_intra: boolean; p_include: boolean; p_quantity: number; p_unit_price_minor: number; p_discount_minor: number; p_taxable_minor: number; p_tax_rate_bp: number; p_cgst_minor: number; p_sgst_minor: number; p_igst_minor: number; p_tax_minor: number };
@@ -2335,6 +3540,10 @@ export type Database = {
         Args: { p_client: string };
         Returns: string[];
       };
+      confirm_food_order: {
+        Args: { p_order: string };
+        Returns: string;
+      };
       create_invitation_link: {
         Args: { p_org: string; p_role: Database["public"]["Enums"]["member_role"]; p_display_name: string };
         Returns: string;
@@ -2347,6 +3556,10 @@ export type Database = {
         Args: { p_org_name: string; p_language: string };
         Returns: string;
       };
+      delivery_cutoff: {
+        Args: { p_org: string; p_date: string; p_slot: Database["public"]["Enums"]["delivery_slot"] };
+        Returns: string;
+      };
       erase_client: {
         Args: { p_client: string };
         Returns: string[];
@@ -2355,8 +3568,20 @@ export type Database = {
         Args: { p_client: string };
         Returns: Json;
       };
+      first_delivery_day: {
+        Args: { p_org: string; p_weekdays?: number[] };
+        Returns: string;
+      };
       fiscal_year_label: {
         Args: { p_date: string; p_start_month?: number };
+        Returns: string;
+      };
+      food_bill_lines: {
+        Args: { p_org: string; p_subscription: string; p_from: string; p_to: string; p_delivery: string };
+        Returns: { part: string; quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number; sac_code: string }[];
+      };
+      food_order_paid: {
+        Args: { p_token: string };
         Returns: string;
       };
       generate_care_tasks: {
@@ -2369,6 +3594,10 @@ export type Database = {
       };
       get_public_booking_form: {
         Args: { p_token: string };
+        Returns: Json;
+      };
+      get_public_food_form: {
+        Args: { p_slug: string };
         Returns: Json;
       };
       get_public_intake_form: {
@@ -2427,6 +3656,14 @@ export type Database = {
         Args: { p_roles: Database["public"]["Enums"]["member_role"][] };
         Returns: string[];
       };
+      my_rider_org_ids: {
+        Args: Record<PropertyKey, never>;
+        Returns: string[];
+      };
+      my_runs: {
+        Args: { p_date?: string };
+        Returns: Json;
+      };
       new_token: {
         Args: Record<PropertyKey, never>;
         Returns: string;
@@ -2443,6 +3680,22 @@ export type Database = {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
       };
+      plan_subscription: {
+        Args: { p_subscription: string; p_until: string };
+        Returns: number;
+      };
+      recipe_cost_per_kg: {
+        Args: { p_org: string; p_version: string; p_on?: string };
+        Returns: number;
+      };
+      record_batch: {
+        Args: { p_org: string; p_version: string; p_grams: number; p_packs: number; p_cooked_on: string; p_cook?: string; p_boarders_on?: string; p_note?: string };
+        Returns: string;
+      };
+      record_purchase: {
+        Args: { p_org: string; p_item: string; p_quantity: number; p_cost_minor: number; p_on: string; p_supplier?: string; p_use_by?: string; p_bill_number?: string; p_bill_path?: string; p_expense_category?: string };
+        Returns: string;
+      };
       recovery_codes_left: {
         Args: Record<PropertyKey, never>;
         Returns: number;
@@ -2454,6 +3707,18 @@ export type Database = {
       report_extras: {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { name: string; stays: number; quantity: number; amount_minor: number }[];
+      };
+      report_food: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { month: string; active_subscriptions: number; subscriptions_started: number; subscriptions_ended: number; trials: number; trials_subscribed: number; deliveries: number; kilos_delivered: number; food_value_minor: number; kilos_cooked: number; cooking_cost_minor: number; wasted_g: number; wasted_cost_minor: number }[];
+      };
+      report_food_riders: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { day: string; rider_id: string; rider_name: string; delivered: number; not_home: number; refused: number }[];
+      };
+      report_food_sources: {
+        Args: { p_org: string; p_from: string; p_to: string };
+        Returns: { source: Database["public"]["Enums"]["customer_source"]; started: number; still_active: number }[];
       };
       report_money: {
         Args: { p_org: string; p_from: string; p_to: string };
@@ -2471,6 +3736,18 @@ export type Database = {
         Args: { p_org: string; p_accept: boolean };
         Returns: undefined;
       };
+      rider_mark_stop: {
+        Args: { p_delivery: string; p_status: Database["public"]["Enums"]["delivery_status"]; p_proof_path?: string };
+        Returns: undefined;
+      };
+      rider_upload_allowed: {
+        Args: { p_object_name: string };
+        Returns: boolean;
+      };
+      rotation_recipe: {
+        Args: { p_org: string; p_index: number };
+        Returns: string;
+      };
       safe_date: {
         Args: { p_text: string };
         Returns: string;
@@ -2478,6 +3755,10 @@ export type Database = {
       save_invoice_draft: {
         Args: { p_invoice: string; p_totals: Json; p_lines: Json };
         Returns: undefined;
+      };
+      save_recipe_version: {
+        Args: { p_recipe: string; p_details: Json; p_ingredients: Json };
+        Returns: string;
       };
       session_meets_mfa: {
         Args: Record<PropertyKey, never>;
@@ -2507,6 +3788,14 @@ export type Database = {
         Args: { p_token: string; p_payload: Json };
         Returns: number;
       };
+      submit_food_order: {
+        Args: { p_slug: string; p_payload: Json };
+        Returns: Json;
+      };
+      submit_food_request: {
+        Args: { p_token: string; p_payload: Json };
+        Returns: undefined;
+      };
       submit_intake: {
         Args: { p_slug: string; p_payload: Json };
         Returns: Json;
@@ -2526,19 +3815,36 @@ export type Database = {
     };
     Enums: {
       address_kind: "home" | "work" | "other";
+      boarder_food: "kitchen" | "kibble" | "own";
       booking_kind: "boarding" | "daycare";
       booking_status: "requested" | "confirmed" | "checked_in" | "checked_out" | "cancelled" | "no_show";
       care_kind: "meal" | "medication" | "walk" | "play" | "cleaning" | "other";
+      customer_source: "boarding" | "referral" | "website" | "other";
+      delivery_kind: "subscription" | "trial" | "order" | "item" | "replacement";
+      delivery_slot: "morning" | "afternoon" | "evening";
+      delivery_status: "planned" | "packed" | "out" | "delivered" | "not_home" | "refused" | "cancelled";
+      food_goal: "lose" | "keep" | "gain";
+      food_order_kind: "trial" | "subscription" | "pause" | "skip" | "more";
+      food_order_status: "waiting_area" | "unpaid" | "paid" | "requested" | "confirmed" | "declined";
+      food_plan: "full" | "topper";
+      food_product_kind: "trial" | "subscription" | "by_kilo" | "item";
       incident_severity: "low" | "medium" | "high";
       intake_status: "new" | "accepted" | "rejected" | "spam";
       invoice_status: "draft" | "issued" | "void";
-      member_role: "owner" | "manager" | "staff";
+      member_role: "owner" | "manager" | "staff" | "rider";
+      pay_period: "week" | "month";
       payment_method: "upi" | "cash" | "card" | "bank_transfer" | "other";
       pet_sex: "male" | "female" | "unknown";
+      problem_kind: "damaged" | "late" | "wrong";
+      problem_outcome: "replaced" | "refunded" | "none";
       service_kind: "boarding" | "daycare" | "addon";
       staff_skill: "cook" | "groomer" | "trainer" | "swim_supervisor" | "rider";
+      stock_kind: "meat" | "organ" | "egg" | "grain" | "vegetable" | "oil" | "supplement" | "packaging" | "fuel" | "grooming" | "medicine" | "other";
+      stock_move_kind: "purchase" | "used" | "waste" | "count";
+      stock_unit: "g" | "ml" | "piece";
       task_status: "pending" | "done" | "skipped";
       tax_mode: "none" | "simple" | "gst_india";
+      waste_reason: "spoiled" | "past_date" | "dropped" | "other";
     };
     CompositeTypes: { [_ in never]: never };
   };

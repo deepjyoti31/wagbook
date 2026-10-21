@@ -17,6 +17,8 @@ export const generateMetadata = () => appTitle((m) => m.more.title);
 // Reports, expenses and the history are for owners and managers (D20), so staff are not shown them.
 // A link with `when` shows only while the kennel offers that (D44).
 const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; managers?: boolean; when?: (o: Offers) => boolean }[] = [
+  { href: "/app/kitchen", key: "kitchen", when: (o) => o.offers_kitchen },
+  { href: "/app/food", key: "food", when: (o) => o.offers_food_delivery },
   { href: "/app/bills", key: "bills" },
   { href: "/app/more/reports", key: "reports", managers: true },
   { href: "/app/more/expenses", key: "expenses", managers: true },

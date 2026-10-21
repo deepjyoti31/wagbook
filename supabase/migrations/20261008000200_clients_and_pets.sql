@@ -18,7 +18,7 @@ create table public.clients (
   emergency_phone text,
   notes text,
   consent_at timestamptz,
-  consent_source text check (consent_source is null or consent_source in ('intake_form', 'staff')),
+  consent_source text check (consent_source is null or consent_source in ('intake_form', 'staff', 'food_order')),
   bill_translation text check (bill_translation is null or bill_translation in ('hi', 'kn')),
   request_token text unique default public.new_token(),
   created_by uuid references auth.users (id) on delete set null,
@@ -40,7 +40,7 @@ comment on column public.clients.gst_state_code is 'Buyer''s GST state code. Onl
 comment on column public.clients.tax_id is 'Buyer''s GSTIN, for business customers who want it printed on the invoice.';
 comment on column public.clients.emergency_name is 'Someone to call when the parent cannot be reached during a stay.';
 comment on column public.clients.consent_at is 'When the parent agreed to the kennel holding their details. Evidence for DPDP.';
-comment on column public.clients.consent_source is 'intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent.';
+comment on column public.clients.consent_source is 'intake_form: the parent ticked the box themselves. food_order: they ticked it on the food order page. staff: a staff member recorded verbal consent.';
 comment on column public.clients.bill_translation is
   'Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only.';
 comment on column public.clients.request_token is

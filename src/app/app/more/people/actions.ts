@@ -11,7 +11,8 @@ import { getAppI18n } from "@/lib/i18n-server";
 import type { Messages } from "@/messages";
 import { createClient } from "@/lib/supabase/server";
 
-const ROLES = ["owner", "manager", "staff"] as const;
+// A rider (D45) sees only their own delivery run.
+const ROLES = ["owner", "manager", "staff", "rider"] as const;
 
 const invite = (m: Messages) =>
   z.object({

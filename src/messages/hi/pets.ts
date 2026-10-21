@@ -255,7 +255,7 @@ export const petsArea: typeof English = {
     },
     rolesAbout:
       "स्टाफ़ रोज़ का काम चलाते हैं: बुकिंग, चेक इन, देखभाल और भुगतान। मैनेजर केनेल, कीमतें और सेटिंग भी बदल सकते हैं। मालिक सब कुछ कर सकते हैं, दूसरे मालिकों को संभालना भी।",
-    roleInLine: { owner: "मालिक", manager: "मैनेजर", staff: "स्टाफ़" },
+    roleInLine: { owner: "मालिक", manager: "मैनेजर", staff: "स्टाफ़", rider: "राइडर" },
     byEmail: {
       title: "किसी ऐसे को बुलाएं जिसका पहले से अकाउंट है",
       intro: "वह ईमेल लिखें जो वे Wagbook के लिए इस्तेमाल करते हैं। अगली बार साइन इन करने पर उन्हें न्योता दिखेगा।",
@@ -292,6 +292,7 @@ export const petsArea: typeof English = {
       owner: "{kennel} में मालिक के रूप में, {name} नाम से जुड़ें?",
       manager: "{kennel} में मैनेजर के रूप में, {name} नाम से जुड़ें?",
       staff: "{kennel} में स्टाफ़ के रूप में, {name} नाम से जुड़ें?",
+      rider: "{kennel} में राइडर के रूप में, {name} नाम से जुड़ें?",
     },
     signedInAs: "{email} से साइन इन है।",
     you: "आप",

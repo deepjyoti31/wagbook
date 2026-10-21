@@ -67,6 +67,21 @@ alter table public.invitation_links enable row level security;
 alter table public.pet_weights enable row level security;
 alter table public.client_addresses enable row level security;
 alter table public.service_areas enable row level security;
+alter table public.suppliers enable row level security;
+alter table public.stock_items enable row level security;
+alter table public.stock_moves enable row level security;
+alter table public.stock_costs enable row level security;
+alter table public.recipes enable row level security;
+alter table public.recipe_versions enable row level security;
+alter table public.recipe_ingredients enable row level security;
+alter table public.food_products enable row level security;
+alter table public.pet_food enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.deliveries enable row level security;
+alter table public.batches enable row level security;
+alter table public.delivery_runs enable row level security;
+alter table public.delivery_problems enable row level security;
+alter table public.food_orders enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -136,7 +151,8 @@ declare
 begin
   foreach t in array array[
     'clients', 'pets', 'vaccinations', 'bookings', 'booking_items',
-    'care_tasks', 'play_sessions', 'stay_updates', 'incidents'
+    'care_tasks', 'play_sessions', 'stay_updates', 'incidents',
+    'pet_food', 'subscriptions', 'deliveries', 'delivery_runs', 'delivery_problems'
   ] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
@@ -188,7 +204,8 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas'] loop
+  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
+                          'suppliers', 'stock_items', 'recipes', 'food_products'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -256,6 +273,52 @@ create policy client_addresses_update on public.client_addresses for update to a
 create policy client_addresses_delete on public.client_addresses for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
+-- Stock (M26): any member reads what is in stock and records what was thrown
+-- away or counted; only owners and managers record a purchase. Batches write
+-- what cooking used (M30). Nobody changes or deletes a movement: there are no
+-- grants for it, and a stock take corrects the count.
+grant select, insert on public.stock_moves to authenticated;
+create policy stock_moves_select on public.stock_moves for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy stock_moves_insert on public.stock_moves for insert to authenticated
+  with check (
+    org_id in (select public.my_org_ids())
+    and (kind <> 'purchase' or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  );
+grant select on public.stock_levels to authenticated;
+
+-- What things cost is for owners and managers only; it is never changed.
+grant select, insert on public.stock_costs to authenticated;
+create policy stock_costs_select on public.stock_costs for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy stock_costs_insert on public.stock_costs for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+
+-- Recipe versions (M27) never change: any member reads them (the cook works
+-- from them); owners and managers write a new one (save_recipe_version), and
+-- nobody changes or deletes one.
+grant select, insert on public.recipe_versions, public.recipe_ingredients to authenticated;
+create policy recipe_versions_select on public.recipe_versions for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy recipe_versions_insert on public.recipe_versions for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy recipe_ingredients_select on public.recipe_ingredients for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy recipe_ingredients_insert on public.recipe_ingredients for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+grant select on public.recipe_current to authenticated;
+
+-- Batches (M30): any member records cooking (record_batch) and reads; nobody
+-- changes one (its stock went out with it); owners delete one that took
+-- nothing out.
+grant select, insert, delete on public.batches to authenticated;
+create policy batches_select on public.batches for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy batches_insert on public.batches for insert to authenticated
+  with check (org_id in (select public.my_org_ids()));
+create policy batches_delete on public.batches for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
 -- Reminders sent: any member reads and records one; nobody changes one; owners delete.
 grant select, insert, delete on public.reminders_sent to authenticated;
 create policy reminders_sent_select on public.reminders_sent for select to authenticated
@@ -275,10 +338,10 @@ create policy reminders_sent_delete on public.reminders_sent for delete to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, group_id, series_id, series_month, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -369,6 +432,21 @@ create policy intake_submissions_delete on public.intake_submissions for delete 
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
+-- food_orders (M32): written only by submit_food_order() and
+-- submit_food_request(). Members read them and decline one; confirming goes
+-- through confirm_food_order(). What the parent sent is never edited.
+-- ---------------------------------------------------------------------------
+grant select, delete on public.food_orders to authenticated;
+grant update (status) on public.food_orders to authenticated;
+create policy food_orders_select on public.food_orders for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy food_orders_update on public.food_orders for update to authenticated
+  using (org_id in (select public.my_org_ids()) and status not in ('confirmed', 'declined'))
+  with check (org_id in (select public.my_org_ids()) and status in ('declined', 'waiting_area', 'unpaid', 'paid', 'requested'));
+create policy food_orders_delete on public.food_orders for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- ---------------------------------------------------------------------------
 -- audit_log: owners and managers read. Nobody writes; the trigger does.
 -- ---------------------------------------------------------------------------
 grant select on public.audit_log to authenticated;
@@ -436,6 +514,22 @@ grant execute on function public.renew_request_link(uuid) to authenticated;
 grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.stay_charges(uuid, uuid[]) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
+grant execute on function public.my_rider_org_ids() to authenticated;
+grant execute on function public.save_recipe_version(uuid, jsonb, jsonb) to authenticated;
+grant execute on function public.recipe_cost_per_kg(uuid, uuid, date) to authenticated;
+grant execute on function public.delivery_cutoff(uuid, date, public.delivery_slot) to authenticated;
+grant execute on function public.rotation_recipe(uuid, integer) to authenticated;
+grant execute on function public.plan_subscription(uuid, date) to authenticated;
+grant execute on function public.food_bill_lines(uuid, uuid, date, date, uuid) to authenticated;
+grant execute on function public.record_batch(uuid, uuid, integer, integer, date, uuid, date, text) to authenticated;
+grant execute on function public.batch_cost(uuid, uuid) to authenticated;
+grant execute on function public.batch_recipients(uuid, uuid) to authenticated;
+grant execute on function public.my_runs(date) to authenticated;
+grant execute on function public.rider_mark_stop(uuid, public.delivery_status, text) to authenticated;
+grant execute on function public.first_delivery_day(uuid, smallint[]) to authenticated;
+grant execute on function public.org_today(uuid) to authenticated;
+grant execute on function public.confirm_food_order(uuid) to authenticated;
+grant execute on function public.record_purchase(uuid, uuid, bigint, bigint, date, uuid, date, text, text, text) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;
 
@@ -447,3 +541,9 @@ grant execute on function public.get_public_stay(text) to anon, authenticated;
 grant execute on function public.get_public_invoice(text) to anon, authenticated;
 grant execute on function public.get_public_booking_form(text) to anon, authenticated;
 grant execute on function public.submit_booking_request(text, jsonb) to anon, authenticated;
+-- Food (M32): the order page, saying an order was paid, and a known parent's
+-- changes to their food from their own link.
+grant execute on function public.get_public_food_form(text) to anon, authenticated;
+grant execute on function public.submit_food_order(text, jsonb) to anon, authenticated;
+grant execute on function public.food_order_paid(text) to anon, authenticated;
+grant execute on function public.submit_food_request(text, jsonb) to anon, authenticated;

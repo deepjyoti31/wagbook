@@ -1,18 +1,38 @@
 import { BILLABLE_IN_FAMILY, bookingLines, creditContext, differenceCredit, familyLines, moneyLines, seriesLines, staysChanged, type CreditableBill } from "./billing";
 import { computeInvoice, toStayCharges, type InvoiceTotals, type LineInput } from "./core";
+import { foodLines } from "./food-bill";
 import type { createClient } from "./supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /**
- * What a bill covers: one stay, a family booked together, or one month of a
- * repeating day boarding series (D41). Must match invoice_bookings() in the
- * database.
+ * What a bill covers: one stay, a family booked together, one month of a
+ * repeating day boarding series (D41), a week or month of a food
+ * subscription, or one food order (M29). Must match invoice_bookings() and
+ * food_bill_lines() in the database.
  */
-export type BillScope = { booking: string } | { group: string } | { series: string; month: string };
+export type BillScope =
+  | { booking: string }
+  | { group: string }
+  | { series: string; month: string }
+  | { subscription: string; from: string; to: string }
+  | { delivery: string };
+
+interface ScopeColumns {
+  booking_id: string | null;
+  group_id: string | null;
+  series_id: string | null;
+  series_month: string | null;
+  subscription_id?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  delivery_id?: string | null;
+}
 
 /** The scope of a bill, from its row. Null for a one-off bill that covers no stay. */
-export function scopeOf(inv: { booking_id: string | null; group_id: string | null; series_id: string | null; series_month: string | null }): BillScope | null {
+export function scopeOf(inv: ScopeColumns): BillScope | null {
+  if (inv.subscription_id && inv.period_start && inv.period_end) return { subscription: inv.subscription_id, from: inv.period_start, to: inv.period_end };
+  if (inv.delivery_id) return { delivery: inv.delivery_id };
   if (inv.group_id) return { group: inv.group_id };
   if (inv.series_id && inv.series_month) return { series: inv.series_id, month: inv.series_month };
   if (inv.booking_id) return { booking: inv.booking_id };
@@ -33,6 +53,7 @@ const STAY = "id, client_id, kind, start_date, end_date, boarding_from, pass_id,
  * left out, so a cancelled stay comes to nothing.
  */
 export async function stayBillLines(supabase: Supabase, orgId: string, scope: BillScope) {
+  if ("subscription" in scope || "delivery" in scope) return foodBillLines(supabase, orgId, scope);
   let query = supabase.from("bookings").select(STAY).eq("org_id", orgId).in("status", [...BILLABLE_IN_FAMILY]);
   if ("group" in scope) query = query.eq("group_id", scope.group);
   else if ("series" in scope) query = query.eq("series_id", scope.series).gte("start_date", scope.month).lt("start_date", nextMonth(scope.month));
@@ -66,6 +87,32 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
   return { stays: stays.data, lines };
 }
 
+const DELIVERY = "kind, status, delivery_date, grams, quantity, unit_price_minor, delivery_charge_minor, tax_rate_bp, sac_code, pets(name), food_products(name), subscriptions(pay_period)" as const;
+
+/**
+ * The deliveries a food bill covers and the lines they come to today: what
+ * Make bill writes on a draft for a subscription's week or month or for an
+ * order, and what a bill whose deliveries changed is compared with. A
+ * cancelled delivery comes to nothing.
+ */
+export async function foodBillLines(supabase: Supabase, orgId: string, scope: { subscription: string; from: string; to: string } | { delivery: string }) {
+  let query = supabase.from("deliveries").select(DELIVERY).eq("org_id", orgId);
+  query = "subscription" in scope ? query.eq("subscription_id", scope.subscription).gte("delivery_date", scope.from).lte("delivery_date", scope.to) : query.eq("id", scope.delivery);
+  const [deliveries, org] = await Promise.all([
+    query.order("delivery_date").order("created_at"),
+    supabase.from("organizations").select("monthly_food_discount_bp").eq("id", orgId).single(),
+  ]);
+  if (deliveries.error || org.error) return { error: deliveries.error ?? org.error };
+  const monthly = deliveries.data.some((d) => d.subscriptions?.pay_period === "month");
+  const pet = deliveries.data[0]?.pets?.name ?? "Pet";
+  const lines = foodLines(
+    pet,
+    deliveries.data.map((d) => ({ ...d, product_name: d.food_products?.name ?? null })),
+    monthly ? org.data.monthly_food_discount_bp : 0,
+  );
+  return { stays: [] as { id: string }[], lines };
+}
+
 /** The first day of the month after `month` (itself a first day). */
 export function nextMonth(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -73,12 +120,8 @@ export function nextMonth(month: string): string {
 }
 
 /** An issued bill, as far as crediting it for a change to its stays needs it. */
-export interface ChangedBill {
+export interface ChangedBill extends ScopeColumns {
   id: string;
-  booking_id: string | null;
-  group_id: string | null;
-  series_id: string | null;
-  series_month: string | null;
   is_tax_invoice: boolean;
   prices_include_tax: boolean;
   place_of_supply_state_code: string | null;

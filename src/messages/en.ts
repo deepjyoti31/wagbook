@@ -12,6 +12,7 @@ import { moneyArea } from "./en/money";
 import { petsArea } from "./en/pets";
 import { kennelArea } from "./en/kennel";
 import { beyondArea } from "./en/beyond";
+import { kitchenArea } from "./en/kitchen";
 
 export const en = {
   ...core,
@@ -21,6 +22,7 @@ export const en = {
   ...petsArea,
   ...kennelArea,
   ...beyondArea,
+  ...kitchenArea,
 };
 
 export type Messages = typeof en;

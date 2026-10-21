@@ -46,7 +46,9 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
 
   // Mirrors the database rule: managers manage staff and managers, only owners manage owners.
   const canChange = (target: (typeof members.data)[number]) => target.user_id !== user.id && (role === "owner" || (role === "manager" && target.role !== "owner"));
-  const roles = role === "owner" ? (["staff", "manager", "owner"] as const) : (["staff", "manager"] as const);
+  // Riders (D45) only while the kennel delivers food.
+  const base = role === "owner" ? (["staff", "manager", "owner"] as const) : (["staff", "manager"] as const);
+  const roles: readonly ("staff" | "manager" | "owner" | "rider")[] = org.offers_food_delivery ? [...base, "rider"] : base;
   // Skills for what the kennel offers (M25). Owners and managers set them, their own included; only owners set an owner's.
   const offered = skillsOffered(org);
   const canSetSkills = (target: (typeof members.data)[number]) => offered.length > 0 && (role === "owner" || (role === "manager" && target.role !== "owner"));

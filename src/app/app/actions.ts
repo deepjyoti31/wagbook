@@ -115,7 +115,7 @@ export async function switchOrganisation(form: FormData): Promise<void> {
   redirect("/app");
 }
 
-const ReminderKind = z.enum(["vaccination", "arrival", "pickup", "unpaid"]);
+const ReminderKind = z.enum(["vaccination", "arrival", "pickup", "unpaid", "trial"]);
 
 /**
  * A reminder on Today was sent: the person tapped Send, which opened WhatsApp

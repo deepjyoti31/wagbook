@@ -266,7 +266,7 @@ export const petsArea: typeof English = {
     rolesAbout:
       "ಸಿಬ್ಬಂದಿ ದಿನದ ಕೆಲಸ ನೋಡುತ್ತಾರೆ: ಬುಕಿಂಗ್, ಚೆಕ್ ಇನ್, ಆರೈಕೆ ಮತ್ತು ಪಾವತಿ. ಮ್ಯಾನೇಜರ್‌ಗಳು ಕೆನೆಲ್‌ಗಳು, ದರಗಳು ಮತ್ತು ಸೆಟ್ಟಿಂಗ್ಸ್ ಕೂಡ ಬದಲಿಸಬಹುದು. ಮಾಲೀಕರು ಬೇರೆ ಮಾಲೀಕರನ್ನು ನೋಡಿಕೊಳ್ಳುವುದೂ ಸೇರಿ ಎಲ್ಲವನ್ನೂ ಮಾಡಬಹುದು.",
     // A role in the middle of a line, after a name.
-    roleInLine: { owner: "ಮಾಲೀಕ", manager: "ಮ್ಯಾನೇಜರ್", staff: "ಸಿಬ್ಬಂದಿ" },
+    roleInLine: { owner: "ಮಾಲೀಕ", manager: "ಮ್ಯಾನೇಜರ್", staff: "ಸಿಬ್ಬಂದಿ", rider: "ರೈಡರ್" },
     byEmail: {
       title: "ಈಗಾಗಲೇ ಅಕೌಂಟ್ ಇರುವವರನ್ನು ಆಹ್ವಾನಿಸಿ",
       intro: "ಅವರು Wagbook ಗೆ ಬಳಸುವ ಇಮೇಲ್ ಬರೆಯಿರಿ. ಮುಂದಿನ ಸಲ ಸೈನ್ ಇನ್ ಮಾಡಿದಾಗ ಅವರಿಗೆ ಆಹ್ವಾನ ಕಾಣುತ್ತದೆ.",
@@ -304,6 +304,7 @@ export const petsArea: typeof English = {
       owner: "{name} ಎಂಬ ಹೆಸರಿನಲ್ಲಿ, ಮಾಲೀಕರಾಗಿ {kennel} ಸೇರಬೇಕೇ?",
       manager: "{name} ಎಂಬ ಹೆಸರಿನಲ್ಲಿ, ಮ್ಯಾನೇಜರ್ ಆಗಿ {kennel} ಸೇರಬೇಕೇ?",
       staff: "{name} ಎಂಬ ಹೆಸರಿನಲ್ಲಿ, ಸಿಬ್ಬಂದಿಯಾಗಿ {kennel} ಸೇರಬೇಕೇ?",
+      rider: "{name} ಎಂಬ ಹೆಸರಿನಲ್ಲಿ, ರೈಡರ್ ಆಗಿ {kennel} ಸೇರಬೇಕೇ?",
     },
     signedInAs: "{email} ಆಗಿ ಸೈನ್ ಇನ್ ಆಗಿದೆ.",
     // Stands for the email when there is none: "Signed in as you."

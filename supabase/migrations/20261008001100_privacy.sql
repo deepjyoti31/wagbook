@@ -58,6 +58,12 @@ as $$
     union all
     select unnest(u.media_paths) from public.stay_updates u where u.booking_id in (select id from booking_ids)
     union all
+    select d.proof_path from public.deliveries d join c on d.org_id = c.org_id and d.client_id = c.id
+    union all
+    select dp.photo_path from public.delivery_problems dp
+    join public.deliveries d on d.org_id = dp.org_id and d.id = dp.delivery_id
+    join c on d.org_id = c.org_id and d.client_id = c.id
+    union all
     select o.name
     from public.intake_submissions s
     join c on s.org_id = c.org_id and (s.client_id = c.id or s.parent_phone = c.phone)
@@ -71,7 +77,7 @@ as $$
   ) x;
 $$;
 comment on function public.client_file_paths(uuid) is
-  'Paths in the pet-media bucket that hold this parent''s pets'' photos and certificates, photos from their stays, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.';
+  'Paths in the pet-media bucket that hold this parent''s pets'' photos and certificates, photos from their stays and food deliveries, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.';
 
 -- ---------------------------------------------------------------------------
 
@@ -111,6 +117,7 @@ begin
                                     from public.vaccinations v where v.pet_id = p.id), '[]'::jsonb),
           'weights', coalesce((select jsonb_agg(to_jsonb(w) - 'org_id' order by w.weighed_on, w.created_at)
                                from public.pet_weights w where w.pet_id = p.id), '[]'::jsonb),
+          'food', (select to_jsonb(f) - 'org_id' from public.pet_food f where f.org_id = p.org_id and f.pet_id = p.id),
           'own_routine', coalesce((select jsonb_agg(to_jsonb(ci) - 'org_id' order by ci.due_time)
                                    from public.care_items ci where ci.pet_id = p.id), '[]'::jsonb),
           'incidents', coalesce((select jsonb_agg(to_jsonb(i) - 'org_id' order by i.occurred_at)
@@ -147,6 +154,23 @@ begin
         order by i.created_at)
       from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id
     ), '[]'::jsonb),
+    'subscriptions', coalesce((
+      select jsonb_agg(to_jsonb(sb) - 'org_id' order by sb.starts_on, sb.created_at)
+      from public.subscriptions sb where sb.org_id = v_client.org_id and sb.client_id = v_client.id
+    ), '[]'::jsonb),
+    'deliveries', coalesce((
+      select jsonb_agg(
+        to_jsonb(d) - 'org_id'
+        || jsonb_build_object('problems', coalesce((select jsonb_agg(to_jsonb(dp) - 'org_id' order by dp.reported_at)
+                                                    from public.delivery_problems dp where dp.org_id = d.org_id and dp.delivery_id = d.id), '[]'::jsonb))
+        order by d.delivery_date, d.created_at)
+      from public.deliveries d where d.org_id = v_client.org_id and d.client_id = v_client.id
+    ), '[]'::jsonb),
+    'food_orders', coalesce((
+      select jsonb_agg(to_jsonb(fo) - 'org_id' - 'public_token' order by fo.created_at)
+      from public.food_orders fo
+      where fo.org_id = v_client.org_id and (fo.client_id = v_client.id or fo.phone = v_client.phone)
+    ), '[]'::jsonb),
     'packs', coalesce((
       select jsonb_agg(to_jsonb(pb) - 'org_id' order by pb.starts_on)
       from public.pass_balances pb where pb.org_id = v_client.org_id and pb.client_id = v_client.id
@@ -165,7 +189,7 @@ begin
 end;
 $$;
 comment on function public.export_client(uuid) is
-  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
+  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
 
 -- ---------------------------------------------------------------------------
 
@@ -206,6 +230,15 @@ begin
     raise exception 'WB072: this parent has stays still to come. Cancel them first.' using errcode = '23514';
   end if;
 
+  if exists (select 1 from public.subscriptions sb
+             where sb.org_id = v_client.org_id and sb.client_id = v_client.id
+               and (sb.cancelled_on is null or sb.cancelled_on > public.org_today(sb.org_id)))
+     or exists (select 1 from public.deliveries d
+                where d.org_id = v_client.org_id and d.client_id = v_client.id
+                  and d.status in ('planned', 'packed', 'out') and d.delivery_date >= public.org_today(d.org_id)) then
+    raise exception 'WB075: this parent has food deliveries still to come. Cancel them first.' using errcode = '23514';
+  end if;
+
   select coalesce(array_agg(p.id), '{}') into v_pets
   from public.pets p where p.org_id = v_client.org_id and p.client_id = v_client.id;
   select coalesce(array_agg(b.id), '{}') into v_bookings
@@ -223,6 +256,14 @@ begin
     select unnest(u.media_paths)
     from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings)
     union all
+    select d.proof_path
+    from public.deliveries d where d.org_id = v_client.org_id and d.client_id = v_client.id
+    union all
+    select dp.photo_path
+    from public.delivery_problems dp
+    join public.deliveries d on d.org_id = dp.org_id and d.id = dp.delivery_id
+    where d.org_id = v_client.org_id and d.client_id = v_client.id
+    union all
     select o.name
     from public.intake_submissions s
     join storage.objects o on o.bucket_id = 'pet-media' and o.name like s.org_id || '/intake/' || s.id || '/%'
@@ -235,8 +276,18 @@ begin
     select regexp_replace(path, '\.jpg$', '.small.jpg') from paths where path ~ '\.jpg$'
   ) x;
 
-  -- Where they live and work.
+  -- Where they live and work, and the photos taken at their door.
   delete from public.client_addresses a where a.org_id = v_client.org_id and a.client_id = v_client.id;
+  update public.deliveries d set proof_path = null, note = null
+  where d.org_id = v_client.org_id and d.client_id = v_client.id;
+  update public.delivery_problems dp set photo_path = null, note = null
+  where dp.org_id = v_client.org_id
+    and dp.delivery_id in (select d.id from public.deliveries d where d.org_id = v_client.org_id and d.client_id = v_client.id);
+  update public.subscriptions sb set notes = null, cancel_reason = 'Erased'
+  where sb.org_id = v_client.org_id and sb.client_id = v_client.id and sb.cancelled_on is not null;
+  -- Food orders sent from the website carry their name, phone and address.
+  delete from public.food_orders fo
+  where fo.org_id = v_client.org_id and (fo.client_id = v_client.id or fo.phone = v_client.phone);
   -- What was said to the parent, and the forms they sent.
   delete from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings);
   delete from public.intake_submissions s
@@ -283,7 +334,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071), a stay is still to come (WB072) or food is still to be delivered (WB075). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

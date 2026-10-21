@@ -25,6 +25,10 @@ create table public.invoices (
   group_id uuid,
   series_id uuid,
   series_month date,
+  subscription_id uuid,
+  period_start date,
+  period_end date,
+  delivery_id uuid,
   status public.invoice_status not null default 'draft',
   number text,
   fiscal_year text,
@@ -60,8 +64,15 @@ create table public.invoices (
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete set null (booking_id),
   -- A bill is for one stay, for a family booked together, for a month of a
-  -- repeating series, or for none of them (a one-off bill). Never two.
-  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id) <= 1),
+  -- repeating series, for a week or month of a food subscription, for one
+  -- food order, or for none of them (a one-off bill). Never two.
+  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id) <= 1),
+  -- A subscription is billed for a period: a week or a month, ahead.
+  constraint invoices_subscription_period check (
+    (subscription_id is null) = (period_start is null)
+    and (period_start is null) = (period_end is null)
+    and (period_end is null or (period_end >= period_start and period_end - period_start <= 31))
+  ),
   -- A series is billed a calendar month at a time, named by its first day.
   constraint invoices_series_month check (
     (series_id is null) = (series_month is null)
@@ -89,6 +100,11 @@ comment on column public.invoices.group_id is
 comment on column public.invoices.series_id is
   'The repeating day boarding series this bill is for (bookings.series_id): its days in series_month, each with its extras, on one bill. A day of a series is never billed on its own.';
 comment on column public.invoices.series_month is 'With series_id: the first day of the calendar month whose days this bill covers.';
+comment on column public.invoices.subscription_id is
+  'The food subscription this bill is for (M29): its deliveries from period_start to period_end, billed ahead. A subscription''s delivery is never billed on its own.';
+comment on column public.invoices.period_start is 'With subscription_id: the first day whose deliveries this bill covers.';
+comment on column public.invoices.period_end is 'With subscription_id: the last day whose deliveries this bill covers (a week or a month after period_start).';
+comment on column public.invoices.delivery_id is 'The one-off food order this bill is for: a trial, food by the kilo or a made-to-order item (M29).';
 comment on column public.invoices.number is 'Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused.';
 comment on column public.invoices.fiscal_year is 'Financial year the number belongs to, e.g. 2027-28.';
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
@@ -654,7 +670,26 @@ begin
   -- booked rate, discount and tax, plus each extra at its own price, nothing
   -- more and nothing less. A bill that was edited is issued by an owner or
   -- manager. The same rule as bookings_guard_price() (docs/09-decisions.md, D15).
-  if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+  if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+     and (v_inv.subscription_id is not null or v_inv.delivery_id is not null) then
+    -- Food: exactly what the deliveries come to (food_bill_lines, M29).
+    if not exists (select 1 from public.food_bill_lines(v_inv.org_id, v_inv.subscription_id, v_inv.period_start, v_inv.period_end, v_inv.delivery_id))
+       or exists (
+         (select f.quantity, f.unit_price_minor, f.discount_minor, f.tax_rate_bp
+          from public.food_bill_lines(v_inv.org_id, v_inv.subscription_id, v_inv.period_start, v_inv.period_end, v_inv.delivery_id) f)
+         except all
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+       )
+       or exists (
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+         except all
+         (select f.quantity, f.unit_price_minor, f.discount_minor, f.tax_rate_bp
+          from public.food_bill_lines(v_inv.org_id, v_inv.subscription_id, v_inv.period_start, v_inv.period_end, v_inv.delivery_id) f)
+       )
+    then
+      raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
+    end if;
+  elsif v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
     if (v_inv.booking_id is null and v_inv.group_id is null and v_inv.series_id is null)
        or not exists (
          select 1 from public.bookings b
@@ -757,7 +792,7 @@ begin
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, or its month of a series) says. Takes in advances paid for those stays.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, its month of a series, or its food deliveries) says. Takes in advances paid for those stays.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -1346,6 +1381,7 @@ create table public.expenses (
   recorded_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  unique (org_id, id),
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete set null (booking_id)
 );
 
@@ -1433,7 +1469,7 @@ begin
   -- While merging, a family's bookings and bills are briefly split between the
   -- two parents; the checks that keep a family with one parent wait until the end.
   perform set_config('wagbook.merging', 'on', true);
-  -- Pets, and with them their bookings (on update cascade).
+  -- Pets, and with them their bookings, subscriptions and deliveries (on update cascade).
   update public.pets p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   -- Anything else that names the parent.
   update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
@@ -1446,6 +1482,7 @@ begin
   update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
   update public.client_addresses a set client_id = v_keep.id where a.org_id = v_keep.org_id and a.client_id = v_merge.id;
+  update public.food_orders f set client_id = v_keep.id where f.org_id = v_keep.org_id and f.client_id = v_merge.id;
 
   -- Fill in what the kept parent is missing, and keep both sets of notes.
   update public.clients c set
@@ -1469,4 +1506,4 @@ begin
 end;
 $$;
 comment on function public.merge_clients(uuid, uuid) is
-  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings), bills, payments, forms and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';
+  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';
