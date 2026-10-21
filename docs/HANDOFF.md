@@ -38,8 +38,8 @@ keeping records and erasure is written up for the accountant and the lawyer (`06
 kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
 owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (271 database tests, 176 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 48 tests). What has still never
+kennel. The database rules are tested in-process (272 database tests, 176 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 49 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
@@ -383,7 +383,7 @@ Chosen in M25 as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 447 tests, build
+npm run check        # dash check, lint, typecheck, 448 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -394,6 +394,7 @@ All of it should pass on a clean clone with no environment variables set. With D
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
 - 21 October 2026. M25: what the kennel offers, parents' addresses and areas served, skills, weights in grams (D44).
+  e2e walk extended to 49 tests, all passing against the local Supabase (images pulled through `mirror.gcr.io`).
   The owner's answers on boarders' food, riders, monthly payment, credit reminders and grooming prices recorded in
   the roadmap.
 - 21 October 2026. Roadmap extended to M44 for appointments, the kitchen and food subscriptions (D44); the example
