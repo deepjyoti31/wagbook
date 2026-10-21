@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 29. Views: 2. Functions: 76.
+Migrations applied: 11. Tables: 30. Views: 2. Functions: 83.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [reminders_sent](#reminders_sent), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
 - Views: [invoice_balances](#invoice_balances), [pass_balances](#pass_balances)
 - [Functions](#functions)
 
@@ -161,6 +161,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill. |
 | `series_id` | `uuid` |  |  | Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own. |
 | `pass_id` | `uuid` |  |  | The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero. |
+| `waitlisted_at` | `timestamp with time zone` |  |  | For a request on the waiting list: when it joined, which is its place in line (the earliest first). Stamped by the database with the real time, never moved, and cleared when the request is confirmed or cancelled. Empty: not waiting. |
 | `public_token` | `text` | yes | `new_token()` | Secret in the parent's stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else. |
 | `created_by` | `uuid` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -197,6 +198,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - Check `bookings_series_is_day_boarding`: `CHECK (((series_id IS NULL) OR (kind = 'daycare'::booking_kind)))`
 - Check `bookings_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'intake'::text, 'parent'::text])))`
 - Check `bookings_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
+- Check `bookings_waitlist_is_a_request`: `CHECK (((waitlisted_at IS NULL) OR (status = 'requested'::booking_status)))`
 
 **Indexes**
 
@@ -206,6 +208,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `CREATE INDEX bookings_org_pet_idx ON public.bookings USING btree (org_id, pet_id)`
 - `CREATE INDEX bookings_org_series_idx ON public.bookings USING btree (org_id, series_id) WHERE (series_id IS NOT NULL)`
 - `CREATE INDEX bookings_org_status_idx ON public.bookings USING btree (org_id, status)`
+- `CREATE INDEX bookings_org_waitlist_idx ON public.bookings USING btree (org_id, waitlisted_at) WHERE (waitlisted_at IS NOT NULL)`
 
 **Triggers**
 
@@ -216,6 +219,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
 - `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
+- `bookings_keep_billed_month` (before update of start_date) runs `bookings_keep_billed_month()`
 - `bookings_set_updated_at` (before update) runs `set_updated_at()`
 - `bookings_stamp_status` (before insert or update) runs `bookings_stamp_status()`
 - `bookings_stamp_vaccinations_checked` (before insert or update) runs `stamp_when_set()`
@@ -852,6 +856,8 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 | `client_id` | `uuid` | yes |  |  |
 | `booking_id` | `uuid` |  |  | The stay this bill is for, when it is for one pet's stay that was booked on its own. |
 | `group_id` | `uuid` |  |  | The family booking this bill is for: every pet booked together (bookings.group_id) is billed on it, each with its stay and extras. A pet of a family is never billed on its own. |
+| `series_id` | `uuid` |  |  | The repeating day boarding series this bill is for (bookings.series_id): its days in series_month, each with its extras, on one bill. A day of a series is never billed on its own. |
+| `series_month` | `date` |  |  | With series_id: the first day of the calendar month whose days this bill covers. |
 | `status` | `invoice_status` | yes | `'draft'::invoice_status` |  |
 | `number` | `text` |  |  | Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused. |
 | `fiscal_year` | `text` |  |  | Financial year the number belongs to, e.g. 2027-28. |
@@ -905,9 +911,10 @@ CASE
     WHEN (status = 'draft'::invoice_status) THEN ((number IS NULL) AND (seq IS NULL) AND (fiscal_year IS NULL) AND (issued_on IS NULL) AND (issued_by IS NULL))
     ELSE ((number IS NOT NULL) AND (seq IS NOT NULL) AND (fiscal_year IS NOT NULL) AND (issued_on IS NOT NULL))
 END)`
-- Check `invoices_one_stay_or_one_family`: `CHECK (((booking_id IS NULL) OR (group_id IS NULL)))`
+- Check `invoices_one_stay_or_one_family`: `CHECK ((num_nonnulls(booking_id, group_id, series_id) <= 1))`
 - Check `invoices_place_of_supply_state_code_check`: `CHECK (((place_of_supply_state_code IS NULL) OR (place_of_supply_state_code ~ '^[0-9]{2}$'::text)))`
 - Check `invoices_round_off_minor_check`: `CHECK (((round_off_minor >= '-99'::integer) AND (round_off_minor <= 99)))`
+- Check `invoices_series_month`: `CHECK ((((series_id IS NULL) = (series_month IS NULL)) AND ((series_month IS NULL) OR (EXTRACT(day FROM series_month) = (1)::numeric))))`
 - Check `invoices_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
 - Check `invoices_subtotal_minor_check`: `CHECK ((subtotal_minor >= 0))`
 - Check `invoices_tax_minor_check`: `CHECK ((tax_minor >= 0))`
@@ -919,6 +926,7 @@ END)`
 
 - `CREATE UNIQUE INDEX invoices_one_live_per_booking ON public.invoices USING btree (org_id, booking_id) WHERE ((booking_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE UNIQUE INDEX invoices_one_live_per_family ON public.invoices USING btree (org_id, group_id) WHERE ((group_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
+- `CREATE UNIQUE INDEX invoices_one_live_per_series_month ON public.invoices USING btree (org_id, series_id, series_month) WHERE ((series_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE INDEX invoices_org_booking_idx ON public.invoices USING btree (org_id, booking_id)`
 - `CREATE INDEX invoices_org_client_idx ON public.invoices USING btree (org_id, client_id)`
 - `CREATE INDEX invoices_org_issued_idx ON public.invoices USING btree (org_id, issued_on DESC)`
@@ -926,7 +934,7 @@ END)`
 **Triggers**
 
 - `invoices_audit` (after insert or delete or update) runs `audit_row()`
-- `invoices_check_stay` (before insert or update of booking_id, group_id, client_id) runs `invoices_check_stay()`
+- `invoices_check_stay` (before insert or update of booking_id, group_id, series_id, client_id) runs `invoices_check_stay()`
 - `invoices_forbid_org_change` (before update) runs `forbid_org_change()`
 - `invoices_guard` (before delete or update) runs `invoices_guard()`
 - `invoices_guard_insert` (before insert) runs `invoices_guard_insert()`
@@ -1204,6 +1212,7 @@ Money received from a parent, or refunded to one. Wagbook records payments; it d
 **Triggers**
 
 - `payments_audit` (after insert or delete or update) runs `audit_row()`
+- `payments_check_refund` (before insert or update of direction, amount_minor, invoice_id, booking_id) runs `payments_check_refund()`
 - `payments_forbid_org_change` (before update) runs `forbid_org_change()`
 - `payments_set_updated_at` (before update) runs `set_updated_at()`
 - `payments_stamp_actor` (before insert or update) runs `stamp_actor()`
@@ -1406,6 +1415,37 @@ A fenced area where one pet at a time plays or exercises.
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### recovery_codes
+
+Two-step sign-in recovery codes, one row a code, kept only as a hash. Sealed: no policy, no grant; only make_recovery_codes(), use_recovery_code() and recovery_codes_left() reach it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `user_id` | `uuid` | yes |  |  |
+| `factor_id` | `uuid` | yes |  | The authenticator (auth.mfa_factors) the code was made for. Once that is gone or replaced, the code no longer counts. |
+| `code_hash` | `text` | yes |  | SHA-256 of the code, in hex. The code itself is shown once and never stored. |
+| `used_at` | `timestamp with time zone` |  |  |  |
+| `used_in_session` | `text` |  |  | The session (the session_id in its token) that used the code. That session counts as having given its code. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `recovery_codes_pkey`: `PRIMARY KEY (id)`
+- Unique `recovery_codes_user_id_code_hash_key`: `UNIQUE (user_id, code_hash)`
+- Foreign key `recovery_codes_user_id_fkey`: `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE`
+- Check `recovery_codes_code_hash_check`: `CHECK ((code_hash ~ '^[0-9a-f]{64}$'::text))`
+- Check `recovery_codes_used_together`: `CHECK (((used_at IS NULL) = (used_in_session IS NULL)))`
+
+**Indexes**
+
+- `CREATE INDEX recovery_codes_user_idx ON public.recovery_codes USING btree (user_id)`
+
+**Access**
+
+- Signed-in users may: nothing directly (then narrowed by the policies below). Anonymous visitors: nothing.
+- No policies: no row is reachable except through SECURITY DEFINER functions.
+
 ### reminders_sent
 
 A reminder a person sent a parent from Today, on WhatsApp from their own phone: so it leaves the list. Wagbook sends nothing itself.
@@ -1531,6 +1571,7 @@ A note about how a pet is doing, usually with photos. Doubles as the shift hando
 **Triggers**
 
 - `stay_updates_forbid_org_change` (before update) runs `forbid_org_change()`
+- `stay_updates_guard_media` (before update of media_paths) runs `stay_updates_guard_media()`
 - `stay_updates_set_updated_at` (before update) runs `set_updated_at()`
 - `stay_updates_stamp_actor` (before insert or update) runs `stamp_actor()`
 
@@ -1608,6 +1649,8 @@ Each invoice with what has been paid against it, what credit notes took off it, 
 | `paid_minor` | `bigint` |  |  |  |
 | `credited_minor` | `bigint` |  |  |  |
 | `due_minor` | `bigint` |  |  |  |
+| `series_id` | `uuid` |  |  |  |
+| `series_month` | `date` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -1754,6 +1797,18 @@ bookings_guard_price() returns trigger
 
 Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel, with the usual price for nights alone), with no discount, and cannot change the price, discount, tax or kind of an existing booking, or when it turns from day boarding into boarding.
 
+### bookings_keep_billed_month
+
+```
+bookings_keep_billed_month() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a day of a repeating series whose month has an issued bill cannot move into another month (WB057), where it would be billed a second time.
+
 ### bookings_stamp_status
 
 ```
@@ -1764,7 +1819,7 @@ bookings_stamp_status() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
+Trigger: records who and when as a booking is created, checked in, checked out or cancelled, and when a request joined the waiting list (its place in line, which never moves). Client-supplied values for these columns are ignored.
 
 ### check_bill_line
 
@@ -2057,26 +2112,26 @@ Invites an existing account to an organisation, or corrects an invitation that h
 ### invoice_bookings
 
 ```
-invoice_bookings(p_org uuid, p_booking uuid, p_group uuid) returns SETOF uuid
+invoice_bookings(p_org uuid, p_booking uuid, p_group uuid, p_series uuid, p_month date) returns SETOF uuid
 ```
 
 - Who may call: internal
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The bookings a bill covers: its own booking, or the family's bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.
+The bookings a bill covers, in date order: its own booking; or the family's bookings that are not requests or cancelled; or the days of a series in the month starting p_month that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.
 
 ### invoice_expected_lines
 
 ```
-invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_mode, p_series uuid, p_month date) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 ```
 
 - Who may call: internal
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts).
 
 ### invoice_lines_guard
 
@@ -2100,7 +2155,7 @@ invoices_check_stay() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: a pet booked with others is billed only on the family's bill (WB053), and a family's bill names a family booking of that parent (WB054).
+Trigger: a pet booked with others is billed only on the family's bill (WB053), and a family's bill names a family booking of that parent (WB054). A day of a repeating series is billed only on its month's bill (WB055), which names a series of that parent (WB056).
 
 ### invoices_guard
 
@@ -2148,7 +2203,19 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings) says. Takes in advances paid for those stays.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, or its month of a series) says. Takes in advances paid for those stays.
+
+### make_recovery_codes
+
+```
+make_recovery_codes() returns SETOF text
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Makes ten one-use recovery codes for the signed-in person's authenticator, replacing earlier ones, and returns them (the only time they are seen). Needs a session that gave its code (WB005) and two-step sign-in on (WB006).
 
 ### merge_clients
 
@@ -2258,6 +2325,18 @@ paths_in_org(p_paths text[], p_org uuid) returns boolean
 
 True when every path that is set is inside the given organisation's folder. Empty paths are allowed.
 
+### payments_check_refund
+
+```
+payments_check_refund() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a refund names a bill or a stay (WB120) and gives back no more than was paid over what the bill now comes to after credit notes (WB121), or than the advance paid for a stay with no bill (WB122).
+
 ### play_sessions_fill_client
 
 ```
@@ -2281,6 +2360,18 @@ protect_last_owner() returns trigger
 - Volatility: volatile
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
+
+### recovery_codes_left
+
+```
+recovery_codes_left() returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+How many unused recovery codes the signed-in person has for their current authenticator. SECURITY DEFINER because recovery_codes is sealed.
 
 ### renew_request_link
 
@@ -2388,7 +2479,7 @@ session_meets_mfa() returns boolean
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1). SECURITY DEFINER because only it may read auth.mfa_factors.
+True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1), nor a recovery code for that factor. SECURITY DEFINER because only it may read auth.mfa_factors and recovery_codes.
 
 ### set_my_language
 
@@ -2486,6 +2577,18 @@ stay_range(p_kind booking_kind, p_start date, p_end date) returns daterange
 
 The days a stay holds a kennel: check-in up to but not including check-out for boarding; first to last day inclusive for day boarding.
 
+### stay_updates_guard_media
+
+```
+stay_updates_guard_media() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only an owner takes a photo off an update (WB081). Adding photos is for any member.
+
 ### storage_org_id
 
 ```
@@ -2522,6 +2625,18 @@ submit_intake(p_slug text, p_payload jsonb) returns jsonb
 
 PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed).
 
+### use_recovery_code
+
+```
+use_recovery_code(p_code text) returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Spends one of the signed-in person's recovery codes on this session, which then counts as having given its code (session_meets_mfa). Returns the codes left. A wrong or used code raises WB007.
+
 ### validate_organization
 
 ```
@@ -2545,3 +2660,15 @@ void_invoice(p_invoice uuid, p_reason text) returns invoices
 - Volatility: volatile
 
 Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it. A tax invoice from an earlier month is not voided but credited (WB095), and a bill with a credit note is credited the rest of the way (WB096).
+
+### waiting_list
+
+```
+waiting_list(p_org uuid) returns TABLE(booking_id uuid, waitlisted_at timestamp with time zone, has_space boolean)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The kennel's waiting list, first in line first: each request waiting for a kennel, when it joined, and whether it would fit now (a kennel free on every day, and no other stay for the pet). Stays already over are left out. Must agree with bookings_check_capacity().

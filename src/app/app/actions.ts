@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getMemberships, rememberOrg, requireOrg } from "@/lib/auth";
-import { todayIn } from "@/lib/core";
+import { shortenedEnd, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { getAppI18n } from "@/lib/i18n-server";
 import { checked, text, type FormState } from "@/lib/forms";
@@ -60,7 +60,15 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
   return { ok: t.m.today.done.checked_in };
 }
 
-/** Check a pet out. The kennel becomes free for the next arrival. */
+/**
+ * Check a pet out. The kennel becomes free for the next arrival.
+ *
+ * A pet going home before its booked end is billed as booked, unless the form
+ * says "bill to today" (D40): then the stay ends today, so its bill is for the
+ * days it stayed. A boarding stay keeps at least its first night. A bill
+ * already issued is not changed; its page offers a credit note for the
+ * difference.
+ */
 export async function checkOut(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
   const t = await getAppI18n();
@@ -68,9 +76,18 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
   if (!bookingId.success) return { error: t.m.errors.bookingNotFound };
 
   const supabase = await createClient();
+  const update: TablesUpdate<"bookings"> = { status: "checked_out" };
+  const toToday = form.get("bill") === "today";
+  if (toToday) {
+    const current = await supabase.from("bookings").select("kind, start_date, end_date").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
+    if (current.error) return { error: friendlyError(current.error, t) };
+    if (!current.data) return { error: t.m.errors.bookingNotFound };
+    const end = shortenedEnd(current.data.kind, current.data.start_date, current.data.end_date, todayIn(org.time_zone));
+    if (end !== current.data.end_date) update.end_date = end;
+  }
   const { data, error } = await supabase
     .from("bookings")
-    .update({ status: "checked_out" })
+    .update(update)
     .eq("org_id", org.id)
     .eq("id", bookingId.data)
     .eq("status", "checked_in")
@@ -79,7 +96,7 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
   if (data.length === 0) return { error: t.m.errors.notCheckedIn };
 
   revalidatePath("/app", "layout");
-  if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=checked_out`);
+  if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=${update.end_date ? "checked_out_early" : "checked_out"}`);
   if (form.get("from") === "today") redirect(`/app?done=checked_out&booking=${bookingId.data}`);
   return { ok: t.m.today.checkedOut };
 }

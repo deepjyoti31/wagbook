@@ -13,6 +13,7 @@ import { billMessage, formatDate, formatMoney, formatPhone, todayIn, toDecimalSt
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
+import { creditForChange, nextMonth } from "@/lib/stay-bill";
 import { createClient } from "@/lib/supabase/server";
 import type { Messages } from "@/messages";
 import { creditBill, deleteDraft, editLine, issueBill, makeBill, voidBill } from "../actions";
@@ -40,7 +41,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, currency, booking_id, group_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -49,7 +50,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   if (!res.data) notFound();
   const inv = res.data;
 
-  const [lines, payments, balance, family, credits, origin] = await Promise.all([
+  const [lines, payments, balance, family, credits, origin, seriesDays] = await Promise.all([
     supabase
       .from("invoice_lines")
       .select("description, sac_code, quantity, unit_price_minor, discount_minor, taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor")
@@ -64,9 +65,21 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
       : Promise.resolve({ data: [], error: null }),
     supabase.from("credit_notes").select("id, number, issued_on, reason, total_minor").eq("org_id", org.id).eq("invoice_id", id).order("seq"),
     siteOrigin(),
+    // A month of a repeating series (D41): its days that are billed.
+    inv.series_id && inv.series_month
+      ? supabase
+          .from("bookings")
+          .select("id, start_date, pets(name)")
+          .eq("org_id", org.id)
+          .eq("series_id", inv.series_id)
+          .gte("start_date", inv.series_month)
+          .lt("start_date", nextMonth(inv.series_month))
+          .in("status", [...BILLABLE_IN_FAMILY])
+          .order("start_date")
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (lines.error || payments.error || balance.error || family.error || credits.error) throw new Error("Could not load the bill.");
-  const stays = inv.bookings ? [inv.bookings] : family.data;
+  if (lines.error || payments.error || balance.error || family.error || credits.error || seriesDays.error) throw new Error("Could not load the bill.");
+  const stays = inv.bookings ? [inv.bookings] : inv.group_id ? family.data : seriesDays.data.slice(0, 1);
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale, trimZeros: true });
   const due = balance.data?.due_minor ?? 0;
@@ -83,6 +96,12 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const link = `${origin}/inv/${inv.public_token}`;
   const editable = inv.status === "draft" && canManage;
   const decimal = (minor: number) => toDecimalString(minor).replace(/\.00$/, "");
+  // An issued bill whose stays now come to less (D40): a pet went home early, a stay or a day was cancelled.
+  const change =
+    inv.status === "issued" && credited < inv.total_minor
+      ? await creditForChange(supabase, org.id, inv, fill(m.bill.difference.whatDefault, { number: inv.number ?? "" }), org.round_invoice_totals)
+      : null;
+  const difference = change && !("error" in change) ? change.credit : null;
 
   return (
     <>
@@ -114,14 +133,20 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         ) : null}
         <p className="text-slate">
           {inv.issued_on ? `${fill(m.bill.issuedOn, { date: formatDate(inv.issued_on, locale) })} ` : ""}
-          {stays.map((b, i) => (
-            <span key={b.id}>
-              {i > 0 ? ", " : null}
-              <Link href={`/app/bookings/${b.id}`} className="underline underline-offset-4">
-                {b.pets?.name ? fill(m.bill.petBooking, { pet: b.pets.name }) : m.bill.theBooking}
-              </Link>
-            </span>
-          ))}
+          {inv.series_month && stays[0] ? (
+            <Link href={`/app/bookings/${stays[0].id}`} className="underline underline-offset-4">
+              {fill(m.bill.seriesMonth, { pet: stays[0].pets?.name ?? m.bill.theBooking, month: monthName(inv.series_month, locale) })}
+            </Link>
+          ) : (
+            stays.map((b, i) => (
+              <span key={b.id}>
+                {i > 0 ? ", " : null}
+                <Link href={`/app/bookings/${b.id}`} className="underline underline-offset-4">
+                  {b.pets?.name ? fill(m.bill.petBooking, { pet: b.pets.name }) : m.bill.theBooking}
+                </Link>
+              </span>
+            ))
+          )}
         </p>
         {inv.status === "void" && inv.void_reason ? <p className="text-slate">{fill(m.bill.cancelledBecause, { reason: inv.void_reason })}</p> : null}
       </div>
@@ -248,6 +273,32 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         ) : null}
       </Section>
 
+      {difference ? (
+        <Section title={m.bill.difference.title}>
+          <div className="space-y-3 rounded-xl border-2 border-marigold bg-marigold-soft p-4">
+            <p>
+              {fill(m.bill.difference.text, {
+                now: money(change && !("error" in change) && change.now ? change.now.totalMinor : 0),
+                amount: money(difference.totalMinor),
+              })}
+            </p>
+            {canManage ? (
+              <ActionForm action={creditBill} className="space-y-3">
+                <input type="hidden" name="invoiceId" value={inv.id} />
+                <input type="hidden" name="how" value="difference" />
+                <input type="hidden" name="description" value={fill(m.bill.difference.whatDefault, { number: inv.number ?? "" })} />
+                <Field label={m.bill.credit.why} hint={m.bill.credit.whyHint}>
+                  <Input name="reason" required maxLength={500} defaultValue={change && !("error" in change) && change.now?.totalMinor === 0 ? m.bill.difference.reasonCancelled : m.bill.difference.reasonEarly} />
+                </Field>
+                <SubmitButton pendingLabel={m.bill.credit.making}>{fill(m.bill.difference.make, { amount: money(difference.totalMinor) })}</SubmitButton>
+              </ActionForm>
+            ) : (
+              <p className="font-semibold">{m.bill.difference.askManager}</p>
+            )}
+          </div>
+        </Section>
+      ) : null}
+
       {credits.data.length > 0 ? (
         <Section title={m.invoice.creditNotes} count={credits.data.length}>
           <Ledger>
@@ -295,8 +346,9 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
               </LedgerRow>
             </Ledger>
           )}
+          {inv.status === "issued" && due < 0 ? <p className="mt-3 font-semibold">{fill(canManage ? m.bill.refundOwed : m.bill.refundOwedStaff, { amount: money(-due) })}</p> : null}
           {inv.status === "issued" ? (
-            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : ""} today={today} canRefund={canManage} words={m} />
+            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : due < 0 && canManage ? decimal(-due) : ""} today={today} canRefund={canManage} words={m} />
           ) : null}
         </Section>
       ) : null}
@@ -418,4 +470,9 @@ function LineForm({
       </SubmitButton>
     </ActionForm>
   );
+}
+
+/** "October 2027", in the reader's language. */
+function monthName(month: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}T00:00:00Z`));
 }

@@ -4,6 +4,7 @@ import { historyFields } from "./fields";
 /** Kannada words for bills, payments, the parent's bill, reports, expenses and the history of changes. First draft, to be checked by a native speaker. */
 export const moneyArea: typeof English = {
   bills: {
+    seriesMonth: "{pet}, {month} ತಿಂಗಳ ಡೇ ಬೋರ್ಡಿಂಗ್",
     title: "ಬಿಲ್‌ಗಳು",
     paid: "ಪಾವತಿಯಾಗಿದೆ",
     due: "{amount} ಬಾಕಿ",
@@ -16,6 +17,18 @@ export const moneyArea: typeof English = {
     recent: "ಇತ್ತೀಚಿನವು",
   },
   bill: {
+    refundOwedStaff: "ಬಿಲ್‌ನ ಈಗಿನ ಮೊತ್ತಕ್ಕಿಂತ {amount} ಹೆಚ್ಚು ಪಾವತಿಸಲಾಗಿದೆ. ಮರುಪಾವತಿಯನ್ನು ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ದಾಖಲಿಸುತ್ತಾರೆ.",
+    refundOwed: "ಬಿಲ್‌ನ ಈಗಿನ ಮೊತ್ತಕ್ಕಿಂತ {amount} ಹೆಚ್ಚು ಪಾವತಿಸಲಾಗಿದೆ. ಹಿಂದಿರುಗಿಸಿದಾಗ ಕೆಳಗೆ ಮರುಪಾವತಿ ದಾಖಲಿಸಿ.",
+    difference: {
+      title: "ವಾಸ್ತವ್ಯ ಬದಲಾಗಿದೆ",
+      text: "ಈ ಬಿಲ್‌ನ ವಾಸ್ತವ್ಯಗಳು ಈಗ {now} ಆಗುತ್ತವೆ. ಬಿಲ್ ಅದಕ್ಕಿಂತ {amount} ಹೆಚ್ಚು. ವ್ಯತ್ಯಾಸಕ್ಕೆ ಕ್ರೆಡಿಟ್ ನೀಡಿ, ನಂತರ ಹೆಚ್ಚು ಪಾವತಿಸಿದ್ದನ್ನು ಮರುಪಾವತಿ ಮಾಡಿ.",
+      whatDefault: "ಉಳಿಯದ ದಿನಗಳು, ಬಿಲ್ {number} ಮೇಲೆ",
+      reasonEarly: "ಬೇಗ ಮನೆಗೆ ಹೋಯಿತು",
+      reasonCancelled: "ವಾಸ್ತವ್ಯ ರದ್ದಾಯಿತು",
+      make: "{amount} ಕ್ರೆಡಿಟ್ ನೀಡಿ",
+      askManager: "ವ್ಯತ್ಯಾಸಕ್ಕೆ ಕ್ರೆಡಿಟ್ ನೀಡಲು ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್‌ಗೆ ಹೇಳಿ.",
+    },
+    seriesMonth: "{month} ತಿಂಗಳಲ್ಲಿ {pet} ಡೇ ಬೋರ್ಡಿಂಗ್",
     title: "ಬಿಲ್",
     draftTitle: "ಡ್ರಾಫ್ಟ್ ಬಿಲ್",
     allBills: "ಎಲ್ಲಾ ಬಿಲ್‌ಗಳು",
@@ -92,6 +105,7 @@ export const moneyArea: typeof English = {
       add: "ಸಾಲು ಸೇರಿಸಿ",
     },
     errors: {
+      nothingChanged: "ಈ ಬಿಲ್‌ನ ವಾಸ್ತವ್ಯಗಳು ಬಿಲ್‌ಗಿಂತ ಕಡಿಮೆ ಆಗುವುದಿಲ್ಲ, ಹಾಗಾಗಿ ಕ್ರೆಡಿಟ್ ನೀಡಲು ಏನೂ ಇಲ್ಲ.",
       creditAmount: "ಮೊತ್ತ ಬರೆಯಿರಿ, ಉದಾ. 1200.",
       creditWhy: "ಬಿಲ್‌ಗೆ ಏಕೆ ಕ್ರೆಡಿಟ್ ನೀಡಲಾಗುತ್ತಿದೆ ಎಂದು ಬರೆಯಿರಿ.",
       creditRate: "ಬಿಲ್‌ನಲ್ಲಿರುವ ತೆರಿಗೆ ದರ ಆರಿಸಿ.",
@@ -113,6 +127,7 @@ export const moneyArea: typeof English = {
     updated: "ಬಿಲ್ ಅಪ್‌ಡೇಟ್ ಆಗಿದೆ.",
   },
   payments: {
+    recordRefundTitle: "ಮರುಪಾವತಿ ದಾಖಲಿಸಿ",
     recordPaymentTitle: "ಪಾವತಿ ದಾಖಲಿಸಿ",
     recordAdvanceTitle: "ಮುಂಗಡ ದಾಖಲಿಸಿ",
     amount: "ಮೊತ್ತ",

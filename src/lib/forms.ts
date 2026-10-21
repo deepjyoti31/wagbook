@@ -30,3 +30,8 @@ export interface TwoStepSetup extends FormState {
   /** The same secret as text, for typing in by hand. */
   secret?: string;
 }
+
+/** What the form that makes two-step sign-in recovery codes hands back: the codes, shown once (D43). */
+export interface RecoveryCodesState extends FormState {
+  codes?: string[];
+}

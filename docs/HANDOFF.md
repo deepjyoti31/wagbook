@@ -2,11 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after milestones M16 to M19 (reminders, booking requests, day boarding regulars, GSTR-1 files).
+Last updated: 21 October 2026, after milestones M20 to M24 (refunds, the waiting list, requests on the calendar, a
+series billed by the month, small fixes).
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M19. The latest: Today lists the reminders to send on WhatsApp (M16,
+Every milestone on the roadmap is built, M2 to M24. The latest, asked for by the owner on 21 October 2026: a pet going
+home early is billed to today or as booked, an issued bill whose stays got shorter is credited for the difference, and a
+refund can never give back more than was paid over (M20, D40, `WB120` to `WB122`); a request can wait on a waiting list
+in order, and Today offers it when a kennel frees up (M21, D42); requests and the waiting list show on the calendar
+(M22); a repeating day boarding series is billed once a month (M23, D41); owners take a photo posted by mistake off an
+update (`WB081`), and two-step sign-in has recovery codes kept inside Wagbook (M24, D43). Before that, Today lists the
+reminders to send on WhatsApp (M16,
 D39); a known parent asks for a stay through their own link, as a request that holds no kennel (M17, D36, two more
 public functions, eight in all); day boarding repeats on chosen weekdays, and packs of days are sold with a bill and
 paid from (M18, D37); and a GST kennel downloads the month's GSTR-1 as the offline tool's CSV files (M19, D38). Before
@@ -22,8 +29,8 @@ keeping records and erasure is written up for the accountant and the lawyer (`06
 kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
 owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (239 database tests, 156 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 43 tests). What has still never
+kennel. The database rules are tested in-process (257 database tests, 166 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 48 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
@@ -100,6 +107,12 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Booking requests: the link shows only the parent's own pets and stays; requests at the usual price holding no kennel; other parents' pets, past or long dates, a kind with no price, a flood and a switched-off kennel refused; a new link ends the old; the token cannot be set by hand | `tests/db/requests.test.ts`, `tests/db/security.test.ts` (eight public functions); end-to-end from a private window | High |
 | Packs: paid days at ₹0, never beyond the days bought (a family counts each pet), inside the dates, for the pack's parent; requests hold none until confirmed; staff move a day onto a pack but not off; sold only by owners and managers; packs move when parents merge; a series is day boarding | `tests/db/regulars.test.ts`; `src/lib/core/bookings.test.ts` (series dates, which pack pays); end-to-end: a pack sold and issued, seven repeating days paid from it | High |
 | GSTR-1 sheets: b2b, b2cl over ₹1 lakh to another state, b2cs net of credit notes, cdnr, hsn, docs with cancelled bills | `src/lib/core/gstr1.test.ts` | Medium: column names not checked against the GST offline tool; not walked in a browser (the demo kennel charges no tax) |
+| Refunds: never more than was paid over a bill less its credit notes (`WB121`), or than a stay's advance (`WB122`), always naming one (`WB120`); a payment changed later is checked too | `tests/db/refunds.test.ts`; the rule removed once to see the tests fail | High |
+| Going home early: billed to today (a boarding stay keeps its first night) or as booked; the bill page offers the credit note for the difference, worked out on the server, then the refund | `src/lib/core/bookings.test.ts` (`shortenedEnd`); end-to-end: a paid bill credited ₹2,400 and refunded, a bigger refund refused; screenshots at 360 pixels, 21 October 2026 | High for the local stack |
+| The waiting list: the place in line stamped by the database and never moved, cleared when answered, only for requests; which would fit now, first in line first, not on days the pet already stays, past stays left out | `tests/db/waiting-list.test.ts`; the stamp removed once to see the test fail; end-to-end: New booking, the request's page, the calendar row, Today's Tell the parent and Confirm | High |
+| A series billed by the month: one line for each price, extras with their dates, staff issue it, a day never billed alone (`WB055`), one live bill a month, a series of the bill's parent (`WB056`), advances taken in, a billed day kept in its month (`WB057`) | `tests/db/series-bills.test.ts`; the `WB055` rule removed once to see the test fail; end-to-end: Make the bill for the month and issue it | High |
+| A photo taken off an update only by an owner (`WB081`), and the stay page stops showing it | `tests/db/media.test.ts` (the rule removed once to see it fail); end-to-end through real Storage | High |
+| Recovery codes: made only at `aal2` with a factor (`WB005`, `WB006`), ten, hashed, sealed; one lets one session in, once; a used or wrong one refused (`WB007`); new codes void old ones; a new authenticator voids codes and the sessions they let in | `tests/db/recovery-codes.test.ts` (the session check removed once to see it fail); end-to-end against the local Supabase Auth (its tokens carry `session_id`) | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -123,6 +136,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
 | Rate limits on Vercel | Each copy of the app counts on its own | Add a Vercel Firewall rule (`10`, "Rate limits") |
 | Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
+| Recovery codes on a hosted Supabase project | Walked only against the CLI's Supabase Auth (v2.197.0) | They rely on the `session_id` claim in access tokens, which Supabase Auth has carried for years |
+| Two waiting requests for the same last kennel | The database test confirms both show as fitting, then the second is refused at Confirm | By design (D42); a kennel with long waiting lists may want "first in line only" |
 | An independent security review of M9 | The second review was Claude Code's own pass | Have a person outside the project review before a public instance |
 
 ## Do this next
@@ -138,6 +153,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, which the kennel can now set itself;
    quarterly filers and cancelling; the tax by rate figure), and **the erasure questions in `05` to a lawyer** (Rule
    8(3), pets' free text). The research in both is a starting point, read from public commentary, not advice.
+
+7. **Ask the accountant questions 11 and 12 in `06`**: whether a kept advance on a cancelled stay needs a bill (a
+   cancellation charge, with tax), and whether a monthly bill for a regular's days is issued in time.
 
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
@@ -210,6 +228,12 @@ price" as साझा केनेल का दाम and ಹಂಚಿಕೊ�
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
 
+Drafted on 21 October 2026 (M20 to M24), also unchecked: the waiting list (वेटिंग लिस्ट, ಕಾಯುವ ಪಟ್ಟಿ), the WhatsApp
+message telling a parent a kennel is free (parents read it), going home early and the two check-out buttons, "The stay
+changed" and refunds on the bill page, the month's bill for a series, removing a photo, recovery codes (रिकवरी कोड,
+ರಿಕವರಿ ಕೋಡ್ kept close to English), and the new error sentences (`WB006`, `WB007`, `WB055` to `WB057`, `WB081`, `WB120` to
+`WB122`).
+
 Drafted on 21 October 2026 (M16 to M19), also unchecked: the reminder messages to parents (the most important to get
 right, as parents read them), the booking request page, repeating days and packs, and the GSTR-1 file names on Reports.
 
@@ -229,14 +253,16 @@ are fixed, and the hint under Stay on a booking.
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
 
-- Cancelling records a reason but no refund decision (bills are M4).
+- An advance kept on a cancelled stay (not refunded) is money in with no bill for it. Should Wagbook offer a bill for a
+  cancellation charge? Waits for the accountant (question 11 in `06`).
+- Staff choose at check-out whether an early leaver is billed to today or as booked (D40). Should that be a manager's
+  choice, or follow the peak period's no-refund rule by itself?
 - Staff cannot remove an extra added by mistake; a manager has to. Right?
 - Staff may add a one-off item at any price (for a vet bill paid for the parent). Right?
 - In a family booking of "a kennel each", only the first pet gets the chosen kennel; the others get theirs at
   check-in. "One kennel together" is offered only for exactly two pets.
-- A pet whose sibling leaves early pays the usual price for the nights alone (D32), but the sibling that left still
-  pays its own booked nights in full; refunding them is a manager's change of dates. Should check-out before the
-  date shorten the stay by itself?
+- A pet whose sibling leaves early pays the usual price for the nights alone (D32). The sibling that left pays its own
+  booked nights in full unless it was checked out with "bill to today" (D40).
 - A pet at the shared price that moves kennel counts as alone for its whole stay, because a booking has one kennel.
 - Only day boarding turning into boarding is split; boarding that turns into day boarding is a change of the whole
   stay's kind.
@@ -250,7 +276,8 @@ Product behaviours that were chosen as the simplest thing and may need the owner
   do not today.)
 - A bill made before check-out is not rebuilt when the stay changes afterwards; Make bill on the draft brings it back
   in line, and an issued bill must be cancelled and made again.
-- An update's photos cannot be removed once posted, except by deleting files as a manager in Supabase.
+- Only owners take a photo off an update (D29). A photo on the wrong pet's page is a privacy matter: should managers
+  be able to as well?
 - Invitation links are not tied to an email or phone: whoever holds one can join, once (D19). Right for how kennels
   hire?
 - Merging parents keeps the record you are on and hides the other. There is no "unmerge".
@@ -274,15 +301,18 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - Erasing a parent keeps their issued bills, payments, the stays' dates and prices, and the pets (D25, D30). What we
   found (`05`) says tax law's 72 months covers the bills; DPDP Rule 8(3) may ask for a year's hold before erasing; free
   text on pets may still point at the parent. (For a lawyer.) The owner's view: a microchip number is not personal data.
-- Two-step sign-in has no recovery codes; a lost phone needs an administrator (`10`). Enough for a small kennel?
-- The intake form accepts one certificate per pet. Some parents have two cards (rabies, and the yearly shot).
+- A recovery code lets one sign-in in, but the lost phone stays on the account until an administrator removes it (D43).
+  A recovered session lasts as long as that sign-in. Enough for a small kennel?
 - The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
   signs in from one connection at shift change should not reach 20; tell us if it does.
 
 ## Known rough edges in what is built
 
-- A repeating series is not billed together; a day not paid from a pack is billed on its own. A no-show uses a pack
-  day.
+- A no-show uses a pack day. A series that runs across two months gets a bill for each month; days paid from a pack
+  show on the month's bill at ₹0.
+- The difference offered on a bill is worked out from the stays as they are now. A line a manager added to a bill by
+  hand is never offered back on its own (`staysChanged()`), but when the stays changed as well, the amount offered
+  includes it: check the amount on a bill edited by hand before crediting it.
 - Tapping Send on a reminder marks it sent even if WhatsApp's own Send is not pressed.
 - A parent's booking link shows the dates of their stays to whoever holds it.
 
@@ -290,7 +320,8 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The credit note form offers "the whole bill" only while nothing has been credited; after that, an amount.
 
 - Proof photos on care tasks are not built (the unused field was removed in M13).
-- The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
+- The calendar has no drag and drop (by design in M2). It draws 30 requests at most; more are on the bookings list.
+- The bills list puts the parent and pets on their own line under the number, so a phone row is taller than before.
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
 - The calendar's top row counts kennels in use; when siblings share, the number of pets is shown under it.
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
@@ -315,7 +346,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 395 tests, build
+npm run check        # dash check, lint, typecheck, 423 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -325,6 +356,9 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 21 October 2026. M20 to M24, asked for by the owner: refunds and going home early (D40), the waiting list (D42),
+  requests on the calendar, a series billed by the month (D41), removing a photo, recovery codes (D43). e2e walk
+  extended to 48 tests, run against the local Supabase (images pulled through `mirror.gcr.io`).
 - 21 October 2026. M16 to M19: reminders to send on Today, booking requests through a parent's own link, repeating
   day boarding and day boarding packs, GSTR-1 files. e2e walk extended to 43 tests.
 - 21 October 2026. M15: credit notes (bill page, parent's bill, reports, download) and the kennel's own tax rate and

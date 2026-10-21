@@ -166,10 +166,21 @@ secret, shown as a picture to scan with an authenticator app, and the first code
   `WB005`. So a stolen password is useless through the API as well. The end-to-end walk checks this with a direct API
   client.
 - Supabase Auth refuses to add another authenticator, or remove one, from an `aal1` session.
-- A person who lost their phone asks whoever runs the installation to remove the factor (see
-  [10-setup-and-deploy.md](10-setup-and-deploy.md)).
+- A person who lost their phone signs in with one of their recovery codes (below), or asks whoever runs the
+  installation to remove the factor (see [10-setup-and-deploy.md](10-setup-and-deploy.md)).
 
 Owners who have not turned it on see a reminder under More. It is not forced.
+
+**Recovery codes (M24, D43).** On the same page, a session that gave its code from the app makes ten one-use codes
+(`make_recovery_codes()`), shown once. Only their SHA-256 hashes are kept, in `recovery_codes`, which has row level
+security on and no policy and no grant (like `invoice_counters`): only the three functions reach it, all `security
+definer`, each checking `auth.uid()` itself. "Use a recovery code instead" on `/login/code` spends one
+(`use_recovery_code()`, behind the sign-in rate limit): the session that used it, named by the `session_id` in its
+token, then passes `session_meets_mfa()`, and no other session does. A code counts only while the authenticator it was
+made for is still there, so turning two-step off or replacing the phone voids every code and every session they let in.
+A recovered session cannot make more codes (it is not `aal2`), and Supabase Auth still treats it as `aal1`, so it cannot
+remove the lost factor either; that stays with the administrator. Tested in `tests/db/recovery-codes.test.ts` and in the
+browser walk.
 
 ## Privacy
 
@@ -365,7 +376,7 @@ added to a bill while it is being issued (it waits, then is refused, `WB032`). B
 
 **Looked at and left as they are** (in "Known limitations" below): `'self'` for scripts; per-server counting of rate
 limits; intake uploads by direct API callers (bounded by the form's hourly limits; staff open them from Supabase's
-address); no recovery codes for two-step sign-in.
+address).
 
 ## Known limitations
 
@@ -388,7 +399,7 @@ These are real. Do not describe Wagbook as free of them.
 | An invitation link works for whoever holds it | A forwarded link lets someone else join, once, in its role, within seven days | Send it to one person; withdraw it from People if it went astray; suspend or remove the wrong person. The person's name and role show on People as soon as they join. |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |
 | Two race fixes are tested only against a real Postgres | Review numbers 6 and 16: `scripts/race-checks.sh` needs the local Supabase, so it is not part of `npm run check` | Run it after changing invoices or memberships |
-| Two-step sign-in is optional, and has no recovery codes | A person without it can be reached with a stolen password; a person who loses their phone needs an administrator | Owners see a reminder; recovery is documented in `10` |
+| Two-step sign-in is optional; recovery codes let a session in but do not remove the lost phone | A person without it can be reached with a stolen password; a person who loses their phone and their codes needs an administrator, and one who uses a code needs the administrator to set up a new phone | Owners see a reminder; recovery codes (D43); recovery by the administrator is documented in `10` |
 | Erasing a parent leaves backups, merged duplicates, bill line descriptions and payment notes | See "Privacy" | Backups age out; erase a merged duplicate too |
 | Links can be forwarded | Whoever has a stay link can see that stay | By design; kept minimal and expiring |
 | Copies of Today and Care stay on a phone for offline use | Whoever holds the phone, still signed in or not, can open the last copy (pet names, parents' phone numbers) with no connection | The copy is replaced on every visit and forgotten when the sign-in page opens. A shared phone should sign out at the end of a shift. |

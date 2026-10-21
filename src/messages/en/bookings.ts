@@ -24,12 +24,28 @@ export const bookingsArea = {
       confirmed: "Confirmed. The space is now held.",
       checked_in: "Checked in.",
       checked_out: "Checked out. The kennel is free for the next pet. Make the bill below.",
+      checked_out_early: "Checked out. The stay now ends today, so it is billed for the days it stayed. If its bill was already issued, credit the difference on the bill.",
       cancelled: "Booking cancelled. The space is free again.",
       no_show: "Marked as did not arrive. The space is free again.",
       extended: "Stay extended to today.",
       boarding: "Now boarding. The days before the first night are billed as day boarding.",
       series_cancelled: "The rest of the series is cancelled. Those days are free again.",
       pack: "Paid from the pack. The day costs nothing on its own now.",
+      waitlisted: "On the waiting list. Today says when a kennel frees up for it.",
+      unwaitlisted: "Taken off the waiting list. It is still a request.",
+      photo_removed: "Photo deleted. The parent's stay page no longer shows it.",
+    },
+    // The waiting list (D42): requests that wait for a kennel to free up.
+    waitlist: {
+      badge: "Waiting list",
+      offer: "No kennel free for these dates? Put this request on the waiting list, and Today tells you when one frees up.",
+      join: "Put on the waiting list",
+      leave: "Take off the waiting list",
+      // {place} is 1 for the first in line.
+      place: "Number {place} on the waiting list.",
+      over: "On the waiting list, but these dates have passed.",
+      spaceNow: "A kennel is free for it now.",
+      stillFull: "Still full on some of these days.",
     },
     // {name} is the name of a busy period the kennel set, like "Diwali".
     peakNoRefund: "{name}, no refund",
@@ -98,6 +114,16 @@ export const bookingsArea = {
       // For pets booked together, after goneHome or noneYet.
       familyNote: "The pets booked together share one bill.",
       makeFamily: "Make the family bill",
+      // A day of a repeating series (D41). {month} is like "October 2027".
+      seriesNote: "The days of this series are billed together, a month at a time, with their extras.",
+      makeMonth: "Make the bill for {month}",
+      // A bill paid for more than it now comes to, after a credit note.
+      toRefund: "{amount} to refund",
+    },
+    // Money paid in advance for a stay that was cancelled (D40).
+    refund: {
+      paid: "{amount} was paid in advance for this stay and has not been refunded.",
+      managersOnly: "Only an owner or manager records a refund.",
     },
     // Money taken before the bill. {method} is UPI, Cash and so on; {reference} is what was typed, like a UTR.
     payment: {
@@ -105,6 +131,9 @@ export const bookingsArea = {
       advanceWithReference: "Advance of {amount} on {date}, {method}, {reference}. Counts against the bill when it is issued.",
       refund: "Refund of {amount} on {date}, {method}. Counts against the bill when it is issued.",
       refundWithReference: "Refund of {amount} on {date}, {method}, {reference}. Counts against the bill when it is issued.",
+      // On a cancelled stay, where no bill will take the money in.
+      paid: "Paid {amount} on {date}, {method}.",
+      refunded: "Refunded {amount} on {date}, {method}.",
     },
     change: {
       title: "Change this booking",
@@ -153,6 +182,10 @@ export const bookingsArea = {
       parentSees: "Parent sees it",
       teamOnly: "Team only",
       write: "Write update",
+      // Owners take a photo posted by mistake off an update (D29).
+      removePhoto: "Remove a photo",
+      removePhotoWarning: "The photo is deleted and leaves the parent's stay page. This cannot be undone. A photo already sent on WhatsApp stays in that chat.",
+      removeThis: "Delete photo {n}",
     },
     about: {
       title: "About {pet}",
@@ -167,6 +200,10 @@ export const bookingsArea = {
       title: "Cancel",
       // {periods} is one or more busy period names, joined with "and" below.
       noRefund: "This stay touches {periods}, which you do not refund. Tell the parent before cancelling.",
+      // The same, said at check-out and beside a refund.
+      noRefundPeriods: "This stay touches {periods}, which you do not refund.",
+      advancePaid: "{amount} was paid in advance. After cancelling, an owner or manager can refund it here.",
+      billIssued: "This stay has an issued bill. After cancelling, an owner or manager credits it on the bill, then records any refund there.",
       and: "{a} and {b}",
       why: "Why is it cancelled?",
       button: "Cancel booking",
@@ -183,6 +220,10 @@ export const bookingsArea = {
       writeUpdate: "Write update",
       checkOut: "Check out",
       checkingOut: "Checking out",
+      // A pet going home before its booked end (D40). {date} is the booked check-out or last day.
+      early: "Booked until {date}. Going home early? Bill only to today, or for the stay as booked.",
+      checkOutToToday: "Check out, bill to today",
+      checkOutAsBooked: "Check out, bill as booked",
       checklist: "Check-in checklist",
       kennel: "Kennel",
       noKennelYet: "No kennel yet",
@@ -299,6 +340,9 @@ export const bookingsArea = {
     saveAsRequest: "Save as request",
     back: "Back to bookings",
     requestNote: "A request holds no space. Confirm it later from the booking.",
+    // The waiting list (D42): a request that waits for a kennel to free up.
+    addToWaitlist: "Add to the waiting list",
+    waitlistNote: "On the waiting list, Today tells you when a kennel frees up for it.",
     // The pet chooser at the top of the form.
     picker: {
       find: "Find a pet",
@@ -319,10 +363,13 @@ export const bookingsArea = {
     earlier: "Earlier",
     today: "Today",
     later: "Later",
-    requests: {
-      one: "One request in these days holds no space and is not shown.",
-      other: "{n} requests in these days hold no space and are not shown.",
-    },
+    // Requests and the waiting list, drawn under the kennels (they hold no space).
+    requestsTitle: "Requests and waiting list (no space held)",
+    request: "Request",
+    waiting: "Waiting",
+    requestFor: "Request for {pet}",
+    waitingFor: "{pet}, on the waiting list",
+    moreRequests: "Only the first {n} requests are drawn.",
     seeBookings: "See bookings",
     noKennels: "Add your kennels to see the calendar.",
     addKennels: "Add kennels",
@@ -335,7 +382,7 @@ export const bookingsArea = {
     // For screen readers on an empty square. {day} is a short date like "14 Apr".
     bookFrom: "Book {kennel} from {day}",
     noKennelYet: "No kennel yet",
-    key: "Green: in house. Grey: booked. Red: still here after the check-out date. Tap a booking to open it, or an empty square to book that kennel from that day.",
+    key: "Green: in house. Grey: booked. Red: still here after the check-out date. Yellow with a dashed edge: a request or the waiting list, holding no space. Tap a booking to open it, or an empty square to book that kennel from that day.",
   },
   // Writing an update for the parent.
   update: {

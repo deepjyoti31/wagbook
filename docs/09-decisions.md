@@ -450,6 +450,7 @@ two inline scripts staying as they are; the unit tests say when they change.
 ## D24. Two-step sign-in is enforced by the database
 
 **Status:** Decided, 15 October 2026 (milestone M9). Not forced on owners: confirmed by the owner, 21 October 2026.
+Recovery codes added by D43.
 
 **Situation.** The roadmap asks for two-step sign-in for owners. Supabase Auth supports authenticator apps (TOTP): a
 session that has given the code is at assurance level `aal2`. Nothing stops a client with only the password (`aal1`)
@@ -738,8 +739,8 @@ none. What a pack has left is `pass_balances`.
 
 **Why.** Regulars are a large share of day boarding, and paying in advance is how they usually pay.
 
-**Cost.** A series is not billed together: a day not on a pack is billed on its own. A day that did not come (no-show)
-still uses a pack day. Selling a pack is for owners and managers.
+**Cost.** A series is not billed together: a day not on a pack is billed on its own (changed by D41: billed by the
+month). A day that did not come (no-show) still uses a pack day. Selling a pack is for owners and managers.
 
 ## D38. GSTR-1 files for the accountant
 
@@ -772,4 +773,92 @@ comes back three days later. Wagbook sends nothing itself (`07`).
 **Why.** The staff member's own WhatsApp, at no cost, as everywhere else in Wagbook.
 
 **Cost.** Tapping Send marks it sent even if the person then does not press Send in WhatsApp.
+
+## D40. Going home early, refunds, and crediting a bill whose stay changed
+
+**Status:** Decided, 21 October 2026 (milestone M20), when the owner asked for refunds when a stay ends early or is
+cancelled.
+
+**Situation.** Cancelling recorded a reason but no decision about money, a pet that went home early still paid for
+every booked night, and a refund could be recorded for any amount, even more than was paid.
+
+**Decision.** At check-out before the booked end, the booking page asks: bill to today, or bill as booked. Bill to today
+moves the end to today (a boarding stay keeps at least its first night, `shortenedEnd()`), so a draft or a new bill is
+for the days stayed. An issued bill is never changed: its page compares it with what its stays now come to
+(`stayBillLines()`, the same lines Make bill writes) and offers a credit note for the difference, worked out on the
+server for each tax rate on the bill under the bill's own tax treatment (`differenceCredit()`). A refund then gives
+back what was paid over. The database allows a refund only of money paid and not owed: on a bill, what was paid over
+its total less its credit notes (`WB121`); on a stay with no bill, its advance (`WB122`); always naming one of them
+(`WB120`). Refunds stay for owners and managers (the payments policy). A cancelled stay shows its advance, and owners
+and managers refund it there; keeping it is simply not refunding it, and a no-refund peak period is named beside the
+choice.
+
+**Why.** The rule that protects money is in the database, and the books always say why money went back: a credit note
+for the tax return, then the refund. Choosing at check-out keeps it one tap for staff, without a manager.
+
+**Cost.** Staff choose how an early leaver is billed. A kept advance on a cancelled stay is money in with no bill for
+it; whether it needs a bill (a cancellation charge, with tax) is a question for the accountant (`06`). The difference
+is computed against today's view of the stays: it is offered only when a stay really changed (`staysChanged()`), but
+then a line a manager added to the bill by hand counts in it, so a bill edited by hand needs its amount checked.
+
+## D41. A repeating series is billed by the month
+
+**Status:** Decided, 21 October 2026 (milestone M23), when the owner asked to bill a day boarding series together.
+
+**Situation.** Each day of a series was billed on its own: a regular coming three days a week got twelve bills a month.
+
+**Decision.** A bill may be for a month of a series (`invoices.series_id`, `series_month`, the first of the month),
+covering that month's days that are not requests or cancelled, with one stay line for each price, tax rate and code,
+days added up and listed, and each day's extras with its date (`seriesLines()`; the database groups the same way in
+`invoice_expected_lines()`, so staff can issue it). Make bill on any day of a series makes or opens its month's bill.
+A day of a series is never billed alone (`WB055`), a month has one live bill (`invoices_one_live_per_series_month`),
+advances on any day of the month count against it, and a day on an issued month's bill cannot move to another month
+(`WB057`), where it would be billed again.
+
+**Why.** Regulars pay monthly. A calendar month is simple to explain, to number, and to find.
+
+**Cost.** A series that runs across two months gets two bills. Days paid from a pack still appear, at ₹0. A family of
+two regulars gets a bill for each pet.
+
+## D42. The waiting list is requests that wait, in order
+
+**Status:** Decided, 21 October 2026 (milestone M21), when the owner asked for a waiting list when full.
+
+**Situation.** In a full peak week, kennels keep a list on paper of families to call if someone cancels.
+
+**Decision.** A request can be put on the waiting list (`bookings.waitlisted_at`). The database stamps the real time it
+joined, keeps that place while it waits, and clears it when the request is confirmed or cancelled; only a request can
+be on it. `waiting_list()` lists them, first in line first, with whether each would fit now (a kennel free on every day
+of the stay, and no other stay for the pet). Today shows those that fit, with Tell the parent on WhatsApp and Confirm
+booking; the request's page says its place, and the calendar draws requests and the waiting list under the kennels.
+
+**Why.** A request already holds no space and is confirmed through the same rules as any booking, so the list needed
+only an order and a question ("would it fit now?"), not a new kind of booking.
+
+**Cost.** Two people waiting for the same last kennel both show as fitting until one is confirmed; the second is then
+refused with the usual sentence. Pets of one family on the list are checked one by one, as if each needs its own
+kennel. Wagbook does not send the message by itself (D39).
+
+## D43. Recovery codes for two-step sign-in, kept inside Wagbook
+
+**Status:** Decided, 21 October 2026 (milestone M24), when the owner asked for recovery codes.
+
+**Situation.** Losing the phone with the authenticator app meant asking whoever runs the installation (D24). Supabase
+Auth has no recovery codes, and removing a factor needs either a session that gave its code or the service role key,
+which Wagbook never uses (rule 7).
+
+**Decision.** Wagbook makes ten one-use codes (`make_recovery_codes()`, only from a session that gave its code from
+the app), shows them once, and keeps only their SHA-256 hashes in a sealed table (`recovery_codes`: no policy, no
+grant). On the code page, "Use a recovery code instead" spends one (`use_recovery_code()`): that session, by its
+`session_id`, then counts as having given its code in `session_meets_mfa()`, and nowhere else. Codes belong to the
+authenticator they were made for, so turning two-step off or setting up a new phone makes them worthless. Making new
+codes replaces the old ones.
+
+**Why.** A person locked out at 7 in the morning with dogs to feed can work, without anyone holding a key that could
+open every account.
+
+**Cost.** A code does not remove the lost authenticator: Supabase Auth still sees the session at `aal1`, so the person
+cannot turn two-step off or set up a new phone until the administrator removes the factor (`10`), and each sign-in
+until then needs another code. A recovered session lasts as long as that sign-in does. Codes are 12 hex characters (48
+bits); guessing is limited by the sign-in rate limits.
 

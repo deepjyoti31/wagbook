@@ -14,6 +14,8 @@ export const moneyArea = {
     notPaid: "Not paid yet",
     drafts: "Drafts",
     recent: "Recent",
+    // A month of a repeating series (D41). {month} is like "October 2027".
+    seriesMonth: "{pet}, day boarding in {month}",
   },
   // One bill, as staff see it.
   bill: {
@@ -57,6 +59,21 @@ export const moneyArea = {
     cancelEarlier: "This tax invoice is from an earlier month, so it may already be in a tax return. Make a credit note below instead of cancelling it.",
     cancelCredited: "This bill has a credit note. Credit what is left below instead of cancelling it.",
     // Taking back all or part of an issued bill (D34). {rate} is a number, {number} the bill's or credit note's number.
+    // A month of a repeating series (D41). {month} is like "October 2027".
+    seriesMonth: "{pet}'s day boarding in {month}",
+    // An issued bill whose stays now come to less (D40): gone home early, cancelled.
+    difference: {
+      title: "The stay changed",
+      text: "The stays on this bill now come to {now}. The bill is {amount} more than that. Credit the difference, then refund anything paid over.",
+      whatDefault: "Not stayed, against bill {number}",
+      reasonEarly: "Went home early",
+      reasonCancelled: "Stay cancelled",
+      make: "Credit {amount}",
+      askManager: "Ask an owner or manager to credit the difference.",
+    },
+    // Paid more than the bill now comes to.
+    refundOwed: "{amount} was paid more than the bill now comes to. Record the refund below when you give it back.",
+    refundOwedStaff: "{amount} was paid more than the bill now comes to. An owner or manager records the refund.",
     credit: {
       title: "Credit note",
       about: "Take back all or part of this bill, such as nights not stayed. The bill stays as it is; the credit note has its own number and counts in this month.",
@@ -98,6 +115,7 @@ export const moneyArea = {
       creditWhy: "Say why the bill is being credited.",
       creditRate: "Choose a tax rate from the bill.",
       nothingToBill: "A cancelled booking or a request has nothing to bill.",
+      nothingChanged: "The stays on this bill do not come to less than it, so there is nothing to credit.",
       onlyDraftChanged: "Only a draft bill can be changed. Cancel it and make a new one.",
       lineNotFound: "That line could not be found.",
       needsLine: "A bill needs at least one line.",
@@ -118,6 +136,7 @@ export const moneyArea = {
   payments: {
     recordPaymentTitle: "Record a payment",
     recordAdvanceTitle: "Record an advance",
+    recordRefundTitle: "Record a refund",
     amount: "Amount",
     how: "How",
     date: "Date",

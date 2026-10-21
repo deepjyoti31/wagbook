@@ -14,19 +14,21 @@ import { VaccinationList, VaccinationWarnings } from "@/components/pet-panels";
 import { signedUrls } from "@/lib/media";
 import { RoutineForm } from "@/components/routine-form";
 import { makeBill } from "@/app/app/bills/actions";
+import { removeUpdatePhoto } from "@/app/app/media/actions";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  addDays, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
+  addDays, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, peaksTouching, quoteStay,
   sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
+import { monthOf } from "@/lib/stay-bill";
 import { createClient } from "@/lib/supabase/server";
-import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, switchToBoarding, updateBooking } from "../actions";
+import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, setWaitlist, switchToBoarding, updateBooking } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.booking.title);
 
@@ -39,7 +41,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -62,7 +64,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs] = await Promise.all([
+  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs, waiting] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
@@ -73,14 +75,23 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
     parent ? familyHolds(supabase, org.id, [parent.id], b.start_date, b.end_date) : Promise.resolve({ data: [], error: null }),
     supabase.from("vaccinations").select("id, vaccine, valid_until, certificate_path").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
     supabase.from("care_items").select("id, kind, label, details, due_time").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
-    // A pet booked with others is billed with them, on the family's bill.
-    supabase
-      .from("invoice_balances")
-      .select("invoice_id, status, number, total_minor, due_minor")
-      .eq("org_id", org.id)
-      .eq(b.group_id ? "group_id" : "booking_id", b.group_id ?? id)
-      .neq("status", "void")
-      .maybeSingle(),
+    // A pet booked with others is billed with them, on the family's bill; a day of a series, on its month's bill (D41).
+    b.series_id
+      ? supabase
+          .from("invoice_balances")
+          .select("invoice_id, status, number, total_minor, due_minor")
+          .eq("org_id", org.id)
+          .eq("series_id", b.series_id)
+          .eq("series_month", monthOf(b.start_date))
+          .neq("status", "void")
+          .maybeSingle()
+      : supabase
+          .from("invoice_balances")
+          .select("invoice_id, status, number, total_minor, due_minor")
+          .eq("org_id", org.id)
+          .eq(b.group_id ? "group_id" : "booking_id", b.group_id ?? id)
+          .neq("status", "void")
+          .maybeSingle(),
     supabase
       .from("payments")
       .select("id, direction, amount_minor, method, received_on, reference")
@@ -110,8 +121,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
     b.kind === "daycare" && parent
       ? supabase.from("pass_balances").select("pass_id, name, days_left, starts_on, valid_until").eq("org_id", org.id).eq("client_id", parent.id).order("valid_until")
       : Promise.resolve({ data: [], error: null }),
+    // The waiting list (D42), for this request's place in line.
+    b.waitlisted_at ? supabase.rpc("waiting_list", { p_org: org.id }) : Promise.resolve({ data: [], error: null }),
   ]);
-  if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error || charges.error || nightPrice.error || series.error || packs.error) {
+  if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error || charges.error || nightPrice.error || series.error || packs.error || waiting.error) {
     throw new Error("Could not load the booking.");
   }
 
@@ -125,6 +138,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const open = b.status === "requested" || b.status === "confirmed" || b.status === "checked_in";
   const touching = peaksTouching({ kind: b.kind, startDate: b.start_date, endDate: b.end_date }, (peaks.data ?? []).map(toPeak));
   const noRefund = touching.filter((p) => p.noRefund);
+  const noRefundText =
+    noRefund.length > 0 ? fill(w.cancel.noRefundPeriods, { periods: noRefund.map((period) => period.name).reduce((list, name) => fill(w.cancel.and, { a: list, b: name })) }) : null;
+  // Money paid for this stay that no bill has taken in yet: advances, less any refund of them.
+  const advanceMinor = advances.data.reduce((sum, a) => sum + (a.direction === "out" ? -a.amount_minor : a.amount_minor), 0);
   const overstay = isOverstaying({ status: b.status, endDate: b.end_date }, today);
   const stayUrl = `${origin}/s/${b.public_token}`;
   // Kennels a sibling is already in say so: "K05, with Coco".
@@ -142,6 +159,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const sharesWith = b.kennel_id ? sharing.get(b.kennel_id) : undefined;
 
   const stayCharges = toStayCharges(charges.data);
+  const place = (waiting.data ?? []).findIndex((x) => x.booking_id === b.id);
+  const waitPlace = b.waitlisted_at ? { place: place + 1, hasSpace: place >= 0 && (waiting.data ?? [])[place].has_space } : null;
   const paidFrom = b.pass_id ? (packs.data ?? []).find((x) => x.pass_id === b.pass_id) : undefined;
   const dayUnits = b.end_date >= b.start_date ? chargeableUnits(b.kind, b.start_date, b.end_date) : 0;
   const canPayFrom = !b.pass_id && open
@@ -213,6 +232,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
           <Badge tone={b.status === "checked_in" ? "good" : b.status === "requested" ? "attention" : "neutral"}>{m.labels.bookingStatus[b.status]}</Badge>
           {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+          {b.waitlisted_at ? <Badge tone="attention">{w.waitlist.badge}</Badge> : null}
           {overstay ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
           {touching.map((period) => (
             <Badge key={period.name} tone="attention">
@@ -267,6 +287,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             freeKennels={freeKennels}
             vaccinations={vaccinations.data}
             stayEnds={b.end_date}
+            noRefund={noRefundText}
+            waitPlace={waitPlace}
             updateLink={b.status === "checked_in" ? `/app/bookings/${b.id}/update` : null}
           />
         </Section>
@@ -384,7 +406,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         ) : null}
       </Section>
 
-      {b.status !== "requested" && b.status !== "cancelled" ? (
+      {b.status !== "requested" && (b.status !== "cancelled" || bill.data || advances.data.length > 0) ? (
         <Section title={w.bill.title}>
           {bill.data ? (
             <Link href={`/app/bills/${bill.data.invoice_id}`} className="flex min-h-12 flex-wrap items-center gap-3 rounded-xl border border-rule bg-paper px-4 py-3 hover:bg-ground">
@@ -393,6 +415,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               {bill.data.status === "issued" ? (
                 (bill.data.due_minor ?? 0) > 0 ? (
                   <Badge tone="attention">{fill(w.bill.due, { amount: money(bill.data.due_minor ?? 0) })}</Badge>
+                ) : (bill.data.due_minor ?? 0) < 0 ? (
+                  <Badge tone="attention">{fill(w.bill.toRefund, { amount: money(-(bill.data.due_minor ?? 0)) })}</Badge>
                 ) : (
                   <Badge tone="good">{w.bill.paid}</Badge>
                 )
@@ -400,15 +424,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <Badge tone="attention">{w.bill.notIssued}</Badge>
               )}
             </Link>
-          ) : (
+          ) : b.status === "cancelled" ? null : (
             <ActionForm action={makeBill} className="space-y-2">
               <input type="hidden" name="bookingId" value={b.id} />
               <p>
-                {b.status === "checked_out" ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet }) : w.bill.noneYet}
+                {b.series_id
+                  ? w.bill.seriesNote
+                  : b.status === "checked_out"
+                    ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet })
+                    : w.bill.noneYet}
                 {family.data.length > 0 ? ` ${w.bill.familyNote}` : ""}
               </p>
-              <SubmitButton variant={b.status === "checked_out" ? "primary" : "secondary"} pendingLabel={w.bill.making}>
-                {family.data.length > 0 ? w.bill.makeFamily : w.bill.make}
+              <SubmitButton variant={b.status === "checked_out" && !b.series_id ? "primary" : "secondary"} pendingLabel={w.bill.making}>
+                {b.series_id ? fill(w.bill.makeMonth, { month: monthName(b.start_date, locale) }) : family.data.length > 0 ? w.bill.makeFamily : w.bill.make}
               </SubmitButton>
             </ActionForm>
           )}
@@ -417,7 +445,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             <ul className="mt-3 space-y-1">
               {advances.data.map((a) => {
                 const pay = w.payment;
-                const template = a.direction === "out" ? (a.reference ? pay.refundWithReference : pay.refund) : a.reference ? pay.advanceWithReference : pay.advance;
+                // On a cancelled stay no bill will take the money in: just what moved, and when.
+                const template =
+                  b.status === "cancelled"
+                    ? a.direction === "out"
+                      ? pay.refunded
+                      : pay.paid
+                    : a.direction === "out"
+                      ? a.reference
+                        ? pay.refundWithReference
+                        : pay.refund
+                      : a.reference
+                        ? pay.advanceWithReference
+                        : pay.advance;
                 return (
                   <li key={a.id} className="text-slate">
                     {fill(template, {
@@ -431,7 +471,21 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               })}
             </ul>
           ) : null}
-          {bill.data?.status !== "issued" ? <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} /> : null}
+          {b.status === "cancelled" && !bill.data ? (
+            advanceMinor > 0 ? (
+              <div className="mt-3 space-y-2">
+                <p className="font-semibold">{fill(w.refund.paid, { amount: money(advanceMinor) })}</p>
+                {noRefundText ? <p className="text-slate">{noRefundText}</p> : null}
+                {canManage ? (
+                  <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+                ) : (
+                  <p className="text-slate">{w.refund.managersOnly}</p>
+                )}
+              </div>
+            ) : null
+          ) : bill.data?.status !== "issued" ? (
+            <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} />
+          ) : null}
         </Section>
       ) : null}
 
@@ -614,6 +668,30 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                       )}
                     </div>
                   ) : null}
+                  {canDelete && u.media_paths.length > 0 ? (
+                    // A photo posted by mistake: owners take it off, after a second tap (D29, WB081).
+                    <details className="mt-2">
+                      <summary className={`${buttonStyles.quiet} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>{w.updates.removePhoto}</summary>
+                      <div className="mt-2 space-y-3 rounded-lg bg-alert-soft p-3">
+                        <p className="font-semibold">{w.updates.removePhotoWarning}</p>
+                        <div className="flex flex-wrap gap-3">
+                          {u.media_paths.map((path, i) =>
+                            media.get(path) ? (
+                              <ActionForm key={path} action={removeUpdatePhoto} className="flex flex-col items-start gap-2">
+                                <input type="hidden" name="updateId" value={u.id} />
+                                <input type="hidden" name="path" value={path} />
+                                {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
+                                <img src={media.get(path)} alt="" loading="lazy" className="size-20 rounded-lg object-cover" />
+                                <SubmitButton variant="danger" pendingLabel={m.common.removing}>
+                                  {fill(w.updates.removeThis, { n: i + 1 })}
+                                </SubmitButton>
+                              </ActionForm>
+                            ) : null,
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -656,6 +734,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               {fill(w.cancel.noRefund, { periods: noRefund.map((period) => period.name).reduce((list, name) => fill(w.cancel.and, { a: list, b: name })) })}
             </Notice>
           ) : null}
+          {advanceMinor > 0 && !bill.data ? <p className="mb-3">{fill(w.cancel.advancePaid, { amount: money(advanceMinor) })}</p> : null}
+          {bill.data?.status === "issued" ? <p className="mb-3">{w.cancel.billIssued}</p> : null}
           <ActionForm action={cancelBooking} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="bookingId" value={b.id} />
             <Field label={w.cancel.why}>
@@ -691,6 +771,8 @@ function NextStep({
   freeKennels,
   vaccinations,
   stayEnds,
+  noRefund,
+  waitPlace,
   updateLink,
 }: {
   t: I18n;
@@ -700,17 +782,38 @@ function NextStep({
   freeKennels: { id: string; name: string }[];
   vaccinations: { id: string; vaccine: string; valid_until: string | null }[];
   stayEnds: string;
+  /** The sentence saying the stay touches a period the kennel does not refund, if it does. */
+  noRefund: string | null;
+  /** For a request on the waiting list: its place in line (0 once its stay is over) and whether it would fit now. */
+  waitPlace: { place: number; hasSpace: boolean } | null;
   updateLink: string | null;
 }) {
   const { m, locale } = t;
   const w = m.booking.step;
   if (b.status === "requested") {
+    const wl = m.booking.waitlist;
     return (
-      <ActionForm action={confirmRequest} className="space-y-3">
-        <input type="hidden" name="bookingId" value={b.id} />
-        <p>{w.isRequest}</p>
-        <SubmitButton pendingLabel={w.confirming}>{w.confirm}</SubmitButton>
-      </ActionForm>
+      <div className="space-y-4">
+        <ActionForm action={confirmRequest} className="space-y-3">
+          <input type="hidden" name="bookingId" value={b.id} />
+          <p>{w.isRequest}</p>
+          <SubmitButton pendingLabel={w.confirming}>{w.confirm}</SubmitButton>
+        </ActionForm>
+        <ActionForm action={setWaitlist} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
+          <input type="hidden" name="bookingId" value={b.id} />
+          {waitPlace ? (
+            <p>
+              {waitPlace.place > 0 ? fill(wl.place, { place: waitPlace.place }) : wl.over}{" "}
+              {waitPlace.place > 0 ? <strong>{waitPlace.hasSpace ? wl.spaceNow : wl.stillFull}</strong> : null}
+            </p>
+          ) : (
+            <p>{wl.offer}</p>
+          )}
+          <SubmitButton name="intent" value={waitPlace ? "leave" : "join"} variant={waitPlace ? "quiet" : "secondary"} pendingLabel={m.common.saving}>
+            {waitPlace ? wl.leave : wl.join}
+          </SubmitButton>
+        </ActionForm>
+      </div>
     );
   }
 
@@ -730,13 +833,31 @@ function NextStep({
             {w.writeUpdate}
           </Link>
         ) : null}
-        <ActionForm action={checkOut} className="contents">
-          <input type="hidden" name="bookingId" value={b.id} />
-          <input type="hidden" name="from" value="booking" />
-          <SubmitButton pendingLabel={w.checkingOut} variant={stayEnds <= today ? "primary" : "secondary"}>
-            {w.checkOut}
-          </SubmitButton>
-        </ActionForm>
+        {leavingEarly({ status: b.status, endDate: stayEnds }, today) ? (
+          // Going home before the booked end: bill to today, or as booked (D40).
+          <ActionForm action={checkOut} className="w-full space-y-3 rounded-xl border border-rule bg-paper p-4">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <input type="hidden" name="from" value="booking" />
+            <p>{fill(w.early, { date: formatDate(stayEnds, locale) })}</p>
+            {noRefund ? <p className="text-slate">{noRefund}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <SubmitButton name="bill" value="today" variant="secondary" pendingLabel={w.checkingOut}>
+                {w.checkOutToToday}
+              </SubmitButton>
+              <SubmitButton name="bill" value="booked" variant="secondary" pendingLabel={w.checkingOut}>
+                {w.checkOutAsBooked}
+              </SubmitButton>
+            </div>
+          </ActionForm>
+        ) : (
+          <ActionForm action={checkOut} className="contents">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <input type="hidden" name="from" value="booking" />
+            <SubmitButton pendingLabel={w.checkingOut} variant={stayEnds <= today ? "primary" : "secondary"}>
+              {w.checkOut}
+            </SubmitButton>
+          </ActionForm>
+        )}
       </div>
     );
   }
@@ -803,4 +924,9 @@ function NextStep({
       </ActionForm>
     </div>
   );
+}
+
+/** The month a date is in, like "October 2027", in the reader's language. */
+function monthName(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date.slice(0, 7)}-01T00:00:00Z`));
 }

@@ -120,11 +120,14 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           <SubmitButton name="intent" value="requested" variant="secondary" pendingLabel={m.common.saving}>
             {w.saveAsRequest}
           </SubmitButton>
+          <SubmitButton name="intent" value="waitlist" variant="secondary" pendingLabel={m.common.saving}>
+            {w.addToWaitlist}
+          </SubmitButton>
           <Link href="/app/bookings" className={buttonStyles.quiet}>
             {w.back}
           </Link>
         </div>
-        <p className="text-sm text-slate">{w.requestNote}</p>
+        <p className="text-sm text-slate">{w.requestNote} {w.waitlistNote}</p>
       </ActionForm>
     </>
   );

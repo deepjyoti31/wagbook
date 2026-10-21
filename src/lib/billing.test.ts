@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billForBooking, billForFamily, creditContext, partCredit, taxContext } from "./billing";
+import { billForBooking, billForFamily, creditContext, differenceCredit, moneyLines, partCredit, seriesLines, staysChanged, taxContext } from "./billing";
 
 const org = { tax_mode: "none" as const, gst_state_code: null, prices_include_tax: false, round_invoice_totals: true };
 
@@ -63,5 +63,52 @@ describe("credit notes", () => {
     expect(t).toMatchObject({ taxableMinor: 120000, cgstMinor: 10800, sgstMinor: 10800, totalMinor: 141600 });
     // With prices that included tax, the amount is what the parent paid.
     expect(partCredit({ ...gstBill, prices_include_tax: true }, { description: "x", amountMinor: 118000, taxRateBp: 1800, sacCode: null }, false).totalMinor).toBe(118000);
+  });
+});
+
+describe("a bill whose stays changed", () => {
+  const stay = { kind: "boarding" as const, start_date: "2027-04-14", discount_minor: 0, tax_rate_bp: 0, sac_code: null, rate_minor: 120000 };
+  const asBilled = (t: ReturnType<typeof billForBooking>) =>
+    t.lines.map((l) => ({ quantity: l.quantity, unit_price_minor: l.unitPriceMinor, discount_minor: l.discountMinor, tax_rate_bp: l.taxRateBp, taxable_minor: l.taxableMinor, total_minor: l.totalMinor, sac_code: l.sacCode ?? null }));
+  const plain = { is_tax_invoice: false, prices_include_tax: false, place_of_supply_state_code: null, seller: null };
+
+  it("offers the nights not stayed back as a credit note", () => {
+    const billed = asBilled(billForBooking(org, "Bruno", { ...stay, end_date: "2027-04-17" }, []));
+    const now = billForBooking(org, "Bruno", { ...stay, end_date: "2027-04-15" }, []);
+    expect(staysChanged(billed, now)).toBe(true);
+    const credit = differenceCredit(plain, billed, [], moneyLines(now), "Not stayed", true);
+    expect(credit?.totalMinor).toBe(240000);
+    // After that credit note, nothing more.
+    expect(differenceCredit(plain, billed, moneyLines(credit!), moneyLines(now), "Not stayed", true)).toBeNull();
+  });
+
+  it("never offers back a line a manager added to the bill by hand", () => {
+    const made = billForBooking(org, "Bruno", { ...stay, end_date: "2027-04-17" }, []);
+    const billed = [...asBilled(made), { quantity: 1, unit_price_minor: 50000, discount_minor: 0, tax_rate_bp: 0, taxable_minor: 50000, total_minor: 50000, sac_code: null }];
+    expect(staysChanged(billed, made)).toBe(false);
+  });
+
+  it("offers the whole bill when every stay on it is cancelled", () => {
+    const billed = asBilled(billForBooking(org, "Bruno", { ...stay, end_date: "2027-04-17" }, []));
+    expect(staysChanged(billed, billForFamily(org, []))).toBe(true);
+  });
+});
+
+describe("a month of a repeating series", () => {
+  const day = (date: string, extra?: string) => ({
+    booking: { kind: "daycare" as const, start_date: date, end_date: date, rate_minor: 72000, discount_minor: 0, tax_rate_bp: 0, sac_code: null },
+    items: extra ? [{ description: extra, quantity: 1, unit_price_minor: 50000, tax_rate_bp: 0, sac_code: null }] : [],
+  });
+  it("is one line for each price with its days listed, then each day's extras with its date", () => {
+    const lines = seriesLines("Tofu", "2027-10-01", [day("2027-10-11", "Bath"), day("2027-10-04"), day("2027-10-13")]);
+    expect(lines.map((l) => [l.description, l.quantity, l.unitPriceMinor])).toEqual([
+      ["Day boarding: Tofu, 3 days in October 2027 (4, 11, 13 Oct)", 3, 72000],
+      ["11 Oct: Bath", 1, 50000],
+    ]);
+  });
+  it("keeps days at another price, and days from a pack, on lines of their own", () => {
+    const pack = { ...day("2027-10-06"), booking: { ...day("2027-10-06").booking, rate_minor: 0, pass_id: "p" } };
+    const lines = seriesLines("Tofu", "2027-10-01", [day("2027-10-04"), pack]);
+    expect(lines.map((l) => l.description)).toEqual(["Day boarding: Tofu, 1 day in October 2027 (4 Oct)", "Day boarding: Tofu, 1 day from a pack in October 2027 (6 Oct)"]);
   });
 });

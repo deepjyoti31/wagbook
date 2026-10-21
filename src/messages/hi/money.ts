@@ -5,6 +5,7 @@ import { historyFields } from "./fields";
 export const moneyArea: typeof English = {
   // The list of bills.
   bills: {
+    seriesMonth: "{pet}, {month} में डे बोर्डिंग",
     title: "बिल",
     paid: "भुगतान हो गया",
     due: "{amount} बाकी",
@@ -19,6 +20,18 @@ export const moneyArea: typeof English = {
   },
   // One bill, as staff see it.
   bill: {
+    refundOwedStaff: "बिल की अभी की रकम से {amount} ज़्यादा दिए गए हैं। रिफ़ंड मालिक या मैनेजर दर्ज करते हैं।",
+    refundOwed: "बिल की अभी की रकम से {amount} ज़्यादा दिए गए हैं। लौटाने पर नीचे रिफ़ंड दर्ज करें।",
+    difference: {
+      title: "ठहराव बदल गया",
+      text: "इस बिल के ठहराव अब {now} के बनते हैं। बिल उससे {amount} ज़्यादा है। फ़र्क का क्रेडिट दें, फिर ज़्यादा दिया पैसा लौटाएं।",
+      whatDefault: "न रुके दिन, बिल {number} पर",
+      reasonEarly: "जल्दी घर चला गया",
+      reasonCancelled: "ठहराव रद्द हुआ",
+      make: "{amount} का क्रेडिट दें",
+      askManager: "फ़र्क का क्रेडिट देने के लिए मालिक या मैनेजर से कहें।",
+    },
+    seriesMonth: "{month} में {pet} की डे बोर्डिंग",
     title: "बिल",
     draftTitle: "ड्राफ़्ट बिल",
     allBills: "सारे बिल",
@@ -96,6 +109,7 @@ export const moneyArea: typeof English = {
       add: "लाइन जोड़ें",
     },
     errors: {
+      nothingChanged: "इस बिल के ठहराव बिल से कम नहीं बनते, इसलिए क्रेडिट देने को कुछ नहीं है।",
       creditAmount: "रकम लिखें, जैसे 1200।",
       creditWhy: "बताएं कि बिल पर क्रेडिट क्यों दिया जा रहा है।",
       creditRate: "बिल पर से एक टैक्स दर चुनें।",
@@ -118,6 +132,7 @@ export const moneyArea: typeof English = {
   },
   // Recording money received: on a bill, and as an advance on a booking.
   payments: {
+    recordRefundTitle: "रिफ़ंड दर्ज करें",
     recordPaymentTitle: "भुगतान दर्ज करें",
     recordAdvanceTitle: "एडवांस दर्ज करें",
     amount: "रकम",

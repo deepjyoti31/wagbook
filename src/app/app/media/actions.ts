@@ -9,7 +9,7 @@ import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
-import { readUpload, smallPath, store, type Upload } from "@/lib/media";
+import { BUCKET, readUpload, smallPath, store, type Upload } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type { Messages } from "@/messages";
 
@@ -160,4 +160,36 @@ export async function addVaccination(_state: FormState, form: FormData): Promise
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   return { ok: fill(m.media.vaccination.recorded, { vaccine: parsed.data.vaccine }) };
+}
+
+/**
+ * Take a photo posted by mistake off an update, and delete its file. Owners
+ * only (D29; the database refuses anyone else, WB081, and Storage lets only
+ * owners delete). The parent's stay page stops showing it at once, because it
+ * shows only photos named on a visible update.
+ */
+export async function removeUpdatePhoto(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canDelete } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  if (!canDelete) return { error: m.errors.ownersDelete };
+  const updateId = Id.safeParse(form.get("updateId"));
+  const path = text(form, "path");
+  if (!updateId.success || !path) return { error: m.media.update.photoNotFound };
+  const supabase = await createClient();
+  const update = await supabase.from("stay_updates").select("booking_id, media_paths").eq("org_id", org.id).eq("id", updateId.data).maybeSingle();
+  if (update.error) return { error: friendlyError(update.error, t) };
+  if (!update.data || !update.data.media_paths.includes(path)) return { error: m.media.update.photoNotFound };
+
+  const { error } = await supabase
+    .from("stay_updates")
+    .update({ media_paths: update.data.media_paths.filter((p) => p !== path) })
+    .eq("org_id", org.id)
+    .eq("id", updateId.data);
+  if (error) return { error: friendlyError(error, t) };
+  // The update no longer names it, so nobody is shown it; a file left behind is only untidy.
+  const removed = await supabase.storage.from(BUCKET).remove([path, smallPath(path)]);
+  if (removed.error) console.error("removeUpdatePhoto: the file was not removed", updateId.data);
+  revalidatePath("/app", "layout");
+  redirect(`/app/bookings/${update.data.booking_id}?done=photo_removed`);
 }

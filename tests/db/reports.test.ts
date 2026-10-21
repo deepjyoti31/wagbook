@@ -126,12 +126,14 @@ describe("money", () => {
     const voided = await issueBill(manager, computeInvoice([{ description: "Wrong", quantity: 1, unitPriceMinor: 999900, taxRateBp: 1800 }], ctx, { roundToWholeUnit: true }));
     await as(db, user(manager), () => db.query("select public.void_invoice($1, 'Made by mistake')", [voided.id]));
 
+    // Advances on a stay that was later cancelled, and part of one refunded (a refund names its stay or bill).
+    const stay = await book(db, k, { pet: k.pets[2], start: "2030-05-01", end: "2030-05-03", status: "cancelled" });
     await as(db, user(manager), async () => {
-      const pay = "insert into public.payments (org_id, client_id, direction, amount_minor, method, received_on) values ($1, $2, $3, $4, 'upi', $5)";
-      await db.query(pay, [k.org, k.client, "in", 50000, "2027-01-10"]);
-      await db.query(pay, [k.org, k.client, "out", 10000, "2027-01-20"]);
-      await db.query(pay, [k.org, k.client, "in", 7000, "2027-02-01"]);
-      await db.query(pay, [k.org, k.client, "in", 99, "2026-12-31"]);
+      const pay = "insert into public.payments (org_id, client_id, booking_id, direction, amount_minor, method, received_on) values ($1, $2, $3, $4, $5, 'upi', $6)";
+      await db.query(pay, [k.org, k.client, stay, "in", 50000, "2027-01-10"]);
+      await db.query(pay, [k.org, k.client, stay, "out", 10000, "2027-01-20"]);
+      await db.query(pay, [k.org, k.client, stay, "in", 7000, "2027-02-01"]);
+      await db.query(pay, [k.org, k.client, stay, "in", 99, "2026-12-31"]);
       const spend = "insert into public.expenses (org_id, spent_on, category, amount_minor) values ($1, $2, $3, $4)";
       await db.query(spend, [k.org, "2027-01-05", "Food", 30000]);
       await db.query(spend, [k.org, "2027-02-28", "Repairs", 1000]);

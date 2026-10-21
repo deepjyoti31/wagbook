@@ -265,6 +265,32 @@ create trigger stay_updates_stamp_actor
   before insert or update on public.stay_updates
   for each row execute function public.stamp_actor('created_by');
 
+-- A photo taken off an update is a deletion, so it is for owners (D29), like
+-- deleting the file itself. The parent's stay page then stops showing it
+-- (stay_media_visible() looks for the path on a visible update). With no
+-- signed-in user (the database's own maintenance) it is let through.
+create function public.stay_updates_guard_media()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is not null
+     and exists (select 1 from unnest(old.media_paths) as p (path) where p.path <> all (new.media_paths))
+     and new.org_id not in (select public.my_org_ids_with_role(array['owner']::public.member_role[]))
+  then
+    raise exception 'WB081: only an owner can take a photo off an update' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.stay_updates_guard_media() is
+  'Trigger: only an owner takes a photo off an update (WB081). Adding photos is for any member.';
+
+create trigger stay_updates_guard_media
+  before update of media_paths on public.stay_updates
+  for each row execute function public.stay_updates_guard_media();
+
 create type public.incident_severity as enum ('low', 'medium', 'high');
 comment on type public.incident_severity is
   'low: worth noting. medium: the parent should be told today. high: the parent and a vet should be told now.';

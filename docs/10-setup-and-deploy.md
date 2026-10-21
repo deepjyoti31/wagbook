@@ -211,6 +211,10 @@ their factor: in the dashboard, Authentication, Users, open the person, and dele
 authentication". They can then sign in with the password and set it up again. Do this only after checking it really
 is them (a call on a number you already have).
 
+Until then, a person who saved their recovery codes (More, Two-step sign-in) can still work: "Use a recovery code
+instead" on the code page lets that one sign-in in, once per code (D43). A code cannot remove the lost phone from
+their account; that stays with you, as above. Removing the factor also voids every recovery code made for it.
+
 ### Check the browser protections after deploying
 
 ```bash

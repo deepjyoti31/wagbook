@@ -22,6 +22,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB090 to WB099 | Credit notes |
 | WB100 to WB109 | Booking requests from parents |
 | WB110 to WB119 | Day boarding packs |
+| WB120 to WB129 | Refunds |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -30,6 +31,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB003` | invoice not found<br>submission not found<br>parent not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
+| `WB006` | turn on two-step sign-in first | `20261008000100_foundation.sql` |
+| `WB007` | that recovery code is not right, or it has been used | `20261008000100_foundation.sql` |
 | `WB010` | unknown time zone "%" | `20261008000100_foundation.sql` |
 | `WB011` | a kennel must keep at least one active owner | `20261008000100_foundation.sql` |
 | `WB012` | you already own the maximum number of kennels | `20261008000100_foundation.sql` |
@@ -73,6 +76,9 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB052` | the currency and the month the financial year starts cannot change once a bill has been issued | `20261008000500_billing.sql` |
 | `WB053` | this pet was booked together with others. Bill the family together. | `20261008000500_billing.sql` |
 | `WB054` | that family booking was not found for this parent | `20261008000500_billing.sql` |
+| `WB055` | this day is part of a repeating booking. Bill the month's days together. | `20261008000500_billing.sql` |
+| `WB056` | that repeating booking was not found for this parent | `20261008000500_billing.sql` |
+| `WB057` | this day is on its month's bill. Cancel it and book the new day instead. | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
 | `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |
@@ -81,6 +87,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |
 | `WB074` | only an owner can erase a parent's details | `20261008001100_privacy.sql` |
 | `WB080` | only an owner or manager can change what an incident says | `20261008000400_daily_care.sql` |
+| `WB081` | only an owner can take a photo off an update | `20261008000400_daily_care.sql` |
 | `WB090` | a credit note is made against an issued bill | `20261008000500_billing.sql` |
 | `WB091` | say why the bill is being credited, in under 500 characters | `20261008000500_billing.sql` |
 | `WB092` | a credit note cannot take back more than is left on the bill | `20261008000500_billing.sql` |
@@ -97,3 +104,6 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB110` | a day boarding pack is for day boarding of the parent who bought it | `20261008000500_billing.sql` |
 | `WB111` | the pack is for % to %, and these days are outside it | `20261008000500_billing.sql` |
 | `WB112` | the pack has % days left | `20261008000500_billing.sql` |
+| `WB120` | a refund is made against a bill or a stay | `20261008000500_billing.sql` |
+| `WB121` | a refund can only give back what was paid over what the bill now comes to. Make a credit note first if the stay costs less. | `20261008000500_billing.sql` |
+| `WB122` | a refund can only give back the advance paid for this stay | `20261008000500_billing.sql` |

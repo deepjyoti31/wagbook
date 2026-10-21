@@ -75,6 +75,9 @@ export const core: typeof English = {
     notWaitingForCheckIn: "यह बुकिंग अब चेक इन के इंतज़ार में नहीं है। पेज रिफ़्रेश करें।",
     notCheckedIn: "इस पालतू का चेक इन नहीं हुआ है। पेज रिफ़्रेश करें।",
     constraints: {
+      bookings_waitlist_is_a_request: "वेटिंग लिस्ट में सिर्फ़ अनुरोध रह सकता है।",
+      invoices_series_month: "महीने के बिल पर महीने की पहली तारीख होती है।",
+      invoices_one_live_per_series_month: "दोहराई जाने वाली बुकिंग के इस महीने का बिल पहले से है। उसे बुकिंग से खोलें।",
       bookings_no_kennel_overlap: "उनमें से कुछ तारीखों पर उस केनेल में किसी दूसरे पेरेंट का पालतू है। दूसरा केनेल चुनें या तारीखें बदलें।",
       bookings_no_pet_overlap: "इन तारीखों में इस पालतू की पहले से एक बुकिंग है।",
       bookings_boarding_has_a_night: "बोर्डिंग में कम से कम एक रात होनी चाहिए। सिर्फ़ दिन के लिए हो तो डे बोर्डिंग चुनें।",
@@ -104,6 +107,15 @@ export const core: typeof English = {
     },
     // Shown in place of the database's English sentence, one per code (docs/reference/error-codes.md).
     codes: {
+      WB122: "रिफ़ंड में सिर्फ़ इस ठहराव का दिया गया एडवांस लौट सकता है।",
+      WB121: "रिफ़ंड में सिर्फ़ उतना लौटता है जितना बिल की अभी की रकम से ज़्यादा दिया गया। ठहराव सस्ता हुआ हो तो पहले क्रेडिट नोट बनाएं।",
+      WB120: "रिफ़ंड किसी बिल या ठहराव पर ही दर्ज होता है।",
+      WB081: "अपडेट से फ़ोटो सिर्फ़ मालिक हटा सकते हैं।",
+      WB057: "यह दिन अपने महीने के बिल पर है। इसे रद्द करें और नया दिन बुक करें।",
+      WB056: "इस पेरेंट की वह दोहराई जाने वाली बुकिंग नहीं मिली।",
+      WB055: "यह दिन दोहराई जाने वाली बुकिंग का हिस्सा है। महीने के दिनों का बिल एक साथ बनाएं।",
+      WB007: "वह रिकवरी कोड नहीं चला, या पहले ही इस्तेमाल हो चुका है।",
+      WB006: "पहले दो-चरण साइन इन चालू करें।",
       WB001: "पहले साइन इन करें।",
       WB002: "यह सिर्फ़ मालिक या मैनेजर कर सकते हैं।",
       WB003: "वह नहीं मिला।",
@@ -237,6 +249,12 @@ export const core: typeof English = {
     runsOutDuring: "{vaccine} {date} को खत्म हो रहा है, पालतू के घर जाने से पहले।",
   },
   today: {
+    checkOutEarly: "जल्दी चेक आउट करें",
+    waitlist: {
+      title: "वेटिंग लिस्ट के लिए केनेल खाली है",
+      about: "जिस क्रम में वे जुड़े। पेरेंट को बताएं, और उनके हां कहने पर बुकिंग पक्की करें।",
+      tell: "पेरेंट को बताएं",
+    },
     title: "आज",
     newBooking: "नई बुकिंग",
     done: {
@@ -286,6 +304,8 @@ export const core: typeof English = {
   },
   // Messages that open in WhatsApp, ready to send. Those to parents use the kennel's parent language.
   whatsapp: {
+    spaceFreeAsk: "पक्का करने के लिए जवाब दें, हम इसे आपके लिए रोक लेंगे।",
+    spaceFree: "नमस्ते {parent}, {kennel} से अच्छी ख़बर: {pet} के लिए अब एक केनेल खाली है।",
     bookingConfirmed: "नमस्ते {parent}, {kennel} में {pet} का ठहराव पक्का हो गया है।",
     checkIn: "चेक इन: {date}",
     checkOut: "चेक आउट: {date}",

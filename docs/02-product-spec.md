@@ -279,8 +279,12 @@ cancelling happens. A Calendar button opens C5.
 
 `/app/bookings/{id}`. The pet, kennel, status, dates, peak periods it touches and the pet's warning flags, then:
 
-- **Next**: for a request, Confirm booking. For a confirmed booking, the check-in checklist (D6) and Did not arrive.
-  For a pet in house, Check out, Send update, and Extend to today when it has stayed past its check-out date.
+- **Next**: for a request, Confirm booking, and Put on the waiting list or Take off the waiting list (C6b). For a
+  confirmed booking, the check-in checklist (D6) and Did not arrive. For a pet in house, Check out, Send update, and
+  Extend to today when it has stayed past its check-out date. A pet going home before its booked end gets two buttons
+  instead of Check out (D40): "Check out, bill to today" ends the stay today (a boarding stay keeps its first night),
+  so the bill is for the days stayed; "Check out, bill as booked" leaves the dates alone. A no-refund peak period is
+  named beside them.
 - **Parent's stay page**: the link, Copy link, Open it, and Send confirmation (WhatsApp, with dates, nights and the
   estimated total).
 - **Booked together**: the other pets of a family booking.
@@ -301,7 +305,11 @@ cancelling happens. A Calendar button opens C5.
   "Day boarding until 15 Apr, then staying nights from 16 Apr." The database refuses a first night outside the stay
   (`bookings_boarding_from_inside_stay`).
 - **The pet's own routines** (D2) and what the parent said about food, health, allergies and behaviour.
-- **Cancel**, with a reason (required), and a warning when the stay touches a no-refund peak period.
+- **Cancel**, with a reason (required), and a warning when the stay touches a no-refund peak period. When an advance was
+  paid it says so; after cancelling, the page lists what was paid and refunded, and owners and managers record a refund
+  of the advance there, never more than was paid (`WB122`, D40). A stay with an issued bill is credited on its bill.
+- **Updates**: owners can take a photo posted by mistake off an update, after a second tap (D29). The file is deleted
+  and the parent's stay page stops showing it; the database refuses anyone else (`WB081`).
 
 After a step that changes the status, the page comes back saying what happened. The bill is M4.
 
@@ -336,18 +344,37 @@ parent's packs when ticked (on by default; the pack ending soonest first), at �
 offers "Pay from the pack" for a day not yet on one. The database keeps a pack within its days, dates and parent
 (`WB110` to `WB112`); a cancelled day gives its day back; a request holds none until confirmed.
 
+**Billed by the month (M23, D41).** The days of a series are billed together, a calendar month at a time: Make the bill
+for October 2027 on any day's booking page builds one bill for that month's days that are not requests or cancelled,
+one line for each price ("Day boarding: Tofu, 12 days in October 2027 (2, 4, 7 ... Oct)") and each day's extras with
+its date. Days paid from a pack are a line at ₹0. Advances paid on any day of the month count against it. A day of a
+series is never billed on its own (`WB055`), a month has one live bill
+(`invoices_one_live_per_series_month`), and a day on an issued month's bill cannot move into another month (`WB057`).
+
 ### C5. Calendar. Built.
 
 `/app/calendar`. Kennels down the side, fourteen days across, Earlier and Later to move, scrolling sideways on a phone
 with the kennel column fixed. A row of "in house of kennels" per day from `occupancy_by_day()`, red when full. Each cell
 shows the pet holding that kennel that night (green when in house, grey when booked, red when still here after its
 check-out date) and opens the booking. An empty cell from today on opens New booking for that kennel and day. Pets with
-no kennel yet are counted in a last row. Requests are not shown; a note says how many there are.
+no kennel yet are counted in a last row. Requests and the waiting list (M22) follow under "Requests and waiting list
+(no space held)": one row each, the pet's name and "Request" or "Waiting", and its days in yellow with a dashed edge,
+opening the request. The waiting list comes first. Up to 30 are drawn; a note says when there are more.
 
 ### C6. Requests. Built.
 
 Save as request in New booking. A request holds no space and is not counted for capacity or kennels. Confirm booking on
 its page turns it into a confirmed booking, and only then do the database's space rules apply.
+
+### C6b. Waiting list. Built (M21, D42).
+
+A request can wait for a kennel: Add to the waiting list in New booking, or Put on the waiting list on a request's
+page. The database stamps when it joined (its place in line, which nobody can move), and it leaves the list when it is
+confirmed or cancelled (`bookings_stamp_status`). The request's page says "Number 2 on the waiting list" and whether a
+kennel is free for it now; the bookings list and the calendar mark it. When a kennel frees up for a waiting stay on
+every one of its days (`waiting_list()`), Today lists it under "A kennel is free for the waiting list", first in line
+first, with Tell the parent (WhatsApp, with the dates) and Confirm booking. Two waiting for the last kennel may both
+show; whoever is confirmed second is refused as any booking would be (`WB020`).
 
 ### C7. Peak periods. Built.
 
@@ -376,9 +403,11 @@ linking to the Care screen, a prompt when forms from parents are waiting, then t
 - **Arriving**: confirmed bookings due today or earlier (so yesterday's no-show is still visible, marked "Was due").
   Each has a kennel picker offering only kennels free for the whole stay, and Check in.
 - **In house**: checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
-  parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves. A pet
+  parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves; a pet
+  booked for longer gets "Check out early", which opens its booking to choose how to bill it (D40). A pet
   still here after its check-out date also gets Extend to today, which moves the check-out date to today, or says
   which pet the kennel is promised to and what to do instead.
+- **A kennel is free for the waiting list** (above the care counts, only when there is one): see C6b.
 
 Pet flags (for example "bite history" or "escape risk") show in red on every row.
 
@@ -475,6 +504,13 @@ been credited) or part of it (an amount at one of the bill's tax rates), with a 
 (`CN/27-28/0001`), its tax worked out as on the bill, and never takes back more than is left (`WB092`). The bill page
 lists its credit notes; what is owed drops by them, and below zero says how much was paid over, for a refund.
 
+**When the stay changed (M20, D40).** An issued bill whose stays now come to less than it (a pet billed only to today,
+dates shortened, a stay or a day cancelled) shows "The stay changed": what the stays now come to, and Credit ₹2,400 for
+owners and managers (staff are told to ask one). The credit note is worked out on the server, never taken from the
+form: for each tax rate on the bill, what it billed less what credit notes took back less what the stays now come to,
+under the bill's own tax treatment. A stay that now comes to nothing, on a bill not yet credited, is credited with the
+bill's own lines. Then the bill says how much was paid over, and the refund amount is filled in.
+
 Pets booked together are billed together: Make the family bill puts each pet's stay and extras on one bill
 (`billForFamily()`), with every pet of the family that is not a request or cancelled. A pet of a family is never billed
 on its own (`WB053`); advances on any of the pets count against the family's bill (D27).
@@ -497,6 +533,10 @@ On a bill: Record payment (amount defaults to what is due, method, date, referen
 owners and managers can record a refund. On a booking before its bill: Record advance. Issuing the bill takes in the
 advances for that stay, and payments on a cancelled bill move to the next one for the same stay. Wagbook records
 payments; it never moves money.
+
+A refund (D40) gives back only what the parent paid and is not owed: on a bill, what was paid over the bill less its
+credit notes (`WB121`, so a stay that got cheaper is credited first and the tax return sees why); on a stay with no
+bill, the advance paid for it (`WB122`); and it always names a bill or a stay (`WB120`).
 
 ### E4. Expenses. Built.
 
@@ -579,7 +619,7 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
 | Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase; `npm run setup:local` points the app at it (README, "Try it on your own computer"). No public demo (D28). |
-| Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. |
+| Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. Recovery codes (M24, D43): ten one-use codes, made on the same page and shown once; "Use a recovery code instead" on the code page lets that one session in without the phone. |
 | Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
 | Scripts only from Wagbook itself | Built (M9): a Content-Security-Policy with a fresh nonce for every page (D23) |
 

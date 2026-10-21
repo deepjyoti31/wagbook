@@ -92,6 +92,30 @@ describe("photos on the parent's stay page", () => {
   });
 });
 
+describe("taking a photo off an update", () => {
+  it("is for owners, and the parent's stay page stops showing it", async () => {
+    const manager = await addMember(db, k, "manager");
+    const b = await book(db, k, { pet: k.pets[1], start: "2027-07-01", end: "2027-07-03", status: "checked_in" });
+    const wrong = `${k.org}/updates/u9/1.jpg`;
+    const right = `${k.org}/updates/u9/2.jpg`;
+    for (const name of [wrong, right]) await upload(staff, name);
+    const update = await as(db, user(staff), async () =>
+      (await db.query<{ id: string }>("insert into public.stay_updates (org_id, booking_id, pet_id, body, media_paths) values ($1, $2, $3, 'Playing', $4) returning id", [k.org, b, k.pets[1], [wrong, right]])).rows[0].id,
+    );
+    const t = await tokenOf(b);
+    expect(await visibleTo(t)).toContain(wrong);
+
+    const takeOff = (actor: string) => as(db, user(actor), () => db.query("update public.stay_updates set media_paths = array_remove(media_paths, $2) where id = $1", [update, wrong]));
+    for (const actor of [staff, manager]) expect((await errorOf(() => takeOff(actor))).message).toContain("WB081");
+    // Changing what an update says is still for anyone.
+    await as(db, user(staff), () => db.query("update public.stay_updates set body = 'Playing in the yard' where id = $1", [update]));
+    await takeOff(k.owner);
+    const left = await visibleTo(t);
+    expect(left).not.toContain(wrong);
+    expect(left).toContain(right);
+  });
+});
+
 describe("files stay in their kennel", () => {
   it("refuses a photo, certificate or update that points into another kennel's folder", async () => {
     const theirs = `${other.org}/updates/x/1.jpg`;

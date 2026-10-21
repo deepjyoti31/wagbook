@@ -1192,3 +1192,211 @@ test("a regular buys a pack of days, and repeating day boarding is paid from it"
   await page.getByRole("link", { name: "Neha Placeholder" }).click();
   await expect(page.getByText(/10 days: 3 of 10 days left/)).toBeVisible();
 });
+
+/** Add a pet and its parent, as a manager does on Pets. */
+async function addPet(page: Page, phone: string, parent: string, pet: string) {
+  await page.goto("/app/dogs/new");
+  await page.getByLabel("Mobile number").fill(phone);
+  await page.getByLabel("Name").first().fill(parent);
+  await page.locator("input[name=petName]").fill(pet);
+  await page.getByRole("button", { name: "Save pet" }).click();
+  await page.waitForURL(/\/app\/dogs$/);
+}
+
+/** The month a kennel date is in, as the app writes it in English: "October 2027". */
+const monthName = (date: string) => new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+
+// Juno's stay, used again by the photo test below.
+let junoBooking = "";
+
+test("a pet goes home early: billed to today, the paid bill credited for the nights not stayed, and the difference refunded", async ({ page }) => {
+  await signIn(page, "manager");
+  await addPet(page, "9800000411", "Ravi Sample", "Juno");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(3));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  junoBooking = new URL(page.url()).pathname;
+
+  // Paid in advance, in full: three nights at ₹1,200.
+  await page.getByRole("button", { name: "Make bill" }).click();
+  await page.getByRole("button", { name: "Issue bill" }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+  await page.getByRole("button", { name: "Record payment" }).click();
+  await expect(page.getByText("Payment recorded.")).toBeVisible();
+
+  await page.goto(junoBooking);
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+  // On Today, going home early opens the booking, which asks how to bill it.
+  await page.goto("/app");
+  await page.getByRole("listitem").filter({ hasText: "Juno" }).getByRole("link", { name: en.today.checkOutEarly }).click();
+  await expect(page.getByText(/Going home early\?/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByRole("button", { name: en.booking.step.checkOutToToday }).click();
+  await expect(page.getByText(en.booking.done.checked_out_early)).toBeVisible();
+  // Gone home on the day it came: a boarding stay is at least its first night.
+  await expect(page.getByText("Boarding, 1 x ₹1,200")).toBeVisible();
+
+  await page.locator("a[href^='/app/bills/']").first().click();
+  await expect(page.getByRole("heading", { name: en.bill.difference.title })).toBeVisible();
+  await expect(page.getByText(/now come to ₹1,200\. The bill is ₹2,400 more than that/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByRole("button", { name: "Credit ₹2,400" }).click();
+  await page.waitForURL(/done=credited/);
+  await expect(page.getByRole("heading", { name: en.bill.difference.title })).toHaveCount(0);
+  await expect(page.getByText("₹2,400 was paid more than the bill now comes to.", { exact: false })).toBeVisible();
+
+  // A refund of more than was paid over is refused by the database.
+  const form = page.locator("form").filter({ has: page.getByRole("button", { name: en.payments.recordRefund }) });
+  await form.getByLabel(en.payments.amount).fill("2500");
+  await form.getByRole("button", { name: en.payments.recordRefund }).click();
+  await expect(page.getByText(/refund can only give back what was paid over/i)).toBeVisible();
+  await form.getByLabel(en.payments.amount).fill("2400");
+  await form.getByRole("button", { name: en.payments.recordRefund }).click();
+  await expect(page.getByText(en.payments.refundRecorded)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(en.bill.nothingDue)).toBeVisible();
+});
+
+test("an owner takes a photo posted by mistake off an update, and the parent no longer sees it", async ({ page, browser }) => {
+  await signIn(page, "staff");
+  await page.goto(`${junoBooking}/update`);
+  await page.getByLabel("How is the pet doing?").fill("Juno is settling in.");
+  await page.locator("input[name=photos]").setInputFiles({ name: "wrong.jpg", mimeType: "image/jpeg", buffer: await photoWithLocation(page) });
+  await expect(page.locator("img[src^='blob:']").first()).toBeVisible();
+  await page.getByRole("button", { name: "Save update" }).click();
+  await expect(page.getByText("Saved. It is on the parent's stay page now.")).toBeVisible();
+  await page.goto(junoBooking);
+  // Staff are not offered it.
+  await expect(page.getByText(en.booking.updates.removePhoto)).toHaveCount(0);
+  const link = (await page.getByText(/\/s\/[0-9a-f]{64}/).innerText()).trim();
+
+  await page.context().clearCookies();
+  await signIn(page, "owner");
+  await page.goto(junoBooking);
+  await page.getByText(en.booking.updates.removePhoto).click();
+  await expect(page.getByText(en.booking.updates.removePhotoWarning)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByRole("button", { name: "Delete photo 1" }).click();
+  await expect(page.getByText(en.booking.done.photo_removed)).toBeVisible();
+
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link);
+  await expect(parent.page.getByText("Juno is settling in.")).toBeVisible();
+  await expect(parent.page.locator("a[target=_blank] img")).toHaveCount(0);
+  await parent.context.close();
+});
+
+test("a request waits on the waiting list, is shown on the calendar, and Today offers it once a kennel is free", async ({ page }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
+  await page.getByLabel("Check-in date").fill(day(120));
+  await page.getByLabel("Check-out date").fill(day(123));
+  await page.getByRole("button", { name: en.newBooking.addToWaitlist }).click();
+  await expect(page.getByText(en.booking.savedAsRequest)).toBeVisible();
+  await expect(page.getByText(en.booking.waitlist.badge, { exact: true })).toBeVisible();
+  await expect(page.getByText(/Number \d+ on the waiting list\./)).toBeVisible();
+  // The house has room on those days.
+  await expect(page.getByText(en.booking.waitlist.spaceNow)).toBeVisible();
+  const request = new URL(page.url()).pathname;
+
+  await page.goto(`/app/calendar?from=${day(120)}`);
+  await expect(page.getByText(en.calendar.requestsTitle)).toBeVisible();
+  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: /Juno/ }) });
+  await expect(row.getByRole("rowheader")).toContainText(en.calendar.waiting);
+  await expect(row.getByRole("link").first()).toHaveAttribute("title", "Juno, on the waiting list");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  await page.goto("/app");
+  const offered = page.getByRole("listitem").filter({ hasText: "Juno" }).filter({ has: page.getByRole("link", { name: en.today.waitlist.tell }) });
+  await expect(offered).toBeVisible();
+  await expect(offered.getByRole("link", { name: en.today.waitlist.tell })).toHaveAttribute("href", /wa\.me\/919800000411\?text=Hi%20Ravi%20Sample%2C%20good%20news/);
+  await offered.getByRole("button", { name: en.booking.step.confirm }).click();
+  await expect(page.getByText(en.booking.done.confirmed)).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe(request);
+  await expect(page.getByText(en.booking.waitlist.badge, { exact: true })).toHaveCount(0);
+});
+
+test("the days of a repeating series are billed together, a month at a time", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
+  await page.locator("select[name=kind]").selectOption("daycare");
+  await page.getByLabel("Check-in date").fill(day(150));
+  await page.getByText(en.newBooking.repeat, { exact: true }).click();
+  for (const box of await page.locator("input[name=repeat_day]").all()) await box.check();
+  await page.locator("input[name=repeat_until]").fill(day(156));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+
+  const month = monthName(day(150));
+  const sameMonth = [150, 151, 152, 153, 154, 155, 156].filter((n) => day(n).slice(0, 7) === day(150).slice(0, 7)).length;
+  await expect(page.getByText(en.booking.bill.seriesNote)).toBeVisible();
+  await page.getByRole("button", { name: `Make the bill for ${month}` }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
+  await expect(page.getByText(new RegExp(`Day boarding: Juno, ${sameMonth} days? in ${month}`))).toBeVisible();
+  await expect(page.getByRole("link", { name: `Juno's day boarding in ${month}` })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await page.getByRole("button", { name: "Issue bill" }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+
+  await page.goto("/app/bills");
+  await expect(page.getByText(`Ravi Sample, Juno, day boarding in ${month}`).first()).toBeVisible();
+});
+
+test("a person who lost their phone signs in with a recovery code, once", async ({ page }) => {
+  test.setTimeout(150_000);
+  const email = `recovery-${Date.now()}@example.test`;
+  await page.goto("/login?mode=signup");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByLabel("Kennel name").fill("Recovery Kennel");
+  await page.getByLabel("Link name").fill(`recovery-${Date.now() % 100000}`);
+  await page.getByLabel("Your name").fill("Ira");
+  await page.getByRole("button", { name: /Create/ }).click();
+  await page.waitForURL(/\/app\/more\/kennels/);
+
+  await page.goto("/app/more/two-step");
+  await page.getByRole("button", { name: en.twoStep.start }).click();
+  const secret = (await page.locator("p.font-mono").innerText()).trim();
+  await page.getByLabel(en.twoStep.code).fill(await freshCode(secret, new Set()));
+  await page.getByRole("button", { name: en.twoStep.confirm, exact: true }).click();
+  await expect(page.getByText(en.twoStep.isOn)).toBeVisible();
+  await expect(page.getByText(en.twoStep.recovery.none)).toBeVisible();
+  await page.getByRole("button", { name: en.twoStep.recovery.make }).click();
+  await expect(page.getByText(en.twoStep.recovery.shown)).toBeVisible();
+  const codes = (await page.locator("ol li").allInnerTexts()).map((c) => c.trim());
+  expect(codes).toHaveLength(10);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  const signInWithRecovery = async (code: string) => {
+    await page.goto("/app/more");
+    await page.getByRole("button", { name: en.more.signOut }).click();
+    await page.waitForURL(/\/login/);
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/login\/code/);
+    await page.getByText(en.auth.code.useRecovery).click();
+    await page.getByLabel(en.auth.code.recoveryLabel).fill(code);
+    await page.getByRole("button", { name: en.auth.code.continue }).last().click();
+  };
+
+  await signInWithRecovery(codes[0]);
+  await page.waitForURL(/\/app\/more\/two-step/);
+  await expect(page.getByText(en.twoStep.recovery.usedOne)).toBeVisible();
+  await expect(page.getByText("9 codes left.")).toBeVisible();
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/app$/);
+
+  // The same code does not work twice.
+  await signInWithRecovery(codes[0]);
+  await expect(page.getByText(en.auth.code.recoveryWrong)).toBeVisible();
+  await expect(page).toHaveURL(/\/login\/code/);
+});

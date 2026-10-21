@@ -64,6 +64,7 @@ export function errorCodes(): string {
     "| WB090 to WB099 | Credit notes |",
     "| WB100 to WB109 | Booking requests from parents |",
     "| WB110 to WB119 | Day boarding packs |",
+    "| WB120 to WB129 | Refunds |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

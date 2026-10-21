@@ -194,7 +194,12 @@ and optionally the invoice it settles.
 
 - An **advance** is a payment with no invoice yet. Tie it to the invoice later.
 - A **refund** is a payment with `direction = 'out'`. The amount is always positive. Only owners and managers can
-  record one.
+  record one, and only of money paid and not owed (D40): on a bill, up to what was paid over its total less its credit
+  notes (`WB121`); on a stay with no bill, up to its advance (`WB122`); always against a bill or a stay (`WB120`). So a
+  stay that got cheaper is credited first, and the return shows why the money went back.
+- A **stay that changed** after its bill was issued (a pet billed only to today at an early check-out, dates shortened,
+  a stay or a day cancelled) is credited, never re-billed: the bill page offers a credit note for what the bill is over
+  what its stays now come to, one line for each tax rate on the bill, worked out under the bill's own tax treatment.
 - `recorded_by` is stamped by the database.
 - `invoice_balances` gives total, paid and due per invoice.
 
@@ -302,6 +307,10 @@ Write the answers in your own records, not in this repository.
    acceptable on a tax invoice?
 10. Which rate and SAC apply to boarding, day boarding and grooming (998612, 996311 or another), and is any of it
     exempt?
+11. When a parent cancels and I keep their advance (a no-refund peak period, say), is the money kept a cancellation
+    charge that needs its own bill, with tax? Wagbook records it as an advance on a cancelled stay, with no bill (D40).
+12. A regular's day boarding is billed once a month for the month's days (D41). Is a bill at the end of the month, for
+    days already given, issued in time?
 
 ## GSTR-1 files
 
@@ -313,6 +322,13 @@ and tax by SAC and rate, less credit notes) and docs (the numbers used, with can
 14-Apr-2027, places of supply 29-Karnataka, and the files have no byte order mark. The column names were written from
 the tool's templates as we know them: check them against the tool before the first upload. The HSN table's newer split
 into B2B and B2C rows is not done.
+
+## A month of a repeating series
+
+The days of a repeating day boarding series are billed a calendar month at a time (D41): one bill for the month's days
+that are not requests or cancelled (`invoices.series_id`, `series_month`), one line for each price, tax rate and code,
+the days added up and listed, then each day's extras with its date. A day of a series is never billed on its own
+(`WB055`), and a month has one live bill. A day on an issued month's bill cannot move into another month (`WB057`).
 
 ## Day boarding packs
 

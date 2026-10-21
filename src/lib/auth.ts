@@ -62,14 +62,23 @@ export async function requireUser(): Promise<SessionUser> {
 
 /**
  * True when this person has turned on two-step sign-in and this session has
- * not given its code yet. Read from the session cookie, so it costs nothing;
- * the database decides for itself (session_meets_mfa), and requireOrg() asks
- * it when the cookie may be out of date.
+ * not given its code yet. Read from the session cookie, so it usually costs
+ * nothing; the database decides for itself (session_meets_mfa), and
+ * requireOrg() asks it when the cookie may be out of date. A session that
+ * used a recovery code (D43) still reads aal1 in its cookie, so then the
+ * database is asked.
  */
 export const owesCode = cache(async (): Promise<boolean> => {
   const supabase = await createClient();
   const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return data?.currentLevel === "aal1" && data.nextLevel === "aal2";
+  if (!(data?.currentLevel === "aal1" && data.nextLevel === "aal2")) return false;
+  return !(await usedRecoveryCode());
+});
+
+/** True when this session got in with a recovery code instead of the app (D43). */
+export const usedRecoveryCode = cache(async (): Promise<boolean> => {
+  const { data } = await (await createClient()).rpc("session_meets_mfa");
+  return data === true;
 });
 
 /** The signed-in user's organisations, oldest membership first. */

@@ -1,4 +1,4 @@
-import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type StayCharge, type TaxContext } from "./core";
+import { computeInvoice, stayLines, wholeStayCharge, type InvoiceTotals, type LineInput, type StayCharge, type TaxContext } from "./core";
 import type { Enums, Tables } from "./supabase/database.types";
 import type { Messages } from "@/messages";
 
@@ -52,7 +52,12 @@ export interface BillableItem {
  * expects, so staff can issue it.
  */
 export function billForBooking(org: OrgTax, petName: string, b: BillableBooking, items: readonly BillableItem[]): InvoiceTotals {
-  const lines = stayLines({
+  return computeInvoice(bookingLines(petName, b, items), taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
+}
+
+/** The lines of a booking's bill, before tax is worked out: its stay, then each extra. */
+export function bookingLines(petName: string, b: BillableBooking, items: readonly BillableItem[]): LineInput[] {
+  return stayLines({
     kind: b.kind,
     petName,
     startDate: b.start_date,
@@ -66,7 +71,6 @@ export function billForBooking(org: OrgTax, petName: string, b: BillableBooking,
     fromPack: Boolean(b.pass_id),
     addOns: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp, sacCode: i.sac_code })),
   });
-  return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
 }
 
 /**
@@ -87,7 +91,12 @@ export interface FamilyMember {
  * invoice_expected_lines() expects for the family, so staff can issue it.
  */
 export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): InvoiceTotals {
-  const lines = members.flatMap(({ petName, booking: b, items }) =>
+  return computeInvoice(familyLines(members), taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
+}
+
+/** The lines of a family's bill, before tax is worked out. */
+export function familyLines(members: readonly FamilyMember[]): LineInput[] {
+  return members.flatMap(({ petName, booking: b, items }) =>
     stayLines({
       kind: b.kind,
       petName,
@@ -109,6 +118,64 @@ export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): In
       })),
     }),
   );
+}
+
+/** A day of a repeating series, with its extras, for its month's bill. */
+export interface SeriesDay {
+  booking: BillableBooking;
+  items: readonly BillableItem[];
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * The lines of the bill for one month of a repeating day boarding series
+ * (D41): one line for each price, its days added up and listed, then each
+ * day's extras with its date. Grouped exactly as invoice_expected_lines() in
+ * the database groups a series (by price, tax rate and code), so staff can
+ * issue it. Stored with the bill, so in English like the rest of its lines.
+ */
+export function seriesLines(petName: string, month: string, days: readonly SeriesDay[]): LineInput[] {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const short = MONTHS[monthNumber - 1];
+  const groups = new Map<string, { line: LineInput; dates: number[]; fromPack: boolean }>();
+  const sorted = [...days].sort((a, b) => a.booking.start_date.localeCompare(b.booking.start_date));
+  for (const { booking: b } of sorted) {
+    const charges = b.charges ?? wholeStayCharge({ kind: b.kind, startDate: b.start_date, endDate: b.end_date, rateMinor: b.rate_minor, discountMinor: b.discount_minor });
+    for (const c of charges) {
+      const key = `${c.unitPriceMinor}|${b.tax_rate_bp}|${b.sac_code ?? ""}`;
+      const group = groups.get(key) ?? {
+        line: { description: "", quantity: 0, unitPriceMinor: c.unitPriceMinor, discountMinor: 0, taxRateBp: b.tax_rate_bp, sacCode: b.sac_code },
+        dates: [],
+        fromPack: true,
+      };
+      group.line = { ...group.line, quantity: group.line.quantity + c.quantity, discountMinor: (group.line.discountMinor ?? 0) + c.discountMinor };
+      group.dates.push(Number(b.start_date.slice(8, 10)));
+      group.fromPack &&= Boolean(b.pass_id);
+      groups.set(key, group);
+    }
+  }
+  const stays = [...groups.values()].map(({ line, dates, fromPack }) => {
+    const n = line.quantity;
+    const what = `${n} ${n === 1 ? "day" : "days"}${fromPack ? " from a pack" : ""}`;
+    const list = [...new Set(dates)].join(", ");
+    return { ...line, description: `Day boarding: ${petName}, ${what} in ${MONTHS_LONG[monthNumber - 1]} ${year} (${list} ${short})`.slice(0, 300) };
+  });
+  const extras = sorted.flatMap(({ booking: b, items }) =>
+    items.map((i) => ({
+      description: `${Number(b.start_date.slice(8, 10))} ${short}: ${i.description}`.slice(0, 300),
+      quantity: Number(i.quantity),
+      unitPriceMinor: i.unit_price_minor,
+      taxRateBp: i.tax_rate_bp,
+      sacCode: i.sac_code,
+    })),
+  );
+  return [...stays, ...extras];
+}
+
+/** Work out a bill's totals from its lines, with the kennel's tax and rounding. */
+export function billFor(org: OrgTax, lines: readonly LineInput[]): InvoiceTotals {
   return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
 }
 
@@ -200,4 +267,72 @@ export function partCredit(
 export function creditPayload(t: InvoiceTotals) {
   const { p_totals, p_lines } = draftPayload(t);
   return { p_totals, p_lines };
+}
+
+/** A line of a bill or a credit note, as far as crediting the difference needs it. */
+export interface MoneyLine {
+  tax_rate_bp: number;
+  taxable_minor: number;
+  total_minor: number;
+  sac_code: string | null;
+}
+
+/**
+ * The credit note a bill needs after its stays changed (D40): a pet went home
+ * early, a day was cancelled. For each tax rate on the bill, what it billed,
+ * less what credit notes already took back, less what the stays now come to;
+ * one line for each rate where that is more than nothing. Amounts are before
+ * tax when the bill's prices were, and including tax when they included it,
+ * as partCredit() takes them. Null when there is nothing to credit.
+ * `now` is the stays' lines as they would be billed today, worked out under
+ * the bill's own tax treatment (creditContext).
+ */
+export function differenceCredit(
+  bill: CreditableBill,
+  billed: readonly MoneyLine[],
+  credited: readonly MoneyLine[],
+  now: readonly MoneyLine[],
+  description: string,
+  roundToWholeUnit: boolean,
+): InvoiceTotals | null {
+  const gross = bill.is_tax_invoice && bill.prices_include_tax;
+  const amount = (l: MoneyLine) => (gross ? l.total_minor : l.taxable_minor);
+  const sum = (lines: readonly MoneyLine[], rate: number) => lines.filter((l) => l.tax_rate_bp === rate).reduce((a, l) => a + amount(l), 0);
+  const rates = [...new Set(billed.map((l) => l.tax_rate_bp))].sort((a, b) => a - b);
+  const lines: LineInput[] = rates.flatMap((rate) => {
+    const left = sum(billed, rate) - sum(credited, rate) - sum(now, rate);
+    if (left <= 0) return [];
+    const sacCode = billed.find((l) => l.tax_rate_bp === rate && l.sac_code)?.sac_code ?? null;
+    return [{ description: description.slice(0, 300), quantity: 1, unitPriceMinor: left, taxRateBp: rate, sacCode }];
+  });
+  if (lines.length === 0) return null;
+  return computeInvoice(lines, creditContext(bill), { roundToWholeUnit });
+}
+
+/** Lines worked out by computeInvoice, as differenceCredit() takes them. */
+export function moneyLines(t: InvoiceTotals): MoneyLine[] {
+  return t.lines.map((l) => ({ tax_rate_bp: l.taxRateBp, taxable_minor: l.taxableMinor, total_minor: l.totalMinor, sac_code: l.sacCode ?? null }));
+}
+
+/**
+ * Whether a bill's stays really changed since it was issued, so that the
+ * difference is worth offering as a credit note (D40): every stay is now
+ * cancelled, or the stays now have a line that is not on the bill as it
+ * stands (a night fewer, a day cancelled). A line a manager added to the bill
+ * by hand is not a change of stay, and is never offered back as one. Lines
+ * are compared by what they charge, as issue_invoice() compares them.
+ */
+export function staysChanged(
+  billed: readonly { quantity: number | string; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[],
+  now: InvoiceTotals,
+): boolean {
+  if (now.lines.length === 0) return billed.length > 0;
+  const key = (quantity: number, price: number, discount: number, rate: number) => `${quantity}|${price}|${discount}|${rate}`;
+  const onBill = billed.map((l) => key(Number(l.quantity), l.unit_price_minor, l.discount_minor, l.tax_rate_bp));
+  return now.lines.some((l) => {
+    const at = onBill.indexOf(key(l.quantity, l.unitPriceMinor, l.discountMinor, l.taxRateBp));
+    if (at === -1) return true;
+    onBill.splice(at, 1);
+    return false;
+  });
 }

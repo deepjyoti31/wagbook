@@ -374,6 +374,7 @@ export const petsArea: typeof English = {
     warningOne: "ಲಸಿಕೆಗಳು: {warnings}",
     warningMany: "ಪರಿಶೀಲಿಸಬೇಕಾದ ಲಸಿಕೆಗಳು: {warnings}",
     update: {
+      photoNotFound: "ಆ ಫೋಟೋ ಈಗ ಅಪ್‌ಡೇಟ್‌ನಲ್ಲಿ ಇಲ್ಲ.",
       body: "ಸಾಕುಪ್ರಾಣಿ ಹೇಗಿದೆ ಎಂದು ಒಂದು ಸಾಲು ಬರೆಯಿರಿ.",
       tooLong: "ಅಪ್‌ಡೇಟ್ ಅನ್ನು 2,000 ಅಕ್ಷರಗಳ ಒಳಗೆ ಬರೆಯಿರಿ.",
       photoFailed: "ಒಂದು ಫೋಟೋ ಉಳಿಸಲು ಆಗಲಿಲ್ಲ. ಏನೂ ಪೋಸ್ಟ್ ಆಗಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",

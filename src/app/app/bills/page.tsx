@@ -26,7 +26,7 @@ async function Bills() {
   const [invoices, balances] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, status, number, issued_on, created_at, total_minor, group_id, clients(full_name), bookings(pets(name))")
+      .select("id, status, number, issued_on, created_at, total_minor, group_id, series_id, series_month, clients(full_name), bookings(pets(name))")
       .eq("org_id", org.id)
       .order("created_at", { ascending: false })
       .limit(300),
@@ -36,14 +36,26 @@ async function Bills() {
 
   // A family's bill names every pet on it.
   const groups = [...new Set(invoices.data.flatMap((i) => (i.group_id ? [i.group_id] : [])))];
-  const familyPets = groups.length
-    ? await supabase.from("bookings").select("group_id, pets(name)").eq("org_id", org.id).in("group_id", groups).in("status", [...BILLABLE_IN_FAMILY]).order("created_at")
-    : { data: [], error: null };
-  if (familyPets.error) throw new Error("Could not load bills.");
+  // A month of a repeating series (D41) names its pet and its month.
+  const seriesIds = [...new Set(invoices.data.flatMap((i) => (i.series_id ? [i.series_id] : [])))];
+  const [familyPets, seriesPets] = await Promise.all([
+    groups.length
+      ? supabase.from("bookings").select("group_id, pets(name)").eq("org_id", org.id).in("group_id", groups).in("status", [...BILLABLE_IN_FAMILY]).order("created_at")
+      : Promise.resolve({ data: [], error: null }),
+    seriesIds.length
+      ? supabase.from("bookings").select("series_id, pets(name)").eq("org_id", org.id).in("series_id", seriesIds).limit(seriesIds.length * 40)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (familyPets.error || seriesPets.error) throw new Error("Could not load bills.");
   const petsOf = (i: (typeof invoices.data)[number]) =>
     i.group_id
       ? familyPets.data.filter((b) => b.group_id === i.group_id).map((b) => b.pets?.name).filter(Boolean).join(", ")
-      : (i.bookings?.pets?.name ?? "");
+      : i.series_id && i.series_month
+        ? fill(m.bills.seriesMonth, {
+            pet: seriesPets.data.find((b) => b.series_id === i.series_id)?.pets?.name ?? "",
+            month: new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${i.series_month}T00:00:00Z`)),
+          })
+        : (i.bookings?.pets?.name ?? "");
 
   const due = new Map(balances.data.map((b) => [b.invoice_id, b.due_minor ?? 0]));
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
@@ -58,14 +70,15 @@ async function Bills() {
       <li key={i.id}>
         <Link href={`/app/bills/${i.id}`} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-ground">
           <span className="font-bold">{i.number ?? m.labels.invoiceStatus.draft}</span>
-          <span className="min-w-0 flex-1">
-            {i.clients?.full_name}
-            {petsOf(i) ? `, ${petsOf(i)}` : ""}
-          </span>
           {i.status === "void" ? <Badge tone="alert">{m.labels.invoiceStatus.void}</Badge> : null}
           {i.status === "issued" && d <= 0 ? <Badge tone="good">{m.bills.paid}</Badge> : null}
           {i.status === "issued" && d > 0 ? <Badge tone="attention">{fill(m.bills.due, { amount: money(d) })}</Badge> : null}
-          <span className="tabular-nums text-slate">{money(i.total_minor)}</span>
+          <span className="ml-auto tabular-nums text-slate">{money(i.total_minor)}</span>
+          {/* On its own line, so a long name or a month of a series never runs under the badges on a phone. */}
+          <span className="w-full">
+            {i.clients?.full_name}
+            {petsOf(i) ? `, ${petsOf(i)}` : ""}
+          </span>
           <span className="w-full text-sm text-slate">
             {i.issued_on ? formatDate(i.issued_on, locale) : fill(m.bills.started, { date: formatDate(i.created_at.slice(0, 10), locale) })}
           </span>

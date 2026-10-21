@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { BILLABLE_IN_FAMILY, billForBooking, billForFamily, billFromLines, creditPayload, draftPayload, partCredit, PAYMENT_METHODS, type CreditableBill } from "@/lib/billing";
-import { isISODate, parseMoney, todayIn, toStayCharges, type LineInput } from "@/lib/core";
+import { billFor, billFromLines, creditPayload, draftPayload, partCredit, PAYMENT_METHODS, type CreditableBill } from "@/lib/billing";
+import { isISODate, parseMoney, todayIn, type LineInput } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
+import { creditForChange, monthOf, stayBillLines, type BillScope } from "@/lib/stay-bill";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
@@ -19,7 +20,8 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
  * Make the bill for a booking, or bring an existing draft back in line with
  * the booking. A stay has one live bill at a time (the database insists), so
  * an issued bill is simply opened. Pets booked together are billed together:
- * the family's bill has every pet that is not a request or cancelled.
+ * the family's bill has every pet that is not a request or cancelled. A day
+ * of a repeating series is billed with the other days of its month (D41).
  */
 export async function makeBill(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
@@ -28,56 +30,38 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   if (!bookingId.success) return { error: t.m.errors.bookingNotFound };
   const supabase = await createClient();
 
-  const booking = await supabase.from("bookings").select("id, client_id, group_id, status").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
+  const booking = await supabase.from("bookings").select("id, client_id, group_id, series_id, start_date").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
   if (booking.error) return { error: friendlyError(booking.error, t) };
   if (!booking.data) return { error: t.m.errors.bookingNotFound };
-  const group = booking.data.group_id;
+  const b = booking.data;
+  const scope: BillScope = b.group_id ? { group: b.group_id } : b.series_id ? { series: b.series_id, month: monthOf(b.start_date) } : { booking: b.id };
 
-  // The stays this bill covers: the booking, or its family.
-  const stays = await supabase
-    .from("bookings")
-    .select("id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
-    .eq("org_id", org.id)
-    .in(group ? "group_id" : "id", [group ?? booking.data.id])
-    .in("status", group ? [...BILLABLE_IN_FAMILY] : ["confirmed", "checked_in", "checked_out", "no_show"])
-    .order("created_at")
-    .order("id");
-  if (stays.error) return { error: friendlyError(stays.error, t) };
-  if (stays.data.length === 0) return { error: t.m.bill.errors.nothingToBill };
+  // The stays this bill covers, and what they come to.
+  const built = await stayBillLines(supabase, org.id, scope);
+  if ("error" in built) return { error: friendlyError(built.error, t) };
+  if (built.lines.length === 0) return { error: t.m.bill.errors.nothingToBill };
 
-  const [items, existing, charges] = await Promise.all([
-    supabase
-      .from("booking_items")
-      .select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code")
-      .eq("org_id", org.id)
-      .in("booking_id", stays.data.map((b) => b.id))
-      .order("created_at"),
-    supabase
-      .from("invoices")
-      .select("id, status")
-      .eq("org_id", org.id)
-      .eq(group ? "group_id" : "booking_id", group ?? booking.data.id)
-      .neq("status", "void")
-      .maybeSingle(),
-    // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
-    supabase.rpc("stay_charges", { p_org: org.id, p_bookings: stays.data.map((b) => b.id) }),
-  ]);
-  if (items.error || existing.error || charges.error) return { error: friendlyError(items.error ?? existing.error ?? charges.error, t) };
-  const billable = stays.data.map((b) => ({ ...b, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
+  let existingQuery = supabase.from("invoices").select("id, status").eq("org_id", org.id).neq("status", "void");
+  if ("group" in scope) existingQuery = existingQuery.eq("group_id", scope.group);
+  else if ("series" in scope) existingQuery = existingQuery.eq("series_id", scope.series).eq("series_month", scope.month);
+  else existingQuery = existingQuery.eq("booking_id", scope.booking);
+  const existing = await existingQuery.maybeSingle();
+  if (existing.error) return { error: friendlyError(existing.error, t) };
   if (existing.data?.status === "issued") redirect(`/app/bills/${existing.data.id}`);
 
-  // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
-  const totals = group
-    ? billForFamily(
-        org,
-        billable.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
-      )
-    : billForBooking(org, billable[0].pets?.name ?? "Pet", billable[0], items.data);
+  const totals = billFor(org, built.lines);
   let invoiceId = existing.data?.id;
   if (!invoiceId) {
     const created = await supabase
       .from("invoices")
-      .insert({ org_id: org.id, client_id: booking.data.client_id, booking_id: group ? null : booking.data.id, group_id: group })
+      .insert({
+        org_id: org.id,
+        client_id: b.client_id,
+        booking_id: "booking" in scope ? scope.booking : null,
+        group_id: "group" in scope ? scope.group : null,
+        series_id: "series" in scope ? scope.series : null,
+        series_month: "series" in scope ? scope.month : null,
+      })
       .select("id")
       .single();
     if (created.error) return { error: friendlyError(created.error, t) };
@@ -214,7 +198,9 @@ export async function voidBill(_state: FormState, form: FormData): Promise<FormS
  * and managers; the database checks again (issue_credit_note: WB002, WB092,
  * WB093). The whole bill, while nothing has been credited, copies the bill's
  * own lines, so every paisa matches. Part of it is one line, of the amount
- * typed, at one of the bill's tax rates.
+ * typed, at one of the bill's tax rates. The difference (D40) is what the
+ * bill's stays no longer come to, worked out here again, never taken from the
+ * form: one line for each tax rate.
  */
 export async function creditBill(_state: FormState, form: FormData): Promise<FormState> {
   const { org, canManage } = await requireOrg();
@@ -226,13 +212,14 @@ export async function creditBill(_state: FormState, form: FormData): Promise<For
   const reason = text(form, "reason");
   if (!reason) return { error: e.creditWhy };
   if (reason.length > 500) return { error: e.reasonTooLong };
-  const whole = form.get("how") === "whole";
+  let whole = form.get("how") === "whole";
+  const difference = form.get("how") === "difference";
 
   const supabase = await createClient();
   const [bill, lines, balance] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, number, status, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, taxable_minor, total_minor")
+      .select("id, number, status, booking_id, group_id, series_id, series_month, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, taxable_minor, total_minor")
       .eq("org_id", org.id)
       .eq("id", invoiceId.data)
       .maybeSingle(),
@@ -251,8 +238,20 @@ export async function creditBill(_state: FormState, form: FormData): Promise<For
   const what = text(form, "description") ?? fill(t.m.bill.credit.whatDefault, { number: b.number ?? "" });
   const rates = [...new Set(lines.data.map((l) => l.tax_rate_bp))];
 
+  let changed: ReturnType<typeof creditPayload> | null = null;
+  if (difference) {
+    const change = await creditForChange(supabase, org.id, b, what, org.round_invoice_totals);
+    if ("error" in change) return { error: friendlyError(change.error, t) };
+    if (!change.credit) return { error: e.nothingChanged };
+    // Nothing left to bill and nothing credited yet: the whole bill, with its own lines.
+    if (change.whole) whole = true;
+    else changed = creditPayload(change.credit);
+  }
+
   let payload: ReturnType<typeof creditPayload>;
-  if (whole && (balance.data?.credited_minor ?? 0) === 0) {
+  if (changed) {
+    payload = changed;
+  } else if (whole && (balance.data?.credited_minor ?? 0) === 0) {
     // The bill's own lines, exactly as they were issued.
     payload = {
       p_totals: {

@@ -100,6 +100,9 @@ export const core = {
       passes_dates_in_order: "The pack must end after it starts, within two years.",
       invoices_one_live_per_booking: "This stay already has a bill. Open it from the booking.",
       invoices_one_live_per_family: "This family already has a bill. Open it from the booking.",
+      invoices_one_live_per_series_month: "This month of the series already has a bill. Open it from the booking.",
+      invoices_series_month: "A month's bill is named by the first day of the month.",
+      bookings_waitlist_is_a_request: "Only a request can be on the waiting list.",
     },
     // In English the database's own sentence is shown. Other languages show
     // these, one per code (docs/reference/error-codes.md).
@@ -109,6 +112,8 @@ export const core = {
       WB003: "That could not be found.",
       WB004: "This cannot be moved to another kennel.",
       WB005: "Enter the code from your authenticator app first.",
+      WB006: "Turn on two-step sign-in first.",
+      WB007: "That recovery code did not work, or it was used already.",
       WB010: "That time zone is not known.",
       WB011: "A kennel must keep at least one active owner.",
       WB012: "You already own the most kennels allowed.",
@@ -152,6 +157,9 @@ export const core = {
       WB052: "The currency and the month the financial year starts cannot change once a bill has been issued.",
       WB053: "This pet was booked together with others. Bill the family together.",
       WB054: "That family booking was not found for this parent.",
+      WB055: "This day is part of a repeating booking. Bill the month's days together.",
+      WB056: "That repeating booking was not found for this parent.",
+      WB057: "This day is on its month's bill. Cancel it and book the new day instead.",
       WB060: "Reports are for owners and managers.",
       WB061: "Choose a period of a year or less, with the start before the end.",
       WB070: "Only an owner or manager can download or erase a parent's details.",
@@ -160,6 +168,7 @@ export const core = {
       WB073: "This parent's details have already been erased.",
       WB074: "Only an owner can erase a parent's details.",
       WB080: "Only an owner or manager can change what an incident says.",
+      WB081: "Only an owner can take a photo off an update.",
       WB090: "A credit note is made against an issued bill.",
       WB091: "Say why the bill is being credited, in under 500 characters.",
       WB092: "A credit note cannot take back more than is left on the bill.",
@@ -176,6 +185,9 @@ export const core = {
       WB110: "A day boarding pack is for day boarding of the parent who bought it.",
       WB111: "These days are outside the pack's dates.",
       WB112: "The pack does not have enough days left.",
+      WB120: "A refund is made against a bill or a stay.",
+      WB121: "A refund can only give back what was paid over what the bill now comes to. Make a credit note first if the stay costs less.",
+      WB122: "A refund can only give back the advance paid for this stay.",
     },
   },
   labels: {
@@ -278,6 +290,14 @@ export const core = {
     incident: "Incident",
     checkOut: "Check out",
     checkingOut: "Checking out",
+    // The waiting list (D42): requests a kennel is now free for, first in line first.
+    waitlist: {
+      title: "A kennel is free for the waiting list",
+      about: "In the order they joined. Tell the parent, and confirm once they say yes.",
+      tell: "Tell the parent",
+    },
+    // A pet going home before its booked end: opens the booking page, which asks how to bill it.
+    checkOutEarly: "Check out early",
     unknownPet: "Unknown pet",
     leavesToday: "Leaves today",
     wasDueToLeave: "Was due to leave {date}",
@@ -302,6 +322,9 @@ export const core = {
     thanks: "Thank you!",
     intakeHello: "Hello from {kennel}!",
     intakeAsk: "Please fill in your pet's details before the stay. It takes about 3 minutes:",
+    // To a parent on the waiting list when a kennel frees up (D42).
+    spaceFree: "Hi {parent}, good news from {kennel}: a kennel is now free for {pet}.",
+    spaceFreeAsk: "Reply to confirm and we will hold it for you.",
     greeting: "Hi {name}, ",
     askAbout: "Hi, I am asking about {pet}.",
     yourPet: "Your pet",

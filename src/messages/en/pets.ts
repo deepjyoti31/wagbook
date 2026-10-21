@@ -377,6 +377,7 @@ export const petsArea = {
       body: "Write a line about how the pet is doing.",
       tooLong: "Keep the update under 2,000 characters.",
       photoFailed: "A photo could not be saved. Nothing was posted. Try again.",
+      photoNotFound: "That photo is no longer on the update.",
     },
     tooMany: "Choose at most {n} photos.",
   },

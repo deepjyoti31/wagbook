@@ -82,6 +82,7 @@ async function Bookings({ searchParams }: Pick<PageProps<"/app/bookings">, "sear
                     </Badge>
                     {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
                     {b.group_id ? <Badge>{m.bookings.family}</Badge> : null}
+                    {b.waitlisted_at ? <Badge tone="attention">{m.booking.waitlist.badge}</Badge> : null}
                     {touching.map((p) => (
                       <Badge key={p.name} tone="attention">
                         {p.name}

@@ -54,7 +54,7 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 2. **Every tenant table has `org_id`, row level security, grants and policies.** Until the migration freeze they go
    in `…800_row_level_security.sql`, where the whole access model is read in one place; after it, in the new migration
    that creates the table. The test suite fails if a table has row level security off or no policy
-   (`invoice_counters` is the one deliberate exception, sealed with no policy at all).
+   (`invoice_counters` and `recovery_codes` are the deliberate exceptions, sealed with no policy at all).
 3. **Foreign keys between tenant tables are composite**: `(org_id, x_id) references x (org_id, id)`. A plain
    `x_id references x (id)` lets one kennel point at another kennel's row.
 4. **Every function sets `search_path = ''`** and schema-qualifies every name. After creating one:

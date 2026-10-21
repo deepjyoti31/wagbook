@@ -47,6 +47,8 @@ export interface WhatsappWords {
   thanks: string;
   intakeHello: string;
   intakeAsk: string;
+  spaceFree: string;
+  spaceFreeAsk: string;
 }
 
 function fillIn(template: string, vars: Record<string, string | number>): string {
@@ -79,6 +81,21 @@ export function bookingConfirmedMessage(w: WhatsappWords, i: BookingMessageInput
   }
   if (i.stayUrl) lines.push("", fillIn(w.followStay, { url: i.stayUrl }));
   return lines.join("\n");
+}
+
+/**
+ * Sent to a parent on the waiting list when a kennel frees up for their
+ * dates (D42). The kennel confirms the booking once they reply.
+ */
+export function spaceFreeMessage(w: WhatsappWords, i: Omit<BookingMessageInput, "nights" | "totalMinor" | "currency" | "stayUrl">, locale = "en-IN"): string {
+  return [
+    fillIn(w.spaceFree, { parent: i.parentName, pet: i.petName, kennel: i.kennelName }),
+    "",
+    fillIn(w.checkIn, { date: formatDate(i.startDate, locale) }),
+    fillIn(w.checkOut, { date: formatDate(i.endDate, locale) }),
+    "",
+    w.spaceFreeAsk,
+  ].join("\n");
 }
 
 /** Sent with the daily update. The sender attaches photos in WhatsApp. */
