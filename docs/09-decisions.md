@@ -862,3 +862,31 @@ cannot turn two-step off or set up a new phone until the administrator removes t
 until then needs another code. A recovered session lasts as long as that sign-in does. Codes are 12 hex characters (48
 bits); guessing is limited by the sign-in rate limits.
 
+---
+
+## D44. Wagbook grows from a boarding register into the kennel's whole business
+
+**Status:** Decided, 21 October 2026, when the owner asked for appointments, a kitchen and food subscriptions before
+any production deployment.
+
+**Situation.** Every boarding milestone (M2 to M24) is built. A kennel rarely only boards: the example kennel in `13`
+also grooms, runs a pool, trains, holds birthday parties, picks dogs up from home, and cooks fresh food for its boarders
+and for dogs at home, sold as a trial and a subscription delivered twice a week. Today those live in notebooks,
+spreadsheets and WhatsApp, apart from the parents and pets Wagbook already knows.
+
+**Decision.** Wagbook takes them on, as milestones M25 to M44 in `08`: services booked by time, stock, recipes, food
+subscriptions with deliveries, the cook plan and delivery runs, cancellation credit, and a rota. Each area is switched
+on per kennel, so a kennel that only boards sees none of it. They share Wagbook's parents, pets, bills, payments and
+reminders rather than having their own.
+
+**Why.** One parent record across boarding and food is the point: a boarder's parent becomes a food customer and a food
+customer comes back to board, and staff see one history. A kennel kitchen is also small enough that general food
+delivery software would be heavier than the job.
+
+**Cost.** Wagbook roughly doubles in size, and the new areas bring a fourth role (riders, M31), more public pages
+(M32, M41) and goods with their own tax questions (`06`, questions 13 to 15). The migration freeze waits until the
+schema these milestones need has settled.
+
+**Look again** if a kennel using Wagbook would rather connect a separate food or delivery tool, or if the food side
+grows beyond one kitchen.
+

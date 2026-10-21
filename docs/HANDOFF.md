@@ -2,12 +2,17 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after milestones M20 to M24 (refunds, the waiting list, requests on the calendar, a
-series billed by the month, small fixes).
+Last updated: 21 October 2026, after the roadmap was extended to M44 (D44: appointments, a kitchen, food
+subscriptions and deliveries). No code changed in that session.
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M24. The latest, asked for by the owner on 21 October 2026: a pet going
+Every boarding milestone is built, M2 to M24. On 21 October 2026 the owner asked for Wagbook to run the rest of a
+kennel's business before going to production, so the roadmap now runs to M44 (D44): groundwork, stock, recipes, food
+portions, subscriptions, the cook plan, delivery runs and food ordering (Phase 1, M25 to M33); services by appointment,
+grooming, swimming, training, parties and packages (Phase 2, M34 to M37); cancellation credit, pick-up from home,
+health papers, a public booking form and reviews (Phase 3, M38 to M42); and the rota and rough edges (Phase 4, M43 and
+M44). None of it is started. The latest built work, asked for by the owner on 21 October 2026: a pet going
 home early is billed to today or as booked, an issued bill whose stays got shorter is credited for the difference, and a
 refund can never give back more than was paid over (M20, D40, `WB120` to `WB122`); a request can wait on a waiting list
 in order, and Today offers it when a kennel frees up (M21, D42); requests and the waiting list show on the calendar
@@ -160,7 +165,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
+**Building: start M25** (groundwork for more than boarding), then go through Phase 1 in order (M26 to M33). Each
+milestone first writes its section in `02-product-spec.md`. The owner has said production is not soon, so the launch
+steps above can wait and migrations stay editable in place until then. Steps 1 to 8 need the owner; M25 onwards
+does not.
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -306,6 +314,15 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
   signs in from one connection at shift change should not reach 20; tell us if it does.
 
+Raised by the plan for M25 to M44 (21 October 2026), to answer before or during each milestone:
+
+- Do boarders always eat kitchen food, or does a parent choose (own food stays possible)? M30 assumes a choice per
+  pet, with kitchen food the default when the kitchen is on.
+- Riders get a fourth role that sees only their run (M31). Or are riders always staff who see everything?
+- Is a food subscription paid weekly in advance only, or monthly too? M29 allows both, weekly by default.
+- Does credit from a cancellation (M38) expire silently after 12 months, or does the parent get a reminder first?
+- Grooming prices by size or by coat (M35): which does the kennel use? Boarding is the same price for every size.
+
 ## Known rough edges in what is built
 
 - A no-show uses a pack day. A series that runs across two months gets a bill for each month; days paid from a pack
@@ -355,6 +372,9 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 21 October 2026. Roadmap extended to M44 for appointments, the kitchen and food subscriptions (D44); the example
+  kennel's public rules for those added to `13`; questions 13 to 15 added for the accountant in `06`. Docs only.
 
 - 21 October 2026. M20 to M24, asked for by the owner: refunds and going home early (D40), the waiting list (D42),
   requests on the calendar, a series billed by the month (D41), removing a photo, recovery codes (D43). e2e walk

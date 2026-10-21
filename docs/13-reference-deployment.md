@@ -82,6 +82,37 @@ The rest follows Wagbook's defaults, with nothing special to configure:
 | Get a new dog's details before arrival | The intake link, sent on WhatsApp. |
 | Let parents see how their dog is doing | The stay page link. |
 
+## Beyond boarding
+
+The same kennel's public rules for everything else it offers, as a parent reads them. Milestones M25 to M44 in `08`
+build them (D44).
+
+| Rule | Milestone |
+| --- | --- |
+| Open at every hour; drop off and collect any time, with no handover fee | Nothing to configure. |
+| Pick-up and drop from anywhere in the city, priced by location and quoted when the booking is confirmed | M39 |
+| Grooming: bath, brush, drying, tidy-up, booked as its own service | M34, M35 |
+| Swimming: 90 minutes, one dog at a time, supervised, life jacket provided, same vaccination rules as boarding | M34, M36 |
+| Training: puppy basics, leash manners, recall; priced by the trainer and confirmed after booking | M36 |
+| Birthday parties: three hours in the yard, the birthday dog plus one dog friend it already knows, up to five people | M36 |
+| Birthday cakes: dog-safe, the dog's name on top, ordered at least 24 hours ahead, delivered across the city for a charge by area | M28, M36 |
+| A longer "holiday" stay with extra play, a pool session and a groom before going home, priced on request | M37 |
+| Boarders eat food from the kennel's own kitchen | M30 |
+| Food for dogs at home: a one-time trial, then a subscription priced per kilo, portioned to the dog's weight, delivered chilled twice a week at a chosen time, each delivery covering three to four days | M28, M29 |
+| Four recipes rotating, a new one each delivery, repeating every two weeks; recipes balanced by a pet dietician with a vitamin and mineral mix; never onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar or preservatives | M27 |
+| Portions of about 3%, 2.5% and 2% of body weight a day for small, medium and large dogs, adjusted after the first week | M28 |
+| Ordering food online: enter an address and be told at once whether it is delivered to; pay by UPI in advance; subscriptions paid a week at a time | M32 |
+| Pause or cancel food any time with 24 hours' notice before the next delivery; prepaid deliveries not yet cooked are refunded | M29 |
+| A damaged, late or wrong delivery reported within 24 hours with a photo is replaced or refunded | M31 |
+| Weekday stays, grooming, swims, training and parties are fully refunded with 24 hours' notice | M38 |
+| Weekend and holiday nights (Saturdays, Sundays, the state's public holidays and long weekends around them) are not refunded once confirmed, but kept as credit; so is a weekday cancelled with less than 24 hours' notice. Each night of a stay follows its own rule | M38 |
+| Credit is spent on any stay or service within 12 months of the cancelled date | M38 |
+| When the kennel cancels, the parent chooses a full refund or credit | M38 |
+| Refunds go back to the UPI account that paid, within 7 working days | Recorded as a refund (M20). |
+| At the door: DHPPiL, anti-rabies and kennel cough vaccines within 12 months, deworming and tick treatment up to date, and every dog over 12 months spayed or neutered | M40 |
+| Booking any service online: send the dates, the kennel calls to confirm, nothing is charged online | M41 |
+| Caretakers on site day and night | M43 |
+
 ## What this kennel needs that is not built yet
 
 In the order it needs them. This is why the roadmap is in the order it is.
@@ -91,3 +122,5 @@ In the order it needs them. This is why the roadmap is in the order it is.
 3. The meal round and the play timetable on a phone (M3).
 4. Bills and payments (M4).
 5. Photos to parents (M5).
+6. The kitchen and food subscriptions (M25 to M33), then appointments (M34 to M37), then the rest of the rules above
+   (M38 to M43).

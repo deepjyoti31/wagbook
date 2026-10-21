@@ -311,6 +311,13 @@ Write the answers in your own records, not in this repository.
     charge that needs its own bill, with tax? Wagbook records it as an advance on a cancelled stay, with no bill (D40).
 12. A regular's day boarding is billed once a month for the month's days (D41). Is a bill at the end of the month, for
     days already given, issued in time?
+13. If I cook and sell dog food (a trial, food by the kilo on a subscription delivered twice a week, birthday cakes),
+    what are the HSN code and rate for it, and does a delivery charge take the food's rate or its own? A subscription
+    is paid a week ahead: is that an advance, and when is the bill due (M29)?
+14. Does a kitchen that sells cooked pet food need a licence or registration of its own, and must anything be printed
+    on the pack label (M30)? (Not strictly tax; ask whom the accountant suggests.)
+15. When a parent keeps the value of a cancelled stay as credit for 12 months (M38), is that an advance I hold, and is
+    there tax when it is kept, when it is spent, or when it runs out unspent?
 
 ## GSTR-1 files
 
