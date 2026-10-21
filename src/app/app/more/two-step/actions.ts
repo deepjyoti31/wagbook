@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/auth";
-import { text, type FormState, type TwoStepSetup } from "@/lib/forms";
+import { friendlyError } from "@/lib/errors";
+import { text, type FormState, type RecoveryCodesState, type TwoStepSetup } from "@/lib/forms";
 import { getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -58,4 +59,18 @@ export async function turnOffTwoStep(): Promise<FormState> {
   await supabase.auth.refreshSession();
   revalidatePath("/app/more");
   return { ok: m.twoStep.turnedOff };
+}
+
+/**
+ * Ten new recovery codes (D43), replacing any made before, handed back to be
+ * shown once. The database makes them, keeps only their hashes, and makes
+ * them only for a session that gave its code from the app (WB005).
+ */
+export async function makeRecoveryCodes(): Promise<RecoveryCodesState> {
+  await requireOrg();
+  const t = await getAppI18n();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("make_recovery_codes");
+  if (error) return { error: friendlyError(error, t) };
+  return { codes: data ?? [] };
 }

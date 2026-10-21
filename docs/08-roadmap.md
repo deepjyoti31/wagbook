@@ -394,11 +394,75 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M20. Refunds when a stay ends early or is cancelled
+
+- [x] Finished 21 October 2026. Asked for by the owner (D40).
+
+**Build**
+
+1. [x] Check-out before the booked end asks: bill to today (the stay ends today, keeping a boarding stay's first night)
+   or bill as booked. Today sends an early leaver to its booking to choose.
+2. [x] An issued bill whose stays now come to less offers a credit note for the difference, worked out on the server for
+   each tax rate on the bill; then the refund amount is filled in.
+3. [x] A cancelled stay lists its advance, and owners and managers refund it there.
+4. [x] The database refuses a refund of more than was paid over the bill (`WB121`) or than the advance (`WB122`), and a
+   refund that names neither (`WB120`).
+
+---
+
+## M21. Waiting list when full
+
+- [x] Finished 21 October 2026. Asked for by the owner (D42).
+
+**Build**
+
+1. [x] Add to the waiting list in New booking, and Put on or Take off on a request's page. The database stamps each
+   one's place in line and clears it when the request is answered.
+2. [x] `waiting_list()` says which waiting requests would fit now; Today lists them first in line first, with Tell the
+   parent on WhatsApp and Confirm booking.
+
+---
+
+## M22. Requests and the waiting list on the calendar
+
+- [x] Finished 21 October 2026. Asked for by the owner.
+
+**Build**
+
+1. [x] One row a request under the kennels, the waiting list first, its days drawn as holding no space.
+
+---
+
+## M23. A day boarding series billed by the month
+
+- [x] Finished 21 October 2026. Asked for by the owner (D41).
+
+**Build**
+
+1. [x] A bill for a month of a series: its days that are not requests or cancelled, one line for each price, each
+   day's extras with its date. Staff can issue it as the database prices it.
+2. [x] A day of a series is never billed alone (`WB055`); a month has one live bill; a day on an issued month's bill
+   cannot move into another month (`WB057`).
+
+---
+
+## M24. Small fixes
+
+- [x] Finished 21 October 2026. Asked for by the owner.
+
+**Build**
+
+1. [x] Two vaccination cards per pet on the intake form: already built in M13 (a card for each of two vaccines); the
+   open question in `HANDOFF.md` was stale and is removed.
+2. [x] Owners take a photo posted by mistake off an update; its file is deleted (D29, `WB081`).
+3. [x] Recovery codes for two-step sign-in (D43).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
-- Waiting list when full.
 - Multiple sites under one owner with combined reports.
 - Staff rota and attendance.
 - Stock of food and medicines.

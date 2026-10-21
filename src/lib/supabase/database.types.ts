@@ -152,6 +152,7 @@ export type Database = {
           group_id: string | null;
           series_id: string | null;
           pass_id: string | null;
+          waitlisted_at: string | null;
           public_token: string;
           created_by: string | null;
           created_at: string;
@@ -191,6 +192,7 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           pass_id?: string | null;
+          waitlisted_at?: string | null;
           public_token?: string;
           created_by?: string | null;
           created_at?: string;
@@ -230,6 +232,7 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           pass_id?: string | null;
+          waitlisted_at?: string | null;
           public_token?: string;
           created_by?: string | null;
           created_at?: string;
@@ -1082,6 +1085,8 @@ export type Database = {
           client_id: string;
           booking_id: string | null;
           group_id: string | null;
+          series_id: string | null;
+          series_month: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           number: string | null;
           fiscal_year: string | null;
@@ -1118,6 +1123,8 @@ export type Database = {
           client_id: string;
           booking_id?: string | null;
           group_id?: string | null;
+          series_id?: string | null;
+          series_month?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1154,6 +1161,8 @@ export type Database = {
           client_id?: string;
           booking_id?: string | null;
           group_id?: string | null;
+          series_id?: string | null;
+          series_month?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1849,6 +1858,37 @@ export type Database = {
           },
         ];
       };
+      recovery_codes: {
+        Row: {
+          id: string;
+          user_id: string;
+          factor_id: string;
+          code_hash: string;
+          used_at: string | null;
+          used_in_session: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          factor_id: string;
+          code_hash: string;
+          used_at?: string | null;
+          used_in_session?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          factor_id?: string;
+          code_hash?: string;
+          used_at?: string | null;
+          used_in_session?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+        ];
+      };
       reminders_sent: {
         Row: {
           id: string;
@@ -2078,6 +2118,8 @@ export type Database = {
           paid_minor: number | null;
           credited_minor: number | null;
           due_minor: number | null;
+          series_id: string | null;
+          series_month: string | null;
         };
         Relationships: [];
       };
@@ -2183,11 +2225,11 @@ export type Database = {
         Returns: undefined;
       };
       invoice_bookings: {
-        Args: { p_org: string; p_booking: string; p_group: string };
+        Args: { p_org: string; p_booking: string; p_group: string; p_series?: string; p_month?: string };
         Returns: string[];
       };
       invoice_expected_lines: {
-        Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
+        Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"]; p_series?: string; p_month?: string };
         Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
       };
       issue_credit_note: {
@@ -2197,6 +2239,10 @@ export type Database = {
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
+      make_recovery_codes: {
+        Args: Record<PropertyKey, never>;
+        Returns: string[];
       };
       merge_clients: {
         Args: { p_keep: string; p_merge: string };
@@ -2229,6 +2275,10 @@ export type Database = {
       paths_in_org: {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
+      };
+      recovery_codes_left: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
       };
       renew_request_link: {
         Args: { p_client: string };
@@ -2294,9 +2344,17 @@ export type Database = {
         Args: { p_slug: string; p_payload: Json };
         Returns: Json;
       };
+      use_recovery_code: {
+        Args: { p_code: string };
+        Returns: number;
+      };
       void_invoice: {
         Args: { p_invoice: string; p_reason: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
+      waiting_list: {
+        Args: { p_org: string };
+        Returns: { booking_id: string; waitlisted_at: string; has_space: boolean }[];
       };
     };
     Enums: {

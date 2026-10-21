@@ -142,6 +142,10 @@ still take bookings. `allow_overbooking` on the organisation turns this one rule
 **peak_periods** are named date ranges (a festival week) with an optional no-refund flag and optional shorter play
 sessions.
 
+**Waiting list.** A request may carry `waitlisted_at`: when it joined the waiting list, stamped by the database and
+never moved while it waits, cleared when it is answered (D42). `waiting_list()` lists the waiting requests in order,
+with whether each would fit now.
+
 ## Daily care
 
 **care_items** are routines. With no pet, a routine applies to every pet in house ("Breakfast, 9:00"). With a pet, only
@@ -171,6 +175,10 @@ Covered properly in [06-billing-and-gst.md](06-billing-and-gst.md). In short:
   always positive. Optionally tied to an invoice.
 - **invoice_balances** is a view: total, paid and due for each invoice.
 - **expenses** are what the kennel spent, with an optional receipt file. Owners and managers only.
+
+A bill covers one stay (`booking_id`), a family booked together (`group_id`), a month of a repeating series
+(`series_id` with `series_month`, D41), or none of them (a one-off bill); never two. A refund is a payment out that
+gives back only what was paid and is not owed (`payments_check_refund`, D40).
 
 ## Reports
 

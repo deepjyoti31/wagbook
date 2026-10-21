@@ -70,7 +70,7 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
     petIds: first ? [first, ...new Set(also)] : [],
     kennelId: text(form, "kennelId"),
     notes: text(form, "notes"),
-    status: form.get("intent") === "requested" ? "requested" : "confirmed",
+    status: form.get("intent") === "requested" || form.get("intent") === "waitlist" ? "requested" : "confirmed",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const b = { ...parsed.data, ...stay.data };
@@ -149,11 +149,14 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
   const seriesId = days ? crypto.randomUUID() : null;
   // The second of two sharing pays the shared kennel price, and the usual price for any night it has the kennel to itself.
   const sharedMinor = together ? (service.data?.shared_price_minor ?? null) : null;
+  // A request that waits for a kennel (D42). The database stamps its place in line with the real time.
+  const waitlisted_at = form.get("intent") === "waitlist" ? new Date().toISOString() : null;
   const base = {
     org_id: org.id,
     client_id: clientId,
     kind: b.kind,
     status: b.status,
+    waitlisted_at,
     tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
     sac_code: service.data?.sac_code ?? null,
     notes: b.notes,
@@ -176,6 +179,7 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
         sac_code: base.sac_code,
         notes: b.notes,
         group_id: groupId,
+        waitlisted_at,
         ...paid(i),
       }));
   const { data, error } = await supabase.from("bookings").insert(rows).select("id");
@@ -336,9 +340,34 @@ async function moveStatus(
   redirect(`/app/bookings/${id.data}?done=${to}`);
 }
 
-/** Accept a request: from now on it holds space, so capacity is checked. */
+/** Accept a request: from now on it holds space, so capacity is checked. It leaves the waiting list. */
 export async function confirmRequest(_state: FormState, form: FormData): Promise<FormState> {
   return moveStatus(form, ["requested"], "confirmed");
+}
+
+/**
+ * Put a request on the waiting list, or take it off (D42). Anyone may: staff
+ * take the calls. The database stamps the time it joined, which is its place
+ * in line, and clears it when the request is answered.
+ */
+export async function setWaitlist(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: t.m.errors.bookingNotFound };
+  const join = form.get("intent") === "join";
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ waitlisted_at: join ? new Date().toISOString() : null })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .eq("status", "requested")
+    .select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.booking.errors.changed };
+  revalidatePath("/app", "layout");
+  redirect(`/app/bookings/${id.data}?done=${join ? "waitlisted" : "unwaitlisted"}`);
 }
 
 export async function cancelBooking(_state: FormState, form: FormData): Promise<FormState> {

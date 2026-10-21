@@ -168,11 +168,12 @@ grant update (org_id, created_by, full_name, phone, alt_phone, email, address, c
 -- client may send.
 revoke insert, update on public.bookings from authenticated;
 grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
-              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
+              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id,
+              waitlisted_at)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
-              vaccinations_checked_at, notes, group_id)
+              vaccinations_checked_at, notes, group_id, waitlisted_at)
   on public.bookings to authenticated;
 -- Who may change a price is decided by a trigger, not here: owners, managers
 -- and staff all sign in as the same role. See bookings_guard_price().
@@ -244,10 +245,10 @@ create policy reminders_sent_delete on public.reminders_sent for delete to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, group_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, series_id, series_month, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -375,6 +376,10 @@ $$;
 
 -- Needed to evaluate the policies and constraints above.
 grant execute on function public.session_meets_mfa() to authenticated;
+-- Two-step sign-in recovery codes (recovery_codes itself has no policy and no grant).
+grant execute on function public.make_recovery_codes() to authenticated;
+grant execute on function public.use_recovery_code(text) to authenticated;
+grant execute on function public.recovery_codes_left() to authenticated;
 grant execute on function public.my_org_ids() to authenticated;
 grant execute on function public.my_org_ids_with_role(public.member_role[]) to authenticated;
 grant execute on function public.stay_range(public.booking_kind, date, date) to authenticated;
@@ -392,6 +397,7 @@ grant execute on function public.set_my_language(text) to authenticated;
 grant execute on function public.merge_clients(uuid, uuid) to authenticated;
 grant execute on function public.occupancy_by_day(uuid, date, date) to authenticated;
 grant execute on function public.available_kennels(uuid, public.booking_kind, date, date, uuid, integer) to authenticated;
+grant execute on function public.waiting_list(uuid) to authenticated;
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;

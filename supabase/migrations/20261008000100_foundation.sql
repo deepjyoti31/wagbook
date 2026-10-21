@@ -324,6 +324,34 @@ create trigger memberships_protect_last_owner
 -- Supabase Auth then issues a session at assurance level aal2. Until then,
 -- with only a password, they reach nothing of any kennel. So a stolen password
 -- alone is useless, whatever the app does.
+--
+-- A person who has lost their phone can still get in with one of their
+-- recovery codes (D43). Each code works once, for one session: the session
+-- that used it counts as having given its code, in this database only.
+-- Supabase Auth still sees it at aal1, so the lost authenticator cannot be
+-- removed from it; whoever runs the installation does that (docs/10). A code
+-- belongs to the authenticator it was made for, so turning two-step sign-in
+-- off, or setting up a new phone, makes the old codes worthless.
+create table public.recovery_codes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  factor_id uuid not null,
+  code_hash text not null check (code_hash ~ '^[0-9a-f]{64}$'),
+  used_at timestamptz,
+  used_in_session text,
+  created_at timestamptz not null default now(),
+  unique (user_id, code_hash),
+  constraint recovery_codes_used_together check ((used_at is null) = (used_in_session is null))
+);
+comment on table public.recovery_codes is
+  'Two-step sign-in recovery codes, one row a code, kept only as a hash. Sealed: no policy, no grant; only make_recovery_codes(), use_recovery_code() and recovery_codes_left() reach it.';
+comment on column public.recovery_codes.factor_id is 'The authenticator (auth.mfa_factors) the code was made for. Once that is gone or replaced, the code no longer counts.';
+comment on column public.recovery_codes.code_hash is 'SHA-256 of the code, in hex. The code itself is shown once and never stored.';
+comment on column public.recovery_codes.used_in_session is 'The session (the session_id in its token) that used the code. That session counts as having given its code.';
+
+alter table public.recovery_codes enable row level security;
+create index recovery_codes_user_idx on public.recovery_codes (user_id);
+
 create function public.session_meets_mfa()
 returns boolean
 language sql
@@ -335,10 +363,111 @@ as $$
       or not exists (
         select 1 from auth.mfa_factors f
         where f.user_id = (select auth.uid()) and f.status = 'verified'
+      )
+      or exists (
+        select 1
+        from public.recovery_codes r
+        join auth.mfa_factors f on f.id = r.factor_id and f.user_id = r.user_id and f.status = 'verified'
+        where r.user_id = (select auth.uid())
+          and r.used_in_session = (select auth.jwt()) ->> 'session_id'
       );
 $$;
 comment on function public.session_meets_mfa() is
-  'True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1). SECURITY DEFINER because only it may read auth.mfa_factors.';
+  'True unless the signed-in user has a two-step sign-in factor and this session has not used it yet (assurance level aal1), nor a recovery code for that factor. SECURITY DEFINER because only it may read auth.mfa_factors and recovery_codes.';
+
+-- Ten new recovery codes for the signed-in person, replacing any earlier
+-- ones, shown once. Only from a session that gave its code from the app
+-- (aal2): a session let in by a recovery code cannot make more.
+create function public.make_recovery_codes()
+returns setof text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := (select auth.uid());
+  v_factor uuid;
+  v_code text;
+begin
+  -- SECURITY DEFINER: recovery_codes is sealed, and auth.mfa_factors is read here.
+  if v_user is null then
+    raise exception 'WB001: sign in first' using errcode = '42501';
+  end if;
+  select f.id into v_factor
+  from auth.mfa_factors f
+  where f.user_id = v_user and f.status = 'verified'
+  order by f.created_at desc
+  limit 1;
+  if v_factor is null then
+    raise exception 'WB006: turn on two-step sign-in first' using errcode = '23514';
+  end if;
+  if coalesce((select auth.jwt()) ->> 'aal', 'aal1') <> 'aal2' then
+    raise exception 'WB005: enter the code from your authenticator app first' using errcode = '42501';
+  end if;
+  delete from public.recovery_codes r where r.user_id = v_user;
+  for i in 1..10 loop
+    -- 48 random bits, written as three groups of four: 3f9a-0c71-be42.
+    v_code := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
+    v_code := substr(v_code, 1, 4) || '-' || substr(v_code, 5, 4) || '-' || substr(v_code, 9, 4);
+    insert into public.recovery_codes (user_id, factor_id, code_hash)
+    values (v_user, v_factor, encode(sha256(convert_to(replace(v_code, '-', ''), 'UTF8')), 'hex'));
+    return next v_code;
+  end loop;
+end;
+$$;
+comment on function public.make_recovery_codes() is
+  'Makes ten one-use recovery codes for the signed-in person''s authenticator, replacing earlier ones, and returns them (the only time they are seen). Needs a session that gave its code (WB005) and two-step sign-in on (WB006).';
+
+-- Use a recovery code instead of the authenticator app, for this session.
+-- Returns how many codes are left.
+create function public.use_recovery_code(p_code text)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := (select auth.uid());
+  v_session text := (select auth.jwt()) ->> 'session_id';
+  v_id uuid;
+begin
+  -- SECURITY DEFINER: recovery_codes is sealed. The caller is the person whose code it is.
+  if v_user is null or v_session is null then
+    raise exception 'WB001: sign in first' using errcode = '42501';
+  end if;
+  select r.id into v_id
+  from public.recovery_codes r
+  join auth.mfa_factors f on f.id = r.factor_id and f.user_id = r.user_id and f.status = 'verified'
+  where r.user_id = v_user
+    and r.used_at is null
+    and r.code_hash = encode(sha256(convert_to(regexp_replace(lower(coalesce(p_code, '')), '[^0-9a-f]', '', 'g'), 'UTF8')), 'hex')
+  for update of r;
+  if v_id is null then
+    raise exception 'WB007: that recovery code is not right, or it has been used' using errcode = '22023';
+  end if;
+  update public.recovery_codes r set used_at = now(), used_in_session = v_session where r.id = v_id;
+  return public.recovery_codes_left();
+end;
+$$;
+create function public.recovery_codes_left()
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer
+  from public.recovery_codes r
+  join auth.mfa_factors f on f.id = r.factor_id and f.user_id = r.user_id and f.status = 'verified'
+  where r.user_id = (select auth.uid()) and r.used_at is null;
+$$;
+comment on function public.recovery_codes_left() is
+  'How many unused recovery codes the signed-in person has for their current authenticator. SECURITY DEFINER because recovery_codes is sealed.';
+
+comment on function public.use_recovery_code(text) is
+  'Spends one of the signed-in person''s recovery codes on this session, which then counts as having given its code (session_meets_mfa). Returns the codes left. A wrong or used code raises WB007.';
 
 create function public.my_org_ids()
 returns setof uuid

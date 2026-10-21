@@ -40,6 +40,14 @@ The first release will be 0.1.0. Everything below is in it.
 - Day boarding regulars: days that repeat each week, and packs of days bought up front that a day is paid from.
 - GSTR-1 files for the month (b2b, b2cl, b2cs, credit notes, HSN and documents) for a GST-registered kennel to hand
   its accountant.
+- A pet going home early is billed to today or as booked, your choice at check-out. A bill already paid offers a
+  credit note for the nights not stayed, then the refund; a cancelled stay's advance is refunded from its booking.
+  Refunds can never be more than was paid over.
+- A waiting list: a request waits in the order it joined, and Today tells you when a kennel frees up for it, with a
+  message to the parent ready on WhatsApp. Requests and the waiting list show on the calendar.
+- A regular's repeating day boarding is billed once a month, on one bill.
+- Owners can take a photo posted by mistake off an update.
+- Recovery codes for two-step sign-in, for when a phone is lost.
 
 ### For whoever runs it
 

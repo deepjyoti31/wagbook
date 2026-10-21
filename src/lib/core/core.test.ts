@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "../../messages/en";
 import {
-  addDays, amountInWords, billMessage, bookingConfirmedMessage, dailySummaryMessage, chargeableUnits, computeInvoice, computeLine,
+  addDays, amountInWords, billMessage, bookingConfirmedMessage, spaceFreeMessage, dailySummaryMessage, chargeableUnits, computeInvoice, computeLine,
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
   isValidGstin, isValidVpa, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
   quoteStay, todayIn, toDecimalString, upiLink, whatsappLink, yardsNeeded,
@@ -224,6 +224,17 @@ describe("whatsapp", () => {
       kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-17", nights: 3,
     }, "hi-IN");
     expect(hindi).toContain("चेक इन: 14 अप्रैल 2027");
+  });
+  it("tells a parent on the waiting list that a kennel is free, with the dates", () => {
+    const text = spaceFreeMessage(en.whatsapp, { kennelName: "Happy Tails", parentName: "Asha", petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-17" });
+    expect(text.split("\n")).toEqual([
+      "Hi Asha, good news from Happy Tails: a kennel is now free for Bruno.",
+      "",
+      "Check in: 14 Apr 2027",
+      "Check out: 17 Apr 2027",
+      "",
+      "Reply to confirm and we will hold it for you.",
+    ]);
   });
 });
 

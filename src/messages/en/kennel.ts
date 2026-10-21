@@ -51,7 +51,24 @@ export const kennelArea = {
     turnOff: "Turn off two-step sign-in",
     turningOff: "Turning off",
     turnedOff: "Two-step sign-in is off.",
-    lostPhoneNote: "Keep the app on your phone. If you lose the phone, whoever runs your Wagbook can turn this off for you.",
+    lostPhoneNote: "Keep the app on your phone. If you lose the phone, sign in with a recovery code, or ask whoever runs your Wagbook to turn this off for you.",
+    // Recovery codes (D43): one-use codes for when the phone is lost.
+    recovery: {
+      title: "Recovery codes",
+      about: "If you lose your phone, each code lets you sign in once without it. Write them down or save them somewhere safe, away from your phone.",
+      // {n} is how many are left; 0 means none have been made, or all are used.
+      left: { one: "One code left.", other: "{n} codes left." },
+      none: "You have no recovery codes. Make them now, so a lost phone does not lock you out.",
+      make: "Make recovery codes",
+      makeNew: "Make new recovery codes",
+      making: "Making",
+      replaces: "New codes replace any you made before.",
+      shown: "Your recovery codes. They are shown only now. Save them before you leave this page.",
+      copy: "Copy the codes",
+      // After signing in with a recovery code instead of the app.
+      usedOne: "You are in with a recovery code. It cannot be used again.",
+      newPhone: "To use a new phone, ask whoever runs your Wagbook to remove two-step sign-in from your account, then turn it on again here. Until then, each sign-in needs a recovery code.",
+    },
   },
   settings: {
     title: "Settings",
@@ -446,7 +463,12 @@ export const kennelArea = {
       continue: "Continue",
       checking: "Checking",
       wrong: "That code did not work. The code changes every 30 seconds: enter the one showing now.",
-      lostPhone: "Lost your phone? Ask whoever runs your Wagbook to turn two-step sign-in off for your account.",
+      lostPhone: "Lost your phone and your recovery codes? Ask whoever runs your Wagbook to turn two-step sign-in off for your account.",
+      // Recovery codes (D43), made on the two-step sign-in page.
+      useRecovery: "Use a recovery code instead",
+      recoveryHint: "One of the codes you saved when you turned on two-step sign-in. Each works once.",
+      recoveryLabel: "Recovery code",
+      recoveryWrong: "That recovery code did not work, or it was used already. Check it and try again.",
       signOut: "Sign out",
     },
   },

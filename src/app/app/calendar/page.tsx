@@ -2,14 +2,16 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { buttonStyles, Empty, Loading, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { addDays, calendarDays, calendarGrid, isISODate, isOverstaying, todayIn, type ISODate } from "@/lib/core";
-import { fill, plural } from "@/lib/i18n";
+import { addDays, calendarDays, calendarGrid, daysCovered, isISODate, isOverstaying, todayIn, type ISODate } from "@/lib/core";
+import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
 export const generateMetadata = () => appTitle((m) => m.calendar.title);
 
 const DAYS = 14;
+/** Requests drawn under the kennels; more are on the bookings list. */
+const MAX_REQUESTS = 30;
 
 export default function CalendarPage({ searchParams }: PageProps<"/app/calendar">) {
   return (
@@ -30,7 +32,7 @@ function dayLabel(date: ISODate, locale: string) {
 async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "searchParams">) {
   const params = await searchParams;
   const { org } = await requireOrg();
-  const { m, language, locale } = await getAppI18n();
+  const { m, locale } = await getAppI18n();
   const w = m.calendar;
   const today = todayIn(org.time_zone);
   const from = typeof params.from === "string" && isISODate(params.from) ? params.from : today;
@@ -49,9 +51,23 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
       .gte("end_date", from)
       .limit(5000),
     supabase.rpc("occupancy_by_day", { p_org: org.id, p_from: from, p_to: last }),
-    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "requested").lte("start_date", last).gte("end_date", from),
+    // Requests hold no space, so they are drawn under the kennels, each on its own row (the waiting list first).
+    supabase
+      .from("bookings")
+      .select("id, kind, start_date, end_date, waitlisted_at, pets(name)")
+      .eq("org_id", org.id)
+      .eq("status", "requested")
+      .lte("start_date", last)
+      .gte("end_date", from)
+      .order("waitlisted_at", { nullsFirst: false })
+      .order("start_date")
+      .limit(MAX_REQUESTS + 1),
   ]);
-  if (kennels.error || stays.error || occupancy.error) throw new Error("Could not load the calendar.");
+  if (kennels.error || stays.error || occupancy.error || requests.error) throw new Error("Could not load the calendar.");
+  const requestRows = requests.data
+    .slice(0, MAX_REQUESTS)
+    .map((r) => ({ ...r, covered: daysCovered({ kind: r.kind, startDate: r.start_date, endDate: r.end_date }, days) }))
+    .filter((r) => r.covered.some(Boolean));
 
   const held = new Set(stays.data.map((s) => s.kennel_id));
   // Kennels out of service are shown only while a stay still sits in one.
@@ -90,9 +106,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
         {from !== today ? nav(today, w.today) : null}
         {nav(addDays(from, DAYS), w.later)}
       </div>
-      {(requests.count ?? 0) > 0 ? (
+      {requests.data.length > MAX_REQUESTS ? (
         <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">
-          {plural(language, requests.count ?? 0, w.requests)}{" "}
+          {fill(w.moreRequests, { n: MAX_REQUESTS })}{" "}
           <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
             {w.seeBookings}
           </Link>
@@ -194,6 +210,37 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                   ))}
                 </tr>
               ) : null}
+              {requestRows.length > 0 ? (
+                <tr>
+                  <th scope="rowgroup" colSpan={days.length + 1} className="border-b border-t-2 border-rule bg-ground px-2 py-2 text-left font-semibold">
+                    <span className="sticky left-2">{w.requestsTitle}</span>
+                  </th>
+                </tr>
+              ) : null}
+              {requestRows.map((r) => {
+                const pet = r.pets?.name ?? w.pet;
+                return (
+                  <tr key={r.id}>
+                    <th scope="row" className="sticky left-0 z-10 max-w-24 border-b border-r border-rule bg-paper px-2 text-left text-xs font-semibold">
+                      <span className="block truncate">{pet}</span>
+                      <span className="block font-normal text-slate">{r.waitlisted_at ? w.waiting : w.request}</span>
+                    </th>
+                    {r.covered.map((on, i) => (
+                      <td key={days[i]} className="h-12 border-b border-rule p-0">
+                        {on ? (
+                          <Link
+                            href={`/app/bookings/${r.id}`}
+                            className="flex h-12 items-center overflow-hidden whitespace-nowrap border-2 border-dashed border-marigold bg-marigold-soft px-1 font-semibold text-ink"
+                            title={fill(r.waitlisted_at ? w.waitingFor : w.requestFor, { pet })}
+                          >
+                            {r.start_date === days[i] || i === 0 || !r.covered[i - 1] ? pet.slice(0, 9) : <span className="sr-only">{pet}</span>}
+                          </Link>
+                        ) : null}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

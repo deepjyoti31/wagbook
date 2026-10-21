@@ -33,3 +33,21 @@ export async function verifyCode(_state: FormState, form: FormData): Promise<For
   if (error) return { error: w.wrong };
   redirect(safeDestination(text(form, "next"), await siteOrigin(), "/app"));
 }
+
+/**
+ * Sign in with a recovery code instead of the app, when the phone is lost
+ * (D43). The code works once, for this session only; the database checks it
+ * (use_recovery_code). Then the two-step page says what to do next.
+ */
+export async function signInWithRecoveryCode(_state: FormState, form: FormData): Promise<FormState> {
+  if (!isSupabaseConfigured()) redirect("/setup");
+  const { m } = await getVisitorI18n();
+  const w = m.auth.code;
+  if (await isRateLimited()) return { error: m.errors.slowDown };
+  const code = (text(form, "recoveryCode") ?? "").toLowerCase().replace(/[^0-9a-f]/g, "");
+  if (code.length !== 12) return { error: w.recoveryWrong };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("use_recovery_code", { p_code: code });
+  if (error) return { error: w.recoveryWrong };
+  redirect("/app/more/two-step?recovered=1");
+}

@@ -35,6 +35,8 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Night | `end_date - start_date` | The unit of boarding. 14th to 17th is three nights. |
 | Check-in date, check-out date | `start_date`, `end_date` | Dates at the kennel. |
 | Requested | `status = 'requested'` | Asked for, not confirmed. Holds no space. |
+| Waiting list | `bookings.waitlisted_at` | Requests waiting for a kennel to free up, in the order they joined (D42). |
+| Recovery code | `recovery_codes` | A one-use code that lets a person sign in once without their phone, when two-step sign-in is on (D43). |
 | Confirmed | `status = 'confirmed'` | Space is held. |
 | In house | `status = 'checked_in'` | The pet is here now. |
 | Checked out | `status = 'checked_out'` | Gone home. |

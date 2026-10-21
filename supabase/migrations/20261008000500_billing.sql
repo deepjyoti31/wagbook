@@ -23,6 +23,8 @@ create table public.invoices (
   client_id uuid not null,
   booking_id uuid,
   group_id uuid,
+  series_id uuid,
+  series_month date,
   status public.invoice_status not null default 'draft',
   number text,
   fiscal_year text,
@@ -57,9 +59,14 @@ create table public.invoices (
   unique (org_id, fiscal_year, seq),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete set null (booking_id),
-  -- A bill is for one stay, for a family booked together, or for neither (a
-  -- one-off bill). Never both.
-  constraint invoices_one_stay_or_one_family check (booking_id is null or group_id is null),
+  -- A bill is for one stay, for a family booked together, for a month of a
+  -- repeating series, or for none of them (a one-off bill). Never two.
+  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id) <= 1),
+  -- A series is billed a calendar month at a time, named by its first day.
+  constraint invoices_series_month check (
+    (series_id is null) = (series_month is null)
+    and (series_month is null or extract(day from series_month) = 1)
+  ),
   -- A draft carries no number, sequence, year, date or issuer; an issued or
   -- void invoice carries all of them. Only issue_invoice() crosses that line.
   constraint invoices_numbered_once_issued check (
@@ -79,6 +86,9 @@ comment on table public.invoices is
 comment on column public.invoices.booking_id is 'The stay this bill is for, when it is for one pet''s stay that was booked on its own.';
 comment on column public.invoices.group_id is
   'The family booking this bill is for: every pet booked together (bookings.group_id) is billed on it, each with its stay and extras. A pet of a family is never billed on its own.';
+comment on column public.invoices.series_id is
+  'The repeating day boarding series this bill is for (bookings.series_id): its days in series_month, each with its extras, on one bill. A day of a series is never billed on its own.';
+comment on column public.invoices.series_month is 'With series_id: the first day of the calendar month whose days this bill covers.';
 comment on column public.invoices.number is 'Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused.';
 comment on column public.invoices.fiscal_year is 'Financial year the number belongs to, e.g. 2027-28.';
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
@@ -105,6 +115,10 @@ comment on index public.invoices_one_live_per_booking is 'A booking has at most 
 create unique index invoices_one_live_per_family on public.invoices (org_id, group_id)
   where group_id is not null and status <> 'void';
 comment on index public.invoices_one_live_per_family is 'A family booking has at most one draft or issued invoice, so it cannot be billed twice.';
+-- And one bill per month of a series.
+create unique index invoices_one_live_per_series_month on public.invoices (org_id, series_id, series_month)
+  where series_id is not null and status <> 'void';
+comment on index public.invoices_one_live_per_series_month is 'A month of a repeating series has at most one draft or issued invoice, so its days cannot be billed twice.';
 create index invoices_org_client_idx on public.invoices (org_id, client_id);
 create index invoices_org_booking_idx on public.invoices (org_id, booking_id);
 
@@ -118,7 +132,8 @@ create trigger invoices_stamp_actor
 
 -- A pet booked together with others is billed with them, on the family's
 -- bill, never on its own: otherwise its stay could be billed twice. And a
--- family's bill belongs to that family's parent.
+-- family's bill belongs to that family's parent. The same for the days of a
+-- repeating series, which are billed a month at a time.
 create function public.invoices_check_stay()
 returns trigger
 language plpgsql
@@ -129,6 +144,20 @@ begin
     select 1 from public.bookings b where b.org_id = new.org_id and b.id = new.booking_id and b.group_id is not null
   ) then
     raise exception 'WB053: this pet was booked together with others. Bill the family together.' using errcode = '23514';
+  end if;
+  if new.booking_id is not null and (tg_op = 'INSERT' or new.booking_id is distinct from old.booking_id) and exists (
+    select 1 from public.bookings b where b.org_id = new.org_id and b.id = new.booking_id and b.series_id is not null
+  ) then
+    raise exception 'WB055: this day is part of a repeating booking. Bill the month''s days together.' using errcode = '23514';
+  end if;
+  if new.series_id is not null
+     and (tg_op = 'INSERT' or new.series_id is distinct from old.series_id or new.client_id is distinct from old.client_id)
+     and not exists (
+       select 1 from public.bookings b where b.org_id = new.org_id and b.series_id = new.series_id and b.client_id = new.client_id
+     )
+     and coalesce(current_setting('wagbook.merging', true), '') <> 'on'
+  then
+    raise exception 'WB056: that repeating booking was not found for this parent' using errcode = '23514';
   end if;
   if new.group_id is not null and (tg_op = 'INSERT' or new.group_id is distinct from old.group_id or new.client_id is distinct from old.client_id)
      and not exists (
@@ -143,10 +172,10 @@ begin
 end;
 $$;
 comment on function public.invoices_check_stay() is
-  'Trigger: a pet booked with others is billed only on the family''s bill (WB053), and a family''s bill names a family booking of that parent (WB054).';
+  'Trigger: a pet booked with others is billed only on the family''s bill (WB053), and a family''s bill names a family booking of that parent (WB054). A day of a repeating series is billed only on its month''s bill (WB055), which names a series of that parent (WB056).';
 
 create trigger invoices_check_stay
-  before insert or update of booking_id, group_id, client_id on public.invoices
+  before insert or update of booking_id, group_id, series_id, client_id on public.invoices
   for each row execute function public.invoices_check_stay();
 
 create table public.invoice_lines (
@@ -310,13 +339,42 @@ create trigger invoice_lines_guard
   before insert or update or delete on public.invoice_lines
   for each row execute function public.invoice_lines_guard();
 
+-- A day of a series that is on its month's issued bill stays in that month:
+-- moved into another month it would be billed again on that month's bill.
+create function public.bookings_keep_billed_month()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.series_id is not null
+     and date_trunc('month', new.start_date) <> date_trunc('month', old.start_date)
+     and exists (
+       select 1 from public.invoices i
+       where i.org_id = old.org_id and i.series_id = old.series_id
+         and i.series_month = date_trunc('month', old.start_date)::date and i.status = 'issued'
+     )
+  then
+    raise exception 'WB057: this day is on its month''s bill. Cancel it and book the new day instead.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.bookings_keep_billed_month() is
+  'Trigger: a day of a repeating series whose month has an issued bill cannot move into another month (WB057), where it would be billed a second time.';
+
+create trigger bookings_keep_billed_month
+  before update of start_date on public.bookings
+  for each row execute function public.bookings_keep_billed_month();
+
 -- ---------------------------------------------------------------------------
 -- Issuing and voiding
 -- ---------------------------------------------------------------------------
 
 -- The stays a bill covers: its one booking, or every pet of its family that
--- is staying, stayed or did not come (not requests, not cancellations).
-create function public.invoice_bookings(p_org uuid, p_booking uuid, p_group uuid)
+-- is staying, stayed or did not come (not requests, not cancellations), or
+-- the days of a repeating series in one month that are the same.
+create function public.invoice_bookings(p_org uuid, p_booking uuid, p_group uuid, p_series uuid default null, p_month date default null)
 returns setof uuid
 language sql
 stable
@@ -326,10 +384,14 @@ as $$
   from public.bookings b
   where b.org_id = p_org
     and (b.id = p_booking
-         or (p_group is not null and b.group_id = p_group and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show')));
+         or (p_group is not null and b.group_id = p_group and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show'))
+         or (p_series is not null and b.series_id = p_series
+             and b.start_date >= p_month and b.start_date < (p_month + interval '1 month')::date
+             and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show')))
+  order by b.start_date, b.created_at, b.id;
 $$;
-comment on function public.invoice_bookings(uuid, uuid, uuid) is
-  'The bookings a bill covers: its own booking, or the family''s bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.';
+comment on function public.invoice_bookings(uuid, uuid, uuid, uuid, date) is
+  'The bookings a bill covers, in date order: its own booking; or the family''s bookings that are not requests or cancelled; or the days of a series in the month starting p_month that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.';
 
 -- What a stay costs, as the lines of a bill. Usually one: every night (or
 -- day) at the booked rate. Two more cases split it:
@@ -412,27 +474,37 @@ $$;
 comment on function public.stay_charges(uuid, uuid[]) is
   'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
 
-create function public.invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode)
+create function public.invoice_expected_lines(
+  p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode, p_series uuid default null, p_month date default null)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 language sql
 stable
 set search_path = ''
 as $$
-  select
-    sc.quantity::numeric(10, 2),
-    sc.unit_price_minor,
-    sc.discount_minor,
-    case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end
-  from public.bookings b
-  join public.stay_charges(p_org, array(select public.invoice_bookings(p_org, p_booking, p_group))) sc on sc.booking_id = b.id
-  where b.org_id = p_org
+  with stays as (
+    select sc.quantity, sc.unit_price_minor, sc.discount_minor,
+           case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end as tax_rate_bp, b.sac_code
+    from public.bookings b
+    join public.stay_charges(p_org, array(select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month))) sc
+      on sc.booking_id = b.id
+    where b.org_id = p_org
+  )
+  select s.quantity::numeric(10, 2), s.unit_price_minor, s.discount_minor, s.tax_rate_bp
+  from stays s
+  where p_series is null
+  union all
+  -- A month of a series is one line for each price, not a line a day.
+  select sum(s.quantity)::numeric(10, 2), s.unit_price_minor, sum(s.discount_minor)::bigint, s.tax_rate_bp
+  from stays s
+  where p_series is not null
+  group by s.unit_price_minor, s.tax_rate_bp, s.sac_code
   union all
   select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
   from public.booking_items bi
-  where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group));
+  where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month));
 $$;
-comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.';
+comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode, uuid, date) is
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts).';
 
 -- One line of a bill or credit note, checked against the same rules as
 -- src/lib/core/tax.ts. The app does the sums; the database refuses a document
@@ -583,21 +655,21 @@ begin
   -- more and nothing less. A bill that was edited is issued by an owner or
   -- manager. The same rule as bookings_guard_price() (docs/09-decisions.md, D15).
   if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
-    if (v_inv.booking_id is null and v_inv.group_id is null)
+    if (v_inv.booking_id is null and v_inv.group_id is null and v_inv.series_id is null)
        or not exists (
          select 1 from public.bookings b
          where b.org_id = v_inv.org_id and b.client_id = v_inv.client_id
-           and b.id in (select public.invoice_bookings(v_inv.org_id, v_inv.booking_id, v_inv.group_id))
+           and b.id in (select public.invoice_bookings(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_inv.series_id, v_inv.series_month))
        )
        or exists (
-         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode))
+         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode, v_inv.series_id, v_inv.series_month))
          except all
          (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
        )
        or exists (
          (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
          except all
-         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode))
+         (select * from public.invoice_expected_lines(v_inv.org_id, v_inv.booking_id, v_inv.group_id, v_org.tax_mode, v_inv.series_id, v_inv.series_month))
        )
     then
       raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
@@ -665,14 +737,18 @@ begin
   perform set_config('wagbook.issuing', 'off', true);
 
   -- Money already received for these stays counts against the bill: advances
-  -- (on any pet of a family), and anything paid against an earlier bill for
-  -- them that was voided.
-  if v_inv.booking_id is not null or v_inv.group_id is not null then
+  -- (on any pet of a family, or any day of the series in the month), and
+  -- anything paid against an earlier bill for them that was voided.
+  if v_inv.booking_id is not null or v_inv.group_id is not null or v_inv.series_id is not null then
     update public.payments p
     set invoice_id = v_inv.id
     where p.org_id = v_inv.org_id
       and (p.booking_id = v_inv.booking_id
-           or p.booking_id in (select b.id from public.bookings b where b.org_id = v_inv.org_id and b.group_id = v_inv.group_id))
+           or p.booking_id in (select b.id from public.bookings b where b.org_id = v_inv.org_id and b.group_id = v_inv.group_id)
+           or p.booking_id in (
+             select b.id from public.bookings b
+             where b.org_id = v_inv.org_id and b.series_id = v_inv.series_id
+               and b.start_date >= v_inv.series_month and b.start_date < (v_inv.series_month + interval '1 month')::date))
       and (p.invoice_id is null
            or p.invoice_id in (select i.id from public.invoices i where i.org_id = v_inv.org_id and i.status = 'void'));
   end if;
@@ -681,7 +757,7 @@ begin
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings) says. Takes in advances paid for those stays.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, or its month of a series) says. Takes in advances paid for those stays.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -1196,6 +1272,65 @@ create trigger payments_stamp_actor
   before insert or update on public.payments
   for each row execute function public.stamp_actor('recorded_by');
 
+-- A refund gives back only money the parent paid and is not owed: on a bill,
+-- what was paid over what the bill now comes to (its total less its credit
+-- notes; a cancelled bill comes to nothing); on a stay with no bill yet, the
+-- advance paid for it. So a refund can never stand in for a credit note that
+-- would show the tax taken back, and never sends back money that did not come
+-- in. Refunds are for owners and managers already (payments_insert policy).
+create function public.payments_check_refund()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_room bigint;
+begin
+  if new.direction <> 'out' then
+    return new;
+  end if;
+  if new.invoice_id is null and new.booking_id is null then
+    raise exception 'WB120: a refund is made against a bill or a stay' using errcode = '23514';
+  end if;
+  -- One refund at a time for a bill or stay, so two at once cannot both take the last of it.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('refund:' || coalesce(new.invoice_id, new.booking_id)::text, 0));
+
+  if new.invoice_id is not null then
+    select coalesce((
+             select sum(case when p.direction = 'in' then p.amount_minor else -p.amount_minor end)
+             from public.payments p
+             where p.org_id = new.org_id and p.invoice_id = new.invoice_id and p.id <> new.id
+           ), 0)
+           - case when i.status = 'issued'
+                  then i.total_minor - coalesce((select sum(cn.total_minor) from public.credit_notes cn
+                                                 where cn.org_id = i.org_id and cn.invoice_id = i.id), 0)
+                  else 0 end
+      into v_room
+    from public.invoices i
+    where i.org_id = new.org_id and i.id = new.invoice_id;
+    if coalesce(v_room, 0) < new.amount_minor then
+      raise exception 'WB121: a refund can only give back what was paid over what the bill now comes to. Make a credit note first if the stay costs less.'
+        using errcode = '23514';
+    end if;
+  else
+    select coalesce(sum(case when p.direction = 'in' then p.amount_minor else -p.amount_minor end), 0)
+      into v_room
+    from public.payments p
+    where p.org_id = new.org_id and p.booking_id = new.booking_id and p.invoice_id is null and p.id <> new.id;
+    if v_room < new.amount_minor then
+      raise exception 'WB122: a refund can only give back the advance paid for this stay' using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+comment on function public.payments_check_refund() is
+  'Trigger: a refund names a bill or a stay (WB120) and gives back no more than was paid over what the bill now comes to after credit notes (WB121), or than the advance paid for a stay with no bill (WB122).';
+
+create trigger payments_check_refund
+  before insert or update of direction, amount_minor, invoice_id, booking_id on public.payments
+  for each row execute function public.payments_check_refund();
+
 create table public.expenses (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations (id) on delete cascade,
@@ -1249,7 +1384,9 @@ select
   i.total_minor,
   coalesce(p.paid_minor, 0)::bigint as paid_minor,
   coalesce(c.credited_minor, 0)::bigint as credited_minor,
-  (case when i.status = 'issued' then i.total_minor - coalesce(c.credited_minor, 0) - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor
+  (case when i.status = 'issued' then i.total_minor - coalesce(c.credited_minor, 0) - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor,
+  i.series_id,
+  i.series_month
 from public.invoices i
 left join lateral (
   select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end) as paid_minor

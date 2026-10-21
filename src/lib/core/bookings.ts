@@ -39,6 +39,22 @@ export function isOverstaying(booking: { status: string; endDate: ISODate }, tod
   return booking.status === "checked_in" && booking.endDate < today;
 }
 
+/** True when a pet in house would go home today before its booked end, missing a night or day it was booked for. */
+export function leavingEarly(booking: { status: string; endDate: ISODate }, today: ISODate): boolean {
+  return booking.status === "checked_in" && booking.endDate > today;
+}
+
+/**
+ * The end of a stay billed only to today, for a pet going home early (D40).
+ * Boarding ends today, but keeps at least its first night; day boarding's
+ * last day is today. A stay already ending by then is left as it is.
+ */
+export function shortenedEnd(kind: "boarding" | "daycare", startDate: ISODate, endDate: ISODate, today: ISODate): ISODate {
+  const earliest = kind === "boarding" ? addDays(startDate, 1) : startDate;
+  const end = today > earliest ? today : earliest;
+  return end < endDate ? end : endDate;
+}
+
 /** `count` consecutive dates starting at `from`. */
 export function calendarDays(from: ISODate, count: number): ISODate[] {
   return Array.from({ length: count }, (_, i) => addDays(from, i));
@@ -74,6 +90,15 @@ export function calendarGrid<B extends CalendarStay>(kennelIds: readonly string[
     });
   }
   return { byKennel, unassigned };
+}
+
+/**
+ * Which of `days` a stay would hold a kennel on, for drawing a request on the
+ * calendar (it holds nothing yet). The same days as calendarGrid uses.
+ */
+export function daysCovered(stay: StaySpan, days: readonly ISODate[]): boolean[] {
+  const until = stayHoldsUntil(stay);
+  return days.map((day) => day >= stay.startDate && day < until);
 }
 
 /** The most pets one kennel holds: two, and only of one parent. Must match bookings_check_capacity() (WB027). */

@@ -278,8 +278,9 @@ describe("payments and balances", () => {
         "insert into public.payments (org_id, client_id, invoice_id, amount_minor, method, reference, received_on) values ($1, $2, $3, 100000, 'upi', 'UTR123', '2027-04-14')",
         [k.org, k.client, id],
       );
+      // ₹200 more than the bill: the parent paid ₹3,800 for ₹3,600.
       await db.query(
-        "insert into public.payments (org_id, client_id, invoice_id, amount_minor, method, received_on) values ($1, $2, $3, 260000, 'cash', '2027-04-17')",
+        "insert into public.payments (org_id, client_id, invoice_id, amount_minor, method, received_on) values ($1, $2, $3, 280000, 'cash', '2027-04-17')",
         [k.org, k.client, id],
       );
     });
@@ -287,14 +288,16 @@ describe("payments and balances", () => {
     const refund = "insert into public.payments (org_id, client_id, invoice_id, direction, amount_minor, method, received_on) values ($1, $2, $3, 'out', 20000, 'upi', '2027-04-18')";
     expect((await errorOf(() => as(db, user(staff), () => db.query(refund, [k.org, k.client, id])))).code).toBe("42501");
     await as(db, user(k.owner), async () => {
+      const before = await db.query<{ due_minor: string }>("select due_minor from public.invoice_balances where invoice_id = $1", [id]);
+      expect(Number(before.rows[0].due_minor)).toBe(-20000);
       await db.query(refund, [k.org, k.client, id]);
       const bal = await db.query<{ total_minor: string; paid_minor: string; due_minor: string }>(
         "select total_minor, paid_minor, due_minor from public.invoice_balances where invoice_id = $1",
         [id],
       );
       expect(Number(bal.rows[0].total_minor)).toBe(360000);
-      expect(Number(bal.rows[0].paid_minor)).toBe(340000);
-      expect(Number(bal.rows[0].due_minor)).toBe(20000);
+      expect(Number(bal.rows[0].paid_minor)).toBe(360000);
+      expect(Number(bal.rows[0].due_minor)).toBe(0);
     });
 
     // Staff record payments but cannot rewrite or remove them.

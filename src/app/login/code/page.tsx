@@ -7,7 +7,7 @@ import { buttonStyles, Field, Input, Loading } from "@/components/ui";
 import { getUser, owesCode } from "@/lib/auth";
 import { getVisitorI18n } from "@/lib/i18n-server";
 import { signOut } from "../actions";
-import { verifyCode } from "./actions";
+import { signInWithRecoveryCode, verifyCode } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getVisitorI18n()).m.auth.code.title };
@@ -47,6 +47,18 @@ async function CodeForm({ searchParams }: Pick<PageProps<"/login/code">, "search
           {w.continue}
         </SubmitButton>
       </ActionForm>
+      <details className="mt-6 rounded-xl border border-rule bg-paper p-4">
+        <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{w.useRecovery}</summary>
+        <ActionForm action={signInWithRecoveryCode} className="mt-2 space-y-3">
+          <p className="text-slate">{w.recoveryHint}</p>
+          <Field label={w.recoveryLabel}>
+            <Input name="recoveryCode" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={20} required />
+          </Field>
+          <SubmitButton variant="secondary" pendingLabel={w.checking}>
+            {w.continue}
+          </SubmitButton>
+        </ActionForm>
+      </details>
       <p className="mt-6 text-slate">{w.lostPhone}</p>
       <form action={signOut} className="mt-4">
         <button type="submit" className={buttonStyles.quiet}>

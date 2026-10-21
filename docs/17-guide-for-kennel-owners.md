@@ -65,6 +65,10 @@ Two pets of one family can be booked together, in a kennel each or in one kennel
 price. If one goes home early, the nights the other has the kennel to itself are billed at your usual price. A booking
 can also start as a **request**, which holds no kennel until you confirm it.
 
+Full on those dates? **Add to the waiting list** instead. Waiting requests keep the order they joined in, and show on the
+calendar under the kennels. When a kennel frees up for one, Today says so at the top, with **Tell the parent** (WhatsApp,
+with the dates) and **Confirm booking** for once they say yes.
+
 Every booking has its own page:
 
 <img src="guide/04-booking.jpg" alt="A booking: check out, updates, the parent's link" width="270">
@@ -72,6 +76,10 @@ Every booking has its own page:
 From here you check the pet in and out, write updates for the parent, add extras (a bath, a pick-up), and send the
 parent their link. If a pet in day boarding stays the night after all, an owner or manager uses **Staying overnight**:
 the days so far stay day boarding, and the nights are boarding, each at its own price on the bill.
+
+Going home before the booked date? The booking asks how to bill it: **bill to today** (only the nights stayed) or
+**bill as booked**. If you do not refund a busy period, it says so right there. A photo posted by mistake on an update
+can be taken off by an owner (**Remove a photo** under the update); it leaves the parent's page at once.
 
 ## The care round
 
@@ -132,6 +140,14 @@ To give back all or part of a bill (nights not stayed, a bill from last month), 
 note** on the bill page: it gets its own number, the parent sees it on their bill link, and your reports count it in
 the month you made it. If you charge GST, a bill from an earlier month can only be credited, not cancelled.
 
+If a stay gets shorter after its bill went out (gone home early, a day cancelled), the bill page says **The stay
+changed** and offers the credit note for exactly the difference. Then it shows how much was paid over, ready to record
+as a refund when you give it back. A refund is never more than was paid over, so a credit note comes first. When a
+cancelled booking had an advance, its page shows it and an owner or manager records the refund there (or keeps it, if
+your terms say so).
+
+A regular in repeating day boarding gets **one bill a month**: **Make the bill for October** on any of their days.
+
 Your accountant tells you the tax rate and the service code (SAC) for what you sell. Put them in **Settings, Tax and
 invoices** for boarding and day boarding, and on **Extras** for each extra. Wagbook does not choose them for you.
 
@@ -150,6 +166,8 @@ downloaded for your accountant.
 - **Turn on two-step sign-in** (More, Two-step sign-in). Install an authenticator app on your phone (Google
   Authenticator or Microsoft Authenticator), scan the picture Wagbook shows, and type the code. From then on, signing
   in needs your password and a code from the app, so a stolen password is not enough. Ask your managers to do the same.
+  Then press **Make recovery codes** and write the ten codes down, away from your phone: if you lose the phone, each
+  code lets you sign in once without it.
 - **Give each person their own account.** Never share the owner's password. When someone leaves, open **More, People**
   and suspend them.
 - **Shared phone at the kennel?** Sign out at the end of the shift (More, Sign out).

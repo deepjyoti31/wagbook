@@ -160,6 +160,7 @@ create table public.bookings (
   group_id uuid,
   series_id uuid,
   pass_id uuid,
+  waitlisted_at timestamptz,
   public_token text not null unique default public.new_token(),
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now(),
@@ -179,6 +180,8 @@ create table public.bookings (
   -- boarding_from are day boarding at day_rate_minor, the nights from it on are
   -- boarding at rate_minor. Both set or neither.
   constraint bookings_day_part_has_a_price check ((boarding_from is null) = (day_rate_minor is null)),
+  -- Only a request waits for a kennel; bookings_stamp_status clears the place when it is answered.
+  constraint bookings_waitlist_is_a_request check (waitlisted_at is null or status = 'requested'),
   -- A repeating series is day boarding, one day a booking.
   constraint bookings_series_is_day_boarding check (series_id is null or kind = 'daycare'),
   -- A day paid from a pack costs nothing more on its own (bookings_check_pass checks the pack).
@@ -217,6 +220,8 @@ comment on column public.bookings.series_id is
   'Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own.';
 comment on column public.bookings.pass_id is
   'The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero.';
+comment on column public.bookings.waitlisted_at is
+  'For a request on the waiting list: when it joined, which is its place in line (the earliest first). Stamped by the database with the real time, never moved, and cleared when the request is confirmed or cancelled. Empty: not waiting.';
 comment on column public.bookings.alone_rate_minor is
   'For a pet booked at the shared kennel price: the price per night or day for the nights or days it has the kennel to itself (its sibling left early or came late), usually the kennel''s usual price. Empty: rate_minor applies throughout. See stay_charges().';
 comment on column public.bookings.boarding_from is
@@ -234,6 +239,7 @@ comment on column public.bookings.source is 'staff: entered by the kennel. intak
 comment on column public.bookings.group_id is 'Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill.';
 comment on column public.bookings.public_token is 'Secret in the parent''s stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else.';
 
+create index bookings_org_waitlist_idx on public.bookings (org_id, waitlisted_at) where waitlisted_at is not null;
 create index bookings_org_series_idx on public.bookings (org_id, series_id) where series_id is not null;
 create index bookings_org_pass_idx on public.bookings (org_id, pass_id) where pass_id is not null;
 create index bookings_org_dates_idx on public.bookings (org_id, start_date, end_date);
@@ -295,11 +301,22 @@ begin
       new.cancelled_at := null;
     end if;
   end if;
+
+  -- The waiting list keeps its order. A request that joins it gets the real
+  -- time, whatever the client sent; its place never moves while it waits; and
+  -- it leaves the list when it is confirmed, cancelled or anything else.
+  if new.status <> 'requested' or new.waitlisted_at is null then
+    new.waitlisted_at := null;
+  elsif tg_op = 'UPDATE' and old.waitlisted_at is not null and old.status = 'requested' then
+    new.waitlisted_at := old.waitlisted_at;
+  else
+    new.waitlisted_at := now();
+  end if;
   return new;
 end;
 $$;
 comment on function public.bookings_stamp_status() is
-  'Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.';
+  'Trigger: records who and when as a booking is created, checked in, checked out or cancelled, and when a request joined the waiting list (its place in line, which never moves). Client-supplied values for these columns are ignored.';
 
 create trigger bookings_stamp_status
   before insert or update on public.bookings
@@ -665,6 +682,62 @@ as $$
 $$;
 comment on function public.occupancy_by_day(uuid, date, date) is
   'For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.';
+
+-- The waiting list: requests that wait for a kennel to free up, in the order
+-- they joined. has_space says whether the stay would fit now: on every one of
+-- its days fewer kennels are in use than are in service (or the kennel allows
+-- overbooking), and the pet has no other stay on those days. Two waiting for
+-- the last kennel may both fit; the first in line should be asked first, and
+-- whoever is confirmed second is refused cleanly (WB020). Stays that have
+-- already ended are left out. SECURITY INVOKER: row level security applies.
+create function public.waiting_list(p_org uuid)
+returns table (booking_id uuid, waitlisted_at timestamptz, has_space boolean)
+language sql
+stable
+set search_path = ''
+as $$
+  select
+    b.id,
+    b.waitlisted_at,
+    (
+      o.allow_overbooking
+      or cap.kennels = 0
+      or not exists (
+        select 1
+        from generate_series(
+               lower(public.stay_range(b.kind, b.start_date, b.end_date))::timestamp,
+               (upper(public.stay_range(b.kind, b.start_date, b.end_date)) - 1)::timestamp,
+               interval '1 day'
+             ) as d (day)
+        where (
+          select count(distinct coalesce(x.kennel_id, x.id))
+          from public.bookings x
+          where x.org_id = b.org_id
+            and x.status in ('confirmed', 'checked_in')
+            and public.stay_range(x.kind, x.start_date, x.end_date) @> d.day::date
+        ) >= cap.kennels
+      )
+    )
+    and not exists (
+      select 1
+      from public.bookings x
+      where x.org_id = b.org_id
+        and x.pet_id = b.pet_id
+        and x.id <> b.id
+        and x.status in ('confirmed', 'checked_in')
+        and public.stay_range(x.kind, x.start_date, x.end_date) && public.stay_range(b.kind, b.start_date, b.end_date)
+    )
+  from public.bookings b
+  join public.organizations o on o.id = b.org_id
+  cross join lateral (select count(*)::integer as kennels from public.kennels k where k.org_id = b.org_id and k.is_active) cap
+  where b.org_id = p_org
+    and b.status = 'requested'
+    and b.waitlisted_at is not null
+    and upper(public.stay_range(b.kind, b.start_date, b.end_date)) > (now() at time zone o.time_zone)::date
+  order by b.waitlisted_at, b.id;
+$$;
+comment on function public.waiting_list(uuid) is
+  'The kennel''s waiting list, first in line first: each request waiting for a kennel, when it joined, and whether it would fit now (a kennel free on every day, and no other stay for the pet). Stays already over are left out. Must agree with bookings_check_capacity().';
 
 -- A kennel is offered for a stay when, on every day of the stay, nobody else
 -- holds it, or (when p_client is given) only that parent's pets hold it and

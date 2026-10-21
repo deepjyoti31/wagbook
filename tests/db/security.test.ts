@@ -24,7 +24,7 @@ describe("every table is locked down", () => {
       where n.nspname = 'public' and c.relkind = 'r'
       order by 1`);
     // Tables nobody may touch directly: only SECURITY DEFINER functions do.
-    const sealed = new Set(["invoice_counters"]);
+    const sealed = new Set(["invoice_counters", "recovery_codes"]);
     for (const t of res.rows) {
       expect(t.rls, `${t.table} must have row level security enabled`).toBe(true);
       if (!sealed.has(t.table)) expect(t.policies, `${t.table} needs policies`).toBeGreaterThan(0);

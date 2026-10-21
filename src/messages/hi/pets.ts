@@ -355,6 +355,7 @@ export const petsArea: typeof English = {
     warningOne: "टीके: {warnings}",
     warningMany: "जांचने वाले टीके: {warnings}",
     update: {
+      photoNotFound: "वह फ़ोटो अब अपडेट पर नहीं है।",
       body: "एक लाइन लिखें कि पालतू कैसा है।",
       tooLong: "अपडेट 2,000 अक्षरों से कम रखें।",
       photoFailed: "एक फ़ोटो सेव नहीं हो पाई। कुछ भी पोस्ट नहीं हुआ। फिर से कोशिश करें।",

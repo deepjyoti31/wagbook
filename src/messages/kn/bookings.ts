@@ -18,11 +18,29 @@ export const bookingsArea: typeof English = {
   },
   // The page of one booking, and what its Server Actions say.
   booking: {
+    refund: {
+      paid: "ಈ ವಾಸ್ತವ್ಯಕ್ಕೆ {amount} ಮುಂಗಡ ಪಾವತಿಸಲಾಗಿದೆ, ಇನ್ನೂ ಮರುಪಾವತಿ ಮಾಡಿಲ್ಲ.",
+      managersOnly: "ಮರುಪಾವತಿಯನ್ನು ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಮಾತ್ರ ದಾಖಲಿಸುತ್ತಾರೆ.",
+    },
+    waitlist: {
+      badge: "ಕಾಯುವ ಪಟ್ಟಿ",
+      offer: "ಈ ದಿನಾಂಕಗಳಿಗೆ ಕೆನೆಲ್ ಖಾಲಿ ಇಲ್ಲವೇ? ಈ ವಿನಂತಿಯನ್ನು ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಿ, ಕೆನೆಲ್ ಖಾಲಿಯಾದಾಗ ಇಂದಿನ ಪುಟ ತಿಳಿಸುತ್ತದೆ.",
+      join: "ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಿ",
+      leave: "ಕಾಯುವ ಪಟ್ಟಿಯಿಂದ ತೆಗೆಯಿರಿ",
+      place: "ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿ ಸಂಖ್ಯೆ {place}.",
+      over: "ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿದೆ, ಆದರೆ ಈ ದಿನಾಂಕಗಳು ಕಳೆದಿವೆ.",
+      spaceNow: "ಈಗ ಇದಕ್ಕೆ ಒಂದು ಕೆನೆಲ್ ಖಾಲಿ ಇದೆ.",
+      stillFull: "ಈ ದಿನಗಳಲ್ಲಿ ಕೆಲವು ಇನ್ನೂ ತುಂಬಿವೆ.",
+    },
     title: "ಬುಕಿಂಗ್",
     allBookings: "ಎಲ್ಲಾ ಬುಕಿಂಗ್‌ಗಳು",
     pet: "ಸಾಕುಪ್ರಾಣಿ",
     // After a step that changes the booking's status.
     done: {
+      photo_removed: "ಫೋಟೋ ಅಳಿಸಲಾಗಿದೆ. ಪೇರೆಂಟ್‌ನ ವಾಸ್ತವ್ಯ ಪುಟದಲ್ಲಿ ಇನ್ನು ಕಾಣುವುದಿಲ್ಲ.",
+      unwaitlisted: "ಕಾಯುವ ಪಟ್ಟಿಯಿಂದ ತೆಗೆಯಲಾಗಿದೆ. ಇದು ಇನ್ನೂ ವಿನಂತಿಯೇ.",
+      waitlisted: "ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಕೆನೆಲ್ ಖಾಲಿಯಾದಾಗ ಇಂದಿನ ಪುಟ ತಿಳಿಸುತ್ತದೆ.",
+      checked_out_early: "ಚೆಕ್ ಔಟ್ ಆಯಿತು. ವಾಸ್ತವ್ಯ ಈಗ ಇಂದು ಮುಗಿಯುತ್ತದೆ, ಹಾಗಾಗಿ ಇದ್ದ ದಿನಗಳಿಗೆ ಮಾತ್ರ ಬಿಲ್. ಬಿಲ್ ಈಗಾಗಲೇ ನೀಡಿದ್ದರೆ, ಬಿಲ್‌ನಲ್ಲಿ ವ್ಯತ್ಯಾಸಕ್ಕೆ ಕ್ರೆಡಿಟ್ ನೀಡಿ.",
       confirmed: "ಖಚಿತವಾಗಿದೆ. ಈಗ ಜಾಗ ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ.",
       checked_in: "ಚೆಕ್ ಇನ್ ಆಗಿದೆ.",
       checked_out: "ಚೆಕ್ ಔಟ್ ಆಗಿದೆ. ಮುಂದಿನ ಸಾಕುಪ್ರಾಣಿಗೆ ಕೆನೆಲ್ ಖಾಲಿ ಇದೆ. ಕೆಳಗೆ ಬಿಲ್ ಮಾಡಿ.",
@@ -84,6 +102,9 @@ export const bookingsArea: typeof English = {
       extrasLink: "ಹೆಚ್ಚುವರಿ",
     },
     bill: {
+      toRefund: "{amount} ಮರುಪಾವತಿ ಬಾಕಿ",
+      makeMonth: "{month} ತಿಂಗಳ ಬಿಲ್ ಮಾಡಿ",
+      seriesNote: "ಈ ಸರಣಿಯ ದಿನಗಳಿಗೆ ಒಟ್ಟಿಗೆ ಬಿಲ್ ಆಗುತ್ತದೆ, ತಿಂಗಳಿಗೆ ಒಮ್ಮೆ, ಅವುಗಳ ಎಕ್ಸ್‌ಟ್ರಾಗಳೊಂದಿಗೆ.",
       title: "ಬಿಲ್",
       draft: "ಡ್ರಾಫ್ಟ್ ಬಿಲ್",
       due: "{amount} ಬಾಕಿ",
@@ -100,6 +121,8 @@ export const bookingsArea: typeof English = {
     },
     // Money taken before the bill. {method} is UPI, Cash and so on; {reference} is what was typed, like a UTR.
     payment: {
+      refunded: "{date} ರಂದು {method} ಮೂಲಕ {amount} ಮರುಪಾವತಿ.",
+      paid: "{date} ರಂದು {method} ಮೂಲಕ {amount} ಪಾವತಿ.",
       advance: "{date} ರಂದು {method} ಮೂಲಕ {amount} ಮುಂಗಡ. ಬಿಲ್ ನೀಡಿದಾಗ ಅದರ ಲೆಕ್ಕಕ್ಕೆ ಸೇರುತ್ತದೆ.",
       advanceWithReference: "{date} ರಂದು {method} ಮೂಲಕ {amount} ಮುಂಗಡ, {reference}. ಬಿಲ್ ನೀಡಿದಾಗ ಅದರ ಲೆಕ್ಕಕ್ಕೆ ಸೇರುತ್ತದೆ.",
       refund: "{date} ರಂದು {method} ಮೂಲಕ {amount} ಮರುಪಾವತಿ. ಬಿಲ್ ನೀಡಿದಾಗ ಅದರ ಲೆಕ್ಕಕ್ಕೆ ಸೇರುತ್ತದೆ.",
@@ -147,6 +170,9 @@ export const bookingsArea: typeof English = {
       stopping: "ನಿಲ್ಲಿಸಲಾಗುತ್ತಿದೆ",
     },
     updates: {
+      removeThis: "ಫೋಟೋ {n} ಅಳಿಸಿ",
+      removePhotoWarning: "ಫೋಟೋ ಅಳಿಸಲಾಗುತ್ತದೆ ಮತ್ತು ಪೇರೆಂಟ್‌ನ ವಾಸ್ತವ್ಯ ಪುಟದಿಂದ ಹೋಗುತ್ತದೆ. ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ. WhatsApp ನಲ್ಲಿ ಈಗಾಗಲೇ ಕಳುಹಿಸಿದ ಫೋಟೋ ಆ ಚಾಟ್‌ನಲ್ಲೇ ಉಳಿಯುತ್ತದೆ.",
+      removePhoto: "ಫೋಟೋ ತೆಗೆಯಿರಿ",
       title: "ಅಪ್‌ಡೇಟ್‌ಗಳು",
       none: "ಇನ್ನೂ ಅಪ್‌ಡೇಟ್‌ಗಳು ಇಲ್ಲ.",
       parentSees: "ಪೇರೆಂಟ್ ನೋಡುತ್ತಾರೆ",
@@ -163,6 +189,9 @@ export const bookingsArea: typeof English = {
       behaviour: "ನಡವಳಿಕೆ",
     },
     cancel: {
+      billIssued: "ಈ ವಾಸ್ತವ್ಯಕ್ಕೆ ಬಿಲ್ ನೀಡಲಾಗಿದೆ. ರದ್ದುಮಾಡಿದ ನಂತರ ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಬಿಲ್‌ನಲ್ಲಿ ಕ್ರೆಡಿಟ್ ನೀಡಿ, ಅಲ್ಲೇ ಮರುಪಾವತಿ ದಾಖಲಿಸುತ್ತಾರೆ.",
+      advancePaid: "{amount} ಮುಂಗಡ ಪಾವತಿಸಲಾಗಿದೆ. ರದ್ದುಮಾಡಿದ ನಂತರ ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಇಲ್ಲೇ ಅದನ್ನು ಮರುಪಾವತಿ ಮಾಡಬಹುದು.",
+      noRefundPeriods: "ಈ ವಾಸ್ತವ್ಯ {periods} ಸಮಯಕ್ಕೆ ಬರುತ್ತದೆ, ಆಗ ನೀವು ಮರುಪಾವತಿ ಮಾಡುವುದಿಲ್ಲ.",
       title: "ರದ್ದುಮಾಡಿ",
       // {periods} is one or more busy period names, joined with "and" below.
       noRefund: "ಈ ವಾಸ್ತವ್ಯ {periods} ಸಮಯಕ್ಕೆ ಬರುತ್ತದೆ, ಆಗ ನೀವು ಮರುಪಾವತಿ ಮಾಡುವುದಿಲ್ಲ. ರದ್ದುಮಾಡುವ ಮೊದಲು ಪೇರೆಂಟ್‌ಗೆ ತಿಳಿಸಿ.",
@@ -173,6 +202,9 @@ export const bookingsArea: typeof English = {
     },
     // The "Next" section: what to do now.
     step: {
+      checkOutAsBooked: "ಚೆಕ್ ಔಟ್, ಬುಕ್ ಮಾಡಿದಂತೆ ಬಿಲ್",
+      checkOutToToday: "ಚೆಕ್ ಔಟ್, ಇಂದಿನವರೆಗೆ ಬಿಲ್",
+      early: "{date} ವರೆಗೆ ಬುಕ್ ಆಗಿದೆ. ಬೇಗ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆಯೇ? ಇಂದಿನವರೆಗೆ ಮಾತ್ರ ಬಿಲ್ ಮಾಡಿ, ಅಥವಾ ಬುಕ್ ಮಾಡಿದಂತೆ.",
       isRequest: "ಇದು ವಿನಂತಿ. ನೀವು ಖಚಿತಪಡಿಸುವವರೆಗೆ ಇದು ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ.",
       confirm: "ಬುಕಿಂಗ್ ಖಚಿತಪಡಿಸಿ",
       confirming: "ಖಚಿತಪಡಿಸಲಾಗುತ್ತಿದೆ",
@@ -254,6 +286,8 @@ export const bookingsArea: typeof English = {
     extraRemoved: "ಹೆಚ್ಚುವರಿ ತೆಗೆಯಲಾಗಿದೆ.",
   },
   newBooking: {
+    waitlistNote: "ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿದ್ದರೆ, ಕೆನೆಲ್ ಖಾಲಿಯಾದಾಗ ಇಂದಿನ ಪುಟ ತಿಳಿಸುತ್ತದೆ.",
+    addToWaitlist: "ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಿ",
     title: "ಹೊಸ ಬುಕಿಂಗ್",
     addPetFirst: "ಬುಕಿಂಗ್ ಮಾಡುವ ಮೊದಲು ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಸೇರಿಸಿ.",
     addPet: "ಸಾಕುಪ್ರಾಣಿ ಸೇರಿಸಿ",
@@ -310,15 +344,17 @@ export const bookingsArea: typeof English = {
     },
   },
   calendar: {
+    moreRequests: "ಮೊದಲ {n} ವಿನಂತಿಗಳನ್ನು ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ.",
+    waitingFor: "{pet}, ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿ",
+    requestFor: "{pet} ಗಾಗಿ ವಿನಂತಿ",
+    waiting: "ಕಾಯುತ್ತಿದೆ",
+    request: "ವಿನಂತಿ",
+    requestsTitle: "ವಿನಂತಿಗಳು ಮತ್ತು ಕಾಯುವ ಪಟ್ಟಿ (ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ)",
     title: "ಕ್ಯಾಲೆಂಡರ್",
     newBooking: "ಹೊಸ ಬುಕಿಂಗ್",
     earlier: "ಹಿಂದೆ",
     today: "ಇಂದು",
     later: "ಮುಂದೆ",
-    requests: {
-      one: "ಈ ದಿನಗಳಲ್ಲಿ ಒಂದು ವಿನಂತಿ ಇದೆ. ಅದು ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ, ಹಾಗಾಗಿ ಇಲ್ಲಿ ತೋರಿಸಿಲ್ಲ.",
-      other: "ಈ ದಿನಗಳಲ್ಲಿ {n} ವಿನಂತಿಗಳಿವೆ. ಅವು ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ, ಹಾಗಾಗಿ ಇಲ್ಲಿ ತೋರಿಸಿಲ್ಲ.",
-    },
     seeBookings: "ಬುಕಿಂಗ್‌ಗಳನ್ನು ನೋಡಿ",
     noKennels: "ಕ್ಯಾಲೆಂಡರ್ ನೋಡಲು ನಿಮ್ಮ ಕೆನೆಲ್‌ಗಳನ್ನು ಸೇರಿಸಿ.",
     addKennels: "ಕೆನೆಲ್‌ಗಳನ್ನು ಸೇರಿಸಿ",
@@ -330,7 +366,7 @@ export const bookingsArea: typeof English = {
     // For screen readers on an empty square. {day} is a short date like "14 Apr".
     bookFrom: "{day} ರಿಂದ {kennel} ಬುಕ್ ಮಾಡಿ",
     noKennelYet: "ಇನ್ನೂ ಕೆನೆಲ್ ಇಲ್ಲ",
-    key: "ಹಸಿರು: ಇಲ್ಲಿ ಇದೆ. ಬೂದು: ಬುಕ್ ಆಗಿದೆ. ಕೆಂಪು: ಚೆಕ್ ಔಟ್ ದಿನಾಂಕ ಕಳೆದರೂ ಇನ್ನೂ ಇಲ್ಲೇ ಇದೆ. ಬುಕಿಂಗ್ ತೆರೆಯಲು ಅದರ ಮೇಲೆ ಒತ್ತಿ, ಅಥವಾ ಆ ದಿನದಿಂದ ಆ ಕೆನೆಲ್ ಬುಕ್ ಮಾಡಲು ಖಾಲಿ ಚೌಕದ ಮೇಲೆ ಒತ್ತಿ.",
+    key: "ಹಸಿರು: ಇಲ್ಲಿ ಇದೆ. ಬೂದು: ಬುಕ್ ಆಗಿದೆ. ಕೆಂಪು: ಚೆಕ್ ಔಟ್ ದಿನಾಂಕ ಕಳೆದರೂ ಇನ್ನೂ ಇಲ್ಲೇ ಇದೆ. ಹಳದಿ, ಗೆರೆ ಅಂಚು: ವಿನಂತಿ ಅಥವಾ ಕಾಯುವ ಪಟ್ಟಿ, ಜಾಗ ಹಿಡಿಯುವುದಿಲ್ಲ. ಬುಕಿಂಗ್ ತೆರೆಯಲು ಅದರ ಮೇಲೆ ಒತ್ತಿ, ಅಥವಾ ಆ ದಿನದಿಂದ ಆ ಕೆನೆಲ್ ಬುಕ್ ಮಾಡಲು ಖಾಲಿ ಚೌಕದ ಮೇಲೆ ಒತ್ತಿ.",
   },
   // Writing an update for the parent.
   update: {

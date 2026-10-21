@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeKennels, payFromPacks, petMatches, seriesDates, sharedWith, stayFromForm, type KennelHold } from "./bookings";
+import { daysCovered, freeKennels, leavingEarly, payFromPacks, petMatches, seriesDates, sharedWith, shortenedEnd, stayFromForm, type KennelHold } from "./bookings";
 
 describe("the stay a booking form describes", () => {
   it("reads an empty check-out as one day of day boarding", () => {
@@ -120,5 +120,33 @@ describe("repeating day boarding", () => {
     expect(payFromPacks(["2027-06-01"], packs)).toEqual([null]);
     // Two pets a day take two days.
     expect(payFromPacks(["2027-04-05", "2027-04-06"], [{ id: "p", startsOn: "2027-04-01", validUntil: "2027-04-30", daysLeft: 3 }], 2)).toEqual(["p", null]);
+  });
+});
+
+describe("going home early", () => {
+  it("is leaving before the booked end, while in house", () => {
+    // Boarding 14 to 17 April: the nights of the 14th, 15th and 16th.
+    expect(leavingEarly({ status: "checked_in", endDate: "2027-04-17" }, "2027-04-16")).toBe(true);
+    expect(leavingEarly({ status: "checked_in", endDate: "2027-04-17" }, "2027-04-17")).toBe(false);
+    expect(leavingEarly({ status: "confirmed", endDate: "2027-04-17" }, "2027-04-16")).toBe(false);
+  });
+  it("ends a stay billed to today on today, keeping a boarding stay's first night", () => {
+    expect(shortenedEnd("boarding", "2027-04-14", "2027-04-17", "2027-04-16")).toBe("2027-04-16");
+    // Gone home on the day it came: one night is still the least a boarding stay is.
+    expect(shortenedEnd("boarding", "2027-04-14", "2027-04-17", "2027-04-14")).toBe("2027-04-15");
+    // Day boarding 14 to 16 April, gone home on the 15th: the 15th was its last day.
+    expect(shortenedEnd("daycare", "2027-04-14", "2027-04-16", "2027-04-15")).toBe("2027-04-15");
+    // Already ending by today: left as it is.
+    expect(shortenedEnd("boarding", "2027-04-14", "2027-04-17", "2027-04-18")).toBe("2027-04-17");
+  });
+});
+
+describe("a request on the calendar", () => {
+  const days = ["2027-04-13", "2027-04-14", "2027-04-15", "2027-04-16", "2027-04-17"];
+  it("covers the nights of boarding, not the check-out day", () => {
+    expect(daysCovered({ kind: "boarding", startDate: "2027-04-14", endDate: "2027-04-16" }, days)).toEqual([false, true, true, false, false]);
+  });
+  it("covers every day of day boarding, the last one too", () => {
+    expect(daysCovered({ kind: "daycare", startDate: "2027-04-16", endDate: "2027-04-17" }, days)).toEqual([false, false, false, true, true]);
   });
 });

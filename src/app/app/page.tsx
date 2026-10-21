@@ -7,8 +7,8 @@ import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
-  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, remindersToSend, sharedWith, todayIn, UNPAID_REMINDER_DAYS,
-  VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink,
+  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
+  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
@@ -19,7 +19,7 @@ import { siteOrigin } from "@/lib/site";
 import { bookingCards, familyHolds, type BookingCard } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
-import { extendToToday } from "./bookings/actions";
+import { confirmRequest, extendToToday } from "./bookings/actions";
 
 export const generateMetadata = () => appTitle((m) => m.today.title);
 
@@ -48,7 +48,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const generated = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: today });
   if (generated.error) console.error("generate_care_tasks failed", generated.error.message);
 
-  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes, upcomingRes, oldBillsRes, origin, requestsRes] = await Promise.all([
+  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes, upcomingRes, oldBillsRes, origin, requestsRes, waitingRes] = await Promise.all([
     // Confirmed and due today or earlier: includes anyone who was expected yesterday and has not turned up.
     bookingCards(supabase, org.id).eq("status", "confirmed").lte("start_date", today).order("start_date"),
     bookingCards(supabase, org.id).eq("status", "checked_in").order("end_date"),
@@ -77,10 +77,17 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     siteOrigin(),
     // Stays parents asked for through their booking link, still waiting for an answer.
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "requested").eq("source", "parent").gte("end_date", today),
+    // The waiting list (D42): which requests would fit now.
+    supabase.rpc("waiting_list", { p_org: org.id }),
   ]);
   if (arrivalsRes.error || inHouseRes.error) throw new Error("Could not load today's bookings.");
 
   const arrivals = arrivalsRes.data;
+  // Waiting requests a kennel is free for now, first in line first.
+  const fitting = (waitingRes.data ?? []).filter((x) => x.has_space).map((x) => x.booking_id);
+  const waitingCards = fitting.length > 0 ? ((await bookingCards(supabase, org.id).in("id", fitting.slice(0, 20))).data ?? []) : [];
+  const freeForWaiting = fitting.flatMap((id) => waitingCards.filter((b) => b.id === id));
+  const parentWords = parentI18n(org.parent_language, org.locale);
   const inHouse = inHouseRes.data;
   const photos = await signedUrls(supabase, [...arrivals, ...inHouse].map((b) => b.pets?.photo_path), { small: true });
   const incidents = (incidentsRes.data ?? []).filter((i) => i.severity === "high" || !i.parent_notified_at);
@@ -175,6 +182,44 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
             {m.today.seeRequests}
           </Link>
         </p>
+      ) : null}
+
+      {freeForWaiting.length > 0 ? (
+        <Section title={m.today.waitlist.title} count={freeForWaiting.length}>
+          <p className="mb-3 text-sm text-slate">{m.today.waitlist.about}</p>
+          <Ledger>
+            {freeForWaiting.map((b) => (
+              <LedgerRow key={b.id}>
+                <BookingSummary t={t} booking={b} today={today} />
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                  {b.clients ? (
+                    <a
+                      href={whatsappLink(
+                        spaceFreeMessage(
+                          parentWords.m.whatsapp,
+                          { kennelName: org.name, parentName: b.clients.full_name, petName: b.pets?.name ?? parentWords.m.whatsapp.yourPet, startDate: b.start_date, endDate: b.end_date },
+                          parentWords.locale,
+                        ),
+                        b.clients.phone,
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonStyles.whatsapp}
+                    >
+                      {m.today.waitlist.tell}
+                    </a>
+                  ) : null}
+                  <ActionForm action={confirmRequest} className="contents">
+                    <input type="hidden" name="bookingId" value={b.id} />
+                    <SubmitButton variant="secondary" pendingLabel={m.booking.step.confirming}>
+                      {m.booking.step.confirm}
+                    </SubmitButton>
+                  </ActionForm>
+                </div>
+              </LedgerRow>
+            ))}
+          </Ledger>
+        </Section>
       ) : null}
 
       {care.length > 0 ? (
@@ -294,13 +339,20 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                       {m.today.incident}
                     </Link>
                   ) : null}
-                  <ActionForm action={checkOut} className="contents">
-                    <input type="hidden" name="bookingId" value={b.id} />
-                    <input type="hidden" name="from" value="today" />
-                    <SubmitButton pendingLabel={m.today.checkingOut} variant={b.end_date <= today ? "primary" : "secondary"}>
-                      {m.today.checkOut}
-                    </SubmitButton>
-                  </ActionForm>
+                  {leavingEarly({ status: b.status, endDate: b.end_date }, today) ? (
+                    // Going home early: the booking page asks whether to bill to today or as booked (D40).
+                    <Link href={`/app/bookings/${b.id}`} className={buttonStyles.secondary}>
+                      {m.today.checkOutEarly}
+                    </Link>
+                  ) : (
+                    <ActionForm action={checkOut} className="contents">
+                      <input type="hidden" name="bookingId" value={b.id} />
+                      <input type="hidden" name="from" value="today" />
+                      <SubmitButton pendingLabel={m.today.checkingOut} variant="primary">
+                        {m.today.checkOut}
+                      </SubmitButton>
+                    </ActionForm>
+                  )}
                 </div>
               </LedgerRow>
             ))}
