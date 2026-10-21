@@ -55,15 +55,23 @@ Press **New booking** on Today. Choose the pet (or add a new one with its parent
 it. Wagbook will not let two pets share a kennel on the same night, and will not let you take more pets than you have
 kennels. If something clashes, it tells you in a sentence what and when.
 
-Two pets of one family can be booked together. A booking can also start as a **request**, which holds no kennel until
-you confirm it.
+A regular in day boarding can be booked once for set weekdays: tick **Repeat**, the days, and an end date. If you sell
+**day boarding packs** (add them on **Extras**, sell one from the parent's page), their days are paid from the pack.
+
+Parents you know can ask for a stay themselves: on a parent's page, **Booking link** sends them their own link. What
+they ask for arrives as a request, which holds no kennel until you confirm it.
+
+Two pets of one family can be booked together, in a kennel each or in one kennel, the second at your shared kennel
+price. If one goes home early, the nights the other has the kennel to itself are billed at your usual price. A booking
+can also start as a **request**, which holds no kennel until you confirm it.
 
 Every booking has its own page:
 
 <img src="guide/04-booking.jpg" alt="A booking: check out, updates, the parent's link" width="270">
 
 From here you check the pet in and out, write updates for the parent, add extras (a bath, a pick-up), and send the
-parent their link.
+parent their link. If a pet in day boarding stays the night after all, an owner or manager uses **Staying overnight**:
+the days so far stay day boarding, and the nights are boarding, each at its own price on the bill.
 
 ## The care round
 
@@ -77,6 +85,9 @@ If the phone loses its connection, ticks are kept on the phone and sent when it 
 
 **Play** (top right) plans solo play in your yards, one pet at a time, so dogs that should not meet never do.
 
+Today's **To send** list has the messages due: a vaccination card to ask for, see you tomorrow, going home tomorrow,
+and bills still unpaid. **Send** opens WhatsApp with the message written; send it, and it leaves the list.
+
 ## Pets and parents
 
 <img src="guide/06-pets.jpg" alt="Pets: search by name, parent or phone" width="270">
@@ -84,7 +95,8 @@ If the phone loses its connection, ticks are kept on the phone and sent when it 
 
 **Pets** finds any pet by its name, its parent's name or a phone number. A pet's page has its photo, food, health,
 vaccinations (with a warning when one has run out or will run out during a stay), incidents and stays. Anyone on the
-team can keep these up to date.
+team can keep these up to date. A parent's phone numbers are changed only by an owner or manager, because a wrong
+number sends their updates and bills to someone else.
 
 ### The form parents fill in
 
@@ -115,12 +127,18 @@ number (numbers follow on, with no gaps, as tax law expects). Send it on WhatsAp
 opens their UPI app with the amount filled in. When the money arrives, **Record payment**. An advance taken at booking
 counts towards the bill.
 
-An issued bill cannot be changed by anyone. If it is wrong, cancel it (with a reason) and make a new one.
+An issued bill cannot be changed by anyone. If it is wrong the same month, cancel it (with a reason) and make a new one.
+To give back all or part of a bill (nights not stayed, a bill from last month), an owner or manager makes a **credit
+note** on the bill page: it gets its own number, the parent sees it on their bill link, and your reports count it in
+the month you made it. If you charge GST, a bill from an earlier month can only be credited, not cancelled.
+
+Your accountant tells you the tax rate and the service code (SAC) for what you sell. Put them in **Settings, Tax and
+invoices** for boarding and day boarding, and on **Extras** for each extra. Wagbook does not choose them for you.
 
 <img src="guide/10-reports.jpg" alt="Reports" width="270">
 
 **More, Reports** (owners and managers) shows how full you were each day, money in and out by month, tax by rate, and
-which extras sell. **Expenses** is where you note what the kennel spent, with a photo of the receipt. Everything can be
+which extras sell. If you charge GST, it also has the month's **GSTR-1 files** for your accountant. **Expenses** is where you note what the kennel spent, with a photo of the receipt. Everything can be
 downloaded for your accountant.
 
 **More, History of changes** shows who changed a booking, a price, a bill or a setting, and when.
@@ -141,18 +159,22 @@ downloaded for your accountant.
 ## When a parent asks about their details
 
 India's data protection law lets a parent ask what you hold about them, and ask you to delete it. On the parent's page
-(open a pet, then its parent), owners and managers find **What we hold about them**:
+(open a pet, then its parent), owners and managers find **What we hold about them** (only an owner can erase):
 
 - **Download their details** gives you one file with everything. Send it to the parent.
-- **Erase their details** deletes their pets' notes, photos, vaccinations, updates, forms and certificates, and
-  empties their name, phone and address. Bills you already issued stay, because tax law requires you to keep them.
+- **Erase their details** empties their name, phone numbers, address and notes, and deletes the updates you sent
+  them, their forms and the vaccination cards (a card shows the owner's name). Their pets' records stay, hidden: the
+  pet's details, photo, vaccinations, routines and incidents. Bills you already issued stay, because tax law requires
+  you to keep them.
   This cannot be undone, so Wagbook asks you to tick a box first. It is refused while their pet is still with you or a
   stay is booked.
 
 ## Languages
 
 Each person chooses the language Wagbook speaks to them under **More**: English, Hindi or Kannada. Under **Settings**
-you choose the language of the pages and messages parents get.
+you choose the language of the pages and messages parents get. Bills are always in English; if a parent asks, choose
+**Bills: English and हिन्दी** (or ಕನ್ನಡ) on their page, and the headings of their bills show in that language too, in
+brackets.
 
 ## Getting help
 

@@ -18,15 +18,15 @@ import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
-  sharedWith, todayIn, toDecimalString, vaccinationWarnings, whatsappLink,
+  addDays, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, peaksTouching, quoteStay,
+  sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import { addExtra, cancelBooking, confirmRequest, extendToToday, markNoShow, removeExtra, updateBooking } from "../actions";
+import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, switchToBoarding, updateBooking } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.booking.title);
 
@@ -39,7 +39,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -62,7 +62,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, origin] = await Promise.all([
+  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
@@ -95,9 +95,23 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       .eq("booking_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
+    // What the stay costs, split where it has to be (see stay_charges() in the database).
+    supabase.rpc("stay_charges", { p_org: org.id, p_bookings: [b.id] }),
+    // The usual price per night, offered when day boarding turns into boarding.
+    b.kind === "daycare" && canManage
+      ? supabase.from("services").select("price_minor").eq("org_id", org.id).eq("kind", "boarding").eq("is_default", true).eq("is_active", true).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     siteOrigin(),
+    // A repeating series (D37): its days, to say how many are still to come.
+    b.series_id
+      ? supabase.from("bookings").select("start_date, status").eq("org_id", org.id).eq("series_id", b.series_id).neq("status", "cancelled")
+      : Promise.resolve({ data: [], error: null }),
+    // The parent's day boarding packs: the one this day is paid from, or one that could pay for it.
+    b.kind === "daycare" && parent
+      ? supabase.from("pass_balances").select("pass_id, name, days_left, starts_on, valid_until").eq("org_id", org.id).eq("client_id", parent.id).order("valid_until")
+      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error) {
+  if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error || charges.error || nightPrice.error || series.error || packs.error) {
     throw new Error("Could not load the booking.");
   }
 
@@ -127,6 +141,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const freeKennels = [...(b.kennels ? [b.kennels] : []), ...(kennels.data ?? []).filter((k) => k.id !== b.kennel_id)].map(kennelLabel);
   const sharesWith = b.kennel_id ? sharing.get(b.kennel_id) : undefined;
 
+  const stayCharges = toStayCharges(charges.data);
+  const paidFrom = b.pass_id ? (packs.data ?? []).find((x) => x.pass_id === b.pass_id) : undefined;
+  const dayUnits = b.end_date >= b.start_date ? chargeableUnits(b.kind, b.start_date, b.end_date) : 0;
+  const canPayFrom = !b.pass_id && open
+    ? (packs.data ?? []).find((x) => (x.days_left ?? 0) >= dayUnits && (x.starts_on ?? "") <= b.start_date && b.end_date <= (x.valid_until ?? ""))
+    : undefined;
+  const seriesLeft = (series.data ?? []).filter((x) => x.start_date >= today && (x.status === "requested" || x.status === "confirmed")).length;
+  // How a line of the stay reads on this page: "Boarding", "Day boarding", "Boarding, sharing a kennel".
+  const chargeLabel = (c: StayCharge) => {
+    const what = m.labels.bookingKind[c.part === "days" ? "daycare" : b.kind];
+    if (b.pass_id) return fill(w.costs.fromPack, { what });
+    return c.part === "shared" ? fill(w.costs.shared, { what }) : c.part === "alone" ? fill(w.costs.alone, { what }) : what;
+  };
   const quote = quoteStay(
     {
       kind: b.kind,
@@ -136,6 +163,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       rateMinor: b.rate_minor,
       discountMinor: b.discount_minor,
       taxRateBp: b.tax_rate_bp,
+      boardingFrom: b.boarding_from,
+      charges: stayCharges,
+      fromPack: Boolean(b.pass_id),
       addOns: items.data.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp })),
     },
     { mode: org.tax_mode, sellerStateCode: org.gst_state_code, placeOfSupplyStateCode: org.gst_state_code, pricesIncludeTax: org.prices_include_tax },
@@ -196,6 +226,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           ))}
         </p>
         <p className="text-lg">{stayText(t, b.kind, b.start_date, b.end_date)}</p>
+        {b.boarding_from ? (
+          <p className="font-semibold">
+            {fill(w.dayThenBoarding, { date: formatDate(addDays(b.boarding_from, -1), locale), night: formatDate(b.boarding_from, locale) })}
+          </p>
+        ) : null}
+        {b.series_id ? <p className="font-semibold">{fill(w.seriesNote, { n: (series.data ?? []).length, left: seriesLeft })}</p> : null}
+        {paidFrom ? <p className="font-semibold">{fill(w.fromPackNote, { name: paidFrom.name ?? "" })}</p> : null}
         {sharesWith && b.kennels ? <p className="font-semibold">{fill(w.sharesWith, { kennel: b.kennels.name, pets: sharesWith.join(", ") })}</p> : null}
         {parent ? (
           <p className="text-slate">
@@ -273,16 +310,16 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             <LedgerRow key={i}>
               <span className="min-w-0 flex-1">
                 {fill(l.discountMinor > 0 ? w.costs.lineLess : w.costs.line, {
-                  what: i === 0 ? m.labels.bookingKind[b.kind] : l.description,
+                  what: i < stayCharges.length ? chargeLabel(stayCharges[i]) : l.description,
                   quantity: l.quantity,
                   price: money(l.unitPriceMinor),
                   discount: money(l.discountMinor),
                 })}
               </span>
               <span className="font-semibold">{money(l.totalMinor)}</span>
-              {i > 0 && canDelete && open ? (
+              {i >= stayCharges.length && canDelete && open ? (
                 <ActionForm action={removeExtra} className="contents">
-                  <input type="hidden" name="itemId" value={items.data[i - 1].id} />
+                  <input type="hidden" name="itemId" value={items.data[i - stayCharges.length].id} />
                   <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.common.removing} />
                 </ActionForm>
               ) : null}
@@ -444,6 +481,16 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <Field label={w.change.discount} hint={w.change.discountHint}>
                   <Input name="discount" inputMode="decimal" defaultValue={b.discount_minor ? toDecimalString(b.discount_minor).replace(/\.00$/, "") : ""} />
                 </Field>
+                {b.alone_rate_minor !== null ? (
+                  <Field label={w.change.aloneRate} hint={w.change.aloneRateHint}>
+                    <Input name="aloneRate" inputMode="decimal" defaultValue={toDecimalString(b.alone_rate_minor).replace(/\.00$/, "")} />
+                  </Field>
+                ) : null}
+                {b.day_rate_minor !== null ? (
+                  <Field label={w.change.dayRate}>
+                    <Input name="dayRate" inputMode="decimal" required defaultValue={toDecimalString(b.day_rate_minor).replace(/\.00$/, "")} />
+                  </Field>
+                ) : null}
               </div>
             ) : (
               <p className="text-slate">{fill(b.kind === "boarding" ? w.change.priceNight : w.change.priceDay, { price: money(b.rate_minor) })}</p>
@@ -455,6 +502,59 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               <Textarea name="notes" maxLength={2000} defaultValue={b.notes ?? ""} />
             </Field>
             <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
+          </ActionForm>
+        </Section>
+      ) : null}
+
+      {canPayFrom ? (
+        <ActionForm action={payFromPack} className="mb-6">
+          <input type="hidden" name="bookingId" value={b.id} />
+          <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+            {fill(w.usePack, { name: canPayFrom.name ?? "", left: canPayFrom.days_left ?? 0 })}
+          </SubmitButton>
+        </ActionForm>
+      ) : null}
+
+      {b.series_id && open && seriesLeft > 0 ? (
+        <details className="mb-6 rounded-xl border border-rule bg-paper p-4">
+          <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{w.cancelRest}</summary>
+          <ActionForm action={cancelSeriesRest} className="mt-2 space-y-3">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <p className="text-slate">{w.cancelRestHint}</p>
+            <Field label={w.cancel.why}>
+              <Input name="reason" required maxLength={500} />
+            </Field>
+            <SubmitButton variant="secondary" pendingLabel={w.cancellingRest}>
+              {w.cancelRest}
+            </SubmitButton>
+          </ActionForm>
+        </details>
+      ) : null}
+
+      {open && canManage && b.kind === "daycare" && !b.series_id && !b.pass_id ? (
+        <Section title={w.overnight.title}>
+          <ActionForm action={switchToBoarding} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <p>{fill(w.overnight.text, { pet: pet?.name ?? w.bill.thePet })}</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label={w.overnight.firstNight}>
+                <Input name="firstNight" type="date" required defaultValue={today > b.start_date ? today : b.start_date} />
+              </Field>
+              <Field label={w.overnight.checkOut}>
+                <Input name="endDate" type="date" required defaultValue={addDays(today > b.end_date ? today : b.end_date, 1)} />
+              </Field>
+              <Field label={w.overnight.pricePerNight}>
+                <Input
+                  name="rate"
+                  inputMode="decimal"
+                  required
+                  defaultValue={nightPrice.data ? toDecimalString(nightPrice.data.price_minor).replace(/\.00$/, "") : ""}
+                />
+              </Field>
+            </div>
+            <SubmitButton variant="secondary" pendingLabel={w.overnight.saving}>
+              {w.overnight.save}
+            </SubmitButton>
           </ActionForm>
         </Section>
       ) : null}

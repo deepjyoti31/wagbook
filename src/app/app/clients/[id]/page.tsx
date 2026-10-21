@@ -2,18 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { CopyButton } from "@/components/copy-button";
 import { HidePanel } from "@/components/hide-panel";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, whatsappLink } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
+import { fill, LANGUAGE_NAMES } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
+import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import { eraseClient, mergeClient, setParentHidden, updateClient } from "../actions";
+import { eraseClient, mergeClient, renewRequestLink, sellPack, setParentHidden, updateClient } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.parent.title);
 
@@ -37,7 +39,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
   const res = await supabase
     .from("clients")
-    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at, erased_at")
+    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, request_token, deleted_at, erased_at")
     .eq("org_id", org.id)
     .eq("id", id)
     .maybeSingle();
@@ -161,6 +163,10 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
         )}
       </Section>
 
+      <Packs t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
+
+      {c.request_token && !hidden ? <RequestLink t={t} org={org} client={{ id: c.id, name: c.full_name, phone: c.phone, token: c.request_token }} /> : null}
+
       <Section title={p.details}>
         <ActionForm action={updateClient} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <input type="hidden" name="clientId" value={c.id} />
@@ -168,12 +174,18 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
             <Input name="full_name" required maxLength={120} defaultValue={c.full_name} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={f.mobile} hint={f.mobileHint}>
-              <Input name="phone" type="tel" required defaultValue={c.phone} />
-            </Field>
-            <Field label={f.altPhone}>
-              <Input name="alt_phone" type="tel" defaultValue={c.alt_phone ?? ""} />
-            </Field>
+            {canManage ? (
+              <>
+                <Field label={f.mobile} hint={f.mobileHint}>
+                  <Input name="phone" type="tel" required defaultValue={c.phone} />
+                </Field>
+                <Field label={f.altPhone}>
+                  <Input name="alt_phone" type="tel" defaultValue={c.alt_phone ?? ""} />
+                </Field>
+              </>
+            ) : (
+              <p className="text-slate sm:col-span-2">{p.phoneByManager}</p>
+            )}
             <Field label={f.email}>
               <Input name="email" type="email" defaultValue={c.email ?? ""} />
             </Field>
@@ -203,6 +215,16 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                 {Object.entries(GST_STATES).map(([code, state]) => (
                   <option key={code} value={code}>
                     {code} {state}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={f.billLanguage} hint={f.billLanguageHint}>
+              <Select name="bill_translation" defaultValue={c.bill_translation ?? ""}>
+                <option value="">{f.billEnglishOnly}</option>
+                {(["hi", "kn"] as const).map((l) => (
+                  <option key={l} value={l}>
+                    {fill(f.billWith, { language: LANGUAGE_NAMES[l] })}
                   </option>
                 ))}
               </Select>
@@ -291,5 +313,107 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
       {hidden ? null : <HidePanel action={setParentHidden} field="clientId" id={c.id} hidden={false} canManage={canManage} words={hideWords} />}
     </>
+  );
+}
+
+/** The parent's own booking link (D36): copy it, send it on WhatsApp, or make a new one. */
+async function RequestLink({
+  t,
+  org,
+  client,
+}: {
+  t: Awaited<ReturnType<typeof getAppI18n>>;
+  org: { name: string; parent_language: string; locale: string };
+  client: { id: string; name: string; phone: string; token: string };
+}) {
+  const w = t.m.parent.requestLink;
+  const url = `${await siteOrigin()}/b/${client.token}`;
+  const parentWords = parentI18n(org.parent_language, org.locale).m.whatsapp;
+  const message = fill(parentWords.requestLink, { parent: client.name.trim().split(/\s+/)[0] ?? client.name, kennel: org.name, url });
+  return (
+    <Section title={w.title}>
+      <p className="mb-3 text-slate">{fill(w.about, { name: client.name })}</p>
+      <div className="flex flex-wrap gap-2">
+        <a href={whatsappLink(message, client.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
+          {w.send}
+        </a>
+        <CopyButton text={url} words={t.m.copy} />
+      </div>
+      <ActionForm action={renewRequestLink} className="mt-3 space-y-1">
+        <input type="hidden" name="clientId" value={client.id} />
+        <SubmitButton variant="quiet" pendingLabel={t.m.common.saving}>
+          {w.renew}
+        </SubmitButton>
+        <p className="text-sm text-slate">{w.renewHint}</p>
+      </ActionForm>
+    </Section>
+  );
+}
+
+/** The day boarding packs the parent bought, and, for owners and managers, selling another (D37). */
+async function Packs({
+  t,
+  org,
+  clientId,
+  canManage,
+}: {
+  t: Awaited<ReturnType<typeof getAppI18n>>;
+  org: { id: string; currency: string; time_zone: string };
+  clientId: string;
+  canManage: boolean;
+}) {
+  const w = t.m.parent.packs;
+  const supabase = await createClient();
+  const [bought, forSale] = await Promise.all([
+    supabase.from("pass_balances").select("pass_id, name, days, days_left, valid_until, invoice_id").eq("org_id", org.id).eq("client_id", clientId).order("valid_until", { ascending: false }),
+    canManage ? supabase.from("day_packs").select("id, name").eq("org_id", org.id).eq("is_active", true).order("days") : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (bought.error || forSale.error) throw new Error("Could not load packs.");
+  if (bought.data.length === 0 && !canManage) return null;
+  const today = todayIn(org.time_zone);
+  return (
+    <Section title={w.title} count={bought.data.length}>
+      {bought.data.length === 0 ? (
+        <Empty>{w.none}</Empty>
+      ) : (
+        <ul className="space-y-2">
+          {bought.data.map((x) => (
+            <li key={x.pass_id} className="flex flex-wrap items-center gap-2">
+              <span>{fill(w.line, { name: x.name ?? "", left: x.days_left ?? 0, days: x.days ?? 0, until: formatDate(x.valid_until ?? today, t.locale) })}</span>
+              {(x.valid_until ?? today) < today ? <Badge>{fill(w.ended, { date: formatDate(x.valid_until ?? today, t.locale) })}</Badge> : null}
+              {x.invoice_id ? (
+                <Link href={`/app/bills/${x.invoice_id}`} className="underline underline-offset-4">
+                  {w.bill}
+                </Link>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canManage ? (
+        forSale.data.length === 0 ? (
+          <p className="mt-3 text-sm text-slate">{w.addFirst}</p>
+        ) : (
+          <ActionForm action={sellPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <input type="hidden" name="clientId" value={clientId} />
+            <Field label={w.which}>
+              <Select name="packId" required defaultValue={forSale.data[0].id}>
+                {forSale.data.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.startsOn}>
+              <Input name="starts_on" type="date" required defaultValue={today} />
+            </Field>
+            <SubmitButton variant="secondary" pendingLabel={w.selling}>
+              {w.sell}
+            </SubmitButton>
+          </ActionForm>
+        )
+      ) : null}
+    </Section>
   );
 }

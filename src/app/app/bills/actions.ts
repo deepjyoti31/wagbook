@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { BILLABLE_IN_FAMILY, billForBooking, billForFamily, billFromLines, draftPayload, PAYMENT_METHODS } from "@/lib/billing";
-import { isISODate, parseMoney, todayIn, type LineInput } from "@/lib/core";
+import { BILLABLE_IN_FAMILY, billForBooking, billForFamily, billFromLines, creditPayload, draftPayload, partCredit, PAYMENT_METHODS, type CreditableBill } from "@/lib/billing";
+import { isISODate, parseMoney, todayIn, toStayCharges, type LineInput } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
+import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,7 +36,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   // The stays this bill covers: the booking, or its family.
   const stays = await supabase
     .from("bookings")
-    .select("id, client_id, kind, start_date, end_date, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
+    .select("id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
     .eq("org_id", org.id)
     .in(group ? "group_id" : "id", [group ?? booking.data.id])
     .in("status", group ? [...BILLABLE_IN_FAMILY] : ["confirmed", "checked_in", "checked_out", "no_show"])
@@ -44,7 +45,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   if (stays.error) return { error: friendlyError(stays.error, t) };
   if (stays.data.length === 0) return { error: t.m.bill.errors.nothingToBill };
 
-  const [items, existing] = await Promise.all([
+  const [items, existing, charges] = await Promise.all([
     supabase
       .from("booking_items")
       .select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code")
@@ -58,17 +59,20 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
       .eq(group ? "group_id" : "booking_id", group ?? booking.data.id)
       .neq("status", "void")
       .maybeSingle(),
+    // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
+    supabase.rpc("stay_charges", { p_org: org.id, p_bookings: stays.data.map((b) => b.id) }),
   ]);
-  if (items.error || existing.error) return { error: friendlyError(items.error ?? existing.error, t) };
+  if (items.error || existing.error || charges.error) return { error: friendlyError(items.error ?? existing.error ?? charges.error, t) };
+  const billable = stays.data.map((b) => ({ ...b, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
   if (existing.data?.status === "issued") redirect(`/app/bills/${existing.data.id}`);
 
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
   const totals = group
     ? billForFamily(
         org,
-        stays.data.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
+        billable.map((b) => ({ petName: b.pets?.name ?? "Pet", booking: b, items: items.data.filter((i) => i.booking_id === b.id) })),
       )
-    : billForBooking(org, stays.data[0].pets?.name ?? "Pet", stays.data[0], items.data);
+    : billForBooking(org, billable[0].pets?.name ?? "Pet", billable[0], items.data);
   let invoiceId = existing.data?.id;
   if (!invoiceId) {
     const created = await supabase
@@ -203,6 +207,79 @@ export async function voidBill(_state: FormState, form: FormData): Promise<FormS
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   redirect(`/app/bills/${invoiceId.data}?done=void`);
+}
+
+/**
+ * Take back all or part of an issued bill with a credit note (D34). Owners
+ * and managers; the database checks again (issue_credit_note: WB002, WB092,
+ * WB093). The whole bill, while nothing has been credited, copies the bill's
+ * own lines, so every paisa matches. Part of it is one line, of the amount
+ * typed, at one of the bill's tax rates.
+ */
+export async function creditBill(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.bill.errors;
+  if (!canManage) return { error: t.m.errors.codes.WB002 };
+  const invoiceId = Id.safeParse(form.get("invoiceId"));
+  if (!invoiceId.success) return { error: t.m.errors.billNotFound };
+  const reason = text(form, "reason");
+  if (!reason) return { error: e.creditWhy };
+  if (reason.length > 500) return { error: e.reasonTooLong };
+  const whole = form.get("how") === "whole";
+
+  const supabase = await createClient();
+  const [bill, lines, balance] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select("id, number, status, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, taxable_minor, total_minor")
+      .eq("org_id", org.id)
+      .eq("id", invoiceId.data)
+      .maybeSingle(),
+    supabase
+      .from("invoice_lines")
+      .select("description, sac_code, quantity, unit_price_minor, discount_minor, taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor, sort_order")
+      .eq("org_id", org.id)
+      .eq("invoice_id", invoiceId.data)
+      .order("sort_order"),
+    supabase.from("invoice_balances").select("credited_minor").eq("org_id", org.id).eq("invoice_id", invoiceId.data).maybeSingle(),
+  ]);
+  if (bill.error || lines.error || balance.error) return { error: friendlyError(bill.error ?? lines.error ?? balance.error, t) };
+  if (!bill.data || lines.data.length === 0) return { error: t.m.errors.billNotFound };
+  const b = bill.data;
+  const creditable: CreditableBill = { ...b, seller: (b.seller ?? null) as CreditableBill["seller"] };
+  const what = text(form, "description") ?? fill(t.m.bill.credit.whatDefault, { number: b.number ?? "" });
+  const rates = [...new Set(lines.data.map((l) => l.tax_rate_bp))];
+
+  let payload: ReturnType<typeof creditPayload>;
+  if (whole && (balance.data?.credited_minor ?? 0) === 0) {
+    // The bill's own lines, exactly as they were issued.
+    payload = {
+      p_totals: {
+        subtotal_minor: 0, discount_minor: lines.data.reduce((a, l) => a + l.discount_minor, 0), taxable_minor: b.taxable_minor,
+        cgst_minor: lines.data.reduce((a, l) => a + l.cgst_minor, 0), sgst_minor: lines.data.reduce((a, l) => a + l.sgst_minor, 0),
+        igst_minor: lines.data.reduce((a, l) => a + l.igst_minor, 0), tax_minor: lines.data.reduce((a, l) => a + l.tax_minor, 0),
+        round_off_minor: b.total_minor - lines.data.reduce((a, l) => a + l.taxable_minor + l.tax_minor, 0), total_minor: b.total_minor,
+      },
+      p_lines: lines.data.map((l, i) => ({ ...l, quantity: Number(l.quantity), sort_order: i })),
+    };
+  } else {
+    // The whole bill is offered only while nothing has been credited; after that, part of it.
+    const rate = Number(form.get("rate") ?? rates[0]);
+    const amount = parseMoney(text(form, "amount") ?? "");
+    if (!rates.includes(rate)) return { error: e.creditRate };
+    if (amount === null || amount <= 0) return { error: e.creditAmount };
+    const sac = lines.data.find((l) => l.tax_rate_bp === rate && l.sac_code)?.sac_code ?? null;
+    payload = creditPayload(partCredit(creditable, { description: what.slice(0, 300), amountMinor: amount, taxRateBp: rate, sacCode: sac }, org.round_invoice_totals));
+  }
+
+  const { error } = await supabase.rpc("issue_credit_note", { p_invoice: b.id, p_reason: reason, ...payload });
+  if (error) {
+    if (error.message.includes("WB037")) console.error("issue_credit_note refused the app's arithmetic", b.id, error.message);
+    return { error: error.message.includes("WB037") ? e.doesNotAddUp : friendlyError(error, t) };
+  }
+  revalidatePath("/app", "layout");
+  redirect(`/app/bills/${b.id}?done=credited`);
 }
 
 /** Throw away a draft. Owners only (the delete policy, D29). */

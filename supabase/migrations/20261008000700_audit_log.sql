@@ -82,6 +82,8 @@ create trigger booking_items_audit after insert or update or delete on public.bo
   for each row execute function public.audit_row();
 create trigger invoices_audit after insert or update or delete on public.invoices
   for each row execute function public.audit_row();
+create trigger credit_notes_audit after insert or update or delete on public.credit_notes
+  for each row execute function public.audit_row();
 create trigger payments_audit after insert or update or delete on public.payments
   for each row execute function public.audit_row();
 create trigger expenses_audit after insert or update or delete on public.expenses

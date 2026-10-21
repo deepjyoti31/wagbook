@@ -97,3 +97,23 @@ export async function switchOrganisation(form: FormData): Promise<void> {
   revalidatePath("/app", "layout");
   redirect("/app");
 }
+
+const ReminderKind = z.enum(["vaccination", "arrival", "pickup", "unpaid"]);
+
+/**
+ * A reminder on Today was sent: the person tapped Send, which opened WhatsApp
+ * with the message typed. Recorded so it leaves the list (an unpaid bill comes
+ * back three days later, src/lib/core/reminders.ts). Wagbook sends nothing.
+ */
+export async function markReminderSent(kind: string, subjectId: string): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const k = ReminderKind.safeParse(kind);
+  const id = Id.safeParse(subjectId);
+  if (!k.success || !id.success) return { error: t.m.errors.generic };
+  const supabase = await createClient();
+  const { error } = await supabase.from("reminders_sent").insert({ org_id: org.id, kind: k.data, subject_id: id.data, sent_on: todayIn(org.time_zone) });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app");
+  return { ok: t.m.common.saved };
+}

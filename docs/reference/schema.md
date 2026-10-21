@@ -6,13 +6,13 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 67.
+Migrations applied: 11. Tables: 29. Views: 2. Functions: 76.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
-- Views: [invoice_balances](#invoice_balances)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [reminders_sent](#reminders_sent), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Views: [invoice_balances](#invoice_balances), [pass_balances](#pass_balances)
 - [Functions](#functions)
 
 ## Enumerated types
@@ -138,7 +138,10 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `end_date` | `date` | yes |  | Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date). |
 | `kennel_id` | `uuid` |  |  | The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel). |
 | `rate_minor` | `bigint` | yes |  | Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history. |
-| `discount_minor` | `bigint` | yes | `0` | Discount on the stay itself, before tax. |
+| `alone_rate_minor` | `bigint` |  |  | For a pet booked at the shared kennel price: the price per night or day for the nights or days it has the kennel to itself (its sibling left early or came late), usually the kennel's usual price. Empty: rate_minor applies throughout. See stay_charges(). |
+| `boarding_from` | `date` |  |  | For a stay that began as day boarding and became boarding: the first night. The days before it are billed as day boarding at day_rate_minor, the nights from it at rate_minor. Empty for every other stay. |
+| `day_rate_minor` | `bigint` |  |  | With boarding_from: the price per day for the days of day boarding before the first night. |
+| `discount_minor` | `bigint` | yes | `0` | Discount on the stay itself, before tax. On a bill it goes on the stay's largest line (stay_charges()). |
 | `tax_rate_bp` | `integer` | yes | `0` | Tax rate for the stay, copied when booked. |
 | `sac_code` | `text` |  |  |  |
 | `expected_arrival` | `time without time zone` |  |  | When the parent said they would drop off. For planning the day; not enforced. |
@@ -154,8 +157,10 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `vaccinations_checked_at` | `timestamp with time zone` |  |  | When a staff member confirmed at check-in that they had seen the pet's vaccination certificates. Stamped by the database. |
 | `vaccinations_checked_by` | `uuid` |  |  | Who confirmed the vaccinations at check-in. Stamped by the database. |
 | `notes` | `text` |  |  |  |
-| `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. |
+| `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. parent: asked for by the parent through their booking link, as a request. |
 | `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill. |
+| `series_id` | `uuid` |  |  | Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own. |
+| `pass_id` | `uuid` |  |  | The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero. |
 | `public_token` | `text` | yes | `new_token()` | Secret in the parent's stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else. |
 | `created_by` | `uuid` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -174,23 +179,32 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
+- Foreign key `bookings_pass_fkey`: `FOREIGN KEY (org_id, pass_id) REFERENCES passes(org_id, id) ON DELETE RESTRICT`
 - Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&, client_id WITH <>) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
+- Check `bookings_alone_rate_minor_check`: `CHECK (((alone_rate_minor IS NULL) OR (alone_rate_minor >= 0)))`
 - Check `bookings_at_most_a_year`: `CHECK (((end_date - start_date) <= 366))`
+- Check `bookings_boarding_from_inside_stay`: `CHECK (((boarding_from IS NULL) OR ((kind = 'boarding'::booking_kind) AND (boarding_from > start_date) AND (boarding_from < end_date))))`
 - Check `bookings_boarding_has_a_night`: `CHECK (((kind <> 'boarding'::booking_kind) OR (end_date > start_date)))`
 - Check `bookings_dates_in_order`: `CHECK ((end_date >= start_date))`
+- Check `bookings_day_part_has_a_price`: `CHECK (((boarding_from IS NULL) = (day_rate_minor IS NULL)))`
+- Check `bookings_day_rate_minor_check`: `CHECK (((day_rate_minor IS NULL) OR (day_rate_minor >= 0)))`
 - Check `bookings_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `bookings_pass_covers_the_price`: `CHECK (((pass_id IS NULL) OR ((kind = 'daycare'::booking_kind) AND (rate_minor = 0) AND (discount_minor = 0) AND (alone_rate_minor IS NULL) AND (boarding_from IS NULL))))`
 - Check `bookings_rate_minor_check`: `CHECK ((rate_minor >= 0))`
 - Check `bookings_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
-- Check `bookings_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'intake'::text])))`
+- Check `bookings_series_is_day_boarding`: `CHECK (((series_id IS NULL) OR (kind = 'daycare'::booking_kind)))`
+- Check `bookings_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'intake'::text, 'parent'::text])))`
 - Check `bookings_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
 
 **Indexes**
 
 - `CREATE INDEX bookings_org_client_idx ON public.bookings USING btree (org_id, client_id)`
 - `CREATE INDEX bookings_org_dates_idx ON public.bookings USING btree (org_id, start_date, end_date)`
+- `CREATE INDEX bookings_org_pass_idx ON public.bookings USING btree (org_id, pass_id) WHERE (pass_id IS NOT NULL)`
 - `CREATE INDEX bookings_org_pet_idx ON public.bookings USING btree (org_id, pet_id)`
+- `CREATE INDEX bookings_org_series_idx ON public.bookings USING btree (org_id, series_id) WHERE (series_id IS NOT NULL)`
 - `CREATE INDEX bookings_org_status_idx ON public.bookings USING btree (org_id, status)`
 
 **Triggers**
@@ -198,6 +212,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
+- `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
 - `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
@@ -334,6 +349,8 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 | `notes` | `text` |  |  |  |
 | `consent_at` | `timestamp with time zone` |  |  | When the parent agreed to the kennel holding their details. Evidence for DPDP. |
 | `consent_source` | `text` |  |  | intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent. |
+| `bill_translation` | `text` |  |  | Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only. |
+| `request_token` | `text` |  | `new_token()` | Secret in the parent's own booking link (/b/{token}), where they ask for a stay. renew_request_link() replaces it, so an old link stops working; erasing the parent clears it. |
 | `created_by` | `uuid` |  |  |  |
 | `deleted_at` | `timestamp with time zone` |  |  | Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense. |
 | `erased_at` | `timestamp with time zone` |  |  | When the parent's details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it. |
@@ -344,9 +361,11 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 
 - Primary key `clients_pkey`: `PRIMARY KEY (id)`
 - Unique `clients_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `clients_request_token_key`: `UNIQUE (request_token)`
 - Foreign key `clients_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `clients_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `clients_alt_phone_check`: `CHECK (((alt_phone IS NULL) OR (alt_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
+- Check `clients_bill_translation_check`: `CHECK (((bill_translation IS NULL) OR (bill_translation = ANY (ARRAY['hi'::text, 'kn'::text]))))`
 - Check `clients_consent_source_check`: `CHECK (((consent_source IS NULL) OR (consent_source = ANY (ARRAY['intake_form'::text, 'staff'::text]))))`
 - Check `clients_erased_stay_hidden`: `CHECK (((erased_at IS NULL) OR (deleted_at IS NOT NULL)))`
 - Check `clients_full_name_check`: `CHECK (((char_length(full_name) >= 1) AND (char_length(full_name) <= 120)))`
@@ -362,6 +381,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 
 - `clients_forbid_org_change` (before update) runs `forbid_org_change()`
 - `clients_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
+- `clients_guard_phone` (before update) runs `clients_guard_phone()`
 - `clients_hide_pets` (after update of deleted_at) runs `clients_hide_pets()`
 - `clients_set_updated_at` (before update) runs `set_updated_at()`
 - `clients_stamp_actor` (before insert or update) runs `stamp_actor()`
@@ -373,6 +393,168 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 - `clients_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### credit_note_lines
+
+The lines of a credit note: what is taken back, with its tax worked out as on the bill.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `credit_note_id` | `uuid` | yes |  |  |
+| `sort_order` | `integer` | yes | `0` |  |
+| `description` | `text` | yes |  |  |
+| `sac_code` | `text` |  |  |  |
+| `quantity` | `numeric(10,2)` | yes |  |  |
+| `unit_price_minor` | `bigint` | yes |  |  |
+| `discount_minor` | `bigint` | yes |  |  |
+| `taxable_minor` | `bigint` | yes |  |  |
+| `tax_rate_bp` | `integer` | yes |  |  |
+| `cgst_minor` | `bigint` | yes |  |  |
+| `sgst_minor` | `bigint` | yes |  |  |
+| `igst_minor` | `bigint` | yes |  |  |
+| `tax_minor` | `bigint` | yes |  |  |
+| `total_minor` | `bigint` | yes |  |  |
+
+**Constraints**
+
+- Primary key `credit_note_lines_pkey`: `PRIMARY KEY (id)`
+- Foreign key `credit_note_lines_org_id_credit_note_id_fkey`: `FOREIGN KEY (org_id, credit_note_id) REFERENCES credit_notes(org_id, id) ON DELETE CASCADE`
+- Foreign key `credit_note_lines_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `credit_note_lines_cgst_minor_check`: `CHECK ((cgst_minor >= 0))`
+- Check `credit_note_lines_description_check`: `CHECK (((char_length(description) >= 1) AND (char_length(description) <= 300)))`
+- Check `credit_note_lines_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `credit_note_lines_igst_minor_check`: `CHECK ((igst_minor >= 0))`
+- Check `credit_note_lines_quantity_check`: `CHECK ((quantity > (0)::numeric))`
+- Check `credit_note_lines_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `credit_note_lines_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
+- Check `credit_note_lines_tax_minor_check`: `CHECK ((tax_minor >= 0))`
+- Check `credit_note_lines_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
+- Check `credit_note_lines_taxable_minor_check`: `CHECK ((taxable_minor >= 0))`
+- Check `credit_note_lines_total_minor_check`: `CHECK ((total_minor >= 0))`
+- Check `credit_note_lines_unit_price_minor_check`: `CHECK ((unit_price_minor >= 0))`
+
+**Indexes**
+
+- `CREATE INDEX credit_note_lines_note_idx ON public.credit_note_lines USING btree (org_id, credit_note_id, sort_order)`
+
+**Triggers**
+
+- `credit_note_lines_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credit_note_lines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### credit_notes
+
+A credit note: takes back all or part of an issued bill, counted in the month it is made. Written only by issue_credit_note(); never changed.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `invoice_id` | `uuid` | yes |  | The bill it takes back from. Its buyer, seller and tax details are the bill's. |
+| `number` | `text` | yes |  | Printed number, CN/YY-YY/NNNN. Consecutive within a financial year, its own series, never reused. |
+| `fiscal_year` | `text` | yes |  |  |
+| `seq` | `integer` | yes |  |  |
+| `issued_on` | `date` | yes |  | Credit note date: the kennel's local date when it was made. Tax reports count it in this month. |
+| `issued_by` | `uuid` |  |  |  |
+| `reason` | `text` | yes |  | Why the bill is being taken back, such as "Went home two nights early". |
+| `currency` | `text` | yes |  |  |
+| `subtotal_minor` | `bigint` | yes |  |  |
+| `discount_minor` | `bigint` | yes |  |  |
+| `taxable_minor` | `bigint` | yes |  |  |
+| `cgst_minor` | `bigint` | yes |  |  |
+| `sgst_minor` | `bigint` | yes |  |  |
+| `igst_minor` | `bigint` | yes |  |  |
+| `tax_minor` | `bigint` | yes |  |  |
+| `round_off_minor` | `bigint` | yes |  |  |
+| `total_minor` | `bigint` | yes |  | What is taken off the bill: taxable + tax + round off. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `credit_notes_pkey`: `PRIMARY KEY (id)`
+- Unique `credit_notes_org_id_fiscal_year_seq_key`: `UNIQUE (org_id, fiscal_year, seq)`
+- Unique `credit_notes_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `credit_notes_org_id_number_key`: `UNIQUE (org_id, number)`
+- Foreign key `credit_notes_issued_by_fkey`: `FOREIGN KEY (issued_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `credit_notes_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `credit_notes_org_id_invoice_id_fkey`: `FOREIGN KEY (org_id, invoice_id) REFERENCES invoices(org_id, id) ON DELETE RESTRICT`
+- Check `credit_notes_cgst_minor_check`: `CHECK ((cgst_minor >= 0))`
+- Check `credit_notes_currency_check`: `CHECK ((currency ~ '^[A-Z]{3}$'::text))`
+- Check `credit_notes_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `credit_notes_igst_minor_check`: `CHECK ((igst_minor >= 0))`
+- Check `credit_notes_number_check`: `CHECK (((char_length(number) <= 16) AND (number ~ '^[A-Za-z0-9/-]+$'::text)))`
+- Check `credit_notes_reason_check`: `CHECK (((char_length(reason) >= 1) AND (char_length(reason) <= 500)))`
+- Check `credit_notes_round_off_minor_check`: `CHECK (((round_off_minor >= '-99'::integer) AND (round_off_minor <= 99)))`
+- Check `credit_notes_seq_check`: `CHECK ((seq > 0))`
+- Check `credit_notes_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
+- Check `credit_notes_subtotal_minor_check`: `CHECK ((subtotal_minor >= 0))`
+- Check `credit_notes_tax_minor_check`: `CHECK ((tax_minor >= 0))`
+- Check `credit_notes_taxable_minor_check`: `CHECK ((taxable_minor >= 0))`
+- Check `credit_notes_total_minor_check`: `CHECK ((total_minor > 0))`
+
+**Indexes**
+
+- `CREATE INDEX credit_notes_org_invoice_idx ON public.credit_notes USING btree (org_id, invoice_id)`
+- `CREATE INDEX credit_notes_org_issued_idx ON public.credit_notes USING btree (org_id, issued_on DESC)`
+
+**Triggers**
+
+- `credit_notes_audit` (after insert or delete or update) runs `audit_row()`
+- `credit_notes_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credit_notes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### day_packs
+
+The day boarding packs a kennel sells: so many days, at a price, to use within so many days.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `name` | `text` | yes |  |  |
+| `days` | `integer` | yes |  | How many days of day boarding the pack gives. |
+| `price_minor` | `bigint` | yes |  |  |
+| `valid_days` | `integer` | yes |  | How long it lasts from the day it starts, in days: 60 means the start day and the 59 after it. |
+| `tax_rate_bp` | `integer` |  |  | Tax rate on the pack's bill, in basis points. Empty: the kennel's usual rate. |
+| `sac_code` | `text` |  |  | Service code printed on the pack's bill. The kennel's accountant decides it. |
+| `is_active` | `boolean` | yes | `true` | False once taken off the list: packs already sold keep working. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `day_packs_pkey`: `PRIMARY KEY (id)`
+- Unique `day_packs_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `day_packs_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `day_packs_days_check`: `CHECK (((days >= 1) AND (days <= 365)))`
+- Check `day_packs_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `day_packs_price_minor_check`: `CHECK ((price_minor >= 0))`
+- Check `day_packs_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `day_packs_tax_rate_bp_check`: `CHECK (((tax_rate_bp IS NULL) OR ((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000))))`
+- Check `day_packs_valid_days_check`: `CHECK (((valid_days >= 1) AND (valid_days <= 730)))`
+
+**Triggers**
+
+- `day_packs_forbid_org_change` (before update) runs `forbid_org_change()`
+- `day_packs_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `day_packs_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `day_packs_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `day_packs_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `day_packs_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### expenses
 
@@ -574,19 +756,21 @@ A one-time link that lets someone with no account yet join an organisation in a 
 
 ### invoice_counters
 
-The last invoice sequence used per organisation per financial year. Only issue_invoice touches it; nobody can read or write it directly.
+The last sequence number used per organisation, series (bills, credit notes) and financial year. Only issue_invoice and issue_credit_note touch it; nobody can read or write it directly.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
 | `org_id` | `uuid` | yes |  |  |
+| `series` | `text` | yes | `'invoice'::text` | invoice: bills (PREFIX/YY-YY/NNNN). credit_note: credit notes (CN/YY-YY/NNNN). |
 | `fiscal_year` | `text` | yes |  |  |
 | `last_seq` | `integer` | yes | `0` |  |
 
 **Constraints**
 
-- Primary key `invoice_counters_pkey`: `PRIMARY KEY (org_id, fiscal_year)`
+- Primary key `invoice_counters_pkey`: `PRIMARY KEY (org_id, series, fiscal_year)`
 - Foreign key `invoice_counters_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `invoice_counters_last_seq_check`: `CHECK ((last_seq >= 0))`
+- Check `invoice_counters_series_check`: `CHECK ((series = ANY (ARRAY['invoice'::text, 'credit_note'::text])))`
 
 **Triggers**
 
@@ -675,6 +859,7 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 | `issued_on` | `date` |  |  | Invoice date: the kennel's local date when it was issued. |
 | `issued_by` | `uuid` |  |  |  |
 | `is_tax_invoice` | `boolean` | yes | `false` | True when issued by a tax-registered kennel, so it is titled Tax Invoice and shows the tax breakup. |
+| `prices_include_tax` | `boolean` | yes | `false` | Whether the kennel's prices included tax when the bill was issued, so a credit note against it works its tax out the same way. |
 | `currency` | `text` | yes | `'INR'::text` |  |
 | `seller` | `jsonb` |  |  | Copy of the kennel's name, address, tax details and UPI ID as they were when issued. A later change to the kennel's settings never alters an invoice that is already out. |
 | `buyer` | `jsonb` |  |  | Copy of the parent's name, phone and address as they were when issued. |
@@ -869,7 +1054,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `gst_state_code` | `text` |  |  | Two digit GST state code of the kennel, e.g. 29 for Karnataka. Needed for gst_india. |
 | `default_tax_rate_bp` | `integer` | yes | `0` | Tax rate used when a service does not set its own. Basis points: 1800 = 18%. |
 | `prices_include_tax` | `boolean` | yes | `false` | True when rate card prices already contain tax, so tax is backed out instead of added on top. |
-| `invoice_prefix` | `text` | yes | `'WB'::text` | Start of every invoice number, 1 to 4 capital letters or digits. WB gives WB/27-28/0001. |
+| `invoice_prefix` | `text` | yes | `'WB'::text` | Start of every invoice number, 1 to 4 capital letters or digits, not CN (credit notes use it). WB gives WB/27-28/0001. |
 | `fiscal_year_start_month` | `smallint` | yes | `4` | Month the financial year starts. 4 (April) for India, 1 for calendar-year countries. |
 | `round_invoice_totals` | `boolean` | yes | `true` | Round invoice grand totals to a whole currency unit and show the difference as round off. |
 | `upi_vpa` | `text` |  |  | UPI ID that receives payments, e.g. happytails@okhdfcbank. Used to build pay links and QR codes. |
@@ -885,8 +1070,9 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `play_break_start` | `time without time zone` |  |  | Start of an optional break in play, such as the midday heat. Empty for no break. |
 | `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
+| `requests_enabled` | `boolean` | yes | `true` | Whether parents can ask for stays through their own booking link (/b/{token}, submit_booking_request). |
 | `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
-| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page, bill and WhatsApp messages. en, hi or kn. |
+| `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request). |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -900,7 +1086,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_fiscal_year_start_month_check`: `CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12)))`
 - Check `organizations_gst_needs_registration`: `CHECK (((tax_mode <> 'gst_india'::tax_mode) OR ((tax_id IS NOT NULL) AND (gst_state_code IS NOT NULL))))`
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
-- Check `organizations_invoice_prefix_check`: `CHECK ((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text))`
+- Check `organizations_invoice_prefix_check`: `CHECK (((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text) AND (invoice_prefix <> 'CN'::text)))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
 - Check `organizations_parent_language_check`: `CHECK ((parent_language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
@@ -926,6 +1112,56 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - `organizations_delete` (delete): rows where `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `organizations_select` (select): rows where `(id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `organizations_update` (update): rows where `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### passes
+
+A day boarding pack a parent bought: so many days to use between two dates. Day boarding bookings paid from it name it (bookings.pass_id).
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  |  |
+| `day_pack_id` | `uuid` |  |  |  |
+| `name` | `text` | yes |  | The pack's name when it was sold, so renaming the pack later does not change what the parent bought. |
+| `days` | `integer` | yes |  | Days of day boarding bought. pass_balances says how many are used and left. |
+| `price_minor` | `bigint` | yes |  |  |
+| `starts_on` | `date` | yes |  |  |
+| `valid_until` | `date` | yes |  |  |
+| `invoice_id` | `uuid` |  |  | The bill the pack was sold on. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `passes_pkey`: `PRIMARY KEY (id)`
+- Unique `passes_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `passes_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `passes_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE RESTRICT`
+- Foreign key `passes_org_id_day_pack_id_fkey`: `FOREIGN KEY (org_id, day_pack_id) REFERENCES day_packs(org_id, id) ON DELETE SET NULL (day_pack_id)`
+- Foreign key `passes_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `passes_org_id_invoice_id_fkey`: `FOREIGN KEY (org_id, invoice_id) REFERENCES invoices(org_id, id) ON DELETE SET NULL (invoice_id)`
+- Check `passes_dates_in_order`: `CHECK (((valid_until >= starts_on) AND ((valid_until - starts_on) <= 730)))`
+- Check `passes_days_check`: `CHECK (((days >= 1) AND (days <= 365)))`
+- Check `passes_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `passes_price_minor_check`: `CHECK ((price_minor >= 0))`
+
+**Indexes**
+
+- `CREATE INDEX passes_org_client_idx ON public.passes USING btree (org_id, client_id, valid_until)`
+
+**Triggers**
+
+- `passes_forbid_org_change` (before update) runs `forbid_org_change()`
+- `passes_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `passes_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `passes_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `passes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `passes_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### payments
 
@@ -1170,6 +1406,43 @@ A fenced area where one pet at a time plays or exercises.
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### reminders_sent
+
+A reminder a person sent a parent from Today, on WhatsApp from their own phone: so it leaves the list. Wagbook sends nothing itself.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `kind` | `text` | yes |  | vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed. |
+| `subject_id` | `uuid` | yes |  | The booking (vaccination, arrival, pickup) or the bill (unpaid) it was about. |
+| `sent_on` | `date` | yes |  | The kennel's date it was sent. An unpaid bill comes back three days later. |
+| `sent_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `reminders_sent_pkey`: `PRIMARY KEY (id)`
+- Foreign key `reminders_sent_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `reminders_sent_sent_by_fkey`: `FOREIGN KEY (sent_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `reminders_sent_kind_check`: `CHECK ((kind = ANY (ARRAY['vaccination'::text, 'arrival'::text, 'pickup'::text, 'unpaid'::text])))`
+
+**Indexes**
+
+- `CREATE INDEX reminders_sent_org_subject_idx ON public.reminders_sent USING btree (org_id, subject_id, kind)`
+
+**Triggers**
+
+- `reminders_sent_forbid_org_change` (before update) runs `forbid_org_change()`
+- `reminders_sent_stamp_actor` (before insert) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `reminders_sent_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `reminders_sent_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `reminders_sent_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### services
 
 The rate card. A boarding or daycare row sets the price of a stay; addon rows are extras such as grooming or pick-up.
@@ -1320,7 +1593,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 
 ### invoice_balances
 
-Each invoice with what has been paid against it and what is still due.
+Each invoice with what has been paid against it, what credit notes took off it, and what is still due (below zero: paid more than it now comes to, so a refund is owed).
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -1333,7 +1606,27 @@ Each invoice with what has been paid against it and what is still due.
 | `number` | `text` |  |  |  |
 | `total_minor` | `bigint` |  |  |  |
 | `paid_minor` | `bigint` |  |  |  |
+| `credited_minor` | `bigint` |  |  |  |
 | `due_minor` | `bigint` |  |  |  |
+
+**Access**: signed-in users may select. Runs with the caller's row level security.
+
+### pass_balances
+
+Each day boarding pack with the days used (bookings that hold a place) and the days left.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `pass_id` | `uuid` |  |  |  |
+| `org_id` | `uuid` |  |  |  |
+| `client_id` | `uuid` |  |  |  |
+| `name` | `text` |  |  |  |
+| `days` | `integer` |  |  |  |
+| `starts_on` | `date` |  |  |  |
+| `valid_until` | `date` |  |  |  |
+| `invoice_id` | `uuid` |  |  |  |
+| `days_used` | `integer` |  |  |  |
+| `days_left` | `integer` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -1425,6 +1718,18 @@ bookings_check_group() returns trigger
 
 Trigger: every booking sharing a group_id has the same client (WB024), and a booking's group_id never changes (WB026).
 
+### bookings_check_pass
+
+```
+bookings_check_pass() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a day boarding booking paid from a pack must be day boarding of the pack's parent (WB110), inside its dates (WB111), and, once it holds a place, within the days left (WB112).
+
 ### bookings_check_shared_price
 
 ```
@@ -1447,7 +1752,7 @@ bookings_guard_price() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel), with no discount, and cannot change the price, discount, tax or kind of an existing booking.
+Trigger: only owners and managers set or change what a stay costs. Staff can book only at a price on the price list (the usual price, or the shared kennel price for a pet sharing a kennel, with the usual price for nights alone), with no discount, and cannot change the price, discount, tax or kind of an existing booking, or when it turns from day boarding into boarding.
 
 ### bookings_stamp_status
 
@@ -1460,6 +1765,18 @@ bookings_stamp_status() returns trigger
 - Volatility: volatile
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
+
+### check_bill_line
+
+```
+check_bill_line(p_mode tax_mode, p_intra boolean, p_include boolean, p_quantity numeric, p_unit_price_minor bigint, p_discount_minor bigint, p_taxable_minor bigint, p_tax_rate_bp integer, p_cgst_minor bigint, p_sgst_minor bigint, p_igst_minor bigint, p_tax_minor bigint) returns void
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+Raises WB037 when a line's taxable value and tax are not what its quantity, price, discount and rate give under the tax mode (within the state or across states, prices with or without tax). Used by issue_invoice and issue_credit_note.
 
 ### check_privacy_access
 
@@ -1496,6 +1813,18 @@ client_file_paths(p_client uuid) returns text[]
 - Volatility: stable
 
 Paths in the pet-media bucket that hold this parent's pets' photos and certificates, photos from their stays, and files sent with their intake forms (with the small copy of every photo). Runs as the caller, so it lists only what they may read.
+
+### clients_guard_phone
+
+```
+clients_guard_phone() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only owners and managers change a parent's phone number or other number (WB002). Anyone may add a parent.
 
 ### clients_hide_pets
 
@@ -1555,7 +1884,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: deletes their pets' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
+Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 
@@ -1567,7 +1896,7 @@ export_client(p_client uuid) returns jsonb
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
+Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
 ### fiscal_year_label
 
@@ -1617,6 +1946,18 @@ get_invitation_link(p_token text) returns TABLE(org_name text, role member_role,
 
 What an invitation link is for (kennel name, role, name), for a signed-in person holding it, and whether it can still be used.
 
+### get_public_booking_form
+
+```
+get_public_booking_form(p_token text) returns jsonb
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, and their stays already asked for or booked (dates and status only). Nothing for a hidden or erased parent.
+
 ### get_public_intake_form
 
 ```
@@ -1639,7 +1980,7 @@ get_public_invoice(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, and the kennel's UPI details for a pay link. Drafts are never shown.
+PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, its credit notes with their lines, the kennel's UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.
 
 ### get_public_stay
 
@@ -1735,7 +2076,7 @@ invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.
 
 ### invoice_lines_guard
 
@@ -1784,6 +2125,18 @@ invoices_guard_insert() returns trigger
 - Volatility: volatile
 
 Trigger: every invoice starts as a draft.
+
+### issue_credit_note
+
+```
+issue_credit_note(p_invoice uuid, p_reason text, p_totals jsonb, p_lines jsonb) returns credit_notes
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Makes a credit note against an issued bill: checks every line as issue_invoice does, under the bill's own tax treatment and at a rate the bill charged (WB093), and that the bill is not credited beyond its total (WB092); gives the next CN/YY-YY/NNNN number for the year. Owner or manager. A reason is required (WB091).
 
 ### issue_invoice
 
@@ -1869,6 +2222,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 
 For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.
 
+### org_today
+
+```
+org_today(p_org uuid) returns date
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Today's date in the kennel's time zone.
+
 ### organizations_lock_billing_settings
 
 ```
@@ -1917,6 +2282,18 @@ protect_last_owner() returns trigger
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
 
+### renew_request_link
+
+```
+renew_request_link(p_client uuid) returns text
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Gives a parent a new booking link and returns its token; the old link stops working. Any member of the parent's kennel.
+
 ### report_extras
 
 ```
@@ -1932,14 +2309,14 @@ The extras sold on stays that start in the period, biggest first (at most 20): h
 ### report_money
 
 ```
-report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
+report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, credited_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each month in the period: what was billed (issued bills by bill date; cancelled bills left out) and the tax in it, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
+For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
 
 ### report_occupancy
 
@@ -1956,14 +2333,14 @@ For each day: pets staying the night (boarding), pets in for the day (day boardi
 ### report_tax
 
 ```
-report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
+report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, credit_notes integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Tax on issued bills in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST). Bills are counted by bill date; cancelled bills are left out. Owners and managers only.
+Tax in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST) on issued bills by bill date, less credit notes by credit note date. Cancelled bills are left out (only a bill of the same month can be cancelled once taxed, WB095). Owners and managers only.
 
 ### respond_to_invitation
 
@@ -2073,6 +2450,18 @@ stamp_when_set() returns trigger
 
 Trigger for a pair of "when" and "who" columns (named in the two trigger arguments) that record a one-off confirmation, such as a certificate being checked. Sending any time marks it; the database then records the real time and the signed-in user, and later edits cannot change them. Sending null clears both.
 
+### stay_charges
+
+```
+stay_charges(p_org uuid, p_bookings uuid[]) returns TABLE(booking_id uuid, part text, quantity integer, unit_price_minor bigint, discount_minor bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).
+
 ### stay_media_visible
 
 ```
@@ -2109,6 +2498,18 @@ storage_org_id(p_object_name text) returns uuid
 
 The organisation a stored file belongs to, read from the first folder of its path. Null when the path does not start with an organisation id.
 
+### submit_booking_request
+
+```
+submit_booking_request(p_token text, p_payload jsonb) returns integer
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).
+
 ### submit_intake
 
 ```
@@ -2143,4 +2544,4 @@ void_invoice(p_invoice uuid, p_reason text) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it.
+Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it. A tax invoice from an earlier month is not voided but credited (WB095), and a bill with a credit note is credited the rest of the way (WB096).

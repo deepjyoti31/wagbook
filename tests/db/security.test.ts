@@ -43,13 +43,15 @@ describe("every table is locked down", () => {
     expect(res.rows).toEqual([]);
   });
 
-  it("lets the anonymous role run exactly the six public functions and nothing else", async () => {
+  it("lets the anonymous role run exactly the eight public functions and nothing else", async () => {
     const res = await db.query<{ name: string }>(`
       select p.proname as name
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
       order by 1`);
     expect(res.rows.map((r) => r.name)).toEqual([
+      // A known parent's own booking link: see docs/05-security-and-privacy.md.
+      "get_public_booking_form",
       "get_public_intake_form",
       "get_public_invoice",
       "get_public_stay",
@@ -57,6 +59,7 @@ describe("every table is locked down", () => {
       "intake_upload_allowed",
       // Only reached through Storage, for photos on a stay page; see docs/05-security-and-privacy.md.
       "stay_media_visible",
+      "submit_booking_request",
       "submit_intake",
     ]);
   });
@@ -85,7 +88,7 @@ describe("tenant isolation", () => {
   const tables = [
     "organizations", "memberships", "clients", "pets", "vaccinations", "kennels", "services", "peak_periods",
     "bookings", "booking_items", "care_items", "care_tasks", "play_yards", "play_sessions", "stay_updates",
-    "incidents", "invoices", "invoice_lines", "payments", "expenses", "intake_submissions", "audit_log",
+    "incidents", "invoices", "invoice_lines", "credit_notes", "credit_note_lines", "reminders_sent", "day_packs", "passes", "payments", "expenses", "intake_submissions", "audit_log",
   ];
 
   it("shows a member only their own organisation's rows, in every table", async () => {

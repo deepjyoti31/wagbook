@@ -82,7 +82,7 @@ describe("the parent pages' language", () => {
     expect(kn.notice).toContain("ನಾನು ಒಪ್ಪುತ್ತೇನೆ");
   });
 
-  it("is on the parent's bill", async () => {
+  it("is not the bill's: a bill is in English, with the parent's own language added only when they asked", async () => {
     const id = await as(db, user(k.owner), async () => {
       const r = await db.query<{ id: string }>("insert into public.invoices (org_id, client_id) values ($1, $2) returning id", [k.org, k.client]);
       await db.query("select public.save_invoice_draft($1, $2, $3)", [
@@ -94,7 +94,12 @@ describe("the parent pages' language", () => {
       return r.rows[0].id;
     });
     const token = (await db.query<{ public_token: string }>("select public_token from public.invoices where id = $1", [id])).rows[0].public_token;
-    const bill = await as(db, anon, async () => (await db.query<{ v: { language: string } }>("select public.get_public_invoice($1) as v", [token])).rows[0].v);
-    expect(bill.language).toBe("kn");
+    const read = () => as(db, anon, async () => (await db.query<{ v: { translation: string | null } }>("select public.get_public_invoice($1) as v", [token])).rows[0].v);
+    // The kennel's parent pages are in Kannada; the bill is still English only.
+    expect((await read()).translation).toBeNull();
+    await as(db, user(k.owner), () => db.query("update public.clients set bill_translation = 'hi' where id = $1", [k.client]));
+    expect((await read()).translation).toBe("hi");
+    const e = await errorOf(() => as(db, user(k.owner), () => db.query("update public.clients set bill_translation = 'fr' where id = $1", [k.client])));
+    expect(e.message).toContain("bill_translation");
   });
 });

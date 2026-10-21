@@ -132,8 +132,18 @@ begin
         to_jsonb(i) - 'org_id' - 'public_token'
         || jsonb_build_object('lines', coalesce((select jsonb_agg(to_jsonb(l) - 'org_id' order by l.sort_order, l.created_at)
                                                  from public.invoice_lines l where l.invoice_id = i.id), '[]'::jsonb))
+        || jsonb_build_object('credit_notes', coalesce((
+             select jsonb_agg(to_jsonb(cn) - 'org_id'
+                              || jsonb_build_object('lines', coalesce((select jsonb_agg(to_jsonb(cl) - 'org_id' order by cl.sort_order)
+                                                                       from public.credit_note_lines cl where cl.credit_note_id = cn.id), '[]'::jsonb))
+                              order by cn.seq)
+             from public.credit_notes cn where cn.org_id = i.org_id and cn.invoice_id = i.id), '[]'::jsonb))
         order by i.created_at)
       from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id
+    ), '[]'::jsonb),
+    'packs', coalesce((
+      select jsonb_agg(to_jsonb(pb) - 'org_id' order by pb.starts_on)
+      from public.pass_balances pb where pb.org_id = v_client.org_id and pb.client_id = v_client.id
     ), '[]'::jsonb),
     'payments', coalesce((
       select jsonb_agg(to_jsonb(pay) - 'org_id' order by pay.received_on, pay.created_at)
@@ -149,7 +159,7 @@ begin
 end;
 $$;
 comment on function public.export_client(uuid) is
-  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
+  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
 
 -- ---------------------------------------------------------------------------
 
@@ -164,7 +174,6 @@ declare
   v_paths text[];
   v_bookings uuid[];
   v_pets uuid[];
-  v_incidents uuid[];
 begin
   -- SECURITY DEFINER: erasing has to remove personal text from the audit log,
   -- which nobody may write, and nothing else. Who may do it is checked here:
@@ -191,61 +200,71 @@ begin
     raise exception 'WB072: this parent has stays still to come. Cancel them first.' using errcode = '23514';
   end if;
 
-  -- The files go after the rows. The app removes them from storage with the
-  -- list returned here (Postgres cannot reach the files themselves).
-  v_paths := public.client_file_paths(v_client.id);
-
   select coalesce(array_agg(p.id), '{}') into v_pets
   from public.pets p where p.org_id = v_client.org_id and p.client_id = v_client.id;
   select coalesce(array_agg(b.id), '{}') into v_bookings
   from public.bookings b where b.org_id = v_client.org_id and b.client_id = v_client.id;
-  select coalesce(array_agg(i.id), '{}') into v_incidents
-  from public.incidents i where i.org_id = v_client.org_id and i.pet_id = any (v_pets);
 
-  -- What was said and done about the pets, and the forms the parent sent.
+  -- The files go after the rows. The app removes them from storage with the
+  -- list returned here (Postgres cannot reach the files themselves): photos
+  -- sent to the parent with updates, files sent with their forms, and
+  -- vaccination certificates, because a card carries the owner's name and
+  -- address. The pets' own photos stay with the pets.
+  with paths as (
+    select v.certificate_path as path
+    from public.vaccinations v where v.org_id = v_client.org_id and v.pet_id = any (v_pets)
+    union all
+    select unnest(u.media_paths)
+    from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings)
+    union all
+    select o.name
+    from public.intake_submissions s
+    join storage.objects o on o.bucket_id = 'pet-media' and o.name like s.org_id || '/intake/' || s.id || '/%'
+    where s.org_id = v_client.org_id and (s.client_id = v_client.id or s.parent_phone = v_client.phone)
+  )
+  select coalesce(array_agg(distinct x.path order by x.path), '{}') into v_paths
+  from (
+    select path from paths where path is not null
+    union
+    select regexp_replace(path, '\.jpg$', '.small.jpg') from paths where path ~ '\.jpg$'
+  ) x;
+
+  -- What was said to the parent, and the forms they sent.
   delete from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings);
-  delete from public.care_tasks t where t.org_id = v_client.org_id and t.booking_id = any (v_bookings);
-  delete from public.play_sessions ps where ps.org_id = v_client.org_id and ps.booking_id = any (v_bookings);
-  delete from public.incidents i where i.id = any (v_incidents);
-  delete from public.vaccinations v where v.org_id = v_client.org_id and v.pet_id = any (v_pets);
-  delete from public.care_items ci where ci.org_id = v_client.org_id and ci.pet_id = any (v_pets);
   delete from public.intake_submissions s
   where s.org_id = v_client.org_id and (s.client_id = v_client.id or s.parent_phone = v_client.phone);
+  update public.vaccinations v set certificate_path = null
+  where v.org_id = v_client.org_id and v.pet_id = any (v_pets) and v.certificate_path is not null;
   -- Drafts were never given to anyone; issued and cancelled bills stay, as
   -- the law requires, with the buyer details frozen on them when issued.
   delete from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id and i.status = 'draft';
 
   -- Stays keep their dates, kennel and prices (bills and reports rest on
-  -- them), and lose every note.
+  -- them), and lose the notes, which are the parent's arrangements.
   update public.bookings b
   set belongings = null, gate_notes = null, notes = null, cancel_reason = null,
       expected_arrival = null, expected_departure = null
   where b.id = any (v_bookings);
 
-  update public.pets p
-  set name = 'Erased', breed = null, sex = 'unknown', is_neutered = null, date_of_birth = null, weight_kg = null,
-      color = null, microchip = null, photo_path = null, food_notes = null, medical_notes = null, allergies = null,
-      behaviour_notes = null, flags = '{}', vet_name = null, vet_phone = null,
-      deleted_at = coalesce(p.deleted_at, now())
-  where p.id = any (v_pets);
+  -- The pets stay as they are, with their health, routines, incidents, care
+  -- and play (the owner's decision, D30): they are the kennel's record of the
+  -- animal, not the parent's details. Hidden, because their parent is gone.
+  update public.pets p set deleted_at = coalesce(p.deleted_at, now()) where p.id = any (v_pets);
 
   update public.clients c
   set full_name = 'Erased', phone = '', alt_phone = null, email = null, address = null, city = null,
       postal_code = null, gst_state_code = null, tax_id = null, emergency_name = null, emergency_phone = null,
-      notes = null, consent_at = null, consent_source = null,
+      notes = null, consent_at = null, consent_source = null, bill_translation = null, request_token = null,
       deleted_at = coalesce(c.deleted_at, now()), erased_at = now()
   where c.id = v_client.id;
 
-  -- The history of changes copied some of that text when it was written, and
-  -- again just now. Take it out of those entries; keep who changed what, when.
+  -- The history of changes copied the stays' notes when they were written,
+  -- and again just now. Take them out of those entries; keep who changed
+  -- what, when.
   update public.audit_log a
   set old_data = a.old_data - 'belongings' - 'gate_notes' - 'notes' - 'cancel_reason' - 'expected_arrival' - 'expected_departure',
       new_data = a.new_data - 'belongings' - 'gate_notes' - 'notes' - 'cancel_reason' - 'expected_arrival' - 'expected_departure'
   where a.org_id = v_client.org_id and a.table_name = 'bookings' and a.row_id = any (v_bookings);
-  update public.audit_log a
-  set old_data = case when a.old_data is not null then '{"erased": true}'::jsonb end,
-      new_data = case when a.new_data is not null then '{"erased": true}'::jsonb end
-  where a.org_id = v_client.org_id and a.table_name = 'incidents' and a.row_id = any (v_incidents);
 
   -- And the erasure itself is recorded.
   insert into public.audit_log (org_id, actor, action, table_name, row_id, old_data, new_data)
@@ -256,7 +275,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: deletes their pets'' vaccinations, routines and incidents, every update, task and play session of their stays, their intake forms and draft bills; empties every personal detail on the parent, their pets and their stays; and takes that text out of the history of changes. Keeps issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes the updates sent to them, their intake forms, draft bills and vaccination certificates (a card shows the owner), and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071) or a stay is still to come (WB072). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

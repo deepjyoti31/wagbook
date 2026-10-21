@@ -1,4 +1,4 @@
-import { diffDays, formatDate, isISODate, type ISODate } from "./dates";
+import { addDays, diffDays, formatDate, isISODate, type ISODate } from "./dates";
 import type { Minor } from "./money";
 import { computeInvoice, type InvoiceTotals, type LineInput, type TaxContext } from "./tax";
 
@@ -39,6 +39,31 @@ export interface AddOn {
   sacCode?: string | null;
 }
 
+/**
+ * One line of what a stay costs. Usually the whole stay ("stay"). A stay that
+ * began as day boarding and became boarding has its "days" first. A pet at the
+ * shared kennel price has its nights "shared" with a sibling and its nights
+ * "alone" with the kennel to itself (at the usual price).
+ */
+export type StayPart = "stay" | "days" | "shared" | "alone";
+
+export interface StayCharge {
+  part: StayPart;
+  quantity: number;
+  unitPriceMinor: Minor;
+  discountMinor: Minor;
+}
+
+/** Turn the rows of stay_charges() in the database into charges. */
+export function toStayCharges(rows: readonly { part: string; quantity: number; unit_price_minor: number; discount_minor: number }[]): StayCharge[] {
+  return rows.map((r) => ({
+    part: r.part === "days" || r.part === "shared" || r.part === "alone" ? r.part : "stay",
+    quantity: r.quantity,
+    unitPriceMinor: r.unit_price_minor,
+    discountMinor: r.discount_minor,
+  }));
+}
+
 export interface StayQuoteInput {
   kind: BookingKind;
   petName: string;
@@ -50,25 +75,49 @@ export interface StayQuoteInput {
   sacCode?: string | null;
   /** Discount on the stay line only, before tax. */
   discountMinor?: Minor;
+  /** A stay that began as day boarding and became boarding: its first night. */
+  boardingFrom?: ISODate | null;
+  /** Day boarding paid from a day boarding pack, so it costs nothing here. */
+  fromPack?: boolean;
+  /**
+   * What the stay costs, from stay_charges() in the database, when it is more
+   * than every night at the booked rate. Without it: the whole stay at rateMinor.
+   */
+  charges?: readonly StayCharge[];
   addOns?: readonly AddOn[];
 }
 
-/** Turn a stay into invoice lines. The stay itself is always the first line. */
+/** Every night or day of a stay at its booked rate: what a stay costs unless it is split. */
+export function wholeStayCharge(input: Pick<StayQuoteInput, "kind" | "startDate" | "endDate" | "rateMinor" | "discountMinor">): StayCharge[] {
+  return [{ part: "stay", quantity: chargeableUnits(input.kind, input.startDate, input.endDate), unitPriceMinor: input.rateMinor, discountMinor: input.discountMinor ?? 0 }];
+}
+
+/** What a stay line says on a bill. Stored with the bill, so in English like the rest of its lines. */
+function describeCharge(input: StayQuoteInput, c: StayCharge): string {
+  const from = input.boardingFrom ?? input.startDate;
+  const dates = (a: ISODate, b: ISODate) => `(${formatDate(a)} to ${formatDate(b)})`;
+  const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+  if (c.part === "days") return `Day boarding: ${input.petName}, ${days(c.quantity)} ${dates(input.startDate, addDays(from, -1))}`;
+  const kind = input.kind === "boarding" ? "Boarding" : "Day boarding";
+  const units = input.kind === "boarding" ? `${c.quantity} ${c.quantity === 1 ? "night" : "nights"}` : days(c.quantity);
+  if (c.part === "shared") return `${kind}: ${input.petName}, ${units} sharing a kennel ${dates(from, input.endDate)}`;
+  if (c.part === "alone") return `${kind}: ${input.petName}, ${units} with the kennel to itself`;
+  if (input.fromPack) return `${kind}: ${input.petName}, ${units} from a pack ${dates(from, input.endDate)}`;
+  return `${kind}: ${input.petName}, ${units} ${dates(from, input.endDate)}`;
+}
+
+/** Turn a stay into invoice lines: the stay first (one line, or its parts), then each extra. */
 export function stayLines(input: StayQuoteInput): LineInput[] {
-  const units = chargeableUnits(input.kind, input.startDate, input.endDate);
-  const what =
-    input.kind === "boarding"
-      ? `Boarding: ${input.petName}, ${units} ${units === 1 ? "night" : "nights"}`
-      : `Day boarding: ${input.petName}, ${units} ${units === 1 ? "day" : "days"}`;
+  const charges = input.charges ?? wholeStayCharge(input);
   return [
-    {
-      description: `${what} (${formatDate(input.startDate)} to ${formatDate(input.endDate)})`,
-      quantity: units,
-      unitPriceMinor: input.rateMinor,
-      discountMinor: input.discountMinor ?? 0,
+    ...charges.map((c) => ({
+      description: describeCharge(input, c),
+      quantity: c.quantity,
+      unitPriceMinor: c.unitPriceMinor,
+      discountMinor: c.discountMinor,
       taxRateBp: input.taxRateBp ?? 0,
       sacCode: input.sacCode ?? null,
-    },
+    })),
     ...(input.addOns ?? []).map((a) => ({
       description: a.description,
       quantity: a.quantity,

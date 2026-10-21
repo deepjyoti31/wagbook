@@ -25,6 +25,7 @@ export function StayFields({
   clientId,
   pets,
   sharedPrice,
+  locale,
 }: {
   /** m.newBooking */
   words: Messages["newBooking"];
@@ -40,6 +41,8 @@ export function StayFields({
   pets: number;
   /** The shared kennel price for each kind of stay, written out, when the price list has one. */
   sharedPrice: { boarding: string | null; daycare: string | null };
+  /** The reader's locale, for the names of the days of the week. */
+  locale: string;
 }) {
   const [kind, setKind] = useState<string>(defaultKind);
   const [start, setStart] = useState(defaultStart);
@@ -84,6 +87,33 @@ export function StayFields({
             </label>
           ))}
         </fieldset>
+      ) : null}
+      {kind === "daycare" ? (
+        <div className="space-y-3 rounded-lg border border-rule p-3">
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="use_pack" defaultChecked className="mt-1 size-5" />
+            <span>{words.usePack}</span>
+          </label>
+          {pets <= 1 ? (
+            <details>
+              <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{words.repeat}</summary>
+              <p className="mb-2 text-sm text-slate">{words.repeatHint}</p>
+              <fieldset className="flex flex-wrap gap-x-4">
+                <legend className="mb-1 font-semibold">{words.repeatOn}</legend>
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                  <label key={d} className="flex min-h-12 items-center gap-2">
+                    <input type="checkbox" name="repeat_day" value={d} className="size-5" />
+                    {/* 4 January 1970 was a Sunday. */}
+                    <span>{new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(1970, 0, 4 + d)))}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <Field label={words.repeatUntil}>
+                <Input name="repeat_until" type="date" min={start} />
+              </Field>
+            </details>
+          ) : null}
+        </div>
       ) : null}
       <Field label={words.kennel} hint={hint}>
         <Select name="kennelId" value={value} onChange={(e) => setKennelId(e.target.value)} required={together}>

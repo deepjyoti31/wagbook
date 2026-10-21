@@ -17,9 +17,13 @@ Issuing takes in any advances recorded for the booking.
 ```
             add lines, edit freely
  (nothing) ───────────────────────> DRAFT ──── issue_invoice() ────> ISSUED ──── void_invoice(reason) ────> VOID
-                                      │                                 │
-                                   delete                        cannot be edited
-                               (manager, drafts only)            cannot be deleted
+                                      │                                 │           (same month only, for a
+                                   delete                        cannot be edited    tax invoice; WB095, WB096)
+                               (owner, drafts only)              cannot be deleted
+                                                                        │
+                                                          issue_credit_note(reason, lines)
+                                                                        │
+                                                          CREDIT NOTE (CN/YY-YY/NNNN), the bill stays issued
 ```
 
 **Draft.** No number. Any member can create one and change its lines. It is a working copy.
@@ -43,7 +47,33 @@ Issuing takes in any advances recorded for the booking.
 holds for owners too. If a bill is wrong, void it and issue a new one.
 
 **Void.** `void_invoice(invoice_id, reason)`: owners and managers only (`WB002`), reason required (`WB039`). The number
-is not reused, so the series has no gap that cannot be explained.
+is not reused, so the series has no gap that cannot be explained. A tax invoice issued in an earlier month cannot be
+voided (`WB095`): it may already be in a return, so it is credited instead. Nor can a bill that has a credit note
+(`WB096`).
+
+## Credit notes
+
+A credit note takes back all or part of an issued bill (D34). The bill stays exactly as it was issued; the credit note
+is a document of its own, counted in the month it is made.
+
+- **Who and why.** Owners and managers (`WB002`), on the bill page, with a reason printed on it (`WB091`).
+- **What.** The whole bill, while nothing has been credited: its own lines, to the paisa. Or part of it: one line of an
+  amount (before tax when the bill's prices were, including tax when they included it) at one of the bill's tax rates
+  (`WB093`).
+- **Its tax** is worked out as on the bill when the bill was issued: the seller's tax mode and state frozen on the bill,
+  and whether its prices included tax (`invoices.prices_include_tax`, frozen at issue). `issue_credit_note()` checks
+  every line with the same function as a bill (`check_bill_line`, `WB037`).
+- **Never more than is left** on the bill, in all or in value taxed (`WB092`).
+- **Its number** is the next in its own series for the financial year, `CN/27-28/0001`, from the same counter table as
+  bills (`invoice_counters.series`). A bill prefix cannot be `CN`. Nobody can change or delete a credit note.
+- **What is owed** on a bill is its total, less credit notes, less payments (`invoice_balances`). Below zero, the parent
+  paid more than the bill now comes to: record a refund.
+- **The parent** sees the bill's credit notes listed on its link, and each opens as its own printable page.
+- **Reports** count each credit note in its own month, at minus: Billed is net of them, tax by rate subtracts their
+  lines, and the bills download lists them with their own number and date and the bill they are against.
+
+Section 34 lets a credit note reduce tax only until 30 November after the end of the year of the bill (or the annual
+return, if earlier). Wagbook does not stop a later one; it is then a commercial credit note.
 
 ## Invoice numbers
 
@@ -88,8 +118,10 @@ registration threshold. Your accountant will tell you when that changes.
 ### Rates and codes
 
 Wagbook does not ship a tax rate or a service accounting code (SAC) for boarding. It would be wrong to guess, and rates
-change. The kennel enters the rate its accountant gives it (`default_tax_rate_bp`, in basis points: 18% is `1800`), and
-optionally a rate and SAC on each service in the rate card. They are copied onto each booking and each invoice line.
+change. The kennel enters what its accountant gives it (D35): a usual rate (`default_tax_rate_bp`, in basis points:
+18% is `1800`); under Settings, a rate and a SAC code for boarding and for day boarding; and under Extras, a rate and a
+code for each extra. An empty rate means the usual rate. They are copied onto each booking and extra when it is made,
+and onto each bill line from there.
 
 ### The arithmetic
 
@@ -176,13 +208,81 @@ crore. It takes the names of the currency units as arguments for other currencie
 
 ## Building a bill from a stay
 
-`stayLines()` in `src/lib/core/stay.ts` turns a booking into lines: one for the nights or days at the booked rate
-(less any discount), then one per extra. `quoteStay()` runs them through `computeInvoice()`. The M4 screen should:
+What a stay costs is worked out in one place, `stay_charges()` in the database (D32). Usually it is one line, every
+night (or day) at the booked rate. It splits in two cases:
 
-1. Build lines with `stayLines()` and totals with `computeInvoice()`, using the tax context from the kennel.
-2. Insert the draft invoice and its lines with exactly those numbers.
-3. Call `issue_invoice()`. If it raises `WB037`, the TypeScript and SQL arithmetic disagree: that is a bug to fix, not
+- **A pet at the shared kennel price** (`alone_rate_minor` set): the nights its kennel holds a sibling at the shared
+  price, and the nights it has the kennel to itself at the usual price. A sibling checked out early counts up to the
+  day it went home.
+- **Day boarding that turned into boarding** (`boarding_from` set): the days before the first night at the day price
+  (`day_rate_minor`), then the nights at the booked rate.
+
+The booking's discount goes on the stay's largest line. `stayLines()` in `src/lib/core/stay.ts` turns those charges
+(or, without them, the whole stay at the booked rate) into lines with descriptions, then one per extra. `quoteStay()`
+runs them through `computeInvoice()`. Make bill:
+
+1. Reads the charges with `stay_charges()`, builds lines with `stayLines()` and totals with `computeInvoice()`, using
+   the tax context from the kennel.
+2. Inserts the draft invoice and its lines with exactly those numbers.
+3. Calls `issue_invoice()`. If it raises `WB037`, the TypeScript and SQL arithmetic disagree: that is a bug to fix, not
    an error to show the user.
+
+## The language of a bill
+
+A bill is in English (D31). For a parent who asks, the parent page's Bills choice adds Hindi or Kannada: every heading
+is followed by its translation in brackets ("Tax invoice (टैक्स इनवॉइस)"), and lines with amounts stay in English. We
+found no rule on the language of a tax invoice in Rule 46 of the CGST Rules; English is what accountants and tax
+officers read.
+
+## What the law says, as far as we could find
+
+Read on 21 October 2026 from public commentary on the CGST Act and Rules, not from an accountant and not from the
+official texts (the CBIC site could not be reached from where this was written). Each point names where it came
+from. Take them to your accountant; Wagbook still ships no rate and no code.
+
+**Registering.** A business supplying services must register once its turnover passes ₹20 lakh in a year (₹10 lakh in
+some north-eastern and hill states). A small service business may instead choose the composition scheme for services
+(section 10(2A)): up to ₹50 lakh turnover in the year before, tax at 6% (3% CGST and 3% SGST) on turnover, no input
+credit, and it issues a bill of supply, not a tax invoice
+([BUSY](https://busy.in/gst/gst-for-traders-vs-service-providers-key-differences-in-2026/),
+[TIOL](https://taxindiaonline.com/gst/news/details/NDQ5)). Wagbook has no composition mode: such a kennel uses "No
+tax", and the words a bill of supply must carry are not printed yet.
+
+**Rate and SAC for boarding.** Not settled in what we found. The explanatory notes to the services classification
+put pet kennels, grooming and training with "other animal husbandry services", code 998612, like the UN code it comes
+from ([taxreply](https://taxreply.com/gst-rate-service-hsn-99861),
+[UN CPC 86129](https://unstats.un.org/unsd/classifications/Econ/Detail/EN/1074/86129)). One forum answer reads that as
+nil rated; others say the exemption for animal husbandry does not cover pets and the rate is 18%, and one recent note
+puts boarding under accommodation, 996311
+([TaxTMI](https://www.taxmanagementindia.com/web/View_discussions_detail.asp?ID=117039),
+[caclubindia](https://www.caclubindia.com/forum/pets-grooming-taxable--593165.asp),
+[CA Sahuja](https://www.casahuja.com/2025/12/gst-classification-and-taxability.html)). Ask the accountant for the
+rate and code, in writing.
+
+**Invoice numbers.** Rule 46(b): a consecutive serial number, at most 16 characters, unique in the financial year,
+using letters, digits, hyphen and slash; a business may run more than one series
+([cleartax](https://cleartax.in/s/invoice-number),
+[IRIS](https://irisgst.com/effective-1st-april-2026-reset-the-invoice-number-series/)). `PREFIX/YY-YY/NNNN` fits:
+`WB/27-28/0001` is 13 characters, and `formatInvoiceNumber()` refuses one over 16.
+
+**The buyer on the bill.** For a buyer who is not registered, the name, address and state go on the bill when it is
+₹50,000 or more, or when the buyer asks (Rule 46(e) and (f),
+[gimbooks](https://www.gimbooks.com/blog/gst-invoice-mandatory-fields-rule-46-checklist/)). Wagbook prints what it has.
+
+**Cancelling an issued bill (questions 6 and 8).** Built since as credit notes (D34, above). As commonly practised: a bill not yet reported in the month's
+GSTR-1 can be cancelled and reported as cancelled in the documents summary. Once reported, it is not cancelled but
+undone with a credit note under section 34, declared in the return for the month the credit note is issued, by
+30 November after the end of the financial year (or the annual return, if earlier). The earlier month's figure stays
+as filed; the reduction shows in the month of the credit note
+([TaxTMI](https://www.taxtmi.com/forum/issue?id=113574),
+[taxguru](https://taxguru.in/goods-and-service-tax/adjustment-tax-liability-refund-gst-credit-note.html),
+[fintaxblog](https://fintaxblog.com/section-34-of-cgst-act-2017-credit-and-debit-notes/)). Wagbook now follows that: a tax invoice from an
+earlier month is credited, not cancelled, and reports count the credit note in its own month.
+
+**Keeping records (question 7).** Section 36 of the CGST Act: 72 months from the due date of the annual return for the
+year; longer while an appeal or proceeding is open
+([KnowYourGST](https://www.knowyourgst.com/gstlaw/cgst-act/36-period-of-retention-of-accounts-36/)). This is why erasing
+a parent keeps issued bills (D25).
 
 ## Questions to take to an accountant
 
@@ -193,17 +293,35 @@ Write the answers in your own records, not in this repository.
 3. Which SAC or HSN code goes on each?
 4. Are my listed prices inclusive or exclusive of tax, and how should I show that to parents?
 5. Is `PREFIX/YY-YY/NNNN` acceptable as my invoice series?
-6. Does a voided invoice need a credit note instead once I am registered? (Wagbook does not produce credit notes yet.)
+6. Wagbook cancels a tax invoice only in the month it was issued, and credits it after that (D34). If I file
+   quarterly, may I cancel within the quarter instead?
 7. What must I keep, and for how long?
-8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. Is that
-   the figure my return needs, or should a cancellation count in the month it happened?
-9. When the parent's bill is shown in Hindi or Kannada, it says "Tax invoice" in English with the translation in
-   brackets, and the place of supply and tax lines in that language. Is a bill in Hindi or Kannada acceptable, and must
-   "Tax invoice" and the other required details also appear in English?
+8. Tax by rate counts bills by bill date and credit notes, at minus, by their own date. Is that the figure my return
+   needs?
+9. Bills are in English, with the headings also in Hindi or Kannada in brackets when a parent asks (D31). Is that
+   acceptable on a tax invoice?
+10. Which rate and SAC apply to boarding, day boarding and grooming (998612, 996311 or another), and is any of it
+    exempt?
+
+## GSTR-1 files
+
+Reports offers a GST-registered kennel the month's GSTR-1 as the GST offline tool's CSV files (D38,
+`src/lib/core/gstr1.ts`): b2b (bills to a buyer with a GSTIN, one row per bill and rate), b2cl (no GSTIN, another state,
+over ₹1 lakh, the limit from 1 August 2024 under Rule 59(4)), b2cs (every other bill, added up by place of supply and
+rate, less the month's credit notes on such bills), cdnr and cdnur (credit notes on b2b and b2cl bills), hsn (value
+and tax by SAC and rate, less credit notes) and docs (the numbers used, with cancelled bills). Dates are written
+14-Apr-2027, places of supply 29-Karnataka, and the files have no byte order mark. The column names were written from
+the tool's templates as we know them: check them against the tool before the first upload. The HSN table's newer split
+into B2B and B2C rows is not done.
+
+## Day boarding packs
+
+A pack is sold on its own bill (one line: the pack, its days and dates, at its price, rate and code). Days paid from it
+are at ₹0 on their own bills, described "from a pack" (D37).
 
 ## Not built
 
-- Credit notes and debit notes.
+- Debit notes.
 - E-invoicing and e-way bills.
 - GST return exports. Reports gives tax by rate for a month and a CSV of bills, for the accountant to work from.
 - Multiple tax rates on one stay line.

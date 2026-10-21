@@ -29,6 +29,9 @@ export const bookingsArea: typeof English = {
       cancelled: "ಬುಕಿಂಗ್ ರದ್ದಾಗಿದೆ. ಜಾಗ ಮತ್ತೆ ಖಾಲಿ ಇದೆ.",
       no_show: "ಬರಲಿಲ್ಲ ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ. ಜಾಗ ಮತ್ತೆ ಖಾಲಿ ಇದೆ.",
       extended: "ವಾಸ್ತವ್ಯವನ್ನು ಇಂದಿನವರೆಗೆ ಹೆಚ್ಚಿಸಲಾಗಿದೆ.",
+      boarding: "ಈಗ ಬೋರ್ಡಿಂಗ್. ಮೊದಲ ರಾತ್ರಿಗೆ ಮುಂಚಿನ ದಿನಗಳಿಗೆ ಡೇ ಬೋರ್ಡಿಂಗ್ ಆಗಿ ಬಿಲ್.",
+      series_cancelled: "ಸರಣಿಯ ಉಳಿದ ದಿನಗಳು ರದ್ದಾಗಿವೆ. ಆ ದಿನಗಳು ಮತ್ತೆ ಖಾಲಿ.",
+      pack: "ಪ್ಯಾಕ್‌ನಿಂದ ಪಾವತಿಸಲಾಗಿದೆ. ಈ ದಿನಕ್ಕೆ ಪ್ರತ್ಯೇಕ ಬೆಲೆ ಇಲ್ಲ.",
     },
     // {name} is the name of a busy period the kennel set, like "Diwali".
     peakNoRefund: "{name}, ಮರುಪಾವತಿ ಇಲ್ಲ",
@@ -44,6 +47,15 @@ export const bookingsArea: typeof English = {
     bookedTogetherTitle: "ಒಟ್ಟಿಗೆ ಬುಕ್ ಆಗಿರುವವು",
     kennelWith: "{kennel}, {pets} ಜೊತೆ",
     sharesWith: "{pets} ಜೊತೆ {kennel} ಹಂಚಿಕೊಂಡಿದೆ.",
+    // Day boarding regulars (D37).
+    seriesNote: "ಪುನರಾವರ್ತನೆ: ಒಟ್ಟು {n} ದಿನಗಳು, {left} ಇನ್ನೂ ಬರಬೇಕಿದೆ.",
+    cancelRest: "ಸರಣಿಯ ಉಳಿದ ದಿನಗಳನ್ನು ರದ್ದುಮಾಡಿ",
+    cancelRestHint: "ಈ ದಿನ ಮತ್ತು ಆರಂಭವಾಗದ ಸರಣಿಯ ಮುಂದಿನ ಎಲ್ಲ ದಿನಗಳನ್ನು ರದ್ದುಮಾಡುತ್ತದೆ.",
+    cancellingRest: "ರದ್ದುಮಾಡಲಾಗುತ್ತಿದೆ",
+    fromPackNote: "ಪ್ಯಾಕ್ {name} ನಿಂದ ಪಾವತಿಸಲಾಗಿದೆ.",
+    usePack: "ಪ್ಯಾಕ್ {name} ನಿಂದ ಪಾವತಿಸಿ ({left} ದಿನಗಳು ಉಳಿದಿವೆ)",
+    // A stay that began as day boarding and now stays nights. {date} is the last day of day boarding, {night} the first night.
+    dayThenBoarding: "{date} ವರೆಗೆ ಡೇ ಬೋರ್ಡಿಂಗ್, ನಂತರ {night} ರಿಂದ ರಾತ್ರಿ ಉಳಿಯುವುದು.",
     costs: {
       title: "ಎಷ್ಟು ಆಗುತ್ತದೆ",
       // {what} is "Boarding", "Day boarding" or the name of an extra.
@@ -52,6 +64,10 @@ export const bookingsArea: typeof English = {
       total: "ಅಂದಾಜು ಒಟ್ಟು",
       totalWithTax: "ಅಂದಾಜು ಒಟ್ಟು, {tax} ತೆರಿಗೆ ಸೇರಿ",
       note: "ಇದು ಅಂದಾಜು ಮಾತ್ರ. ಬಿಲ್ ಈ ಸಾಲುಗಳಿಂದಲೇ ಮಾಡಲಾಗುತ್ತದೆ, ಸಾಮಾನ್ಯವಾಗಿ ಚೆಕ್ ಔಟ್ ಸಮಯದಲ್ಲಿ.",
+      // A pet at the shared kennel price: nights with its sibling, and nights it had the kennel to itself. {what} is "Boarding" or "Day boarding".
+      shared: "{what}, ಕೆನೆಲ್ ಹಂಚಿಕೊಂಡು",
+      alone: "{what}, ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿ",
+      fromPack: "{what}, ಪ್ಯಾಕ್‌ನಿಂದ",
     },
     extra: {
       title: "ಹೆಚ್ಚುವರಿ ಸೇರಿಸಿ",
@@ -110,6 +126,19 @@ export const bookingsArea: typeof English = {
       belongings: "ಸಾಮಾನುಗಳು",
       belongingsHint: "ಬೆಡ್, ಲೀಶ್, ಆಹಾರ, ಔಷಧಿ. ಎಲ್ಲವೂ ಮತ್ತೆ ಮನೆಗೆ ಹೋಗಲಿ ಎಂದು.",
       notes: "ಸಿಬ್ಬಂದಿಗೆ ಟಿಪ್ಪಣಿ",
+      aloneRate: "ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿಯಾಗಿದ್ದಾಗ ಬೆಲೆ",
+      aloneRateHint: "ರಾತ್ರಿಗೆ ಅಥವಾ ದಿನಕ್ಕೆ, ಜೊತೆಯ ಸಾಕುಪ್ರಾಣಿ ಕೆನೆಲ್‌ನಲ್ಲಿ ಇಲ್ಲದಾಗ. ಖಾಲಿ ಬಿಟ್ಟರೆ ಮೇಲಿನ ಬೆಲೆ ಎಲ್ಲ ರಾತ್ರಿಗೂ.",
+      dayRate: "ಮೊದಲ ರಾತ್ರಿಗೆ ಮುಂಚೆ, ದಿನಕ್ಕೆ ಬೆಲೆ",
+    },
+    // Day boarding that now stays nights: the days so far stay day boarding.
+    overnight: {
+      title: "ರಾತ್ರಿ ಉಳಿಯುವುದು",
+      text: "{pet} ಈಗ ರಾತ್ರಿ ಉಳಿದರೆ, ಇಲ್ಲಿಯವರೆಗಿನ ದಿನಗಳು ಡೇ ಬೋರ್ಡಿಂಗ್ ಆಗಿಯೇ ಉಳಿಯುತ್ತವೆ, ಮೊದಲ ರಾತ್ರಿಯಿಂದ ಮುಂದಿನ ರಾತ್ರಿಗಳು ಬೋರ್ಡಿಂಗ್, ಪ್ರತಿಯೊಂದೂ ತನ್ನದೇ ಬೆಲೆಯಲ್ಲಿ.",
+      firstNight: "ಮೊದಲ ರಾತ್ರಿ",
+      checkOut: "ಚೆಕ್ ಔಟ್ ದಿನಾಂಕ",
+      pricePerNight: "ರಾತ್ರಿಗೆ ಬೆಲೆ",
+      save: "ಬೋರ್ಡಿಂಗ್‌ಗೆ ಬದಲಿಸಿ",
+      saving: "ಬದಲಿಸಲಾಗುತ್ತಿದೆ",
     },
     routines: {
       title: "{pet}: ತನ್ನದೇ ದಿನಚರಿಗಳು",
@@ -172,6 +201,10 @@ export const bookingsArea: typeof English = {
     },
     // What the booking Server Actions say.
     errors: {
+      noPack: "ಈ ವಾಸ್ತವ್ಯಕ್ಕೆ ಸಾಕಷ್ಟು ದಿನಗಳಿರುವ ಪ್ಯಾಕ್ ಪೇರೆಂಟ್ ಬಳಿ ಇಲ್ಲ.",
+      repeatOnePet: "ಪುನರಾವರ್ತಿಸುವ ಸರಣಿ ಒಂದು ಸಾಕುಪ್ರಾಣಿಗೆ. ಪ್ರತಿ ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಬುಕ್ ಮಾಡಿ.",
+      repeatDates: "ವಾರದ ಕನಿಷ್ಠ ಒಂದು ದಿನ ಮತ್ತು ಕೊನೆಯ ದಿನಾಂಕ ಆರಿಸಿ, ಒಟ್ಟು 70 ದಿನಗಳವರೆಗೆ.",
+      repeatDaycare: "ಡೇ ಬೋರ್ಡಿಂಗ್ ಮಾತ್ರ ಪುನರಾವರ್ತಿಸಬಹುದು.",
       validDate: "ಸರಿಯಾದ ದಿನಾಂಕ ಆಯ್ಕೆಮಾಡಿ.",
       clock: "ಸಮಯವನ್ನು 10:30 ತರಹ ಬರೆಯಿರಿ.",
       choosePet: "ಸಾಕುಪ್ರಾಣಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
@@ -209,6 +242,9 @@ export const bookingsArea: typeof English = {
       descriptionLong: "ವಿವರಣೆಯನ್ನು 200 ಅಕ್ಷರಗಳ ಒಳಗೆ ಬರೆಯಿರಿ.",
       itemPrice: "ವಸ್ತುವಿನ ದರ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 500.",
       extraNotFound: "ಆ ಹೆಚ್ಚುವರಿ ಸಿಗಲಿಲ್ಲ.",
+      firstNight: "ಮೊದಲ ರಾತ್ರಿಯ ದಿನಾಂಕ ಆರಿಸಿ.",
+      checkOutAfterNight: "ಚೆಕ್ ಔಟ್ ಮೊದಲ ರಾತ್ರಿಯ ನಂತರ ಇರಬೇಕು.",
+      onlyDaycare: "ಡೇ ಬೋರ್ಡಿಂಗ್ ವಾಸ್ತವ್ಯ ಮಾತ್ರ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಬದಲಾಗಬಹುದು.",
     },
     saved: "ಬುಕಿಂಗ್ ಉಳಿಸಲಾಗಿದೆ.",
     alreadyToday: "ಈ ವಾಸ್ತವ್ಯ ಈಗಾಗಲೇ ಇಂದಿನವರೆಗೆ ಇದೆ.",
@@ -227,6 +263,12 @@ export const bookingsArea: typeof English = {
     checkInDate: "ಚೆಕ್ ಇನ್ ದಿನಾಂಕ",
     checkOutDate: "ಚೆಕ್ ಔಟ್ ದಿನಾಂಕ",
     checkOutHint: "ಒಂದೇ ದಿನದ ಡೇ ಬೋರ್ಡಿಂಗ್‌ಗೆ ಇದನ್ನು ಖಾಲಿ ಬಿಡಿ.",
+    // Day boarding that repeats on weekdays (D37). Weekday names come from the browser's language.
+    repeat: "ಪುನರಾವರ್ತಿಸಿ",
+    repeatOn: "ಈ ದಿನಗಳಲ್ಲಿ ಪುನರಾವರ್ತಿಸಿ",
+    repeatUntil: "ವರೆಗೆ",
+    repeatHint: "ನಿಯಮಿತವಾಗಿ ಬರುವವರಿಗೆ. ಪ್ರತಿ ದಿನ ತನ್ನದೇ ಬುಕಿಂಗ್ ಆಗುತ್ತದೆ, 70 ದಿನಗಳವರೆಗೆ.",
+    usePack: "ಪೇರೆಂಟ್‌ನ ಡೇ ಬೋರ್ಡಿಂಗ್ ಪ್ಯಾಕ್‌ನಲ್ಲಿ ದಿನಗಳಿದ್ದರೆ ಅದರಿಂದ ಪಾವತಿಸಿ",
     kennel: "ಕೆನೆಲ್",
     kennelHint: "ಇದನ್ನು ಚೆಕ್ ಇನ್‌ವರೆಗೆ ಬಿಡಬಹುದು. ಜಾಗ ಆದರೂ ಕಾಯ್ದಿರಿಸಲಾಗುತ್ತದೆ. ಒಟ್ಟಿಗೆ ಬುಕ್ ಆದ ಬೇರೆ ಸಾಕುಪ್ರಾಣಿಗಳಿಗೆ ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ಕೆನೆಲ್ ಸಿಗುತ್ತದೆ.",
     decideAtCheckIn: "ಚೆಕ್ ಇನ್ ಸಮಯದಲ್ಲಿ ನಿರ್ಧರಿಸಿ",

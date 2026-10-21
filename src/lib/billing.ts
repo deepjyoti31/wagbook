@@ -1,4 +1,4 @@
-import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type TaxContext } from "./core";
+import { computeInvoice, stayLines, type InvoiceTotals, type LineInput, type StayCharge, type TaxContext } from "./core";
 import type { Enums, Tables } from "./supabase/database.types";
 import type { Messages } from "@/messages";
 
@@ -30,6 +30,12 @@ export interface BillableBooking {
   discount_minor: number;
   tax_rate_bp: number;
   sac_code: string | null;
+  /** The first night of a stay that began as day boarding. */
+  boarding_from?: string | null;
+  /** The stay's lines from stay_charges() in the database. Without them, every night at rate_minor. */
+  charges?: readonly StayCharge[];
+  /** The day boarding pack it is paid from, if any. */
+  pass_id?: string | null;
 }
 
 export interface BillableItem {
@@ -41,8 +47,8 @@ export interface BillableItem {
 }
 
 /**
- * The bill a booking should get: its stay at the booked rate, discount and
- * tax, then each extra. Exactly what invoice_expected_lines() in the database
+ * The bill a booking should get: its stay (at the booked rate, or split as
+ * stay_charges() says), discount and tax, then each extra. Exactly what invoice_expected_lines() in the database
  * expects, so staff can issue it.
  */
 export function billForBooking(org: OrgTax, petName: string, b: BillableBooking, items: readonly BillableItem[]): InvoiceTotals {
@@ -55,6 +61,9 @@ export function billForBooking(org: OrgTax, petName: string, b: BillableBooking,
     discountMinor: b.discount_minor,
     taxRateBp: b.tax_rate_bp,
     sacCode: b.sac_code,
+    boardingFrom: b.boarding_from,
+    charges: b.charges,
+    fromPack: Boolean(b.pass_id),
     addOns: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp, sacCode: i.sac_code })),
   });
   return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
@@ -88,6 +97,9 @@ export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): In
       discountMinor: b.discount_minor,
       taxRateBp: b.tax_rate_bp,
       sacCode: b.sac_code,
+      boardingFrom: b.boarding_from,
+      charges: b.charges,
+      fromPack: Boolean(b.pass_id),
       addOns: items.map((i) => ({
         description: `${petName}: ${i.description}`.slice(0, 300),
         quantity: Number(i.quantity),
@@ -141,4 +153,51 @@ export function draftPayload(t: InvoiceTotals) {
 export function taxLabel(m: Messages, mode: Enums<"tax_mode"> | string, label?: string | null): string {
   if (mode === "simple") return label?.trim() || m.labels.tax;
   return m.labels.tax;
+}
+
+/** What a credit note needs to know of its bill: how tax worked on it when it was issued. */
+export interface CreditableBill {
+  is_tax_invoice: boolean;
+  prices_include_tax: boolean;
+  place_of_supply_state_code: string | null;
+  /** The seller frozen on the bill: its tax mode and state. */
+  seller: { tax_mode?: string | null; gst_state_code?: string | null } | null;
+}
+
+/**
+ * How tax works on a credit note: exactly as on its bill when the bill was
+ * issued, whatever the kennel's settings say now. Must match
+ * issue_credit_note() in the database.
+ */
+export function creditContext(bill: CreditableBill): TaxContext {
+  const mode = bill.is_tax_invoice ? bill.seller?.tax_mode : "none";
+  return {
+    mode: mode === "gst_india" || mode === "simple" ? mode : "none",
+    sellerStateCode: bill.seller?.gst_state_code ?? null,
+    placeOfSupplyStateCode: bill.place_of_supply_state_code ?? bill.seller?.gst_state_code ?? null,
+    pricesIncludeTax: bill.prices_include_tax,
+  };
+}
+
+/**
+ * A credit note for part of a bill: one line of `amountMinor` at one of the
+ * bill's tax rates. The amount is before tax when the bill's prices were, and
+ * including tax when they included it.
+ */
+export function partCredit(
+  bill: CreditableBill,
+  line: { description: string; amountMinor: number; taxRateBp: number; sacCode: string | null },
+  roundToWholeUnit: boolean,
+): InvoiceTotals {
+  return computeInvoice(
+    [{ description: line.description, quantity: 1, unitPriceMinor: line.amountMinor, taxRateBp: line.taxRateBp, sacCode: line.sacCode }],
+    creditContext(bill),
+    { roundToWholeUnit },
+  );
+}
+
+/** The arguments issue_credit_note() takes for the lines and totals of a credit note. */
+export function creditPayload(t: InvoiceTotals) {
+  const { p_totals, p_lines } = draftPayload(t);
+  return { p_totals, p_lines };
 }

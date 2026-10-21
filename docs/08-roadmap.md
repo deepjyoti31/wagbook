@@ -338,14 +338,67 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M14. The owner's answers
+
+- [x] Finished 21 October 2026.
+
+**Build**
+
+1. [x] A pet at the shared kennel price pays the usual price for nights it has the kennel to itself; a sibling
+   checked out early counts up to the day it left (`stay_charges`, D32).
+2. [x] Day boarding that turns into boarding is billed as days and then nights, each at its price (Staying overnight
+   on the booking page, D32).
+3. [x] Only owners and managers change a parent's phone numbers (`WB002`, D33).
+4. [x] Erasing a parent keeps their pets' records (D30).
+5. [x] Bills are in English, with a parent's language in brackets on request (D31).
+6. [x] What the law says on GST invoices, cancelling bills, record keeping and erasure, written up for the accountant
+   and the lawyer (`06`, `05`).
+
+---
+
+## M15. Credit notes, and the kennel's own tax rates
+
+- [x] Finished 21 October 2026.
+
+**Build**
+
+1. [x] Credit notes on issued bills: the whole bill or part of it, their own `CN/YY-YY/NNNN` numbers, tax as on the
+   bill, never more than is left (D34). On the bill page, the parent's bill link, Reports and the bills download.
+2. [x] A tax invoice from an earlier month, or a credited bill, is credited instead of cancelled (`WB095`, `WB096`).
+3. [x] A tax rate and SAC code for boarding, day boarding and each extra, set by the kennel (D35).
+
+---
+
+## M16. Reminders to send
+
+- [x] Finished 21 October 2026. Today lists vaccination cards to ask for, arrivals and pick-ups tomorrow, and unpaid
+  bills; Send opens WhatsApp and the reminder leaves the list (D39).
+
+---
+
+## M17. Booking requests from parents
+
+- [x] Finished 21 October 2026. A parent's own link, requests that hold no kennel, two public functions (D36).
+
+---
+
+## M18. Day boarding regulars
+
+- [x] Finished 21 October 2026. Repeating day boarding, day boarding packs sold with a bill, days paid from packs (D37).
+
+---
+
+## M19. GSTR-1 files
+
+- [x] Finished 21 October 2026. The month's bills and credit notes as the GST offline tool's CSV files (D38).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
-- Recurring day boarding (every weekday).
 - Waiting list when full.
-- Packages and prepaid passes.
-- Parent self-booking requests from a public page.
 - Multiple sites under one owner with combined reports.
 - Staff rota and attendance.
 - Stock of food and medicines.

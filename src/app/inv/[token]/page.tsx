@@ -7,6 +7,7 @@ import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Loading } from "@/components/ui";
 import { formatDate, formatMoney, GST_STATES, qrMatrix, qrSvgPath, upiLink, type ISODate } from "@/lib/core";
 import { fill } from "@/lib/i18n";
+import { billWords } from "@/lib/bill-words";
 import { parentI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
@@ -26,9 +27,25 @@ interface PublicLine {
   total_minor: number;
 }
 
+interface PublicCreditNote {
+  number: string;
+  issued_on: ISODate;
+  reason: string;
+  subtotal_minor: number;
+  discount_minor: number;
+  taxable_minor: number;
+  cgst_minor: number;
+  sgst_minor: number;
+  igst_minor: number;
+  tax_minor: number;
+  round_off_minor: number;
+  total_minor: number;
+  lines: PublicLine[];
+}
+
 interface PublicInvoice {
-  /** The kennel's language for parents. */
-  language: string;
+  /** The language the parent asked for alongside English (hi or kn), or null. */
+  translation: string | null;
   /** The kennel's locale, such as en-IN: its region formats amounts and dates. */
   locale: string | null;
   number: string;
@@ -66,6 +83,7 @@ interface PublicInvoice {
   notes: string | null;
   upi: { vpa: string; payee_name: string } | null;
   lines: PublicLine[];
+  credit_notes: PublicCreditNote[];
 }
 
 /** The bill for a link, read once per request (the title and the page share it). Null when there is no such bill. */
@@ -76,18 +94,18 @@ const loadInvoice = cache(async (token: string): Promise<PublicInvoice | null> =
   return data as unknown as PublicInvoice;
 });
 
-/** The tab title in the kennel's language for parents. */
+/** The tab title: English, with the parent's language in brackets if they asked for it. */
 export async function generateMetadata({ params }: PageProps<"/inv/[token]">): Promise<Metadata> {
   const inv = await loadInvoice((await params).token);
-  return { title: parentI18n(inv?.language).m.invoice.title, robots: { index: false } };
+  return { title: billWords(inv?.translation).invoice.title, robots: { index: false } };
 }
 
 /** The bill a parent opens from the link the kennel sent them. No sign-in. Prints as a clean A4 invoice. */
-export default function PublicInvoicePage({ params }: PageProps<"/inv/[token]">) {
+export default function PublicInvoicePage({ params, searchParams }: PageProps<"/inv/[token]">) {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 print:max-w-none print:p-0">
       <Suspense fallback={<Loading />}>
-        <Invoice params={params} />
+        <Invoice params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -95,16 +113,49 @@ export default function PublicInvoicePage({ params }: PageProps<"/inv/[token]">)
 
 const lines = (...parts: (string | null | undefined)[]) => parts.filter((p) => p && p.trim()).join(", ");
 
-async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
+const viewLines = (lines: PublicLine[]) =>
+  lines.map((l) => ({
+    description: l.description,
+    sacCode: l.sac_code,
+    quantity: Number(l.quantity),
+    unitPriceMinor: l.unit_price_minor,
+    discountMinor: l.discount_minor,
+    taxableMinor: l.taxable_minor,
+    taxRateBp: l.tax_rate_bp,
+    cgstMinor: l.cgst_minor,
+    sgstMinor: l.sgst_minor,
+    igstMinor: l.igst_minor,
+    taxMinor: l.tax_minor,
+    totalMinor: l.total_minor,
+  }));
+
+const viewTotals = (d: Omit<PublicCreditNote, "number" | "issued_on" | "reason" | "lines">) => ({
+  subtotalMinor: d.subtotal_minor,
+  discountMinor: d.discount_minor,
+  taxableMinor: d.taxable_minor,
+  cgstMinor: d.cgst_minor,
+  sgstMinor: d.sgst_minor,
+  igstMinor: d.igst_minor,
+  taxMinor: d.tax_minor,
+  roundOffMinor: d.round_off_minor,
+  totalMinor: d.total_minor,
+});
+
+async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">, "params" | "searchParams">) {
   const { token } = await params;
+  const cn = (await searchParams).cn;
   const inv = await loadInvoice(token);
   if (!inv) notFound();
-  // In the kennel's language for parents, with amounts and dates in the kennel's region.
-  const { m, locale } = parentI18n(inv.language, inv.locale);
+  const note = typeof cn === "string" ? (inv.credit_notes ?? []).find((c) => c.number === cn) : undefined;
+  if (note) return <CreditNote inv={inv} note={note} />;
+  // In English, with the headings in the parent's language too if they asked (D31); amounts and dates in the kennel's region.
+  const m = billWords(inv.translation);
+  const { locale } = parentI18n("en", inv.locale);
   const w = m.invoice;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale });
-  const due = inv.status === "issued" ? inv.total_minor - Number(inv.paid_minor) : 0;
+  const credited = (inv.credit_notes ?? []).reduce((sum, c) => sum + c.total_minor, 0);
+  const due = inv.status === "issued" ? inv.total_minor - credited - Number(inv.paid_minor) : 0;
   const gst = inv.seller.tax_mode === "gst_india";
   const stateName = (code: string | null) => (code ? fill(w.stateWithCode, { state: GST_STATES[code] ?? w.unknownState, code }) : null);
 
@@ -169,37 +220,29 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
 
       <InvoiceView
         words={m}
-        lines={inv.lines.map((l) => ({
-          description: l.description,
-          sacCode: l.sac_code,
-          quantity: Number(l.quantity),
-          unitPriceMinor: l.unit_price_minor,
-          discountMinor: l.discount_minor,
-          taxableMinor: l.taxable_minor,
-          taxRateBp: l.tax_rate_bp,
-          cgstMinor: l.cgst_minor,
-          sgstMinor: l.sgst_minor,
-          igstMinor: l.igst_minor,
-          taxMinor: l.tax_minor,
-          totalMinor: l.total_minor,
-        }))}
-        totals={{
-          subtotalMinor: inv.subtotal_minor,
-          discountMinor: inv.discount_minor,
-          taxableMinor: inv.taxable_minor,
-          cgstMinor: inv.cgst_minor,
-          sgstMinor: inv.sgst_minor,
-          igstMinor: inv.igst_minor,
-          taxMinor: inv.tax_minor,
-          roundOffMinor: inv.round_off_minor,
-          totalMinor: inv.total_minor,
-        }}
+        lines={viewLines(inv.lines)}
+        totals={viewTotals(inv)}
         currency={inv.currency}
         locale={locale}
         taxMode={inv.seller.tax_mode}
         taxLabel={inv.seller.tax_label}
         showTax={inv.is_tax_invoice}
       />
+
+      {(inv.credit_notes ?? []).length > 0 ? (
+        <section className="space-y-2">
+          <h2 className="font-bold">{w.creditNotes}</h2>
+          <ul className="space-y-1">
+            {inv.credit_notes.map((c) => (
+              <li key={c.number}>
+                <a href={`?cn=${encodeURIComponent(c.number)}`} className="inline-flex min-h-12 items-center underline underline-offset-4">
+                  {fill(w.seeCreditNote, { number: c.number, amount: money(c.total_minor) })}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {inv.status === "issued" ? (
         <section className="rounded-xl border border-rule bg-paper px-4 py-3">
@@ -234,6 +277,61 @@ async function Invoice({ params }: Pick<PageProps<"/inv/[token]">, "params">) {
 
       <div className="flex flex-wrap gap-2">
         <PrintButton label={m.common.print} />
+      </div>
+    </article>
+  );
+}
+
+/** One credit note against the bill, as its own document: printable like the bill. */
+function CreditNote({ inv, note }: { inv: PublicInvoice; note: PublicCreditNote }) {
+  const m = billWords(inv.translation);
+  const { locale } = parentI18n("en", inv.locale);
+  const w = m.invoice;
+  return (
+    <article className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-2xl font-extrabold tracking-tight">{inv.seller.trade_name ?? inv.seller.name}</p>
+          {inv.seller.trade_name && inv.seller.trade_name !== inv.seller.name ? <p>{inv.seller.name}</p> : null}
+          <p className="text-slate">{lines(inv.seller.address_line1, inv.seller.address_line2, inv.seller.city, inv.seller.state, inv.seller.postal_code)}</p>
+          {inv.is_tax_invoice && inv.seller.tax_id ? <p className="font-semibold">{inv.seller.tax_id}</p> : null}
+        </div>
+        <div className="text-right">
+          <h1 className="text-2xl font-extrabold tracking-tight">{w.creditNote}</h1>
+          <p className="font-semibold">{note.number}</p>
+          <p className="text-slate">{formatDate(note.issued_on, locale)}</p>
+        </div>
+      </header>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <h2 className="font-bold">{w.billedTo}</h2>
+          <p>{inv.buyer.name}</p>
+          <p className="text-slate">{lines(inv.buyer.address, inv.buyer.city, inv.buyer.postal_code)}</p>
+          {inv.buyer.tax_id ? <p>{fill(w.buyerGstin, { id: inv.buyer.tax_id })}</p> : null}
+        </div>
+        <div>
+          <p className="font-semibold">{fill(w.againstBill, { number: inv.number, date: formatDate(inv.issued_on, locale) })}</p>
+          <p className="text-slate">{fill(w.reason, { reason: note.reason })}</p>
+        </div>
+      </section>
+
+      <InvoiceView
+        words={m}
+        lines={viewLines(note.lines)}
+        totals={viewTotals(note)}
+        currency={inv.currency}
+        locale={locale}
+        taxMode={inv.seller.tax_mode}
+        taxLabel={inv.seller.tax_label}
+        showTax={inv.is_tax_invoice}
+      />
+
+      <div className="no-print flex flex-wrap gap-2">
+        <PrintButton label={m.common.print} />
+        <a href="?" className={buttonStyles.quiet}>
+          {w.backToBill}
+        </a>
       </div>
     </article>
   );

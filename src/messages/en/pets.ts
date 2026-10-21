@@ -136,6 +136,8 @@ export const petsArea = {
     title: "Parent",
     // Follows the main phone number: "98765 43210, also 91234 56789".
     alsoPhone: ", also {phone}",
+    // Staff see this in place of the phone boxes on a parent's details.
+    phoneByManager: "Only an owner or manager can change the parent's phone numbers.",
     owed: "{amount} owed",
     merged: "Merged. Everything from the other record is here now.",
     noConsent: "No consent on record to keep these details. Ask, and tick it below.",
@@ -163,6 +165,11 @@ export const petsArea = {
       gstinHint: "Only for a business that wants it on the bill.",
       gstState: "State, for GST",
       gstStateFromGstin: "Take it from the GSTIN",
+      // Which language a parent's bills add to English. {language} is a language named in itself, like हिन्दी.
+      billLanguage: "Bills",
+      billLanguageHint: "In English. If the parent asks, the headings also show in their language, in brackets.",
+      billEnglishOnly: "English only",
+      billWith: "English and {language}",
       notes: "Notes for staff",
     },
     consentFromIntake: "Agreed to the kennel keeping these details on {date}, on the intake form.",
@@ -192,13 +199,36 @@ export const petsArea = {
       gstState: "Choose the state from the list.",
       onlyManagersMerge: "Only an owner or manager can merge parents.",
     },
+    // The parent's own booking link (D36). {name} is the parent's name.
+    // Day boarding packs the parent bought (D37).
+    packs: {
+      title: "Day boarding packs",
+      none: "No packs yet.",
+      line: "{name}: {left} of {days} days left, until {until}",
+      ended: "ended {date}",
+      sell: "Sell a pack",
+      which: "Pack",
+      startsOn: "Starts on",
+      selling: "Making the bill",
+      addFirst: "Add packs on Extras first.",
+      choose: "Choose a pack.",
+      bill: "Bill",
+    },
+    requestLink: {
+      title: "Booking link",
+      about: "Send this to {name}. They pick dates for their pets, and it arrives here as a request. Nothing is booked until you confirm it.",
+      send: "Send on WhatsApp",
+      renew: "Make a new link",
+      renewHint: "The old link stops working.",
+      renewed: "New link made. The old one no longer works.",
+    },
     privacy: {
       title: "What we hold about them",
       intro: "A parent may ask for a copy of everything the kennel holds about them, or ask for it to be erased.",
       download: "Download their details",
       eraseTitle: "Erase their details",
       eraseIntro:
-        "Their pets' notes, photos, vaccinations and incidents, every update and care task of their stays, their forms and certificates are deleted for good, and their name, phone and address are emptied. Bills already issued stay, with the name printed on them, because tax law says so.",
+        "Their name, phone numbers, address and notes are emptied, and the updates sent to them, their forms and the vaccination certificates (a card shows the owner) are deleted for good. Their pets' records stay: details, photos, vaccinations, routines and incidents, hidden from lists. Bills already issued stay, with the name printed on them, because tax law says so.",
       eraseConfirm: "I understand that this cannot be undone.",
       eraseButton: "Erase their details",
       erasing: "Erasing",

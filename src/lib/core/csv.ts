@@ -23,7 +23,8 @@ export function csvCell(value: CsvValue): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function toCsv(header: readonly string[], rows: readonly (readonly CsvValue[])[]): string {
+export function toCsv(header: readonly string[], rows: readonly (readonly CsvValue[])[], options: { byteOrderMark?: boolean } = {}): string {
   const lines = [header, ...rows].map((r) => r.map(csvCell).join(","));
-  return `﻿${lines.join("\r\n")}\r\n`;
+  // The mark tells Excel the file is UTF-8. Tools that match column names exactly (the GST offline tool) want none.
+  return `${options.byteOrderMark === false ? "" : "﻿"}${lines.join("\r\n")}\r\n`;
 }

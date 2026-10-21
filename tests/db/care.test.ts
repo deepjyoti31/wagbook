@@ -117,3 +117,24 @@ describe("incidents", () => {
     expect(row.rows[0]).toEqual({ description: "Limping on the left front leg", severity: "medium" });
   });
 });
+
+describe("reminders sent", () => {
+  it("are recorded by anyone, stamped with who sent them, never changed, and removed only by an owner", async () => {
+    const booking = await book(db, k, { pet: k.pets[0], start: "2027-09-01", end: "2027-09-03" });
+    const id = await as(db, user(staff), async () =>
+      (
+        await db.query<{ id: string; sent_by: string }>(
+          "insert into public.reminders_sent (org_id, kind, subject_id, sent_on, sent_by) values ($1, 'arrival', $2, '2027-08-31', $3) returning id, sent_by",
+          [k.org, booking, k.owner],
+        )
+      ).rows[0],
+    );
+    // Nobody records a reminder in someone else's name.
+    expect(id.sent_by).toBe(staff);
+    expect((await errorOf(() => as(db, user(staff), () => db.query("update public.reminders_sent set sent_on = '2027-09-01' where id = $1", [id.id])))).message).toMatch(/permission denied/);
+    const staffDelete = await as(db, user(staff), () => db.query("delete from public.reminders_sent where id = $1", [id.id]));
+    expect(staffDelete.affectedRows).toBe(0);
+    expect((await errorOf(() => as(db, user(staff), () => db.query("insert into public.reminders_sent (org_id, kind, subject_id, sent_on) values ($1, 'sometime', $2, '2027-08-31')", [k.org, booking])))).message).toContain("reminders_sent_kind_check");
+    expect((await errorOf(() => as(db, anon, () => db.query("select * from public.reminders_sent")))).message).toMatch(/permission denied/);
+  });
+});

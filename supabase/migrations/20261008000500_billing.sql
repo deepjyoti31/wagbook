@@ -30,6 +30,7 @@ create table public.invoices (
   issued_on date,
   issued_by uuid references auth.users (id) on delete set null,
   is_tax_invoice boolean not null default false,
+  prices_include_tax boolean not null default false,
   currency text not null default 'INR' check (currency ~ '^[A-Z]{3}$'),
   seller jsonb,
   buyer jsonb,
@@ -83,6 +84,8 @@ comment on column public.invoices.fiscal_year is 'Financial year the number belo
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
 comment on column public.invoices.issued_on is 'Invoice date: the kennel''s local date when it was issued.';
 comment on column public.invoices.is_tax_invoice is 'True when issued by a tax-registered kennel, so it is titled Tax Invoice and shows the tax breakup.';
+comment on column public.invoices.prices_include_tax is
+  'Whether the kennel''s prices included tax when the bill was issued, so a credit note against it works its tax out the same way.';
 comment on column public.invoices.seller is 'Copy of the kennel''s name, address, tax details and UPI ID as they were when issued. A later change to the kennel''s settings never alters an invoice that is already out.';
 comment on column public.invoices.buyer is 'Copy of the parent''s name, phone and address as they were when issued.';
 comment on column public.invoices.place_of_supply_state_code is 'GST state code where the service is supplied. For boarding, the kennel''s own state.';
@@ -174,13 +177,15 @@ create index invoice_lines_org_invoice_idx on public.invoice_lines (org_id, invo
 
 create table public.invoice_counters (
   org_id uuid not null references public.organizations (id) on delete cascade,
+  series text not null default 'invoice' check (series in ('invoice', 'credit_note')),
   fiscal_year text not null,
   last_seq integer not null default 0 check (last_seq >= 0),
-  primary key (org_id, fiscal_year)
+  primary key (org_id, series, fiscal_year)
 );
 
 comment on table public.invoice_counters is
-  'The last invoice sequence used per organisation per financial year. Only issue_invoice touches it; nobody can read or write it directly.';
+  'The last sequence number used per organisation, series (bills, credit notes) and financial year. Only issue_invoice and issue_credit_note touch it; nobody can read or write it directly.';
+comment on column public.invoice_counters.series is 'invoice: bills (PREFIX/YY-YY/NNNN). credit_note: credit notes (CN/YY-YY/NNNN).';
 
 -- ---------------------------------------------------------------------------
 -- Issued invoices are frozen
@@ -326,6 +331,87 @@ $$;
 comment on function public.invoice_bookings(uuid, uuid, uuid) is
   'The bookings a bill covers: its own booking, or the family''s bookings that are not requests or cancelled. Must match BILLABLE_IN_FAMILY in src/lib/billing.ts.';
 
+-- What a stay costs, as the lines of a bill. Usually one: every night (or
+-- day) at the booked rate. Two more cases split it:
+--   * a stay that began as day boarding and became boarding (boarding_from):
+--     the days before the first night at the day price, then the nights;
+--   * a pet booked at the shared kennel price (alone_rate_minor set): the
+--     nights it shared its kennel with a pet of the same parent at that price,
+--     and the nights it had the kennel to itself at the usual price. A sibling
+--     that went home early shares only up to the day it was checked out.
+-- The discount goes on the largest line (the first, if two are equal).
+create function public.stay_charges(p_org uuid, p_bookings uuid[])
+returns table (booking_id uuid, part text, quantity integer, unit_price_minor bigint, discount_minor bigint)
+language sql
+stable
+set search_path = ''
+as $$
+  with b as (
+    select bk.*, o.time_zone
+    from public.bookings bk
+    join public.organizations o on o.id = bk.org_id
+    where bk.org_id = p_org and bk.id = any (p_bookings)
+  ),
+  -- The nights (boarding) or days (day boarding) at the stay's own rate.
+  units as (
+    select b.id, d::date as day
+    from b, generate_series(
+      coalesce(b.boarding_from, b.start_date)::timestamp,
+      (case when b.kind = 'daycare' then b.end_date else b.end_date - 1 end)::timestamp,
+      interval '1 day') d
+  ),
+  counted as (
+    select
+      b.id,
+      count(u.day)::integer as total,
+      (count(u.day) filter (where exists (
+        select 1
+        from public.bookings s
+        where s.org_id = b.org_id
+          and s.client_id = b.client_id
+          and s.id <> b.id
+          and s.kennel_id = b.kennel_id
+          and s.status in ('confirmed', 'checked_in', 'checked_out')
+          and public.stay_range(
+                s.kind,
+                s.start_date,
+                case when s.status = 'checked_out' and s.checked_out_at is not null
+                     then greatest(s.start_date, least(s.end_date, (s.checked_out_at at time zone b.time_zone)::date))
+                     else s.end_date end
+              ) @> u.day
+      )))::integer as shared
+    from b
+    left join units u on u.id = b.id
+    group by b.id
+  ),
+  parts as (
+    select b.id, 1 as position, 'days'::text as part, (b.boarding_from - b.start_date) as quantity, b.day_rate_minor as unit_price_minor
+    from b
+    where b.boarding_from is not null
+    union all
+    select b.id, 2, case when b.alone_rate_minor is null then 'stay' else 'shared' end,
+           case when b.alone_rate_minor is null then c.total else c.shared end, b.rate_minor
+    from b
+    join counted c on c.id = b.id
+    union all
+    select b.id, 3, 'alone', c.total - c.shared, b.alone_rate_minor
+    from b
+    join counted c on c.id = b.id
+    where b.alone_rate_minor is not null
+  ),
+  kept as (
+    select p.*, row_number() over (partition by p.id order by p.quantity * p.unit_price_minor desc, p.position) as rank
+    from parts p
+    where p.quantity > 0
+  )
+  select k.id, k.part, k.quantity, k.unit_price_minor, case when k.rank = 1 then b.discount_minor else 0 end
+  from kept k
+  join b on b.id = k.id
+  order by array_position(p_bookings, k.id), k.position;
+$$;
+comment on function public.stay_charges(uuid, uuid[]) is
+  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
+
 create function public.invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 language sql
@@ -333,19 +419,86 @@ stable
 set search_path = ''
 as $$
   select
-    (case when b.kind = 'daycare' then b.end_date - b.start_date + 1 else b.end_date - b.start_date end)::numeric(10, 2),
-    b.rate_minor,
-    b.discount_minor,
+    sc.quantity::numeric(10, 2),
+    sc.unit_price_minor,
+    sc.discount_minor,
     case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end
   from public.bookings b
-  where b.org_id = p_org and b.id in (select public.invoice_bookings(p_org, p_booking, p_group))
+  join public.stay_charges(p_org, array(select public.invoice_bookings(p_org, p_booking, p_group))) sc on sc.booking_id = b.id
+  where b.org_id = p_org
   union all
   select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
   from public.booking_items bi
   where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group));
 $$;
 comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), the stay (nights for boarding, days for day boarding) and each extra. Must match stayLines() in src/lib/core/stay.ts.';
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra.';
+
+-- One line of a bill or credit note, checked against the same rules as
+-- src/lib/core/tax.ts. The app does the sums; the database refuses a document
+-- whose sums are wrong (WB037). p_include: prices include tax.
+create function public.check_bill_line(
+  p_mode public.tax_mode, p_intra boolean, p_include boolean,
+  p_quantity numeric, p_unit_price_minor bigint, p_discount_minor bigint, p_taxable_minor bigint, p_tax_rate_bp integer,
+  p_cgst_minor bigint, p_sgst_minor bigint, p_igst_minor bigint, p_tax_minor bigint)
+returns void
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_gross bigint;
+  v_net bigint;
+begin
+  v_gross := round(p_quantity * p_unit_price_minor);
+  v_net := v_gross - p_discount_minor;
+  if v_net < 0 then
+    raise exception 'WB037: a discount is larger than its line' using errcode = '23514';
+  end if;
+
+  if p_mode = 'none' or p_tax_rate_bp = 0 then
+    if p_tax_minor <> 0 or p_cgst_minor <> 0 or p_sgst_minor <> 0 or p_igst_minor <> 0
+       or p_taxable_minor <> v_net then
+      raise exception 'WB037: a line that carries no tax has tax or the wrong amount' using errcode = '23514';
+    end if;
+  else
+    if p_include then
+      -- Tax is inside the price: taxable + tax must equal what the customer pays,
+      -- and taxable must be the price with the tax backed out (give or take the
+      -- single unit that keeps CGST and SGST equal).
+      if p_taxable_minor + p_tax_minor <> v_net
+         or abs(p_taxable_minor - round(v_net * 10000.0 / (10000 + p_tax_rate_bp))) > 1 then
+        raise exception 'WB037: a line''s tax does not match its price and rate' using errcode = '23514';
+      end if;
+    elsif p_taxable_minor <> v_net then
+      raise exception 'WB037: a line''s taxable value does not match its price' using errcode = '23514';
+    end if;
+
+    if p_mode = 'gst_india' then
+      if p_intra then
+        if p_igst_minor <> 0 or p_cgst_minor <> p_sgst_minor
+           or p_tax_minor <> p_cgst_minor + p_sgst_minor
+           or (not p_include
+               and p_cgst_minor <> round(p_taxable_minor * p_tax_rate_bp / 20000.0)) then
+          raise exception 'WB037: a line''s CGST and SGST do not match its taxable value and rate' using errcode = '23514';
+        end if;
+      elsif p_cgst_minor <> 0 or p_sgst_minor <> 0 or p_tax_minor <> p_igst_minor
+            or (not p_include
+                and p_igst_minor <> round(p_taxable_minor * p_tax_rate_bp / 10000.0)) then
+        raise exception 'WB037: a line''s IGST does not match its taxable value and rate' using errcode = '23514';
+      end if;
+    else
+      if p_cgst_minor <> 0 or p_sgst_minor <> 0 or p_igst_minor <> 0
+         or (not p_include
+             and p_tax_minor <> round(p_taxable_minor * p_tax_rate_bp / 10000.0)) then
+        raise exception 'WB037: a line''s tax does not match its taxable value and rate' using errcode = '23514';
+      end if;
+    end if;
+  end if;
+end;
+$$;
+comment on function public.check_bill_line(public.tax_mode, boolean, boolean, numeric, bigint, bigint, bigint, integer, bigint, bigint, bigint, bigint) is
+  'Raises WB037 when a line''s taxable value and tax are not what its quantity, price, discount and rate give under the tax mode (within the state or across states, prices with or without tax). Used by issue_invoice and issue_credit_note.';
 
 create function public.issue_invoice(p_invoice uuid)
 returns public.invoices
@@ -363,8 +516,6 @@ declare
   v_today date;
   v_sum record;
   v_line record;
-  v_gross bigint;
-  v_net bigint;
   v_intra boolean;
   v_exact bigint;
   v_round_off bigint;
@@ -385,51 +536,9 @@ begin
   -- src/lib/core/tax.ts. The app does the sums; the database refuses to put
   -- its number on an invoice whose sums are wrong.
   for v_line in select * from public.invoice_lines l where l.invoice_id = v_inv.id loop
-    v_gross := round(v_line.quantity * v_line.unit_price_minor);
-    v_net := v_gross - v_line.discount_minor;
-    if v_net < 0 then
-      raise exception 'WB037: a discount is larger than its line' using errcode = '23514';
-    end if;
-
-    if v_org.tax_mode = 'none' or v_line.tax_rate_bp = 0 then
-      if v_line.tax_minor <> 0 or v_line.cgst_minor <> 0 or v_line.sgst_minor <> 0 or v_line.igst_minor <> 0
-         or v_line.taxable_minor <> v_net then
-        raise exception 'WB037: a line that carries no tax has tax or the wrong amount' using errcode = '23514';
-      end if;
-    else
-      if v_org.prices_include_tax then
-        -- Tax is inside the price: taxable + tax must equal what the customer pays,
-        -- and taxable must be the price with the tax backed out (give or take the
-        -- single unit that keeps CGST and SGST equal).
-        if v_line.taxable_minor + v_line.tax_minor <> v_net
-           or abs(v_line.taxable_minor - round(v_net * 10000.0 / (10000 + v_line.tax_rate_bp))) > 1 then
-          raise exception 'WB037: a line''s tax does not match its price and rate' using errcode = '23514';
-        end if;
-      elsif v_line.taxable_minor <> v_net then
-        raise exception 'WB037: a line''s taxable value does not match its price' using errcode = '23514';
-      end if;
-
-      if v_org.tax_mode = 'gst_india' then
-        if v_intra then
-          if v_line.igst_minor <> 0 or v_line.cgst_minor <> v_line.sgst_minor
-             or v_line.tax_minor <> v_line.cgst_minor + v_line.sgst_minor
-             or (not v_org.prices_include_tax
-                 and v_line.cgst_minor <> round(v_line.taxable_minor * v_line.tax_rate_bp / 20000.0)) then
-            raise exception 'WB037: a line''s CGST and SGST do not match its taxable value and rate' using errcode = '23514';
-          end if;
-        elsif v_line.cgst_minor <> 0 or v_line.sgst_minor <> 0 or v_line.tax_minor <> v_line.igst_minor
-              or (not v_org.prices_include_tax
-                  and v_line.igst_minor <> round(v_line.taxable_minor * v_line.tax_rate_bp / 10000.0)) then
-          raise exception 'WB037: a line''s IGST does not match its taxable value and rate' using errcode = '23514';
-        end if;
-      else
-        if v_line.cgst_minor <> 0 or v_line.sgst_minor <> 0 or v_line.igst_minor <> 0
-           or (not v_org.prices_include_tax
-               and v_line.tax_minor <> round(v_line.taxable_minor * v_line.tax_rate_bp / 10000.0)) then
-          raise exception 'WB037: a line''s tax does not match its taxable value and rate' using errcode = '23514';
-        end if;
-      end if;
-    end if;
+    perform public.check_bill_line(v_org.tax_mode, v_intra, v_org.prices_include_tax, v_line.quantity, v_line.unit_price_minor,
+      v_line.discount_minor, v_line.taxable_minor, v_line.tax_rate_bp, v_line.cgst_minor, v_line.sgst_minor, v_line.igst_minor,
+      v_line.tax_minor);
   end loop;
 
   select
@@ -500,9 +609,9 @@ begin
 
   -- Take the next number. The row lock taken by this upsert makes concurrent
   -- issuers queue up, so numbers are consecutive with no gaps or repeats.
-  insert into public.invoice_counters as c (org_id, fiscal_year, last_seq)
-  values (v_inv.org_id, v_fy, 1)
-  on conflict (org_id, fiscal_year) do update set last_seq = c.last_seq + 1
+  insert into public.invoice_counters as c (org_id, series, fiscal_year, last_seq)
+  values (v_inv.org_id, 'invoice', v_fy, 1)
+  on conflict (org_id, series, fiscal_year) do update set last_seq = c.last_seq + 1
   returning c.last_seq into v_seq;
 
   v_number := v_org.invoice_prefix || '/'
@@ -519,6 +628,7 @@ begin
       issued_on = v_today,
       issued_by = (select auth.uid()),
       is_tax_invoice = (v_org.tax_mode <> 'none'),
+      prices_include_tax = v_org.prices_include_tax,
       currency = v_org.currency,
       subtotal_minor = v_sum.subtotal,
       place_of_supply_state_code = coalesce(i.place_of_supply_state_code, v_org.gst_state_code),
@@ -595,6 +705,15 @@ begin
   if coalesce(btrim(p_reason), '') = '' then
     raise exception 'WB039: say why the invoice is being voided' using errcode = '23514';
   end if;
+  -- A credit note has gone out against it: what is left is credited too, not cancelled.
+  if exists (select 1 from public.credit_notes cn where cn.org_id = v_inv.org_id and cn.invoice_id = v_inv.id) then
+    raise exception 'WB096: this bill has a credit note. Credit what is left instead of cancelling it.' using errcode = '23514';
+  end if;
+  -- A tax invoice from an earlier month may already be in a tax return, so it
+  -- is undone with a credit note in the month it is undone (docs/06, D34).
+  if v_inv.is_tax_invoice and date_trunc('month', v_inv.issued_on) < date_trunc('month', public.org_today(v_inv.org_id)) then
+    raise exception 'WB095: this bill was issued in an earlier month. Make a credit note instead of cancelling it.' using errcode = '23514';
+  end if;
 
   perform set_config('wagbook.voiding', 'on', true);
   update public.invoices i
@@ -646,7 +765,7 @@ comment on function public.save_invoice_draft(uuid, jsonb, jsonb) is
   'Replaces a draft invoice''s lines and totals in one go, so a draft is never left half written. The numbers come from src/lib/core/tax.ts; issue_invoice() checks them.';
 
 comment on function public.void_invoice(uuid, text) is
-  'Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it.';
+  'Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it. A tax invoice from an earlier month is not voided but credited (WB095), and a bill with a credit note is credited the rest of the way (WB096).';
 
 -- ---------------------------------------------------------------------------
 -- Settings that bills depend on
@@ -676,6 +795,363 @@ comment on function public.organizations_lock_billing_settings() is
 create trigger organizations_lock_billing_settings
   before update of currency, fiscal_year_start_month on public.organizations
   for each row execute function public.organizations_lock_billing_settings();
+
+-- ---------------------------------------------------------------------------
+-- Day boarding packs
+--
+-- A kennel sells regulars a pack of day boarding days (10 days within 60 days)
+-- up front, on one bill. Each day boarding booking paid from the pack then
+-- costs nothing on its own (bookings.pass_id, rate 0), and the pack can never
+-- give more days than were bought.
+-- ---------------------------------------------------------------------------
+
+create table public.day_packs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 80),
+  days integer not null check (days between 1 and 365),
+  price_minor bigint not null check (price_minor >= 0),
+  valid_days integer not null check (valid_days between 1 and 730),
+  tax_rate_bp integer check (tax_rate_bp is null or tax_rate_bp between 0 and 10000),
+  sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id, id)
+);
+
+comment on table public.day_packs is 'The day boarding packs a kennel sells: so many days, at a price, to use within so many days.';
+comment on column public.day_packs.days is 'How many days of day boarding the pack gives.';
+comment on column public.day_packs.valid_days is 'How long it lasts from the day it starts, in days: 60 means the start day and the 59 after it.';
+comment on column public.day_packs.tax_rate_bp is 'Tax rate on the pack''s bill, in basis points. Empty: the kennel''s usual rate.';
+comment on column public.day_packs.sac_code is 'Service code printed on the pack''s bill. The kennel''s accountant decides it.';
+comment on column public.day_packs.is_active is 'False once taken off the list: packs already sold keep working.';
+
+create trigger day_packs_set_updated_at
+  before update on public.day_packs
+  for each row execute function public.set_updated_at();
+
+create table public.passes (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  client_id uuid not null,
+  day_pack_id uuid,
+  name text not null check (char_length(name) between 1 and 80),
+  days integer not null check (days between 1 and 365),
+  price_minor bigint not null check (price_minor >= 0),
+  starts_on date not null,
+  valid_until date not null,
+  invoice_id uuid,
+  created_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  unique (org_id, id),
+  foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
+  foreign key (org_id, day_pack_id) references public.day_packs (org_id, id) on delete set null (day_pack_id),
+  foreign key (org_id, invoice_id) references public.invoices (org_id, id) on delete set null (invoice_id),
+  constraint passes_dates_in_order check (valid_until >= starts_on and valid_until - starts_on <= 730)
+);
+
+comment on table public.passes is
+  'A day boarding pack a parent bought: so many days to use between two dates. Day boarding bookings paid from it name it (bookings.pass_id).';
+comment on column public.passes.name is 'The pack''s name when it was sold, so renaming the pack later does not change what the parent bought.';
+comment on column public.passes.days is 'Days of day boarding bought. pass_balances says how many are used and left.';
+comment on column public.passes.invoice_id is 'The bill the pack was sold on.';
+
+create index passes_org_client_idx on public.passes (org_id, client_id, valid_until);
+
+create trigger passes_stamp_actor
+  before insert or update on public.passes
+  for each row execute function public.stamp_actor('created_by');
+
+alter table public.bookings
+  add constraint bookings_pass_fkey foreign key (org_id, pass_id) references public.passes (org_id, id) on delete restrict;
+
+-- The days of a pack that bookings hold: confirmed, in house, gone home, or
+-- did not come (the kennel kept the place). Not requests, not cancellations.
+create view public.pass_balances
+with (security_invoker = true)
+as
+select
+  p.id as pass_id,
+  p.org_id,
+  p.client_id,
+  p.name,
+  p.days,
+  p.starts_on,
+  p.valid_until,
+  p.invoice_id,
+  coalesce(u.used, 0)::integer as days_used,
+  (p.days - coalesce(u.used, 0))::integer as days_left
+from public.passes p
+left join lateral (
+  select sum(b.end_date - b.start_date + 1) as used
+  from public.bookings b
+  where b.org_id = p.org_id and b.pass_id = p.id and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show')
+) u on true;
+
+comment on view public.pass_balances is 'Each day boarding pack with the days used (bookings that hold a place) and the days left.';
+
+-- A day paid from a pack must be day boarding of the parent who bought it,
+-- inside the pack's dates, and the pack must have the days. Bookings on one
+-- pack queue while counting, so two at the same moment cannot both take its
+-- last day. Runs as the caller (row level security applies).
+create function public.bookings_check_pass()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_pass public.passes;
+  v_used integer;
+begin
+  -- Merging two parents moves bookings before their packs (merge_clients).
+  if new.pass_id is null or new.status not in ('requested', 'confirmed', 'checked_in', 'checked_out', 'no_show')
+     or coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    return new;
+  end if;
+  -- One booking at a time per pack: a lock on the pack's id, which staff may
+  -- take (a row lock would need the right to change the pack).
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('pass:' || new.pass_id::text, 0));
+  select * into v_pass from public.passes p where p.org_id = new.org_id and p.id = new.pass_id;
+  if v_pass.id is null or v_pass.client_id <> new.client_id or new.kind <> 'daycare' then
+    raise exception 'WB110: a day boarding pack is for day boarding of the parent who bought it' using errcode = '23514';
+  end if;
+  if new.start_date < v_pass.starts_on or new.end_date > v_pass.valid_until then
+    raise exception 'WB111: the pack is for % to %, and these days are outside it', v_pass.starts_on, v_pass.valid_until using errcode = '23514';
+  end if;
+  if new.status = 'requested' then
+    return new;
+  end if;
+  select coalesce(sum(b.end_date - b.start_date + 1), 0) into v_used
+  from public.bookings b
+  where b.org_id = new.org_id and b.pass_id = new.pass_id and b.id <> new.id
+    and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show');
+  if v_used + (new.end_date - new.start_date + 1) > v_pass.days then
+    raise exception 'WB112: the pack has % days left', greatest(v_pass.days - v_used, 0) using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.bookings_check_pass() is
+  'Trigger: a day boarding booking paid from a pack must be day boarding of the pack''s parent (WB110), inside its dates (WB111), and, once it holds a place, within the days left (WB112).';
+
+create trigger bookings_check_pass
+  before insert or update of pass_id, status, start_date, end_date, kind, client_id on public.bookings
+  for each row execute function public.bookings_check_pass();
+
+-- ---------------------------------------------------------------------------
+-- Credit notes
+--
+-- A credit note takes back all or part of an issued bill, in the month it is
+-- made, with its own number (CN/YY-YY/NNNN). The bill itself stays as it was:
+-- it may already be in a tax return. Only issue_credit_note() writes them,
+-- and once written they never change (no update or delete grants).
+-- ---------------------------------------------------------------------------
+
+create table public.credit_notes (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  invoice_id uuid not null,
+  number text not null check (char_length(number) <= 16 and number ~ '^[A-Za-z0-9/-]+$'),
+  fiscal_year text not null,
+  seq integer not null check (seq > 0),
+  issued_on date not null,
+  issued_by uuid references auth.users (id) on delete set null,
+  reason text not null check (char_length(reason) between 1 and 500),
+  currency text not null check (currency ~ '^[A-Z]{3}$'),
+  subtotal_minor bigint not null check (subtotal_minor >= 0),
+  discount_minor bigint not null check (discount_minor >= 0),
+  taxable_minor bigint not null check (taxable_minor >= 0),
+  cgst_minor bigint not null check (cgst_minor >= 0),
+  sgst_minor bigint not null check (sgst_minor >= 0),
+  igst_minor bigint not null check (igst_minor >= 0),
+  tax_minor bigint not null check (tax_minor >= 0),
+  round_off_minor bigint not null check (round_off_minor between -99 and 99),
+  total_minor bigint not null check (total_minor > 0),
+  created_at timestamptz not null default now(),
+  unique (org_id, id),
+  unique (org_id, number),
+  unique (org_id, fiscal_year, seq),
+  foreign key (org_id, invoice_id) references public.invoices (org_id, id) on delete restrict
+);
+
+comment on table public.credit_notes is
+  'A credit note: takes back all or part of an issued bill, counted in the month it is made. Written only by issue_credit_note(); never changed.';
+comment on column public.credit_notes.invoice_id is 'The bill it takes back from. Its buyer, seller and tax details are the bill''s.';
+comment on column public.credit_notes.number is 'Printed number, CN/YY-YY/NNNN. Consecutive within a financial year, its own series, never reused.';
+comment on column public.credit_notes.issued_on is 'Credit note date: the kennel''s local date when it was made. Tax reports count it in this month.';
+comment on column public.credit_notes.reason is 'Why the bill is being taken back, such as "Went home two nights early".';
+comment on column public.credit_notes.total_minor is 'What is taken off the bill: taxable + tax + round off.';
+
+create index credit_notes_org_invoice_idx on public.credit_notes (org_id, invoice_id);
+create index credit_notes_org_issued_idx on public.credit_notes (org_id, issued_on desc);
+
+create table public.credit_note_lines (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  credit_note_id uuid not null,
+  sort_order integer not null default 0,
+  description text not null check (char_length(description) between 1 and 300),
+  sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
+  quantity numeric(10, 2) not null check (quantity > 0),
+  unit_price_minor bigint not null check (unit_price_minor >= 0),
+  discount_minor bigint not null check (discount_minor >= 0),
+  taxable_minor bigint not null check (taxable_minor >= 0),
+  tax_rate_bp integer not null check (tax_rate_bp between 0 and 10000),
+  cgst_minor bigint not null check (cgst_minor >= 0),
+  sgst_minor bigint not null check (sgst_minor >= 0),
+  igst_minor bigint not null check (igst_minor >= 0),
+  tax_minor bigint not null check (tax_minor >= 0),
+  total_minor bigint not null check (total_minor >= 0),
+  foreign key (org_id, credit_note_id) references public.credit_notes (org_id, id) on delete cascade
+);
+
+comment on table public.credit_note_lines is 'The lines of a credit note: what is taken back, with its tax worked out as on the bill.';
+
+create index credit_note_lines_note_idx on public.credit_note_lines (org_id, credit_note_id, sort_order);
+
+-- The kennel's own date today.
+create function public.org_today(p_org uuid)
+returns date
+language sql
+stable
+set search_path = ''
+as $$
+  select (now() at time zone o.time_zone)::date from public.organizations o where o.id = p_org;
+$$;
+comment on function public.org_today(uuid) is 'Today''s date in the kennel''s time zone.';
+
+create function public.issue_credit_note(p_invoice uuid, p_reason text, p_totals jsonb, p_lines jsonb)
+returns public.credit_notes
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_inv public.invoices;
+  v_org public.organizations;
+  v_mode public.tax_mode;
+  v_intra boolean;
+  v_line jsonb;
+  v_sum record;
+  v_before record;
+  v_exact bigint;
+  v_round_off bigint;
+  v_fy text;
+  v_seq integer;
+  v_note public.credit_notes;
+  v_today date;
+  v_i integer := 0;
+begin
+  -- SECURITY DEFINER: credit notes and the counter have no write grants, so
+  -- nobody can make or change one but here. Who may is checked here: an owner
+  -- or manager of the bill's kennel.
+  select * into v_inv from public.invoices i where i.id = p_invoice for update;
+  if v_inv.id is null or v_inv.org_id not in (select public.my_org_ids()) then
+    raise exception 'WB003: invoice not found' using errcode = 'P0002';
+  end if;
+  if v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])) then
+    raise exception 'WB002: only an owner or manager can make a credit note' using errcode = '42501';
+  end if;
+  if v_inv.status <> 'issued' then
+    raise exception 'WB090: a credit note is made against an issued bill' using errcode = '23514';
+  end if;
+  if coalesce(btrim(p_reason), '') = '' or char_length(btrim(p_reason)) > 500 then
+    raise exception 'WB091: say why the bill is being credited, in under 500 characters' using errcode = '23514';
+  end if;
+  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 or jsonb_array_length(p_lines) > 200 then
+    raise exception 'WB094: a credit note needs at least one line' using errcode = '23514';
+  end if;
+
+  select * into v_org from public.organizations o where o.id = v_inv.org_id;
+  -- The bill's own tax treatment, as frozen on it when it was issued.
+  v_mode := case when v_inv.is_tax_invoice then (v_inv.seller ->> 'tax_mode')::public.tax_mode else 'none' end;
+  v_intra := v_inv.place_of_supply_state_code is not distinct from (v_inv.seller ->> 'gst_state_code');
+  v_today := public.org_today(v_inv.org_id);
+  v_fy := public.fiscal_year_label(v_today, v_org.fiscal_year_start_month);
+
+  -- Every line checked as a bill's line is, and at a tax rate the bill charged.
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    if not exists (select 1 from public.invoice_lines l
+                   where l.invoice_id = v_inv.id and l.tax_rate_bp = (v_line ->> 'tax_rate_bp')::integer) then
+      raise exception 'WB093: a credit note line must use a tax rate that is on the bill' using errcode = '23514';
+    end if;
+    perform public.check_bill_line(v_mode, v_intra, v_inv.prices_include_tax,
+      (v_line ->> 'quantity')::numeric, (v_line ->> 'unit_price_minor')::bigint, (v_line ->> 'discount_minor')::bigint,
+      (v_line ->> 'taxable_minor')::bigint, (v_line ->> 'tax_rate_bp')::integer, (v_line ->> 'cgst_minor')::bigint,
+      (v_line ->> 'sgst_minor')::bigint, (v_line ->> 'igst_minor')::bigint, (v_line ->> 'tax_minor')::bigint);
+  end loop;
+
+  select
+    coalesce(sum(round((x ->> 'quantity')::numeric * (x ->> 'unit_price_minor')::bigint)), 0)::bigint as subtotal,
+    coalesce(sum((x ->> 'discount_minor')::bigint), 0)::bigint as discount,
+    coalesce(sum((x ->> 'taxable_minor')::bigint), 0)::bigint as taxable,
+    coalesce(sum((x ->> 'cgst_minor')::bigint), 0)::bigint as cgst,
+    coalesce(sum((x ->> 'sgst_minor')::bigint), 0)::bigint as sgst,
+    coalesce(sum((x ->> 'igst_minor')::bigint), 0)::bigint as igst,
+    coalesce(sum((x ->> 'tax_minor')::bigint), 0)::bigint as tax
+  into v_sum
+  from jsonb_array_elements(p_lines) x;
+
+  v_exact := v_sum.taxable + v_sum.tax;
+  v_round_off := coalesce((p_totals ->> 'round_off_minor')::bigint, 0);
+  if v_sum.taxable <> (p_totals ->> 'taxable_minor')::bigint
+     or v_sum.tax <> (p_totals ->> 'tax_minor')::bigint
+     or v_sum.cgst <> (p_totals ->> 'cgst_minor')::bigint
+     or v_sum.sgst <> (p_totals ->> 'sgst_minor')::bigint
+     or v_sum.igst <> (p_totals ->> 'igst_minor')::bigint
+     or v_sum.discount <> (p_totals ->> 'discount_minor')::bigint
+     or (p_totals ->> 'total_minor')::bigint <> v_exact + v_round_off
+     -- Round off is nothing, or exactly the rounding to a whole unit.
+     or (v_round_off <> 0 and v_round_off <> round(v_exact / 100.0) * 100 - v_exact)
+  then
+    raise exception 'WB037: credit note totals do not match its lines' using errcode = '23514';
+  end if;
+
+  -- Never more than is left on the bill, in all or in what was taxed.
+  select coalesce(sum(cn.total_minor), 0)::bigint as total, coalesce(sum(cn.taxable_minor), 0)::bigint as taxable
+  into v_before
+  from public.credit_notes cn
+  where cn.org_id = v_inv.org_id and cn.invoice_id = v_inv.id;
+  if v_before.total + v_exact + v_round_off > v_inv.total_minor or v_before.taxable + v_sum.taxable > v_inv.taxable_minor then
+    raise exception 'WB092: a credit note cannot take back more than is left on the bill' using errcode = '23514';
+  end if;
+
+  -- Take the next number in the kennel's credit note series for the year.
+  insert into public.invoice_counters as c (org_id, series, fiscal_year, last_seq)
+  values (v_inv.org_id, 'credit_note', v_fy, 1)
+  on conflict (org_id, series, fiscal_year) do update set last_seq = c.last_seq + 1
+  returning c.last_seq into v_seq;
+
+  insert into public.credit_notes (
+    org_id, invoice_id, number, fiscal_year, seq, issued_on, issued_by, reason, currency,
+    subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor)
+  values (
+    v_inv.org_id, v_inv.id,
+    'CN/' || case when v_fy ~ '^[0-9]{4}-[0-9]{2}$' then substr(v_fy, 3) else v_fy end
+      || '/' || case when v_seq < 10000 then lpad(v_seq::text, 4, '0') else v_seq::text end,
+    v_fy, v_seq, v_today, (select auth.uid()), btrim(p_reason), v_inv.currency,
+    v_sum.subtotal, v_sum.discount, v_sum.taxable, v_sum.cgst, v_sum.sgst, v_sum.igst, v_sum.tax, v_round_off, v_exact + v_round_off)
+  returning * into v_note;
+
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    insert into public.credit_note_lines (
+      org_id, credit_note_id, sort_order, description, sac_code, quantity, unit_price_minor, discount_minor,
+      taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor)
+    values (
+      v_inv.org_id, v_note.id, v_i, left(btrim(v_line ->> 'description'), 300), nullif(v_line ->> 'sac_code', ''),
+      (v_line ->> 'quantity')::numeric, (v_line ->> 'unit_price_minor')::bigint, (v_line ->> 'discount_minor')::bigint,
+      (v_line ->> 'taxable_minor')::bigint, (v_line ->> 'tax_rate_bp')::integer, (v_line ->> 'cgst_minor')::bigint,
+      (v_line ->> 'sgst_minor')::bigint, (v_line ->> 'igst_minor')::bigint, (v_line ->> 'tax_minor')::bigint,
+      (v_line ->> 'taxable_minor')::bigint + (v_line ->> 'tax_minor')::bigint);
+    v_i := v_i + 1;
+  end loop;
+
+  return v_note;
+end;
+$$;
+comment on function public.issue_credit_note(uuid, text, jsonb, jsonb) is
+  'Makes a credit note against an issued bill: checks every line as issue_invoice does, under the bill''s own tax treatment and at a rate the bill charged (WB093), and that the bill is not credited beyond its total (WB092); gives the next CN/YY-YY/NNNN number for the year. Owner or manager. A reason is required (WB091).';
 
 -- ---------------------------------------------------------------------------
 -- Payments and expenses
@@ -772,15 +1248,22 @@ select
   i.number,
   i.total_minor,
   coalesce(p.paid_minor, 0)::bigint as paid_minor,
-  (case when i.status = 'issued' then i.total_minor - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor
+  coalesce(c.credited_minor, 0)::bigint as credited_minor,
+  (case when i.status = 'issued' then i.total_minor - coalesce(c.credited_minor, 0) - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor
 from public.invoices i
 left join lateral (
   select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end) as paid_minor
   from public.payments pay
   where pay.invoice_id = i.id
-) p on true;
+) p on true
+left join lateral (
+  select sum(cn.total_minor) as credited_minor
+  from public.credit_notes cn
+  where cn.org_id = i.org_id and cn.invoice_id = i.id
+) c on true;
 
-comment on view public.invoice_balances is 'Each invoice with what has been paid against it and what is still due.';
+comment on view public.invoice_balances is
+  'Each invoice with what has been paid against it, what credit notes took off it, and what is still due (below zero: paid more than it now comes to, so a refund is owed).';
 
 -- ---------------------------------------------------------------------------
 -- Merging two parents who turn out to be the same person.
@@ -818,6 +1301,8 @@ begin
   -- Anything else that names the parent.
   update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
   update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
+  -- Day boarding packs go with the parent, and so do the days paid from them.
+  update public.passes ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
   perform set_config('wagbook.merging', 'off', true);
   -- Play sessions copy their parent from the booking whenever they are written.
   update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;

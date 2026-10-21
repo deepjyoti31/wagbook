@@ -51,9 +51,14 @@ alter table public.play_yards enable row level security;
 alter table public.play_sessions enable row level security;
 alter table public.stay_updates enable row level security;
 alter table public.incidents enable row level security;
+alter table public.reminders_sent enable row level security;
+alter table public.day_packs enable row level security;
+alter table public.passes enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_lines enable row level security;
 alter table public.invoice_counters enable row level security;
+alter table public.credit_notes enable row level security;
+alter table public.credit_note_lines enable row level security;
 alter table public.payments enable row level security;
 alter table public.expenses enable row level security;
 alter table public.intake_submissions enable row level security;
@@ -152,21 +157,21 @@ $$;
 -- stamp_actor, give their own answer.)
 revoke insert, update on public.clients from authenticated;
 grant insert (org_id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
-              emergency_name, emergency_phone, notes, consent_at, consent_source, created_by, deleted_at)
+              emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, created_by, deleted_at)
   on public.clients to authenticated;
 grant update (org_id, created_by, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id,
-              emergency_name, emergency_phone, notes, consent_at, consent_source, deleted_at)
+              emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, deleted_at)
   on public.clients to authenticated;
 
 -- Bookings: the "who and when" stamps, the creator and the secret link token
 -- are written only by the database, so they are not in the list of columns a
 -- client may send.
 revoke insert, update on public.bookings from authenticated;
-grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
+grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
+              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
   on public.bookings to authenticated;
-grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, discount_minor,
-              tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
+grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
+              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
               vaccinations_checked_at, notes, group_id)
   on public.bookings to authenticated;
 -- Who may change a price is decided by a trigger, not here: owners, managers
@@ -179,7 +184,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards'] loop
+  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -205,6 +210,29 @@ create policy care_items_insert_for_pet on public.care_items for insert to authe
 create policy care_items_update_for_pet on public.care_items for update to authenticated
   using (pet_id is not null and org_id in (select public.my_org_ids()))
   with check (pet_id is not null and org_id in (select public.my_org_ids()));
+
+-- Day boarding packs sold to parents: any member reads them (to book a day on
+-- one); owners and managers sell and correct them; owners delete.
+grant select, insert, update, delete on public.passes to authenticated;
+create policy passes_select on public.passes for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy passes_insert on public.passes for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy passes_update on public.passes for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy passes_delete on public.passes for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select on public.pass_balances to authenticated;
+
+-- Reminders sent: any member reads and records one; nobody changes one; owners delete.
+grant select, insert, delete on public.reminders_sent to authenticated;
+create policy reminders_sent_select on public.reminders_sent for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy reminders_sent_insert on public.reminders_sent for insert to authenticated
+  with check (org_id in (select public.my_org_ids()));
+create policy reminders_sent_delete on public.reminders_sent for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
 -- invoices and their lines
@@ -246,8 +274,17 @@ create policy invoice_lines_delete on public.invoice_lines for delete to authent
 
 grant select on public.invoice_balances to authenticated;
 
+-- Credit notes: any member reads them. Nobody writes them but
+-- issue_credit_note(), and nobody changes or deletes one: there are no grants
+-- for it.
+grant select on public.credit_notes, public.credit_note_lines to authenticated;
+create policy credit_notes_select on public.credit_notes for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy credit_note_lines_select on public.credit_note_lines for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+
 -- invoice_counters: row level security is on and there are no policies and no
--- grants, so nobody reaches it except issue_invoice().
+-- grants, so nobody reaches it except issue_invoice() and issue_credit_note().
 
 -- ---------------------------------------------------------------------------
 -- payments: any member records money received and reads; only managers
@@ -358,7 +395,10 @@ grant execute on function public.available_kennels(uuid, public.booking_kind, da
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
+grant execute on function public.issue_credit_note(uuid, text, jsonb, jsonb) to authenticated;
+grant execute on function public.renew_request_link(uuid) to authenticated;
 grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
+grant execute on function public.stay_charges(uuid, uuid[]) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;
@@ -369,3 +409,5 @@ grant execute on function public.get_public_intake_form(text) to anon, authentic
 grant execute on function public.submit_intake(text, jsonb) to anon, authenticated;
 grant execute on function public.get_public_stay(text) to anon, authenticated;
 grant execute on function public.get_public_invoice(text) to anon, authenticated;
+grant execute on function public.get_public_booking_form(text) to anon, authenticated;
+grant execute on function public.submit_booking_request(text, jsonb) to anon, authenticated;

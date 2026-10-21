@@ -171,22 +171,27 @@ describe("a parent's details", () => {
     await as(db, user(k.owner), () => db.query("update public.bookings set status = 'cancelled', cancel_reason = 'Plans changed' where id = $1", [later]));
   });
 
-  it("are erased on request, keeping only the bills and the bare stays", async () => {
+  it("are erased on request, keeping the bills, the bare stays and the pets' own records", async () => {
     const paths = await as(db, user(k.owner), async () => (await db.query<{ p: string[] }>("select public.erase_client($1) as p", [k.client])).rows[0].p);
-    expect(paths).toEqual(expect.arrayContaining([`${k.org}/pets/${k.pets[0]}/profile.jpg`, `${k.org}/vaccinations/v1.pdf`, `${k.org}/updates/u1/1.small.jpg`]));
+    expect(paths).toEqual(expect.arrayContaining([`${k.org}/vaccinations/v1.pdf`, `${k.org}/updates/u1/1.jpg`, `${k.org}/updates/u1/1.small.jpg`]));
+    // The pet's own photo stays with the pet.
+    expect(paths).not.toContain(`${k.org}/pets/${k.pets[0]}/profile.jpg`);
 
     const c = (await db.query("select * from public.clients where id = $1", [k.client])).rows[0] as Record<string, unknown>;
     expect(c).toMatchObject({ full_name: "Erased", phone: "", email: null, address: null, notes: null, consent_at: null });
     expect(c.erased_at).not.toBeNull();
     expect(c.deleted_at).not.toBeNull();
 
+    // The pets keep their details, health, routines and incidents, hidden from lists (D30).
     const pet = (await db.query("select * from public.pets where id = $1", [k.pets[0]])).rows[0] as Record<string, unknown>;
-    expect(pet).toMatchObject({ name: "Erased", breed: null, medical_notes: null, photo_path: null });
-
-    for (const table of ["vaccinations", "stay_updates", "incidents", "care_tasks"]) {
-      const n = (await db.query<{ n: string }>(`select count(*) as n from public.${table} where org_id = $1`, [k.org])).rows[0].n;
-      expect(Number(n), table).toBe(0);
-    }
+    expect(pet).toMatchObject({ breed: "Indie", medical_notes: "Allergic to chicken", photo_path: `${k.org}/pets/${k.pets[0]}/profile.jpg` });
+    expect(pet.name).not.toBe("Erased");
+    expect(pet.deleted_at).not.toBeNull();
+    const vaccination = (await db.query("select vaccine, certificate_path from public.vaccinations where pet_id = $1", [k.pets[0]])).rows;
+    expect(vaccination).toEqual([{ vaccine: "rabies", certificate_path: null }]);
+    const incident = (await db.query<{ description: string }>("select description from public.incidents where pet_id = $1", [k.pets[0]])).rows;
+    expect(incident.map((i) => i.description)).toEqual(["Scratched paw near the gate"]);
+    expect(Number((await db.query<{ n: string }>("select count(*) as n from public.stay_updates where org_id = $1", [k.org])).rows[0].n)).toBe(0);
     const stay = (await db.query("select start_date, end_date, rate_minor, belongings, notes, cancel_reason from public.bookings where id = $1", [pastStay])).rows[0] as Record<string, unknown>;
     expect(stay).toMatchObject({ belongings: null, notes: null, rate_minor: 120000 });
 
@@ -198,7 +203,7 @@ describe("a parent's details", () => {
 
     // No personal text is left in the history of changes, and the erasure is in it.
     const history = JSON.stringify((await db.query("select old_data, new_data from public.audit_log where org_id = $1", [k.org])).rows);
-    for (const secret of ["Blue blanket", "Gate code 4411", "Scratched paw", "Plans changed"]) expect(history).not.toContain(secret);
+    for (const secret of ["Blue blanket", "Gate code 4411", "Plans changed"]) expect(history).not.toContain(secret);
     expect(Number((await db.query<{ n: string }>("select count(*) as n from public.audit_log where table_name = 'clients' and row_id = $1", [k.client])).rows[0].n)).toBe(1);
 
     expect((await errorOf(() => as(db, user(k.owner), () => db.query("select public.erase_client($1)", [k.client])))).message).toContain("WB073");

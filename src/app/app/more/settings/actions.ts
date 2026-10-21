@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/auth";
-import { gstinStateCode, isGstStateCode, isValidGstin, isValidInvoicePrefix, isValidVpa, normalizePhone, parseMoney } from "@/lib/core";
+import { gstinStateCode, isGstStateCode, isSacCode, isValidGstin, isValidInvoicePrefix, isValidVpa, normalizePhone, parseMoney, parseRatePercent } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { isLanguage } from "@/lib/i18n";
@@ -13,9 +13,11 @@ import { createClient } from "@/lib/supabase/server";
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /**
- * Set the usual price for boarding or day boarding on the rate card, and the
+ * Set the usual price for boarding or day boarding on the rate card, the
  * shared kennel price for a second pet of the same parent in one kennel (an
- * empty box there means no shared price: the second pet pays the usual price).
+ * empty box there means no shared price: the second pet pays the usual price),
+ * and the kennel's own tax rate and service code for it (D35; an empty rate
+ * means the usual rate).
  */
 async function saveDefaultPrice(
   supabase: Supabase,
@@ -23,13 +25,14 @@ async function saveDefaultPrice(
   kind: "boarding" | "daycare",
   priceMinor: number | null,
   sharedMinor: number | null,
+  tax: { tax_rate_bp: number | null; sac_code: string | null },
   name: string,
 ) {
   const existing = await supabase.from("services").select("id").eq("org_id", orgId).eq("kind", kind).eq("is_default", true).eq("is_active", true).maybeSingle();
   if (existing.error) return existing.error;
   if (existing.data) {
     // An empty usual price leaves the current one alone.
-    const change = priceMinor === null ? { shared_price_minor: sharedMinor } : { price_minor: priceMinor, shared_price_minor: sharedMinor };
+    const change = priceMinor === null ? { shared_price_minor: sharedMinor, ...tax } : { price_minor: priceMinor, shared_price_minor: sharedMinor, ...tax };
     return (await supabase.from("services").update(change).eq("org_id", orgId).eq("id", existing.data.id)).error;
   }
   if (priceMinor === null) return null;
@@ -42,6 +45,7 @@ async function saveDefaultPrice(
       unit: kind === "boarding" ? "night" : "day",
       price_minor: priceMinor,
       shared_price_minor: sharedMinor,
+      ...tax,
       is_default: true,
     })
   ).error;
@@ -99,6 +103,19 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     }
   }
 
+  // The kennel's own rate and code for each kind of stay. Wagbook does not choose them.
+  const stayTax: Record<"boarding" | "daycare", { tax_rate_bp: number | null; sac_code: string | null }> = {
+    boarding: { tax_rate_bp: null, sac_code: null },
+    daycare: { tax_rate_bp: null, sac_code: null },
+  };
+  for (const kind of ["boarding", "daycare"] as const) {
+    const rate = parseRatePercent(text(form, `tax_rate_${kind}`));
+    if (rate === undefined) return { error: e.taxRate };
+    const sac = text(form, `sac_${kind}`);
+    if (sac !== null && !isSacCode(sac)) return { error: e.sac };
+    stayTax[kind] = { tax_rate_bp: rate, sac_code: sac };
+  }
+
   const timeZone = text(form, "time_zone") ?? org.time_zone;
   const currency = (text(form, "currency") ?? org.currency).toUpperCase();
   const locale = text(form, "locale") ?? org.locale;
@@ -141,6 +158,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     prices_include_tax: checked(form, "prices_include_tax"),
     invoice_prefix: prefix,
     intake_enabled: checked(form, "intake_enabled"),
+    requests_enabled: checked(form, "requests_enabled"),
     intake_notice: text(form, "intake_notice"),
     parent_language: parentLanguage,
   };
@@ -151,7 +169,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   if (data.length === 0) return { error: t.m.settings.onlyManagers };
 
   for (const kind of ["boarding", "daycare"] as const) {
-    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], shared[kind], t.m.labels.bookingKind[kind]);
+    const priceError = await saveDefaultPrice(supabase, org.id, kind, prices[kind], shared[kind], stayTax[kind], t.m.labels.bookingKind[kind]);
     if (priceError) return { error: friendlyError(priceError, t) };
   }
 

@@ -6,11 +6,16 @@ import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
-import { addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, sharedWith, todayIn, vaccinationWarnings, whatsappLink } from "@/lib/core";
+import {
+  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, remindersToSend, sharedWith, todayIn, UNPAID_REMINDER_DAYS,
+  VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink,
+} from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
-import { appTitle, getAppI18n, type I18n } from "@/lib/i18n-server";
+import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
+import { ReminderLink } from "@/components/reminder-link";
+import { siteOrigin } from "@/lib/site";
 import { bookingCards, familyHolds, type BookingCard } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
@@ -43,7 +48,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const generated = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: today });
   if (generated.error) console.error("generate_care_tasks failed", generated.error.message);
 
-  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes] = await Promise.all([
+  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes, upcomingRes, oldBillsRes, origin, requestsRes] = await Promise.all([
     // Confirmed and due today or earlier: includes anyone who was expected yesterday and has not turned up.
     bookingCards(supabase, org.id).eq("status", "confirmed").lte("start_date", today).order("start_date"),
     bookingCards(supabase, org.id).eq("status", "checked_in").order("end_date"),
@@ -59,6 +64,19 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       .in("severity", ["medium", "high"])
       .order("occurred_at", { ascending: false })
       .limit(20),
+    // For reminders: stays starting within a week, and bills old enough to remind about.
+    bookingCards(supabase, org.id).eq("status", "confirmed").gt("start_date", today).lte("start_date", addDays(today, VACCINATION_REMINDER_DAYS)).order("start_date").limit(100),
+    supabase
+      .from("invoices")
+      .select("id, number, issued_on, public_token, clients(full_name, phone)")
+      .eq("org_id", org.id)
+      .eq("status", "issued")
+      .lte("issued_on", addDays(today, -UNPAID_REMINDER_DAYS))
+      .order("issued_on")
+      .limit(200),
+    siteOrigin(),
+    // Stays parents asked for through their booking link, still waiting for an answer.
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "requested").eq("source", "parent").gte("end_date", today),
   ]);
   if (arrivalsRes.error || inHouseRes.error) throw new Error("Could not load today's bookings.");
 
@@ -74,6 +92,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const vaccineWarnings = new Map(
     arrivals.map((b) => [b.id, vaccinationWarnings(vaccinations.filter((v) => v.pet_id === b.pets?.id), { startDate: b.start_date, endDate: b.end_date })]),
   );
+  const reminders = await todaysReminders(supabase, org, today, origin, upcomingRes.data ?? [], inHouse, oldBillsRes.data ?? []);
   const capacity = kennelsRes.count ?? 0;
   const newForms = intakeRes.count ?? 0;
   // Done out of what is owed: a task skipped on purpose is no longer owed.
@@ -149,6 +168,15 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </p>
       ) : null}
 
+      {(requestsRes.count ?? 0) > 0 ? (
+        <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
+          {plural(language, requestsRes.count ?? 0, m.today.parentRequests)}{" "}
+          <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
+            {m.today.seeRequests}
+          </Link>
+        </p>
+      ) : null}
+
       {care.length > 0 ? (
         <div className="mb-7 flex flex-wrap gap-2">
           {care.map((c) => (
@@ -181,6 +209,23 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
               </li>
             ))}
           </ul>
+        </Section>
+      ) : null}
+
+      {reminders.length > 0 ? (
+        <Section title={m.today.toSend} count={reminders.length}>
+          <p className="mb-3 text-sm text-slate">{m.today.toSendAbout}</p>
+          <Ledger>
+            {reminders.slice(0, 20).map((r) => (
+              <LedgerRow key={`${r.kind}-${r.subjectId}`}>
+                <span className="min-w-0 flex-1">
+                  <span className="font-bold">{r.about}</span> <Badge tone={r.kind === "unpaid" || r.kind === "vaccination" ? "attention" : "neutral"}>{m.today.reminderKinds[r.kind]}</Badge>
+                  <span className="block text-sm text-slate">{r.parentName}</span>
+                </span>
+                <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} />
+              </LedgerRow>
+            ))}
+          </Ledger>
         </Section>
       ) : null}
 
@@ -359,5 +404,66 @@ function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I1
       </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * The reminders due today (src/lib/core/reminders.ts), in the language the
+ * kennel uses for parents: vaccination cards, see you tomorrow, going home
+ * tomorrow, and unpaid bills.
+ */
+async function todaysReminders(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  org: { id: string; name: string; parent_language: string; locale: string; currency: string; check_in_time: string; check_out_time: string },
+  today: string,
+  origin: string,
+  upcoming: BookingCard[],
+  inHouse: BookingCard[],
+  oldBills: { id: string; number: string | null; issued_on: string | null; public_token: string; clients: { full_name: string; phone: string } | null }[],
+) {
+  const ids = [...upcoming.map((b) => b.id), ...inHouse.map((b) => b.id), ...oldBills.map((b) => b.id)];
+  const [vaccinations, balances, sent] = await Promise.all([
+    upcoming.length > 0
+      ? supabase.from("vaccinations").select("pet_id, vaccine, valid_until").eq("org_id", org.id).in("pet_id", upcoming.map((b) => b.pets?.id ?? ""))
+      : Promise.resolve({ data: [] }),
+    oldBills.length > 0
+      ? supabase.from("invoice_balances").select("invoice_id, due_minor").eq("org_id", org.id).in("invoice_id", oldBills.map((b) => b.id)).gt("due_minor", 0)
+      : Promise.resolve({ data: [] }),
+    ids.length > 0 ? supabase.from("reminders_sent").select("kind, subject_id, sent_on").eq("org_id", org.id).in("subject_id", ids) : Promise.resolve({ data: [] }),
+  ]);
+  const due = new Map((balances.data ?? []).map((b) => [b.invoice_id, b.due_minor ?? 0]));
+  const stay = (b: BookingCard) => ({
+    id: b.id,
+    petName: b.pets?.name ?? "",
+    parentName: b.clients?.full_name ?? "",
+    phone: b.clients?.phone ?? "",
+    startDate: b.start_date,
+    endDate: b.end_date,
+  });
+  const p = parentI18n(org.parent_language, org.locale);
+  return remindersToSend(
+    p.m.whatsapp.reminders,
+    {
+      today,
+      kennelName: org.name,
+      dropOff: org.check_in_time,
+      pickUp: org.check_out_time,
+      currency: org.currency,
+      upcoming: upcoming.filter((b) => b.clients).map((b) => ({ ...stay(b), vaccinations: (vaccinations.data ?? []).filter((v) => v.pet_id === b.pets?.id) })),
+      inHouse: inHouse.filter((b) => b.clients).map(stay),
+      unpaid: oldBills
+        .filter((b) => b.clients && b.number && b.issued_on && due.has(b.id))
+        .map((b) => ({
+          id: b.id,
+          number: b.number as string,
+          parentName: b.clients?.full_name ?? "",
+          phone: b.clients?.phone ?? "",
+          issuedOn: b.issued_on as string,
+          dueMinor: due.get(b.id) ?? 0,
+          url: `${origin}/inv/${b.public_token}`,
+        })),
+      sent: (sent.data ?? []).map((x) => ({ kind: x.kind, subjectId: x.subject_id, sentOn: x.sent_on })),
+    },
+    p.locale,
   );
 }

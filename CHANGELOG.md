@@ -28,6 +28,18 @@ The first release will be 0.1.0. Everything below is in it.
 - The intake form parents fill in themselves, now with a vaccination certificate per pet.
 - A parent's details: download everything held about them, and erase it on request, keeping only what tax law needs.
 - Two-step sign-in with an authenticator app, enforced by the database.
+- Bills say what really happened: a sibling who leaves early pays for their own nights, and a stay that turns from day
+  boarding into boarding charges day prices for the days and night prices for the nights. Bills are in English, with
+  the parent's language in brackets when they ask for it.
+- Only an owner or manager can change a parent's phone number. Erasing a parent's details keeps their pets' records.
+- Credit notes for a bill already sent, numbered in their own series, and the kennel's own tax rate and service code
+  on each price.
+- Reminders to send on Today (vaccinations due, arrivals, pick-ups, unpaid bills), each one tap to WhatsApp.
+- Each parent gets a booking link to ask for a stay for their own pets. Requests wait on Today until someone confirms
+  them, and the kennel can turn the link off.
+- Day boarding regulars: days that repeat each week, and packs of days bought up front that a day is paid from.
+- GSTR-1 files for the month (b2b, b2cl, b2cs, credit notes, HSN and documents) for a GST-registered kennel to hand
+  its accountant.
 
 ### For whoever runs it
 

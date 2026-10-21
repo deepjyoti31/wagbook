@@ -7,7 +7,7 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly six things, and can read no table.
+2. Someone who is not signed in can do exactly eight things, and can read no table.
 3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
 5. An issued invoice cannot be changed by anyone, including owners.
@@ -41,7 +41,7 @@ In summary (deleting anything is for owners, D29):
 
 | Data | Staff | Manager | Owner |
 | --- | --- | --- | --- |
-| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete) | Same as staff | Also delete |
+| Clients, pets, vaccinations, bookings, booking items, care tasks, play sessions, updates, incidents | Read, add, edit (editing includes hiding a parent or pet by soft delete), but not a parent's own phone numbers (`WB002`, D33) | Also a parent's phone numbers | Also delete |
 | The price of a booking or an extra | Book at price list prices only; no discount; no changes afterwards (D15) | Set and change anything | Same |
 | A pet's own care routine | Read, add, edit | Same as staff | Also delete |
 | House routines, kennels, rate card, peak periods, play yards | Read | Add, edit | Also delete |
@@ -49,12 +49,13 @@ In summary (deleting anything is for owners, D29):
 | Draft invoices and their lines | Read, add, edit; remove lines from a draft | Same as staff | Also delete whole drafts |
 | Issue an invoice | Only one whose lines are exactly what its booking says (`WB050`) | Any draft | Same |
 | Files (photos, certificates) | Add; never replace or remove | Also replace | Also remove |
-| Void an invoice | No | Yes, with a reason | Yes |
+| Void an invoice | No | Yes, with a reason; a tax invoice only in its own month (`WB095`) | Yes |
+| Credit notes | Read | Make one, with a reason (`issue_credit_note`); nobody changes or deletes one | Same |
 | Payments received | Read, add | Also refunds and corrections | Also removal |
 | Expenses, and their receipt files | Nothing | Read, add, edit | Also delete (with the receipt file) |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
 | Forms from parents | Read; accept or decline, once | Same as staff | Also delete |
-| A parent's details: download everything, erase on request | No (`WB070`) | Yes (`export_client`, `erase_client`) | Same |
+| A parent's details: download everything, erase on request | No (`WB070`) | Download (`export_client`) | Also erase (`erase_client`, `WB074`, D29) |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
 | Audit log (History of changes) | Nothing | Read | Read |
@@ -66,7 +67,7 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Six functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+Eight functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
 is changed on purpose.
 
 | Function | Returns | Guard |
@@ -75,6 +76,8 @@ is changed on purpose.
 | `submit_intake(slug, payload)` | The folder for this form's certificates and its upload secret | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
+| `get_public_booking_form(token)` | A known parent's own booking link: kennel name, WhatsApp number and usual times, the parent's first name, their pets' names, the kinds of stay they can ask for, and their stays already asked for or booked (dates and status) | 64 character secret per parent (`clients.request_token`); nothing for a hidden or erased parent; no prices, notes or other parents |
+| `submit_booking_request(token, payload)` | How many pets were asked for | Same secret; refused when the kennel turns requests off (`WB100`); only the parent's own listed pets (`WB102`); dates from today to a year ahead, 90 days at most (`WB103`); a usual price must exist (`WB104`); 12 requested pets a day at most (`WB105`); size cap. Makes bookings with status `requested`, which hold no kennel |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
 | `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
 
@@ -85,6 +88,13 @@ of the kennel (the folder is the kennel's own). The bucket keeps its limits: 10 
 photo into a JPEG without its hidden data first; someone calling Storage directly could send a file as it is, which
 only staff ever open, from Supabase's address rather than Wagbook's. Worst case for a kennel that is flooded: 60
 waiting forms an hour (`WB048`), six files each.
+
+**Booking requests from parents (milestone M17).** A known parent gets a link of their own from the kennel (Copy or
+Send on the parent page). Behind it, the parent sees their pets' names and the dates of their own stays, and can ask
+for a stay. Each pet asked for becomes a booking with status `requested` at the kennel's usual price. A request holds
+no kennel, so a forwarded or leaked link cannot take space from anyone: at worst it adds requests that staff decline.
+Staff renew the link (`renew_request_link`, any member), and the old one stops working; the token is not writable
+through the API. Erasing the parent clears it. The app limits posts to the page per address, like the intake form.
 
 **Photos on the stay page (milestone M5).** A parent has no account, Postgres cannot sign storage links, and the
 service role key is never used. So the stay page asks Storage for signed links as the anonymous role, sending the stay
@@ -178,14 +188,47 @@ What the software does:
 
 - **Gives a parent their details.** On the parent page, owners and managers download everything held about the parent
   as one file (`export_client`).
-- **Erases on request** (`erase_client`, D25). Contact details, consent, notes, pets' details, vaccinations, routines,
-  incidents, updates, care tasks, play, intake forms, draft bills and every file are deleted or emptied, and the
-  personal text that the history of changes had copied is taken out of it. What tax law makes the kennel keep stays:
-  issued and cancelled bills with the buyer printed on them, payments, and the stays' dates and prices. Refused while
-  a pet is in house or a stay is still to come.
+- **Erases on request** (`erase_client`, D25 and D30). The parent's contact details, consent and notes, the notes on
+  their stays, the updates sent to them, their intake forms, draft bills, and the files among those (with vaccination
+  certificates, because a card shows the owner) are deleted or emptied, and the stays' notes that the history of
+  changes had copied are taken out of it. The pets stay, hidden, with their health, routines, incidents, care and
+  play: the kennel's record of the animal (D30). What tax law makes the kennel keep stays: issued and cancelled bills
+  with the buyer printed on them, payments, and the stays' dates and prices. Refused while a pet is in house or a stay
+  is still to come.
 
 What erasing does not reach: backups made before it (they age out on the backup schedule), a duplicate record merged
-into the parent earlier, the description of a bill line or extra (such as "Vet visit for Bruno"), and payment notes.
+into the parent earlier, the description of a bill line or extra (such as "Vet visit for Bruno"), payment notes, and
+anything about the parent typed into a pet's notes or an incident.
+
+### What the law says, as far as we could find
+
+Read on 21 October 2026 from public commentary, not from a lawyer, and not from the official texts themselves (the
+Gazette sites could not be reached from where this was written). Take it to a lawyer before relying on it.
+
+- **When it applies.** The Digital Personal Data Protection Rules, 2025 were notified on 13 or 14 November 2025 (sources
+  differ). Most duties, erasure and retention among them (Rules 3 and 5 to 16), start eighteen months later, around
+  13 May 2027 ([Bar and Bench](https://www.barandbench.com/view-point/meity-notifies-final-digital-personal-data-protection-rules-2025),
+  [Mondaq](https://www.mondaq.com/india/data-protection/1708164/digital-personal-data-protection-rules-2025-notified)).
+- **Erasure.** Section 8(7) of the Act: erase personal data when consent is withdrawn or the purpose is no longer
+  served, unless keeping it is necessary to comply with a law. Section 12(3) gives the person a right to ask for
+  erasure, with the same exception ([DSCI FAQ](https://www.dsci.in/files/content/documents/2025/faq-on-data-retention-and-data-erasure-v2.pdf),
+  [K S and K](https://ksandk.com/data-protection-and-data-privacy/data-retention-deletion-dpdp-act-india/)).
+- **Tax law is such a law.** Section 36 of the CGST Act: a registered business keeps its accounts and records,
+  invoices included, for 72 months from the due date of the annual return for that year
+  ([KnowYourGST](https://www.knowyourgst.com/gstlaw/cgst-act/36-period-of-retention-of-accounts-36/)). So issued bills
+  with the buyer's name stay, as D25 has it. Payments are part of the accounts too.
+- **Deletion after a period with 48 hours' notice** (Rule 8(1) and (2), Third Schedule) is for named classes of large
+  platforms (e-commerce, gaming, social media), not for a kennel.
+- **A question for the lawyer: Rule 8(3).** It asks every Data Fiduciary to keep personal data, the related traffic
+  data and logs of processing for at least one year from the processing, for the purposes in the Seventh Schedule
+  (mostly the State's). Commentators read it differently: some as a duty for every business, which would mean an
+  erasure request must wait, or keep a sealed copy, for a year; some as limited to processing for those purposes
+  ([NALSAR Tech Law Forum](https://techlawforum.nalsar.ac.in/privacy-with-a-footnote-data-retention-under-the-dpdp-framework/),
+  [S.S. Rana](https://ssrana.in/articles/meity-notifies-final-digital-personal-data-protection-rules-2025/)). Wagbook
+  erases at once. If the lawyer says Rule 8(3) applies, erasure needs a year's sealed hold before May 2027.
+- **Pets.** The Act covers data about an individual who can be identified. A pet's record that no longer names its
+  parent is not that, as far as we can tell (D30). The owner's view is that a microchip number is not the parent's
+  personal data either, so it stays with the pet. Free text that mentions the parent is a question for the lawyer.
 
 For a kennel in India, choose Supabase's Mumbai region so the data stays in the country.
 

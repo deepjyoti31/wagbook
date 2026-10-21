@@ -69,6 +69,12 @@ Planned: a confirmation button after booking (M2), updates with photos (M5), the
 - On a desktop the link opens WhatsApp Web or the desktop app, if the kennel is signed in there.
 - Wagbook does not know whether the message was sent. It does not mark anything as "sent".
 
+### Reminders and booking links
+
+Today's **To send** list (D39) builds the reminder messages (vaccination card, see you tomorrow, going home tomorrow,
+unpaid bill) the same way: a click to chat link with the message typed. Tapping Send records it so it leaves the list.
+A parent's booking link (D36) goes out the same way from their page.
+
 ## UPI: pay links and QR codes
 
 ### How it works

@@ -338,3 +338,33 @@ comment on function public.incidents_guard_content() is
 create trigger incidents_guard_content
   before update on public.incidents
   for each row execute function public.incidents_guard_content();
+
+-- ---------------------------------------------------------------------------
+-- Reminders sent to parents
+-- ---------------------------------------------------------------------------
+
+create table public.reminders_sent (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  kind text not null check (kind in ('vaccination', 'arrival', 'pickup', 'unpaid')),
+  -- A booking (vaccination, arrival, pickup) or a bill (unpaid). Not a foreign
+  -- key, because it names rows of two tables; a reminder about a row that is
+  -- gone is simply never matched again.
+  subject_id uuid not null,
+  sent_on date not null,
+  sent_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now()
+);
+
+comment on table public.reminders_sent is
+  'A reminder a person sent a parent from Today, on WhatsApp from their own phone: so it leaves the list. Wagbook sends nothing itself.';
+comment on column public.reminders_sent.kind is
+  'vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed.';
+comment on column public.reminders_sent.subject_id is 'The booking (vaccination, arrival, pickup) or the bill (unpaid) it was about.';
+comment on column public.reminders_sent.sent_on is 'The kennel''s date it was sent. An unpaid bill comes back three days later.';
+
+create index reminders_sent_org_subject_idx on public.reminders_sent (org_id, subject_id, kind);
+
+create trigger reminders_sent_stamp_actor
+  before insert on public.reminders_sent
+  for each row execute function public.stamp_actor('sent_by');
