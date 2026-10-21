@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { parseMoney } from "@/lib/core";
+import { isSacCode, parseMoney, parseRatePercent } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
@@ -11,6 +11,15 @@ import { getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
+
+/** The tax rate and service code typed for an extra (D35), or the sentence saying what is wrong. Empty rate: the usual rate. */
+function extraTax(form: FormData, e: { rate: string; sac: string }): { tax_rate_bp: number | null; sac_code: string | null } | { error: string } {
+  const rate = parseRatePercent(text(form, "rate"));
+  if (rate === undefined) return { error: e.rate };
+  const sac = text(form, "sac");
+  if (sac !== null && !isSacCode(sac)) return { error: e.sac };
+  return { tax_rate_bp: rate, sac_code: sac };
+}
 
 /** Add an extra to the price list: grooming, pick-up and drop, a bath. Owners and managers. */
 export async function addExtraService(_state: FormState, form: FormData): Promise<FormState> {
@@ -24,15 +33,17 @@ export async function addExtraService(_state: FormState, form: FormData): Promis
   const price = parseMoney(text(form, "price") ?? "");
   if (price === null || price < 0) return { error: e.price };
   const unit = form.get("unit") === "hour" ? "hour" : "each";
+  const tax = extraTax(form, e);
+  if ("error" in tax) return tax;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("services").insert({ org_id: org.id, kind: "addon", name, unit, price_minor: price });
+  const { error } = await supabase.from("services").insert({ org_id: org.id, kind: "addon", name, unit, price_minor: price, ...tax });
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
   return { ok: fill(t.m.extras.added, { name }) };
 }
 
-/** Change an extra's price. Bookings that already have it keep the price they were given. */
+/** Change an extra's price, tax rate and code. Bookings that already have it keep what they were given. */
 export async function changeExtraPrice(_state: FormState, form: FormData): Promise<FormState> {
   const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
@@ -42,12 +53,15 @@ export async function changeExtraPrice(_state: FormState, form: FormData): Promi
   if (!id.success) return { error: e.notFound };
   const price = parseMoney(text(form, "price") ?? "");
   if (price === null || price < 0) return { error: e.price };
+  // The rate and code boxes are shown only when the kennel charges tax.
+  const tax = form.has("rate") ? extraTax(form, e) : null;
+  if (tax && "error" in tax) return tax;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("services").update({ price_minor: price }).eq("org_id", org.id).eq("id", id.data).eq("kind", "addon").select("id");
+  const { data, error } = await supabase.from("services").update({ price_minor: price, ...(tax ?? {}) }).eq("org_id", org.id).eq("id", id.data).eq("kind", "addon").select("id");
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: e.notFound };
   revalidatePath("/app", "layout");
-  return { ok: t.m.extras.priceChanged };
+  return { ok: form.has("rate") ? t.m.extras.saved : t.m.extras.priceChanged };
 }
 
 /** Take an extra off the price list. Past bookings that used it are not changed. */

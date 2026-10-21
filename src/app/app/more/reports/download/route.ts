@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       break;
     }
     case "bills": {
-      const [data, balances] = await Promise.all([
+      const [data, balances, notes] = await Promise.all([
         fetchAll((a, b) =>
           supabase
             .from("invoices")
@@ -100,6 +100,18 @@ export async function GET(request: NextRequest) {
             .range(a, b),
         ),
         fetchAll((a, b) => supabase.from("invoice_balances").select("invoice_id, paid_minor, due_minor").eq("org_id", org.id).neq("status", "draft").order("invoice_id").range(a, b)),
+        // Credit notes by their own date, as a return counts them: amounts below zero.
+        fetchAll((a, b) =>
+          supabase
+            .from("credit_notes")
+            .select("number, issued_on, reason, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, invoices(number, buyer, place_of_supply_state_code)")
+            .eq("org_id", org.id)
+            .gte("issued_on", range.from)
+            .lte("issued_on", range.to)
+            .order("issued_on")
+            .order("seq")
+            .range(a, b),
+        ),
       ]);
       const paid = new Map((balances ?? []).map((x) => [x.invoice_id, x]));
       header = [
@@ -120,6 +132,7 @@ export async function GET(request: NextRequest) {
         c.paid,
         c.due,
         c.whyCancelled,
+        c.againstBill,
       ];
       rows =
         data && balances
@@ -144,9 +157,36 @@ export async function GET(request: NextRequest) {
                 money(p?.paid_minor),
                 money(p?.due_minor),
                 r.void_reason,
+                null,
               ];
             })
           : null;
+      if (rows && notes) {
+        const less = (minor: number) => money(-minor);
+        for (const n of notes) {
+          const buyer = (n.invoices?.buyer ?? {}) as { name?: string; phone?: string; tax_id?: string | null };
+          rows.push([
+            n.number,
+            n.issued_on,
+            m.invoice.creditNote,
+            buyer.name,
+            buyer.phone,
+            buyer.tax_id,
+            n.invoices?.place_of_supply_state_code,
+            less(n.taxable_minor),
+            less(n.cgst_minor),
+            less(n.sgst_minor),
+            less(n.igst_minor),
+            less(n.tax_minor),
+            less(n.round_off_minor),
+            less(n.total_minor),
+            null,
+            null,
+            n.reason,
+            n.invoices?.number,
+          ]);
+        }
+      } else rows = null;
       break;
     }
     case "payments": {

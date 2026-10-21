@@ -46,7 +46,7 @@ async function Settings() {
   const s = m.settings;
   const supabase = await createClient();
   const [services, issued] = await Promise.all([
-    supabase.from("services").select("kind, price_minor, shared_price_minor").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
+    supabase.from("services").select("kind, price_minor, shared_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
     supabase.from("invoices").select("id", { count: "exact", head: true }).eq("org_id", org.id).neq("status", "draft"),
   ]);
   if (services.error || issued.error) throw new Error("Could not load prices.");
@@ -56,6 +56,11 @@ async function Settings() {
     const found = services.data.find((x) => x.kind === kind);
     return found ? toDecimalString(found.price_minor).replace(/\.00$/, "") : "";
   };
+  const stayRate = (kind: string) => {
+    const found = services.data.find((x) => x.kind === kind)?.tax_rate_bp;
+    return found == null ? "" : String(found / 100);
+  };
+  const staySac = (kind: string) => services.data.find((x) => x.kind === kind)?.sac_code ?? "";
   const sharedPrice = (kind: string) => {
     const found = services.data.find((x) => x.kind === kind)?.shared_price_minor;
     return found == null ? "" : toDecimalString(found).replace(/\.00$/, "");
@@ -172,6 +177,24 @@ async function Settings() {
             <input type="checkbox" name="prices_include_tax" defaultChecked={org.prices_include_tax} className="mt-1 size-5" />
             <span>{s.tax.includesTax}</span>
           </label>
+          <div className="space-y-2">
+            <p className="font-bold">{s.tax.perStay}</p>
+            <p className="text-sm text-slate">{s.tax.perStayAbout}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={s.tax.rateBoarding}>
+                <Input name="tax_rate_boarding" inputMode="decimal" defaultValue={stayRate("boarding")} />
+              </Field>
+              <Field label={s.tax.sacBoarding} hint={s.tax.sacHint}>
+                <Input name="sac_boarding" inputMode="numeric" maxLength={8} defaultValue={staySac("boarding")} />
+              </Field>
+              <Field label={s.tax.rateDaycare}>
+                <Input name="tax_rate_daycare" inputMode="decimal" defaultValue={stayRate("daycare")} />
+              </Field>
+              <Field label={s.tax.sacDaycare} hint={s.tax.sacHint}>
+                <Input name="sac_daycare" inputMode="numeric" maxLength={8} defaultValue={staySac("daycare")} />
+              </Field>
+            </div>
+          </div>
         </Group>
 
         <Group title={s.region.title} about={s.region.about}>

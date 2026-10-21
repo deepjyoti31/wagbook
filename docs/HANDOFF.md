@@ -2,11 +2,14 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after milestone M14 (the owner's answers).
+Last updated: 21 October 2026, after milestones M14 (the owner's answers) and M15 (credit notes, the kennel's own tax rates).
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M14. The latest (M14, the owner's answers of 21 October 2026): a pet at
+Every milestone on the roadmap is built, M2 to M15. The latest (M15): credit notes take back all or part of an issued
+bill with their own numbers, counted in their own month, and a tax invoice from an earlier month is credited, never
+cancelled (D34); each kennel sets its own tax rate and SAC code for boarding, day boarding and each extra (D35). Before
+that (M14, the owner's answers of 21 October 2026): a pet at
 the shared kennel price pays the usual price for the nights it has the kennel to itself, and day boarding that turns
 into boarding is billed as days and then nights, both priced by the database (`stay_charges`, D32); only owners and
 managers change a parent's phone numbers (D33); erasing a parent keeps their pets' records (D30); bills are in English,
@@ -15,8 +18,8 @@ keeping records and erasure is written up for the accountant and the lawyer (`06
 kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
 owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (215 database tests, 140 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 39 tests). What has still never
+kennel. The database rules are tested in-process (226 database tests, 144 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 40 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
@@ -86,6 +89,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Only owners and managers change a parent's phone or other number (`WB002`); staff still change the rest and add parents | `tests/db/people.test.ts` (the rule removed once to see it fail); end-to-end: staff see no phone box | High |
 | Erasing keeps the pets (details, photo, vaccinations without the card, routines, incidents), deletes updates, forms and certificate files | `tests/db/privacy.test.ts`; end-to-end (the certificate's link stops working) | High |
 | Bills in English; the parent's language in brackets after each heading when asked (`clients.bill_translation`) | `src/lib/bill-words.test.ts`, `tests/db/languages.test.ts`; end-to-end ("Bill (बिल)") | High |
+| Credit notes: part and whole of a bill, own numbers per year, never more than is left (`WB092`), a rate the bill charged (`WB093`), reason (`WB091`), owners and managers only, sums checked (`WB037`), not writable or deletable by anyone, on the parent's bill; an earlier month's tax invoice and a credited bill not cancelled (`WB095`, `WB096`); reports and the money report count them in their own month; prefix `CN` refused | `tests/db/credit-notes.test.ts`; the month rule and the limit each removed once to see the tests fail; `src/lib/billing.test.ts` | High |
+| A credit note made on the bill page, owed shown as paid over, Cancel replaced by a sentence, the parent opens the credit note | End-to-end at 360 pixels | High for the local stack |
+| Tax rate and SAC code per stay and per extra, typed as a percent and 4 to 8 digits | `src/lib/core/tax-input.test.ts`; Settings and Extras looked at in a browser at 360 pixels | Medium: not walked by an end-to-end test |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -121,12 +127,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
 4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
 5. **Ask a person outside the project for a security review.**
-6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, credit notes, the tax by rate report),
-   and **the erasure questions in `05` to a lawyer** (Rule 8(3), pets' free text, microchips). The research in both
-   is a starting point, read from public commentary, not advice.
-7. **If the accountant confirms credit notes are needed** (likely, once GST registered): build them as the next
-   milestone. A bill cancelled after its month's GSTR-1 should stay in that month's tax figure and come off in the
-   month of the credit note; Reports does not do that today (`06`, "What the law says").
+6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, which the kennel can now set itself;
+   quarterly filers and cancelling; the tax by rate figure), and **the erasure questions in `05` to a lawyer** (Rule
+   8(3), pets' free text). The research in both is a starting point, read from public commentary, not advice.
 
 After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
@@ -156,7 +159,7 @@ migration. Add new files."
 
 | Decision | Where | Default taken |
 | --- | --- | --- |
-| Rate and SAC for boarding, day boarding and grooming; whether to build credit notes (after the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md), "What the law says" and the questions | Tax off, prefix `WB`, no credit notes |
+| Rate and SAC for boarding, day boarding and grooming (after the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md), "What the law says" and the questions | Tax off; each kennel sets its own rate and code (D35) |
 | Whether erasure must wait a year under DPDP Rule 8(3) (after the lawyer; the Rule starts around 13 May 2027) | [05-security-and-privacy.md](05-security-and-privacy.md), "What the law says" | Erased at once |
 
 Decided: only owners and managers set or change a price (D15), extended to bills in M4. The licence is AGPL-3.0-or-later
@@ -168,7 +171,8 @@ owners delete anything, with a second tap, and a deleted expense takes its recei
 On 21 October 2026: bills in English, a parent's language in brackets only when they ask (D31); two-step sign-in
 reminded, not forced (D24); erasing a parent keeps the pets' records (D30); only owners and managers change a parent's
 phone numbers (D33); a pet left alone in a shared kennel pays the usual price for those nights, and day boarding that
-turns into boarding is billed as days then nights (D32).
+turns into boarding is billed as days then nights (D32); credit notes (D34); each kennel sets its own GST rate and code
+(D35); a microchip number is not the parent's personal data and stays with the pet.
 
 ## Translations waiting for a native speaker
 
@@ -194,6 +198,9 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 21 October 2026 (M15), also unchecked: credit notes (क्रेडिट नोट, ಕ್ರೆಡಿಟ್ ನೋಟ್ kept close to English) and
+the tax rate and SAC code boxes.
 
 Drafted on 21 October 2026, also unchecked: sharing a kennel and having it to oneself on a bill (केनेल साझा, केनेल में
 अकेले; ಕೆನೆಲ್ ಹಂಚಿಕೊಂಡು, ಕೆನೆಲ್‌ನಲ್ಲಿ ಒಬ್ಬಂಟಿ), Staying overnight (रात को रुकना, ರಾತ್ರಿ ಉಳಿಯುವುದು), the line saying only
@@ -246,13 +253,13 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 - The daily summary is a button the owner presses. Should it be sent by itself each evening (it would need WhatsApp's
   paid Business API, which `07` explains Wagbook does not use)?
 - Reports are for owners and managers only (D20), including how full the kennel was. Should staff see occupancy?
-- Tax by rate counts issued bills by their bill date and leaves cancelled ones out. What we found (`06`) says a bill
-  cancelled after its month's return stays in that month and comes off by credit note in the month it was cancelled.
-  The report is right only for bills cancelled in their own month. For the accountant, then credit notes.
+- A tax invoice can be cancelled only in the month it was issued, which assumes a monthly return. A kennel filing
+  quarterly might cancel within the quarter. For the accountant.
+- Credit notes have no time limit in Wagbook; section 34 lets one reduce tax only until 30 November after the year.
 - "Received less spent" is money in and out in the month, not profit: it ignores what is owed and when bills fall.
 - Erasing a parent keeps their issued bills, payments, the stays' dates and prices, and the pets (D25, D30). What we
   found (`05`) says tax law's 72 months covers the bills; DPDP Rule 8(3) may ask for a year's hold before erasing; free
-  text on pets and microchip numbers may still point at the parent. (For a lawyer.)
+  text on pets may still point at the parent. (For a lawyer.) The owner's view: a microchip number is not personal data.
 - Two-step sign-in has no recovery codes; a lost phone needs an administrator (`10`). Enough for a small kennel?
 - The intake form accepts one certificate per pet. Some parents have two cards (rabies, and the yearly shot).
 - The rate limits are 20 sign-in tries, 10 forms and 20 joins per address per ten minutes. A kennel whose whole team
@@ -260,7 +267,8 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ## Known rough edges in what is built
 
-- No credit notes, and no composition scheme mode (a bill of supply's own words are not printed).
+- No debit notes, and no composition scheme mode (a bill of supply's own words are not printed).
+- The credit note form offers "the whole bill" only while nothing has been credited; after that, an amount.
 
 - Proof photos on care tasks are not built (the unused field was removed in M13).
 - The calendar does not show requests (it says how many there are) and has no drag and drop (by design in M2).
@@ -288,7 +296,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 355 tests, build
+npm run check        # dash check, lint, typecheck, 370 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -298,6 +306,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 21 October 2026. M15: credit notes (bill page, parent's bill, reports, download) and the kennel's own tax rate and
+  SAC code per stay and per extra.
 - 21 October 2026. M14, the owner's answers: stays priced in parts (`stay_charges`: nights alone, day boarding then
   boarding), parents' phone numbers for managers, erasure keeps pets, bills in English with a translation on request,
   and GST and DPDP research for the accountant and lawyer. e2e walk extended to 39 tests.

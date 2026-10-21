@@ -118,7 +118,13 @@ number (numbers follow on, with no gaps, as tax law expects). Send it on WhatsAp
 opens their UPI app with the amount filled in. When the money arrives, **Record payment**. An advance taken at booking
 counts towards the bill.
 
-An issued bill cannot be changed by anyone. If it is wrong, cancel it (with a reason) and make a new one.
+An issued bill cannot be changed by anyone. If it is wrong the same month, cancel it (with a reason) and make a new one.
+To give back all or part of a bill (nights not stayed, a bill from last month), an owner or manager makes a **credit
+note** on the bill page: it gets its own number, the parent sees it on their bill link, and your reports count it in
+the month you made it. If you charge GST, a bill from an earlier month can only be credited, not cancelled.
+
+Your accountant tells you the tax rate and the service code (SAC) for what you sell. Put them in **Settings, Tax and
+invoices** for boarding and day boarding, and on **Extras** for each extra. Wagbook does not choose them for you.
 
 <img src="guide/10-reports.jpg" alt="Reports" width="270">
 

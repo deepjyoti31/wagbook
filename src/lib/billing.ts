@@ -150,3 +150,50 @@ export function taxLabel(m: Messages, mode: Enums<"tax_mode"> | string, label?: 
   if (mode === "simple") return label?.trim() || m.labels.tax;
   return m.labels.tax;
 }
+
+/** What a credit note needs to know of its bill: how tax worked on it when it was issued. */
+export interface CreditableBill {
+  is_tax_invoice: boolean;
+  prices_include_tax: boolean;
+  place_of_supply_state_code: string | null;
+  /** The seller frozen on the bill: its tax mode and state. */
+  seller: { tax_mode?: string | null; gst_state_code?: string | null } | null;
+}
+
+/**
+ * How tax works on a credit note: exactly as on its bill when the bill was
+ * issued, whatever the kennel's settings say now. Must match
+ * issue_credit_note() in the database.
+ */
+export function creditContext(bill: CreditableBill): TaxContext {
+  const mode = bill.is_tax_invoice ? bill.seller?.tax_mode : "none";
+  return {
+    mode: mode === "gst_india" || mode === "simple" ? mode : "none",
+    sellerStateCode: bill.seller?.gst_state_code ?? null,
+    placeOfSupplyStateCode: bill.place_of_supply_state_code ?? bill.seller?.gst_state_code ?? null,
+    pricesIncludeTax: bill.prices_include_tax,
+  };
+}
+
+/**
+ * A credit note for part of a bill: one line of `amountMinor` at one of the
+ * bill's tax rates. The amount is before tax when the bill's prices were, and
+ * including tax when they included it.
+ */
+export function partCredit(
+  bill: CreditableBill,
+  line: { description: string; amountMinor: number; taxRateBp: number; sacCode: string | null },
+  roundToWholeUnit: boolean,
+): InvoiceTotals {
+  return computeInvoice(
+    [{ description: line.description, quantity: 1, unitPriceMinor: line.amountMinor, taxRateBp: line.taxRateBp, sacCode: line.sacCode }],
+    creditContext(bill),
+    { roundToWholeUnit },
+  );
+}
+
+/** The arguments issue_credit_note() takes for the lines and totals of a credit note. */
+export function creditPayload(t: InvoiceTotals) {
+  const { p_totals, p_lines } = draftPayload(t);
+  return { p_totals, p_lines };
+}

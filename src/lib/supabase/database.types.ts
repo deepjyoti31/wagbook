@@ -482,6 +482,162 @@ export type Database = {
           },
         ];
       };
+      credit_note_lines: {
+        Row: {
+          id: string;
+          org_id: string;
+          credit_note_id: string;
+          sort_order: number;
+          description: string;
+          sac_code: string | null;
+          quantity: number;
+          unit_price_minor: number;
+          discount_minor: number;
+          taxable_minor: number;
+          tax_rate_bp: number;
+          cgst_minor: number;
+          sgst_minor: number;
+          igst_minor: number;
+          tax_minor: number;
+          total_minor: number;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          credit_note_id: string;
+          sort_order?: number;
+          description: string;
+          sac_code?: string | null;
+          quantity: number;
+          unit_price_minor: number;
+          discount_minor: number;
+          taxable_minor: number;
+          tax_rate_bp: number;
+          cgst_minor: number;
+          sgst_minor: number;
+          igst_minor: number;
+          tax_minor: number;
+          total_minor: number;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          credit_note_id?: string;
+          sort_order?: number;
+          description?: string;
+          sac_code?: string | null;
+          quantity?: number;
+          unit_price_minor?: number;
+          discount_minor?: number;
+          taxable_minor?: number;
+          tax_rate_bp?: number;
+          cgst_minor?: number;
+          sgst_minor?: number;
+          igst_minor?: number;
+          tax_minor?: number;
+          total_minor?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credit_note_lines_org_id_credit_note_id_fkey";
+            columns: ["org_id", "credit_note_id"];
+            isOneToOne: false;
+            referencedRelation: "credit_notes";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "credit_note_lines_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      credit_notes: {
+        Row: {
+          id: string;
+          org_id: string;
+          invoice_id: string;
+          number: string;
+          fiscal_year: string;
+          seq: number;
+          issued_on: string;
+          issued_by: string | null;
+          reason: string;
+          currency: string;
+          subtotal_minor: number;
+          discount_minor: number;
+          taxable_minor: number;
+          cgst_minor: number;
+          sgst_minor: number;
+          igst_minor: number;
+          tax_minor: number;
+          round_off_minor: number;
+          total_minor: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          invoice_id: string;
+          number: string;
+          fiscal_year: string;
+          seq: number;
+          issued_on: string;
+          issued_by?: string | null;
+          reason: string;
+          currency: string;
+          subtotal_minor: number;
+          discount_minor: number;
+          taxable_minor: number;
+          cgst_minor: number;
+          sgst_minor: number;
+          igst_minor: number;
+          tax_minor: number;
+          round_off_minor: number;
+          total_minor: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          invoice_id?: string;
+          number?: string;
+          fiscal_year?: string;
+          seq?: number;
+          issued_on?: string;
+          issued_by?: string | null;
+          reason?: string;
+          currency?: string;
+          subtotal_minor?: number;
+          discount_minor?: number;
+          taxable_minor?: number;
+          cgst_minor?: number;
+          sgst_minor?: number;
+          igst_minor?: number;
+          tax_minor?: number;
+          round_off_minor?: number;
+          total_minor?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "credit_notes_org_id_invoice_id_fkey";
+            columns: ["org_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       expenses: {
         Row: {
           id: string;
@@ -752,16 +908,19 @@ export type Database = {
       invoice_counters: {
         Row: {
           org_id: string;
+          series: string;
           fiscal_year: string;
           last_seq: number;
         };
         Insert: {
           org_id: string;
+          series?: string;
           fiscal_year: string;
           last_seq?: number;
         };
         Update: {
           org_id?: string;
+          series?: string;
           fiscal_year?: string;
           last_seq?: number;
         };
@@ -864,6 +1023,7 @@ export type Database = {
           issued_on: string | null;
           issued_by: string | null;
           is_tax_invoice: boolean;
+          prices_include_tax: boolean;
           currency: string;
           seller: Json | null;
           buyer: Json | null;
@@ -899,6 +1059,7 @@ export type Database = {
           issued_on?: string | null;
           issued_by?: string | null;
           is_tax_invoice?: boolean;
+          prices_include_tax?: boolean;
           currency?: string;
           seller?: Json | null;
           buyer?: Json | null;
@@ -934,6 +1095,7 @@ export type Database = {
           issued_on?: string | null;
           issued_by?: string | null;
           is_tax_invoice?: boolean;
+          prices_include_tax?: boolean;
           currency?: string;
           seller?: Json | null;
           buyer?: Json | null;
@@ -1733,6 +1895,7 @@ export type Database = {
           number: string | null;
           total_minor: number | null;
           paid_minor: number | null;
+          credited_minor: number | null;
           due_minor: number | null;
         };
         Relationships: [];
@@ -1750,6 +1913,10 @@ export type Database = {
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string; p_client?: string; p_pets?: number };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
+      };
+      check_bill_line: {
+        Args: { p_mode: Database["public"]["Enums"]["tax_mode"]; p_intra: boolean; p_include: boolean; p_quantity: number; p_unit_price_minor: number; p_discount_minor: number; p_taxable_minor: number; p_tax_rate_bp: number; p_cgst_minor: number; p_sgst_minor: number; p_igst_minor: number; p_tax_minor: number };
+        Returns: undefined;
       };
       check_privacy_access: {
         Args: { p_org: string };
@@ -1823,6 +1990,10 @@ export type Database = {
         Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
         Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
       };
+      issue_credit_note: {
+        Args: { p_invoice: string; p_reason: string; p_totals: Json; p_lines: Json };
+        Returns: Database["public"]["Tables"]["credit_notes"]["Row"];
+      };
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
@@ -1851,6 +2022,10 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { day: string; occupied: number; capacity: number; pets: number }[];
       };
+      org_today: {
+        Args: { p_org: string };
+        Returns: string;
+      };
       paths_in_org: {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
@@ -1861,7 +2036,7 @@ export type Database = {
       };
       report_money: {
         Args: { p_org: string; p_from: string; p_to: string };
-        Returns: { month: string; billed_minor: number; tax_minor: number; bills: number; received_minor: number; refunded_minor: number; spent_minor: number }[];
+        Returns: { month: string; billed_minor: number; credited_minor: number; tax_minor: number; bills: number; received_minor: number; refunded_minor: number; spent_minor: number }[];
       };
       report_occupancy: {
         Args: { p_org: string; p_from: string; p_to: string };
@@ -1869,7 +2044,7 @@ export type Database = {
       };
       report_tax: {
         Args: { p_org: string; p_from: string; p_to: string };
-        Returns: { tax_rate_bp: number; bills: number; taxable_minor: number; cgst_minor: number; sgst_minor: number; igst_minor: number; tax_minor: number }[];
+        Returns: { tax_rate_bp: number; bills: number; credit_notes: number; taxable_minor: number; cgst_minor: number; sgst_minor: number; igst_minor: number; tax_minor: number }[];
       };
       respond_to_invitation: {
         Args: { p_org: string; p_accept: boolean };

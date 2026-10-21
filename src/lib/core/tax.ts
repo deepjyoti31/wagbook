@@ -164,3 +164,21 @@ export function computeInvoice(
     totalMinor,
   };
 }
+
+/**
+ * A tax rate typed as a percent, such as "18" or "2.5", in basis points
+ * (1800, 250). Null when nothing was typed; undefined when it is not a rate
+ * from 0 to 100 with at most two decimals.
+ */
+export function parseRatePercent(typed: string | null | undefined): number | null | undefined {
+  const t = (typed ?? "").trim().replace(/%$/, "").trim();
+  if (t === "") return null;
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(t)) return undefined;
+  const bp = Math.round(Number(t) * 100);
+  return bp <= 10000 ? bp : undefined;
+}
+
+/** A services accounting code (SAC or HSN): 4 to 8 digits. Must match the check on services.sac_code. */
+export function isSacCode(code: string): boolean {
+  return /^[0-9]{4,8}$/.test(code);
+}

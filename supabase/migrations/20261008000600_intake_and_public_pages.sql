@@ -449,6 +449,26 @@ as $$
       select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end)
       from public.payments pay where pay.invoice_id = i.id
     ), 0),
+    -- Credit notes against the bill, each a document the parent can print.
+    'credit_notes', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'number', cn.number, 'issued_on', cn.issued_on, 'reason', cn.reason,
+        'subtotal_minor', cn.subtotal_minor, 'discount_minor', cn.discount_minor, 'taxable_minor', cn.taxable_minor,
+        'cgst_minor', cn.cgst_minor, 'sgst_minor', cn.sgst_minor, 'igst_minor', cn.igst_minor, 'tax_minor', cn.tax_minor,
+        'round_off_minor', cn.round_off_minor, 'total_minor', cn.total_minor,
+        'lines', coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'description', l.description, 'sac_code', l.sac_code, 'quantity', l.quantity,
+            'unit_price_minor', l.unit_price_minor, 'discount_minor', l.discount_minor,
+            'taxable_minor', l.taxable_minor, 'tax_rate_bp', l.tax_rate_bp,
+            'cgst_minor', l.cgst_minor, 'sgst_minor', l.sgst_minor, 'igst_minor', l.igst_minor,
+            'tax_minor', l.tax_minor, 'total_minor', l.total_minor
+          ) order by l.sort_order)
+          from public.credit_note_lines l where l.credit_note_id = cn.id
+        ), '[]'::jsonb)
+      ) order by cn.seq)
+      from public.credit_notes cn where cn.org_id = i.org_id and cn.invoice_id = i.id
+    ), '[]'::jsonb),
     'notes', i.notes,
     -- Where to pay is the copy frozen on the invoice when it was issued, so a
     -- later change to the kennel's settings cannot redirect an open bill.
@@ -473,4 +493,4 @@ as $$
     and i.status in ('issued', 'void');
 $$;
 comment on function public.get_public_invoice(text) is
-  'PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, the kennel''s UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.';
+  'PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, its credit notes with their lines, the kennel''s UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.';

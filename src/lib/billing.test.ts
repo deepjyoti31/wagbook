@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billForBooking, billForFamily, taxContext } from "./billing";
+import { billForBooking, billForFamily, creditContext, partCredit, taxContext } from "./billing";
 
 const org = { tax_mode: "none" as const, gst_state_code: null, prices_include_tax: false, round_invoice_totals: true };
 
@@ -45,5 +45,23 @@ describe("a family's bill", () => {
     expect(bill.lines[1].description).toBe("Bruno: Bath");
     expect(bill.lines[2].description).toContain("Coco");
     expect(bill.totalMinor).toBe(360000 + 50000 + 270000);
+  });
+});
+
+describe("credit notes", () => {
+  const gstBill = { is_tax_invoice: true, prices_include_tax: false, place_of_supply_state_code: "29", seller: { tax_mode: "gst_india", gst_state_code: "29" } };
+
+  it("work tax out as the bill did when it was issued, not as the kennel's settings say now", () => {
+    expect(creditContext(gstBill)).toEqual({ mode: "gst_india", sellerStateCode: "29", placeOfSupplyStateCode: "29", pricesIncludeTax: false });
+    expect(creditContext({ ...gstBill, is_tax_invoice: false }).mode).toBe("none");
+    expect(creditContext({ ...gstBill, place_of_supply_state_code: "27" }).placeOfSupplyStateCode).toBe("27");
+  });
+
+  it("take back part of a bill as one line at one of its rates", () => {
+    const t = partCredit(gstBill, { description: "One night not stayed", amountMinor: 120000, taxRateBp: 1800, sacCode: "998612" }, true);
+    expect(t.lines).toHaveLength(1);
+    expect(t).toMatchObject({ taxableMinor: 120000, cgstMinor: 10800, sgstMinor: 10800, totalMinor: 141600 });
+    // With prices that included tax, the amount is what the parent paid.
+    expect(partCredit({ ...gstBill, prices_include_tax: true }, { description: "x", amountMinor: 118000, taxRateBp: 1800, sacCode: null }, false).totalMinor).toBe(118000);
   });
 });

@@ -156,7 +156,8 @@ create table public.organizations (
   gst_state_code text check (gst_state_code is null or gst_state_code ~ '^[0-9]{2}$'),
   default_tax_rate_bp integer not null default 0 check (default_tax_rate_bp between 0 and 10000),
   prices_include_tax boolean not null default false,
-  invoice_prefix text not null default 'WB' check (invoice_prefix ~ '^[A-Z0-9]{1,4}$'),
+  -- CN is the credit notes' series, so bills cannot use it.
+  invoice_prefix text not null default 'WB' check (invoice_prefix ~ '^[A-Z0-9]{1,4}$' and invoice_prefix <> 'CN'),
   fiscal_year_start_month smallint not null default 4 check (fiscal_year_start_month between 1 and 12),
   round_invoice_totals boolean not null default true,
   upi_vpa text check (upi_vpa is null or upi_vpa ~ '^[a-zA-Z0-9._-]{2,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$'),
@@ -199,7 +200,7 @@ comment on column public.organizations.tax_id is 'Tax registration number. The G
 comment on column public.organizations.gst_state_code is 'Two digit GST state code of the kennel, e.g. 29 for Karnataka. Needed for gst_india.';
 comment on column public.organizations.default_tax_rate_bp is 'Tax rate used when a service does not set its own. Basis points: 1800 = 18%.';
 comment on column public.organizations.prices_include_tax is 'True when rate card prices already contain tax, so tax is backed out instead of added on top.';
-comment on column public.organizations.invoice_prefix is 'Start of every invoice number, 1 to 4 capital letters or digits. WB gives WB/27-28/0001.';
+comment on column public.organizations.invoice_prefix is 'Start of every invoice number, 1 to 4 capital letters or digits, not CN (credit notes use it). WB gives WB/27-28/0001.';
 comment on column public.organizations.fiscal_year_start_month is 'Month the financial year starts. 4 (April) for India, 1 for calendar-year countries.';
 comment on column public.organizations.round_invoice_totals is 'Round invoice grand totals to a whole currency unit and show the difference as round off.';
 comment on column public.organizations.upi_vpa is 'UPI ID that receives payments, e.g. happytails@okhdfcbank. Used to build pay links and QR codes.';

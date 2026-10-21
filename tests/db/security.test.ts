@@ -85,7 +85,7 @@ describe("tenant isolation", () => {
   const tables = [
     "organizations", "memberships", "clients", "pets", "vaccinations", "kennels", "services", "peak_periods",
     "bookings", "booking_items", "care_items", "care_tasks", "play_yards", "play_sessions", "stay_updates",
-    "incidents", "invoices", "invoice_lines", "payments", "expenses", "intake_submissions", "audit_log",
+    "incidents", "invoices", "invoice_lines", "credit_notes", "credit_note_lines", "payments", "expenses", "intake_submissions", "audit_log",
   ];
 
   it("shows a member only their own organisation's rows, in every table", async () => {

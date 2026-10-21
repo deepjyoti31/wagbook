@@ -6,7 +6,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { InvoiceView } from "@/components/invoice-view";
 import { PaymentForm } from "@/components/payment-form";
-import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
+import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { BILLABLE_IN_FAMILY } from "@/lib/billing";
 import { billMessage, formatDate, formatMoney, formatPhone, todayIn, toDecimalString, whatsappLink } from "@/lib/core";
@@ -15,7 +15,7 @@ import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import type { Messages } from "@/messages";
-import { deleteDraft, editLine, issueBill, makeBill, voidBill } from "../actions";
+import { creditBill, deleteDraft, editLine, issueBill, makeBill, voidBill } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.bill.title);
 
@@ -40,7 +40,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, currency, booking_id, group_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, currency, booking_id, group_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -49,7 +49,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   if (!res.data) notFound();
   const inv = res.data;
 
-  const [lines, payments, balance, family, origin] = await Promise.all([
+  const [lines, payments, balance, family, credits, origin] = await Promise.all([
     supabase
       .from("invoice_lines")
       .select("description, sac_code, quantity, unit_price_minor, discount_minor, taxable_minor, tax_rate_bp, cgst_minor, sgst_minor, igst_minor, tax_minor, total_minor")
@@ -57,19 +57,26 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
       .eq("invoice_id", id)
       .order("sort_order"),
     supabase.from("payments").select("id, direction, amount_minor, method, reference, received_on, note").eq("org_id", org.id).eq("invoice_id", id).order("received_on"),
-    supabase.from("invoice_balances").select("paid_minor, due_minor").eq("org_id", org.id).eq("invoice_id", id).maybeSingle(),
+    supabase.from("invoice_balances").select("paid_minor, due_minor, credited_minor").eq("org_id", org.id).eq("invoice_id", id).maybeSingle(),
     // A family's bill covers each pet booked together.
     inv.group_id
       ? supabase.from("bookings").select("id, pets(name)").eq("org_id", org.id).eq("group_id", inv.group_id).in("status", [...BILLABLE_IN_FAMILY]).order("created_at").order("id")
       : Promise.resolve({ data: [], error: null }),
+    supabase.from("credit_notes").select("id, number, issued_on, reason, total_minor").eq("org_id", org.id).eq("invoice_id", id).order("seq"),
     siteOrigin(),
   ]);
-  if (lines.error || payments.error || balance.error || family.error) throw new Error("Could not load the bill.");
+  if (lines.error || payments.error || balance.error || family.error || credits.error) throw new Error("Could not load the bill.");
   const stays = inv.bookings ? [inv.bookings] : family.data;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale, trimZeros: true });
   const due = balance.data?.due_minor ?? 0;
   const paid = balance.data?.paid_minor ?? 0;
+  const credited = balance.data?.credited_minor ?? 0;
+  // A tax invoice from an earlier month may be in a return already, and a credited bill is credited the rest of the way: no cancelling (WB095, WB096).
+  const today = todayIn(org.time_zone);
+  const earlierMonth = inv.is_tax_invoice && inv.issued_on !== null && inv.issued_on.slice(0, 7) < today.slice(0, 7);
+  const canCancel = credits.data.length === 0 && !earlierMonth;
+  const rates = [...new Set(lines.data.map((l) => l.tax_rate_bp))];
   // The WhatsApp message is for the parent, in the kennel's language for parents.
   const p = parentI18n(org.parent_language, org.locale);
   const pet = stays.map((b) => b.pets?.name).filter(Boolean).join(", ") || p.m.bill.yourPet;
@@ -241,6 +248,24 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         ) : null}
       </Section>
 
+      {credits.data.length > 0 ? (
+        <Section title={m.invoice.creditNotes} count={credits.data.length}>
+          <Ledger>
+            {credits.data.map((c) => (
+              <LedgerRow key={c.id}>
+                <span className="min-w-0 flex-1">
+                  <a href={`${link}?cn=${encodeURIComponent(c.number)}`} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-4">
+                    {fill(m.bill.credit.made, { number: c.number, date: formatDate(c.issued_on, locale) })}
+                  </a>
+                  <span className="block text-sm text-slate">{c.reason}</span>
+                </span>
+                <span className="font-semibold tabular-nums">- {money(c.total_minor)}</span>
+              </LedgerRow>
+            ))}
+          </Ledger>
+        </Section>
+      ) : null}
+
       {inv.status !== "draft" ? (
         <Section title={m.bill.paymentsTitle} count={payments.data.length}>
           {payments.data.length === 0 ? (
@@ -271,12 +296,69 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
             </Ledger>
           )}
           {inv.status === "issued" ? (
-            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : ""} today={todayIn(org.time_zone)} canRefund={canManage} words={m} />
+            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : ""} today={today} canRefund={canManage} words={m} />
           ) : null}
         </Section>
       ) : null}
 
       {inv.status === "issued" && canManage ? (
+        <Section title={m.bill.credit.title}>
+          {credited >= inv.total_minor ? (
+            <Empty>{m.bill.credit.nothingLeft}</Empty>
+          ) : (
+            <ActionForm action={creditBill} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+              <input type="hidden" name="invoiceId" value={inv.id} />
+              <p className="text-slate">{m.bill.credit.about}</p>
+              {credited > 0 ? <p className="font-semibold">{fill(m.bill.credit.left, { amount: money(inv.total_minor - credited) })}</p> : null}
+              {credited === 0 ? (
+                <fieldset className="space-y-1">
+                  {(["part", "whole"] as const).map((how) => (
+                    <label key={how} className="flex min-h-12 items-center gap-3">
+                      <input type="radio" name="how" value={how} defaultChecked={how === "part"} className="size-5" />
+                      <span>{how === "part" ? m.bill.credit.part : m.bill.credit.whole}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              ) : null}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={inv.is_tax_invoice ? (inv.prices_include_tax ? m.bill.credit.amountWith : m.bill.credit.amountBefore) : m.bill.credit.amount}>
+                  <Input name="amount" inputMode="decimal" />
+                </Field>
+                {inv.is_tax_invoice ? (
+                  <Field label={m.bill.credit.rate}>
+                    <Select name="rate" defaultValue={String(rates[0] ?? 0)}>
+                      {rates.map((r) => (
+                        <option key={r} value={r}>
+                          {fill(m.bill.credit.rateOption, { rate: r / 100 })}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                ) : (
+                  <input type="hidden" name="rate" value={String(rates[0] ?? 0)} />
+                )}
+              </div>
+              <Field label={m.bill.credit.what}>
+                <Input name="description" maxLength={300} defaultValue={fill(m.bill.credit.whatDefault, { number: inv.number ?? "" })} />
+              </Field>
+              <Field label={m.bill.credit.why} hint={m.bill.credit.whyHint}>
+                <Input name="reason" required maxLength={500} />
+              </Field>
+              <SubmitButton variant="secondary" pendingLabel={m.bill.credit.making}>
+                {m.bill.credit.make}
+              </SubmitButton>
+            </ActionForm>
+          )}
+        </Section>
+      ) : null}
+
+      {inv.status === "issued" && canManage && !canCancel ? (
+        <Section title={m.bill.cancelTitle}>
+          <p className="text-slate">{credits.data.length > 0 ? m.bill.cancelCredited : m.bill.cancelEarlier}</p>
+        </Section>
+      ) : null}
+
+      {inv.status === "issued" && canManage && canCancel ? (
         <Section title={m.bill.cancelTitle}>
           <ActionForm action={voidBill} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="invoiceId" value={inv.id} />

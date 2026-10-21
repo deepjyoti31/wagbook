@@ -49,7 +49,8 @@ In summary (deleting anything is for owners, D29):
 | Draft invoices and their lines | Read, add, edit; remove lines from a draft | Same as staff | Also delete whole drafts |
 | Issue an invoice | Only one whose lines are exactly what its booking says (`WB050`) | Any draft | Same |
 | Files (photos, certificates) | Add; never replace or remove | Also replace | Also remove |
-| Void an invoice | No | Yes, with a reason | Yes |
+| Void an invoice | No | Yes, with a reason; a tax invoice only in its own month (`WB095`) | Yes |
+| Credit notes | Read | Make one, with a reason (`issue_credit_note`); nobody changes or deletes one | Same |
 | Payments received | Read, add | Also refunds and corrections | Also removal |
 | Expenses, and their receipt files | Nothing | Read, add, edit | Also delete (with the receipt file) |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
@@ -217,8 +218,8 @@ Gazette sites could not be reached from where this was written). Take it to a la
   [S.S. Rana](https://ssrana.in/articles/meity-notifies-final-digital-personal-data-protection-rules-2025/)). Wagbook
   erases at once. If the lawyer says Rule 8(3) applies, erasure needs a year's sealed hold before May 2027.
 - **Pets.** The Act covers data about an individual who can be identified. A pet's record that no longer names its
-  parent is not that, as far as we can tell (D30). Free text that mentions the parent, and a microchip number (which a
-  registry links to its owner), are questions for the lawyer.
+  parent is not that, as far as we can tell (D30). The owner's view is that a microchip number is not the parent's
+  personal data either, so it stays with the pet. Free text that mentions the parent is a question for the lawyer.
 
 For a kennel in India, choose Supabase's Mumbai region so the data stays in the country.
 

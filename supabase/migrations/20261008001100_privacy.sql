@@ -132,6 +132,12 @@ begin
         to_jsonb(i) - 'org_id' - 'public_token'
         || jsonb_build_object('lines', coalesce((select jsonb_agg(to_jsonb(l) - 'org_id' order by l.sort_order, l.created_at)
                                                  from public.invoice_lines l where l.invoice_id = i.id), '[]'::jsonb))
+        || jsonb_build_object('credit_notes', coalesce((
+             select jsonb_agg(to_jsonb(cn) - 'org_id'
+                              || jsonb_build_object('lines', coalesce((select jsonb_agg(to_jsonb(cl) - 'org_id' order by cl.sort_order)
+                                                                       from public.credit_note_lines cl where cl.credit_note_id = cn.id), '[]'::jsonb))
+                              order by cn.seq)
+             from public.credit_notes cn where cn.org_id = i.org_id and cn.invoice_id = i.id), '[]'::jsonb))
         order by i.created_at)
       from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id
     ), '[]'::jsonb),
@@ -149,7 +155,7 @@ begin
 end;
 $$;
 comment on function public.export_client(uuid) is
-  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
+  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
 
 -- ---------------------------------------------------------------------------
 

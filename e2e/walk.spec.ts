@@ -1062,3 +1062,32 @@ test("staff cannot change a parent's phone numbers, and a parent who asks gets t
   expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await parent.context.close();
 });
+
+test("a manager takes back part of a paid bill with a credit note, and the parent sees it", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await openPet(page, "Mango");
+  await page.getByRole("link", { name: "Arjun Sample" }).click();
+  await page.getByRole("link", { name: /WB\// }).first().click();
+
+  const form = page.locator("form").filter({ has: page.getByRole("button", { name: en.bill.credit.make }) });
+  await form.getByLabel(en.bill.credit.amount, { exact: true }).fill("200");
+  await form.getByLabel(en.bill.credit.why).fill("Picked up a morning early");
+  await form.getByRole("button", { name: en.bill.credit.make }).click();
+  await page.waitForURL(/done=credited/);
+  await expect(page.getByText(en.bill.done.credited)).toBeVisible();
+  await expect(page.getByRole("link", { name: /^CN\/\d{2}-\d{2}\/0001, / })).toBeVisible();
+  // It was paid in full, so ₹200 is now owed back to the parent.
+  await expect(page.getByText("₹200 paid over")).toBeVisible();
+  // A credited bill is credited the rest of the way, never cancelled.
+  await expect(page.getByText(en.bill.cancelCredited)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  const link = (await page.getByRole("link", { name: "Open it" }).getAttribute("href"))!;
+  const parent = await privateWindow(browser);
+  await parent.page.goto(link);
+  await parent.page.getByRole("link", { name: /^Credit note CN\// }).click();
+  await expect(parent.page.getByRole("heading", { level: 1, name: /^Credit note/ })).toBeVisible();
+  await expect(parent.page.getByText("Why: Picked up a morning early")).toBeVisible();
+  expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await parent.context.close();
+});

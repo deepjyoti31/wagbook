@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 24. Views: 1. Functions: 69.
+Migrations applied: 11. Tables: 26. Views: 1. Functions: 72.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
 - Views: [invoice_balances](#invoice_balances)
 - [Functions](#functions)
 
@@ -384,6 +384,125 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 - `clients_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `clients_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
+### credit_note_lines
+
+The lines of a credit note: what is taken back, with its tax worked out as on the bill.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `credit_note_id` | `uuid` | yes |  |  |
+| `sort_order` | `integer` | yes | `0` |  |
+| `description` | `text` | yes |  |  |
+| `sac_code` | `text` |  |  |  |
+| `quantity` | `numeric(10,2)` | yes |  |  |
+| `unit_price_minor` | `bigint` | yes |  |  |
+| `discount_minor` | `bigint` | yes |  |  |
+| `taxable_minor` | `bigint` | yes |  |  |
+| `tax_rate_bp` | `integer` | yes |  |  |
+| `cgst_minor` | `bigint` | yes |  |  |
+| `sgst_minor` | `bigint` | yes |  |  |
+| `igst_minor` | `bigint` | yes |  |  |
+| `tax_minor` | `bigint` | yes |  |  |
+| `total_minor` | `bigint` | yes |  |  |
+
+**Constraints**
+
+- Primary key `credit_note_lines_pkey`: `PRIMARY KEY (id)`
+- Foreign key `credit_note_lines_org_id_credit_note_id_fkey`: `FOREIGN KEY (org_id, credit_note_id) REFERENCES credit_notes(org_id, id) ON DELETE CASCADE`
+- Foreign key `credit_note_lines_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `credit_note_lines_cgst_minor_check`: `CHECK ((cgst_minor >= 0))`
+- Check `credit_note_lines_description_check`: `CHECK (((char_length(description) >= 1) AND (char_length(description) <= 300)))`
+- Check `credit_note_lines_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `credit_note_lines_igst_minor_check`: `CHECK ((igst_minor >= 0))`
+- Check `credit_note_lines_quantity_check`: `CHECK ((quantity > (0)::numeric))`
+- Check `credit_note_lines_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `credit_note_lines_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
+- Check `credit_note_lines_tax_minor_check`: `CHECK ((tax_minor >= 0))`
+- Check `credit_note_lines_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
+- Check `credit_note_lines_taxable_minor_check`: `CHECK ((taxable_minor >= 0))`
+- Check `credit_note_lines_total_minor_check`: `CHECK ((total_minor >= 0))`
+- Check `credit_note_lines_unit_price_minor_check`: `CHECK ((unit_price_minor >= 0))`
+
+**Indexes**
+
+- `CREATE INDEX credit_note_lines_note_idx ON public.credit_note_lines USING btree (org_id, credit_note_id, sort_order)`
+
+**Triggers**
+
+- `credit_note_lines_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credit_note_lines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### credit_notes
+
+A credit note: takes back all or part of an issued bill, counted in the month it is made. Written only by issue_credit_note(); never changed.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `invoice_id` | `uuid` | yes |  | The bill it takes back from. Its buyer, seller and tax details are the bill's. |
+| `number` | `text` | yes |  | Printed number, CN/YY-YY/NNNN. Consecutive within a financial year, its own series, never reused. |
+| `fiscal_year` | `text` | yes |  |  |
+| `seq` | `integer` | yes |  |  |
+| `issued_on` | `date` | yes |  | Credit note date: the kennel's local date when it was made. Tax reports count it in this month. |
+| `issued_by` | `uuid` |  |  |  |
+| `reason` | `text` | yes |  | Why the bill is being taken back, such as "Went home two nights early". |
+| `currency` | `text` | yes |  |  |
+| `subtotal_minor` | `bigint` | yes |  |  |
+| `discount_minor` | `bigint` | yes |  |  |
+| `taxable_minor` | `bigint` | yes |  |  |
+| `cgst_minor` | `bigint` | yes |  |  |
+| `sgst_minor` | `bigint` | yes |  |  |
+| `igst_minor` | `bigint` | yes |  |  |
+| `tax_minor` | `bigint` | yes |  |  |
+| `round_off_minor` | `bigint` | yes |  |  |
+| `total_minor` | `bigint` | yes |  | What is taken off the bill: taxable + tax + round off. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `credit_notes_pkey`: `PRIMARY KEY (id)`
+- Unique `credit_notes_org_id_fiscal_year_seq_key`: `UNIQUE (org_id, fiscal_year, seq)`
+- Unique `credit_notes_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `credit_notes_org_id_number_key`: `UNIQUE (org_id, number)`
+- Foreign key `credit_notes_issued_by_fkey`: `FOREIGN KEY (issued_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `credit_notes_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `credit_notes_org_id_invoice_id_fkey`: `FOREIGN KEY (org_id, invoice_id) REFERENCES invoices(org_id, id) ON DELETE RESTRICT`
+- Check `credit_notes_cgst_minor_check`: `CHECK ((cgst_minor >= 0))`
+- Check `credit_notes_currency_check`: `CHECK ((currency ~ '^[A-Z]{3}$'::text))`
+- Check `credit_notes_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `credit_notes_igst_minor_check`: `CHECK ((igst_minor >= 0))`
+- Check `credit_notes_number_check`: `CHECK (((char_length(number) <= 16) AND (number ~ '^[A-Za-z0-9/-]+$'::text)))`
+- Check `credit_notes_reason_check`: `CHECK (((char_length(reason) >= 1) AND (char_length(reason) <= 500)))`
+- Check `credit_notes_round_off_minor_check`: `CHECK (((round_off_minor >= '-99'::integer) AND (round_off_minor <= 99)))`
+- Check `credit_notes_seq_check`: `CHECK ((seq > 0))`
+- Check `credit_notes_sgst_minor_check`: `CHECK ((sgst_minor >= 0))`
+- Check `credit_notes_subtotal_minor_check`: `CHECK ((subtotal_minor >= 0))`
+- Check `credit_notes_tax_minor_check`: `CHECK ((tax_minor >= 0))`
+- Check `credit_notes_taxable_minor_check`: `CHECK ((taxable_minor >= 0))`
+- Check `credit_notes_total_minor_check`: `CHECK ((total_minor > 0))`
+
+**Indexes**
+
+- `CREATE INDEX credit_notes_org_invoice_idx ON public.credit_notes USING btree (org_id, invoice_id)`
+- `CREATE INDEX credit_notes_org_issued_idx ON public.credit_notes USING btree (org_id, issued_on DESC)`
+
+**Triggers**
+
+- `credit_notes_audit` (after insert or delete or update) runs `audit_row()`
+- `credit_notes_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credit_notes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### expenses
 
 Money the kennel spent: food, staff, repairs, vet bills. Owners and managers only.
@@ -584,19 +703,21 @@ A one-time link that lets someone with no account yet join an organisation in a 
 
 ### invoice_counters
 
-The last invoice sequence used per organisation per financial year. Only issue_invoice touches it; nobody can read or write it directly.
+The last sequence number used per organisation, series (bills, credit notes) and financial year. Only issue_invoice and issue_credit_note touch it; nobody can read or write it directly.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
 | `org_id` | `uuid` | yes |  |  |
+| `series` | `text` | yes | `'invoice'::text` | invoice: bills (PREFIX/YY-YY/NNNN). credit_note: credit notes (CN/YY-YY/NNNN). |
 | `fiscal_year` | `text` | yes |  |  |
 | `last_seq` | `integer` | yes | `0` |  |
 
 **Constraints**
 
-- Primary key `invoice_counters_pkey`: `PRIMARY KEY (org_id, fiscal_year)`
+- Primary key `invoice_counters_pkey`: `PRIMARY KEY (org_id, series, fiscal_year)`
 - Foreign key `invoice_counters_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `invoice_counters_last_seq_check`: `CHECK ((last_seq >= 0))`
+- Check `invoice_counters_series_check`: `CHECK ((series = ANY (ARRAY['invoice'::text, 'credit_note'::text])))`
 
 **Triggers**
 
@@ -685,6 +806,7 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 | `issued_on` | `date` |  |  | Invoice date: the kennel's local date when it was issued. |
 | `issued_by` | `uuid` |  |  |  |
 | `is_tax_invoice` | `boolean` | yes | `false` | True when issued by a tax-registered kennel, so it is titled Tax Invoice and shows the tax breakup. |
+| `prices_include_tax` | `boolean` | yes | `false` | Whether the kennel's prices included tax when the bill was issued, so a credit note against it works its tax out the same way. |
 | `currency` | `text` | yes | `'INR'::text` |  |
 | `seller` | `jsonb` |  |  | Copy of the kennel's name, address, tax details and UPI ID as they were when issued. A later change to the kennel's settings never alters an invoice that is already out. |
 | `buyer` | `jsonb` |  |  | Copy of the parent's name, phone and address as they were when issued. |
@@ -879,7 +1001,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `gst_state_code` | `text` |  |  | Two digit GST state code of the kennel, e.g. 29 for Karnataka. Needed for gst_india. |
 | `default_tax_rate_bp` | `integer` | yes | `0` | Tax rate used when a service does not set its own. Basis points: 1800 = 18%. |
 | `prices_include_tax` | `boolean` | yes | `false` | True when rate card prices already contain tax, so tax is backed out instead of added on top. |
-| `invoice_prefix` | `text` | yes | `'WB'::text` | Start of every invoice number, 1 to 4 capital letters or digits. WB gives WB/27-28/0001. |
+| `invoice_prefix` | `text` | yes | `'WB'::text` | Start of every invoice number, 1 to 4 capital letters or digits, not CN (credit notes use it). WB gives WB/27-28/0001. |
 | `fiscal_year_start_month` | `smallint` | yes | `4` | Month the financial year starts. 4 (April) for India, 1 for calendar-year countries. |
 | `round_invoice_totals` | `boolean` | yes | `true` | Round invoice grand totals to a whole currency unit and show the difference as round off. |
 | `upi_vpa` | `text` |  |  | UPI ID that receives payments, e.g. happytails@okhdfcbank. Used to build pay links and QR codes. |
@@ -910,7 +1032,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_fiscal_year_start_month_check`: `CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12)))`
 - Check `organizations_gst_needs_registration`: `CHECK (((tax_mode <> 'gst_india'::tax_mode) OR ((tax_id IS NOT NULL) AND (gst_state_code IS NOT NULL))))`
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
-- Check `organizations_invoice_prefix_check`: `CHECK ((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text))`
+- Check `organizations_invoice_prefix_check`: `CHECK (((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text) AND (invoice_prefix <> 'CN'::text)))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
 - Check `organizations_parent_language_check`: `CHECK ((parent_language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
@@ -1330,7 +1452,7 @@ One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's
 
 ### invoice_balances
 
-Each invoice with what has been paid against it and what is still due.
+Each invoice with what has been paid against it, what credit notes took off it, and what is still due (below zero: paid more than it now comes to, so a refund is owed).
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -1343,6 +1465,7 @@ Each invoice with what has been paid against it and what is still due.
 | `number` | `text` |  |  |  |
 | `total_minor` | `bigint` |  |  |  |
 | `paid_minor` | `bigint` |  |  |  |
+| `credited_minor` | `bigint` |  |  |  |
 | `due_minor` | `bigint` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
@@ -1471,6 +1594,18 @@ bookings_stamp_status() returns trigger
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled. Client-supplied values for these columns are ignored.
 
+### check_bill_line
+
+```
+check_bill_line(p_mode tax_mode, p_intra boolean, p_include boolean, p_quantity numeric, p_unit_price_minor bigint, p_discount_minor bigint, p_taxable_minor bigint, p_tax_rate_bp integer, p_cgst_minor bigint, p_sgst_minor bigint, p_igst_minor bigint, p_tax_minor bigint) returns void
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+Raises WB037 when a line's taxable value and tax are not what its quantity, price, discount and rate give under the tax mode (within the state or across states, prices with or without tax). Used by issue_invoice and issue_credit_note.
+
 ### check_privacy_access
 
 ```
@@ -1589,7 +1724,7 @@ export_client(p_client uuid) returns jsonb
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
+Everything held about one parent, for a request under the DPDP Act: their details and consent, their pets with vaccinations, routines and incidents, every stay with its extras, updates, care and play, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
 ### fiscal_year_label
 
@@ -1661,7 +1796,7 @@ get_public_invoice(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, the kennel's UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.
+PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, its credit notes with their lines, the kennel's UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.
 
 ### get_public_stay
 
@@ -1807,6 +1942,18 @@ invoices_guard_insert() returns trigger
 
 Trigger: every invoice starts as a draft.
 
+### issue_credit_note
+
+```
+issue_credit_note(p_invoice uuid, p_reason text, p_totals jsonb, p_lines jsonb) returns credit_notes
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Makes a credit note against an issued bill: checks every line as issue_invoice does, under the bill's own tax treatment and at a rate the bill charged (WB093), and that the bill is not credited beyond its total (WB092); gives the next CN/YY-YY/NNNN number for the year. Owner or manager. A reason is required (WB091).
+
 ### issue_invoice
 
 ```
@@ -1891,6 +2038,18 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 
 For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.
 
+### org_today
+
+```
+org_today(p_org uuid) returns date
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Today's date in the kennel's time zone.
+
 ### organizations_lock_billing_settings
 
 ```
@@ -1954,14 +2113,14 @@ The extras sold on stays that start in the period, biggest first (at most 20): h
 ### report_money
 
 ```
-report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
+report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, billed_minor bigint, credited_minor bigint, tax_minor bigint, bills integer, received_minor bigint, refunded_minor bigint, spent_minor bigint)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each month in the period: what was billed (issued bills by bill date; cancelled bills left out) and the tax in it, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
+For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
 
 ### report_occupancy
 
@@ -1978,14 +2137,14 @@ For each day: pets staying the night (boarding), pets in for the day (day boardi
 ### report_tax
 
 ```
-report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
+report_tax(p_org uuid, p_from date, p_to date) returns TABLE(tax_rate_bp integer, bills integer, credit_notes integer, taxable_minor bigint, cgst_minor bigint, sgst_minor bigint, igst_minor bigint, tax_minor bigint)
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Tax on issued bills in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST). Bills are counted by bill date; cancelled bills are left out. Owners and managers only.
+Tax in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST) on issued bills by bill date, less credit notes by credit note date. Cancelled bills are left out (only a bill of the same month can be cancelled once taxed, WB095). Owners and managers only.
 
 ### respond_to_invitation
 
@@ -2177,4 +2336,4 @@ void_invoice(p_invoice uuid, p_reason text) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it.
+Voids an issued invoice with a reason. Owner or manager only. The number stays used; issue a fresh invoice to replace it. A tax invoice from an earlier month is not voided but credited (WB095), and a bill with a credit note is credited the rest of the way (WB096).

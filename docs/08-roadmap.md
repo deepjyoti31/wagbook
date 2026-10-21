@@ -356,11 +356,23 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M15. Credit notes, and the kennel's own tax rates
+
+- [x] Finished 21 October 2026.
+
+**Build**
+
+1. [x] Credit notes on issued bills: the whole bill or part of it, their own `CN/YY-YY/NNNN` numbers, tax as on the
+   bill, never more than is left (D34). On the bill page, the parent's bill link, Reports and the bills download.
+2. [x] A tax invoice from an earlier month, or a credited bill, is credited instead of cancelled (`WB095`, `WB096`).
+3. [x] A tax rate and SAC code for boarding, day boarding and each extra, set by the kennel (D35).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
-- Credit notes, for a bill cancelled after its month's GST return (`06`, "What the law says").
 - Recurring day boarding (every weekday).
 - Waiting list when full.
 - Packages and prepaid passes.

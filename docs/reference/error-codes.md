@@ -19,11 +19,12 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB060 to WB069 | Reports and expenses |
 | WB070 to WB079 | A parent's details: export and erase |
 | WB080 to WB089 | Daily care and incidents |
+| WB090 to WB099 | Credit notes |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
 | `WB003` | invoice not found<br>submission not found<br>parent not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
@@ -52,7 +53,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB034` | use issue_invoice() to issue an invoice<br>an invoice starts as a draft. Use issue_invoice() to issue it. | `20261008000500_billing.sql` |
 | `WB035` | this invoice has already been issued | `20261008000500_billing.sql` |
 | `WB036` | an invoice needs at least one line | `20261008000500_billing.sql` |
-| `WB037` | a discount is larger than its line<br>a line that carries no tax has tax or the wrong amount<br>a line's tax does not match its price and rate<br>a line's taxable value does not match its price<br>a line's CGST and SGST do not match its taxable value and rate<br>a line's IGST does not match its taxable value and rate<br>a line's tax does not match its taxable value and rate<br>invoice totals do not match its lines<br>the round off is not what the kennel's rounding setting gives | `20261008000500_billing.sql` |
+| `WB037` | a discount is larger than its line<br>a line that carries no tax has tax or the wrong amount<br>a line's tax does not match its price and rate<br>a line's taxable value does not match its price<br>a line's CGST and SGST do not match its taxable value and rate<br>a line's IGST does not match its taxable value and rate<br>a line's tax does not match its taxable value and rate<br>invoice totals do not match its lines<br>the round off is not what the kennel's rounding setting gives<br>credit note totals do not match its lines | `20261008000500_billing.sql` |
 | `WB038` | use void_invoice() to void an invoice<br>only an issued invoice can be voided | `20261008000500_billing.sql` |
 | `WB039` | say why the invoice is being voided | `20261008000500_billing.sql` |
 | `WB040` | this form is not accepting submissions | `20261008000600_intake_and_public_pages.sql` |
@@ -78,3 +79,10 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |
 | `WB074` | only an owner can erase a parent's details | `20261008001100_privacy.sql` |
 | `WB080` | only an owner or manager can change what an incident says | `20261008000400_daily_care.sql` |
+| `WB090` | a credit note is made against an issued bill | `20261008000500_billing.sql` |
+| `WB091` | say why the bill is being credited, in under 500 characters | `20261008000500_billing.sql` |
+| `WB092` | a credit note cannot take back more than is left on the bill | `20261008000500_billing.sql` |
+| `WB093` | a credit note line must use a tax rate that is on the bill | `20261008000500_billing.sql` |
+| `WB094` | a credit note needs at least one line | `20261008000500_billing.sql` |
+| `WB095` | this bill was issued in an earlier month. Make a credit note instead of cancelling it. | `20261008000500_billing.sql` |
+| `WB096` | this bill has a credit note. Credit what is left instead of cancelling it. | `20261008000500_billing.sql` |

@@ -157,6 +157,13 @@ export const core = {
       WB073: "This parent's details have already been erased.",
       WB074: "Only an owner can erase a parent's details.",
       WB080: "Only an owner or manager can change what an incident says.",
+      WB090: "A credit note is made against an issued bill.",
+      WB091: "Say why the bill is being credited, in under 500 characters.",
+      WB092: "A credit note cannot take back more than is left on the bill.",
+      WB093: "A credit note line must use a tax rate that is on the bill.",
+      WB094: "A credit note needs at least one line.",
+      WB095: "This bill was issued in an earlier month. Make a credit note instead of cancelling it.",
+      WB096: "This bill has a credit note. Credit what is left instead of cancelling it.",
     },
   },
   labels: {

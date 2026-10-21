@@ -116,8 +116,9 @@ cookie is only a preference: membership is checked on every request.
 ### A6. Settings. Built.
 
 Kennel details (name, phones, email, address, usual drop-off and pick-up times), usual prices for boarding and day
-boarding and a shared kennel price for each (the second pet of one parent in one kennel; empty means the usual price), UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, rate, legal name, invoice
-prefix, whether prices include tax), intake form (on or off, consent wording). Staff can look but not save. Solo play
+boarding and a shared kennel price for each (the second pet of one parent in one kennel; empty means the usual price), UPI ID and payee name, tax (off, India GST, or one tax at one rate; GSTIN, state, usual rate, legal name, invoice
+prefix (not CN, which credit notes use), whether prices include tax, and a rate and SAC code for boarding and for day
+boarding, D35), intake form (on or off, consent wording). Staff can look but not save. Solo play
 settings are on Play yards (D3).
 
 Region (built in M4): time zone, currency, number and date style, the month the financial year starts, and whether bill
@@ -344,8 +345,9 @@ refund shows a warning. Prices never change.
 
 ### C8. Rate card and extras. Built.
 
-Settings edits the two usual prices. More, then Extras: add an extra (each time or by the hour), change its price, take
-it off the list; owners and managers. On the booking page anyone adds an extra at its listed price, or a one-off item
+Settings edits the two usual prices, and their tax rate and SAC code. More, then Extras: add an extra (each time or by
+the hour), change its price (and, when the kennel charges tax, its rate and SAC code, D35), take it off the list; owners
+and managers. On the booking page anyone adds an extra at its listed price, or a one-off item
 with its own price (a vet bill paid for the parent). Changing what an extra costs is for owners and managers
 (`WB025`); removing one from a booking is for owners (the delete policy, D29).
 
@@ -443,8 +445,14 @@ nights, D32), with its discount on the largest line and its tax, then each extra
 or opens the issued bill. Owners and managers can change, add and remove lines of a draft. Issue checks every sum
 (`issue_invoice`), gives the next number for the financial year and freezes it; staff can issue only a bill exactly as
 its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
-cancel an issued bill with a reason; the number stays used. Bills, under More: what is owed first, then drafts, then
+cancel an issued bill with a reason; the number stays used. A tax invoice from an earlier month, or a bill with a credit
+note, is not cancelled but credited (`WB095`, `WB096`). Bills, under More: what is owed first, then drafts, then
 recent.
+
+**Credit notes (D34).** On an issued bill, owners and managers make a credit note: the whole bill (while nothing has
+been credited) or part of it (an amount at one of the bill's tax rates), with a reason. It has its own number
+(`CN/27-28/0001`), its tax worked out as on the bill, and never takes back more than is left (`WB092`). The bill page
+lists its credit notes; what is owed drops by them, and below zero says how much was paid over, for a refund.
 
 Pets booked together are billed together: Make the family bill puts each pet's stay and extras on one bill
 (`billForFamily()`), with every pet of the family that is not a request or cancelled. A pet of a family is never billed
@@ -459,7 +467,8 @@ number and date; who is billed; place of supply under GST; each line with its SA
 (CGST and SGST, IGST, or the kennel's one tax); totals, round off, and the amount in words; what is paid and what is
 due. While money is due and the bill carries a UPI ID: "Pay with UPI" on phones and a QR code everywhere, drawn on the
 server (D17). "Print or save as PDF" prints a clean A4 page. A cancelled bill says so. Never marked paid by a tap: only
-a payment recorded by the kennel.
+a payment recorded by the kennel. The bill's credit notes are listed under it, and each opens as its own printable
+credit note (`?cn=`): number, date, the bill it is against, why, its lines and total.
 
 ### E3. Payments. Built.
 
@@ -482,11 +491,13 @@ changes keeps it). Receipt files are for owners and managers only, like the expe
 - How full: nights sold, day boarding days, kennels used as a share of kennels available, the busiest day, and a bar
   for each day (with the same numbers in a table). Counts confirmed, current and finished stays; kennels are the ones
   in service today.
-- Money in the month: billed (issued bills by bill date, cancelled ones left out, with the tax in them), received,
+- Money in the month: billed (issued bills by bill date, less credit notes by their own date, cancelled bills left
+  out, with the tax in them), credit notes, received,
   refunded, spent, and received less spent; what is owed on bills today; the last twelve months side by side.
-- Tax by rate from the month's issued bills (CGST, SGST and IGST under India GST).
+- Tax by rate from the month's issued bills, less the month's credit notes (CGST, SGST and IGST under India GST).
 - Extras that sell, on stays starting in the month.
-- Download for a spreadsheet: bookings, bills, payments or expenses for up to 400 days, as a CSV file.
+- Download for a spreadsheet: bookings, bills (with credit notes, at minus, and the bill each is against), payments or
+  expenses for up to 400 days, as a CSV file.
 
 The numbers come from database functions (`report_occupancy`, `report_money`, `report_tax`, `report_extras`) that
 refuse anyone who is not an owner or manager of the kennel.

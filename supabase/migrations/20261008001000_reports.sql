@@ -66,6 +66,7 @@ create function public.report_money(p_org uuid, p_from date, p_to date)
 returns table (
   month date,
   billed_minor bigint,
+  credited_minor bigint,
   tax_minor bigint,
   bills integer,
   received_minor bigint,
@@ -89,6 +90,13 @@ begin
     where i.org_id = p_org and i.status = 'issued' and i.issued_on between p_from and p_to
     group by 1
   ),
+  -- Credit notes count in the month they were made, not the bill's.
+  credited as (
+    select date_trunc('month', cn.issued_on)::date as month, sum(cn.total_minor) as total, sum(cn.tax_minor) as tax
+    from public.credit_notes cn
+    where cn.org_id = p_org and cn.issued_on between p_from and p_to
+    group by 1
+  ),
   paid as (
     select date_trunc('month', p.received_on)::date as month,
            sum(p.amount_minor) filter (where p.direction = 'in') as received,
@@ -106,20 +114,22 @@ begin
   select
     m.month,
     coalesce(b.total, 0)::bigint,
-    coalesce(b.tax, 0)::bigint,
+    coalesce(c.total, 0)::bigint,
+    (coalesce(b.tax, 0) - coalesce(c.tax, 0))::bigint,
     coalesce(b.n, 0)::integer,
     coalesce(p.received, 0)::bigint,
     coalesce(p.refunded, 0)::bigint,
     coalesce(s.total, 0)::bigint
   from months m
   left join billed b on b.month = m.month
+  left join credited c on c.month = m.month
   left join paid p on p.month = m.month
   left join spent s on s.month = m.month
   order by m.month;
 end;
 $$;
 comment on function public.report_money(uuid, date, date) is
-  'For each month in the period: what was billed (issued bills by bill date; cancelled bills left out) and the tax in it, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.';
+  'For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.';
 
 -- ---------------------------------------------------------------------------
 
@@ -127,6 +137,7 @@ create function public.report_tax(p_org uuid, p_from date, p_to date)
 returns table (
   tax_rate_bp integer,
   bills integer,
+  credit_notes integer,
   taxable_minor bigint,
   cgst_minor bigint,
   sgst_minor bigint,
@@ -139,24 +150,36 @@ set search_path = ''
 as $$
 begin
   perform public.check_report_access(p_org, p_from, p_to);
+  -- Bills by bill date, less credit notes by credit note date: what a return
+  -- for the period declares.
   return query
+  with lines as (
+    select l.tax_rate_bp, i.id as bill, null::uuid as note, l.taxable_minor, l.cgst_minor, l.sgst_minor, l.igst_minor, l.tax_minor
+    from public.invoices i
+    join public.invoice_lines l on l.org_id = i.org_id and l.invoice_id = i.id
+    where i.org_id = p_org and i.status = 'issued' and i.issued_on between p_from and p_to
+    union all
+    select l.tax_rate_bp, null, cn.id, -l.taxable_minor, -l.cgst_minor, -l.sgst_minor, -l.igst_minor, -l.tax_minor
+    from public.credit_notes cn
+    join public.credit_note_lines l on l.org_id = cn.org_id and l.credit_note_id = cn.id
+    where cn.org_id = p_org and cn.issued_on between p_from and p_to
+  )
   select
-    l.tax_rate_bp,
-    count(distinct i.id)::integer,
-    sum(l.taxable_minor)::bigint,
-    sum(l.cgst_minor)::bigint,
-    sum(l.sgst_minor)::bigint,
-    sum(l.igst_minor)::bigint,
-    sum(l.tax_minor)::bigint
-  from public.invoices i
-  join public.invoice_lines l on l.org_id = i.org_id and l.invoice_id = i.id
-  where i.org_id = p_org and i.status = 'issued' and i.issued_on between p_from and p_to
-  group by l.tax_rate_bp
-  order by l.tax_rate_bp;
+    x.tax_rate_bp,
+    count(distinct x.bill)::integer,
+    count(distinct x.note)::integer,
+    sum(x.taxable_minor)::bigint,
+    sum(x.cgst_minor)::bigint,
+    sum(x.sgst_minor)::bigint,
+    sum(x.igst_minor)::bigint,
+    sum(x.tax_minor)::bigint
+  from lines x
+  group by x.tax_rate_bp
+  order by x.tax_rate_bp;
 end;
 $$;
 comment on function public.report_tax(uuid, date, date) is
-  'Tax on issued bills in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST). Bills are counted by bill date; cancelled bills are left out. Owners and managers only.';
+  'Tax in the period, by rate: the value taxed and the tax (CGST, SGST and IGST under India GST) on issued bills by bill date, less credit notes by credit note date. Cancelled bills are left out (only a bill of the same month can be cancelled once taxed, WB095). Owners and managers only.';
 
 -- ---------------------------------------------------------------------------
 

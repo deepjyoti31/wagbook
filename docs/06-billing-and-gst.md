@@ -17,9 +17,13 @@ Issuing takes in any advances recorded for the booking.
 ```
             add lines, edit freely
  (nothing) ───────────────────────> DRAFT ──── issue_invoice() ────> ISSUED ──── void_invoice(reason) ────> VOID
-                                      │                                 │
-                                   delete                        cannot be edited
-                               (manager, drafts only)            cannot be deleted
+                                      │                                 │           (same month only, for a
+                                   delete                        cannot be edited    tax invoice; WB095, WB096)
+                               (owner, drafts only)              cannot be deleted
+                                                                        │
+                                                          issue_credit_note(reason, lines)
+                                                                        │
+                                                          CREDIT NOTE (CN/YY-YY/NNNN), the bill stays issued
 ```
 
 **Draft.** No number. Any member can create one and change its lines. It is a working copy.
@@ -43,7 +47,33 @@ Issuing takes in any advances recorded for the booking.
 holds for owners too. If a bill is wrong, void it and issue a new one.
 
 **Void.** `void_invoice(invoice_id, reason)`: owners and managers only (`WB002`), reason required (`WB039`). The number
-is not reused, so the series has no gap that cannot be explained.
+is not reused, so the series has no gap that cannot be explained. A tax invoice issued in an earlier month cannot be
+voided (`WB095`): it may already be in a return, so it is credited instead. Nor can a bill that has a credit note
+(`WB096`).
+
+## Credit notes
+
+A credit note takes back all or part of an issued bill (D34). The bill stays exactly as it was issued; the credit note
+is a document of its own, counted in the month it is made.
+
+- **Who and why.** Owners and managers (`WB002`), on the bill page, with a reason printed on it (`WB091`).
+- **What.** The whole bill, while nothing has been credited: its own lines, to the paisa. Or part of it: one line of an
+  amount (before tax when the bill's prices were, including tax when they included it) at one of the bill's tax rates
+  (`WB093`).
+- **Its tax** is worked out as on the bill when the bill was issued: the seller's tax mode and state frozen on the bill,
+  and whether its prices included tax (`invoices.prices_include_tax`, frozen at issue). `issue_credit_note()` checks
+  every line with the same function as a bill (`check_bill_line`, `WB037`).
+- **Never more than is left** on the bill, in all or in value taxed (`WB092`).
+- **Its number** is the next in its own series for the financial year, `CN/27-28/0001`, from the same counter table as
+  bills (`invoice_counters.series`). A bill prefix cannot be `CN`. Nobody can change or delete a credit note.
+- **What is owed** on a bill is its total, less credit notes, less payments (`invoice_balances`). Below zero, the parent
+  paid more than the bill now comes to: record a refund.
+- **The parent** sees the bill's credit notes listed on its link, and each opens as its own printable page.
+- **Reports** count each credit note in its own month, at minus: Billed is net of them, tax by rate subtracts their
+  lines, and the bills download lists them with their own number and date and the bill they are against.
+
+Section 34 lets a credit note reduce tax only until 30 November after the end of the year of the bill (or the annual
+return, if earlier). Wagbook does not stop a later one; it is then a commercial credit note.
 
 ## Invoice numbers
 
@@ -88,8 +118,10 @@ registration threshold. Your accountant will tell you when that changes.
 ### Rates and codes
 
 Wagbook does not ship a tax rate or a service accounting code (SAC) for boarding. It would be wrong to guess, and rates
-change. The kennel enters the rate its accountant gives it (`default_tax_rate_bp`, in basis points: 18% is `1800`), and
-optionally a rate and SAC on each service in the rate card. They are copied onto each booking and each invoice line.
+change. The kennel enters what its accountant gives it (D35): a usual rate (`default_tax_rate_bp`, in basis points:
+18% is `1800`); under Settings, a rate and a SAC code for boarding and for day boarding; and under Extras, a rate and a
+code for each extra. An empty rate means the usual rate. They are copied onto each booking and extra when it is made,
+and onto each bill line from there.
 
 ### The arithmetic
 
@@ -237,16 +269,15 @@ using letters, digits, hyphen and slash; a business may run more than one series
 ₹50,000 or more, or when the buyer asks (Rule 46(e) and (f),
 [gimbooks](https://www.gimbooks.com/blog/gst-invoice-mandatory-fields-rule-46-checklist/)). Wagbook prints what it has.
 
-**Cancelling an issued bill (questions 6 and 8).** As commonly practised: a bill not yet reported in the month's
+**Cancelling an issued bill (questions 6 and 8).** Built since as credit notes (D34, above). As commonly practised: a bill not yet reported in the month's
 GSTR-1 can be cancelled and reported as cancelled in the documents summary. Once reported, it is not cancelled but
 undone with a credit note under section 34, declared in the return for the month the credit note is issued, by
 30 November after the end of the financial year (or the annual return, if earlier). The earlier month's figure stays
 as filed; the reduction shows in the month of the credit note
 ([TaxTMI](https://www.taxtmi.com/forum/issue?id=113574),
 [taxguru](https://taxguru.in/goods-and-service-tax/adjustment-tax-liability-refund-gst-credit-note.html),
-[fintaxblog](https://fintaxblog.com/section-34-of-cgst-act-2017-credit-and-debit-notes/)). So for a registered kennel,
-Wagbook's tax by rate report is right only for a bill cancelled in the same month: it drops a bill cancelled later
-from the month it was issued, where the return already counted it. Credit notes are not built (see "Not built").
+[fintaxblog](https://fintaxblog.com/section-34-of-cgst-act-2017-credit-and-debit-notes/)). Wagbook now follows that: a tax invoice from an
+earlier month is credited, not cancelled, and reports count the credit note in its own month.
 
 **Keeping records (question 7).** Section 36 of the CGST Act: 72 months from the due date of the annual return for the
 year; longer while an appeal or proceeding is open
@@ -262,12 +293,11 @@ Write the answers in your own records, not in this repository.
 3. Which SAC or HSN code goes on each?
 4. Are my listed prices inclusive or exclusive of tax, and how should I show that to parents?
 5. Is `PREFIX/YY-YY/NNNN` acceptable as my invoice series?
-6. Does a voided invoice need a credit note instead once I am registered? (What we found says yes once the bill is in
-   a filed return; see above. Wagbook does not produce credit notes yet.)
+6. Wagbook cancels a tax invoice only in the month it was issued, and credits it after that (D34). If I file
+   quarterly, may I cancel within the quarter instead?
 7. What must I keep, and for how long?
-8. The Reports screen gives tax by rate from issued bills by bill date, leaving out bills cancelled since. What we
-   found says a bill cancelled after its month's return should count in that month and come off, by credit note, in
-   the month it was cancelled. Is that right for me, and do I need credit notes in Wagbook?
+8. Tax by rate counts bills by bill date and credit notes, at minus, by their own date. Is that the figure my return
+   needs?
 9. Bills are in English, with the headings also in Hindi or Kannada in brackets when a parent asks (D31). Is that
    acceptable on a tax invoice?
 10. Which rate and SAC apply to boarding, day boarding and grooming (998612, 996311 or another), and is any of it
@@ -275,7 +305,7 @@ Write the answers in your own records, not in this repository.
 
 ## Not built
 
-- Credit notes and debit notes.
+- Debit notes.
 - E-invoicing and e-way bills.
 - GST return exports. Reports gives tax by rate for a month and a CSV of bills, for the accountant to work from.
 - Multiple tax rates on one stay line.

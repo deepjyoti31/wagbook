@@ -54,6 +54,8 @@ alter table public.incidents enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_lines enable row level security;
 alter table public.invoice_counters enable row level security;
+alter table public.credit_notes enable row level security;
+alter table public.credit_note_lines enable row level security;
 alter table public.payments enable row level security;
 alter table public.expenses enable row level security;
 alter table public.intake_submissions enable row level security;
@@ -246,8 +248,17 @@ create policy invoice_lines_delete on public.invoice_lines for delete to authent
 
 grant select on public.invoice_balances to authenticated;
 
+-- Credit notes: any member reads them. Nobody writes them but
+-- issue_credit_note(), and nobody changes or deletes one: there are no grants
+-- for it.
+grant select on public.credit_notes, public.credit_note_lines to authenticated;
+create policy credit_notes_select on public.credit_notes for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy credit_note_lines_select on public.credit_note_lines for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+
 -- invoice_counters: row level security is on and there are no policies and no
--- grants, so nobody reaches it except issue_invoice().
+-- grants, so nobody reaches it except issue_invoice() and issue_credit_note().
 
 -- ---------------------------------------------------------------------------
 -- payments: any member records money received and reads; only managers
@@ -358,6 +369,7 @@ grant execute on function public.available_kennels(uuid, public.booking_kind, da
 grant execute on function public.generate_care_tasks(uuid, date) to authenticated;
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
+grant execute on function public.issue_credit_note(uuid, text, jsonb, jsonb) to authenticated;
 grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.stay_charges(uuid, uuid[]) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;

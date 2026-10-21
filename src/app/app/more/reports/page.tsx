@@ -96,8 +96,9 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
       <Section title={fill(r.moneyIn, { month: name })}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Figure label={r.billed} hint={charged && thisMonth ? includes(fmt(thisMonth.tax_minor)) : undefined}>
-            {fmt(thisMonth?.billed_minor ?? 0)}
+            {fmt((thisMonth?.billed_minor ?? 0) - (thisMonth?.credited_minor ?? 0))}
           </Figure>
+          {thisMonth && thisMonth.credited_minor > 0 ? <Figure label={r.credited}>{fmt(-thisMonth.credited_minor)}</Figure> : null}
           <Figure label={r.received}>{fmt(thisMonth?.received_minor ?? 0)}</Figure>
           {thisMonth && thisMonth.refunded_minor > 0 ? <Figure label={r.refunded}>{fmt(thisMonth.refunded_minor)}</Figure> : null}
           <Figure label={r.spent}>{fmt(thisMonth?.spent_minor ?? 0)}</Figure>
@@ -141,7 +142,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
                       {fill(r.shortMonth, { month: shortMonthName(x.month.slice(0, 7), locale), year: x.month.slice(2, 4) })}
                     </Link>
                   </th>
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.billed_minor)}</td>
+                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.billed_minor - x.credited_minor)}</td>
                   <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.received_minor - x.refunded_minor)}</td>
                   <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.spent_minor)}</td>
                 </tr>
@@ -160,7 +161,10 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
             <ul className="space-y-2">
               {tax.data.map((x) => (
                 <li key={x.tax_rate_bp} className="rounded-xl border border-rule bg-paper p-4">
-                  <p className="font-bold">{plural(language, x.bills, r.rateOnBills, { rate: x.tax_rate_bp / 100 })}</p>
+                  <p className="font-bold">
+                    {plural(language, x.bills, r.rateOnBills, { rate: x.tax_rate_bp / 100 })}
+                    {x.credit_notes > 0 ? `, ${plural(language, x.credit_notes, r.creditNotesIn)}` : ""}
+                  </p>
                   <dl className="mt-1 grid grid-cols-2 gap-x-4 text-sm">
                     <dt className="text-slate">{r.valueTaxed}</dt>
                     <dd className="text-right tabular-nums">{fmt(x.taxable_minor)}</dd>

@@ -587,8 +587,9 @@ because a vaccination card usually shows the owner's name and address.
 its parent is not that.
 
 **Cost.** Free text kept on a pet or incident can mention the parent ("mum says he bites"); it is not searched or
-emptied. A microchip number can be traced to its owner through a registry. Both are questions for the lawyer
-(`HANDOFF.md`). The pets cannot be shown in lists again, because their erased parent stays hidden.
+emptied, and is a question for the lawyer (`HANDOFF.md`). The microchip number stays with the pet: the owner's view
+(21 October 2026) is that it is not the parent's personal data. The pets cannot be shown in lists again, because their
+erased parent stays hidden.
 
 ## D31. Bills are in English; a parent may ask for their language alongside
 
@@ -652,3 +653,49 @@ shows staff a line saying who can change the numbers, instead of the boxes.
 **Why.** A wrong number sends a parent's updates and bills to someone else.
 
 **Cost.** A staff member who takes a new number from a parent at the gate asks a manager to put it in.
+
+## D34. A bill is taken back with a credit note
+
+**Status:** Decided, 21 October 2026, by the owner, after the research in `06` ("What the law says").
+
+**Situation.** An issued bill could only be cancelled, and a cancelled bill dropped out of the tax figure of the month
+it was issued. Under GST, a bill already reported in a return is not cancelled: it is undone with a credit note
+(section 34), counted in the month the credit note is issued. A kennel also needs to give back part of a bill, such as
+nights not stayed.
+
+**Decision.** Owners and managers make a credit note on an issued bill (`issue_credit_note`): the whole bill, while
+nothing has been credited (its own lines, to the paisa), or part of it (one line of an amount, at one of the bill's
+tax rates, `WB093`). Its tax is worked out as on the bill when the bill was issued (`invoices.prices_include_tax`
+frozen at issue, and the seller's frozen tax mode), and checked by the same function as a bill's lines
+(`check_bill_line`, `WB037`). It never takes back more than is left (`WB092`), needs a reason (`WB091`), and takes the
+next number in its own series per financial year, `CN/YY-YY/NNNN` (so no bill prefix may be `CN`). Nobody can change
+or delete one. What a bill owes is its total, less credit notes, less payments; below zero, a refund is owed. Reports
+and the bills download count each credit note in its own month, at minus. A tax invoice from an earlier month cannot
+be cancelled (`WB095`), nor a bill that has a credit note (`WB096`); cancelling stays for a mistake in the month it was
+made, and for a kennel that does not charge tax. The parent's bill link lists its credit notes, and each opens as its
+own printable page (`?cn=`).
+
+**Why.** It is what tax law asks of a registered kennel, and what any kennel needs for a partial refund. Keeping the
+bill as it was means a return already filed stays true.
+
+**Cost.** "Earlier month" assumes a monthly return; a kennel filing quarterly could have cancelled within the
+quarter. Credit notes have no time limit in Wagbook; section 34 says they reduce tax only until 30 November after the
+year ends (a credit note after that is a commercial one). There are no debit notes.
+
+## D35. The kennel sets its own tax rate and code for each price
+
+**Status:** Decided, 21 October 2026, by the owner, while question 10 in `06` waits for an accountant.
+
+**Situation.** Sources disagree on the GST rate and service code for boarding (`06`). The owner wants each kennel to
+apply its own accountant's answer, without waiting for one.
+
+**Decision.** Settings, Tax and invoices has a rate and a SAC code for boarding and for day boarding; Extras has a rate
+and a code for each extra, shown when the kennel charges tax. An empty rate means the kennel's usual rate. They are
+copied onto each booking and extra when it is made, and from there onto the bill (as before: `services.tax_rate_bp`,
+`services.sac_code`). Wagbook still ships no rate and no code.
+
+**Why.** The kennel answers for its own tax; Wagbook should make whatever its accountant says easy to apply.
+
+**Cost.** A changed rate applies to bookings made after the change; bookings already made keep the rate they were
+given, and a manager changes one by hand if needed.
+
