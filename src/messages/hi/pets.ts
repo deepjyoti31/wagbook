@@ -191,6 +191,29 @@ export const petsArea: typeof English = {
       gstState: "लिस्ट से राज्य चुनें।",
       onlyManagersMerge: "पेरेंट को सिर्फ़ मालिक या मैनेजर जोड़ सकते हैं।",
     },
+    // The parent's own booking link (D36). {name} is the parent's name.
+    // Day boarding packs the parent bought (D37).
+    packs: {
+      title: "डे बोर्डिंग पैक",
+      none: "अभी कोई पैक नहीं।",
+      line: "{name}: {days} में से {left} दिन बाकी, {until} तक",
+      ended: "{date} को खत्म",
+      sell: "पैक बेचें",
+      which: "पैक",
+      startsOn: "शुरू होगा",
+      selling: "बिल बना रहे हैं",
+      addFirst: "पहले एक्स्ट्रा में पैक जोड़ें।",
+      choose: "एक पैक चुनें।",
+      bill: "बिल",
+    },
+    requestLink: {
+      title: "बुकिंग लिंक",
+      about: "यह {name} को भेजें। वे अपने पालतुओं के लिए तारीखें चुनते हैं, और यह यहाँ अनुरोध के रूप में आता है। आपके पक्का करने तक कुछ बुक नहीं होता।",
+      send: "WhatsApp पर भेजें",
+      renew: "नया लिंक बनाएं",
+      renewHint: "पुराना लिंक काम करना बंद कर देगा।",
+      renewed: "नया लिंक बन गया। पुराना अब काम नहीं करता।",
+    },
     privacy: {
       title: "इनके बारे में हमारे पास क्या है",
       intro: "पेरेंट केनेल से अपनी पूरी जानकारी की कॉपी मांग सकते हैं, या उसे मिटाने के लिए कह सकते हैं।",

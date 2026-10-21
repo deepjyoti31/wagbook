@@ -33,6 +33,7 @@ describe("rateRuleFor", () => {
     expect(rateRuleFor("/login/code")?.name).toBe("sign-in");
     expect(rateRuleFor("/i/happy-tails")?.name).toBe("intake");
     expect(rateRuleFor("/join/abc")?.name).toBe("join");
+    expect(rateRuleFor("/b/abc")?.name).toBe("requests");
     expect(rateRuleFor("/app")).toBeNull();
     expect(rateRuleFor("/app/bookings/new")).toBeNull();
     expect(rateRuleFor("/loginx")).toBeNull();

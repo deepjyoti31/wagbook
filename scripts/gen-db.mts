@@ -62,6 +62,8 @@ export function errorCodes(): string {
     "| WB070 to WB079 | A parent's details: export and erase |",
     "| WB080 to WB089 | Daily care and incidents |",
     "| WB090 to WB099 | Credit notes |",
+    "| WB100 to WB109 | Booking requests from parents |",
+    "| WB110 to WB119 | Day boarding packs |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

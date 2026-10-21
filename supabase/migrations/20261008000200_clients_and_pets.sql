@@ -20,6 +20,7 @@ create table public.clients (
   consent_at timestamptz,
   consent_source text check (consent_source is null or consent_source in ('intake_form', 'staff')),
   bill_translation text check (bill_translation is null or bill_translation in ('hi', 'kn')),
+  request_token text unique default public.new_token(),
   created_by uuid references auth.users (id) on delete set null,
   deleted_at timestamptz,
   erased_at timestamptz,
@@ -42,6 +43,8 @@ comment on column public.clients.consent_at is 'When the parent agreed to the ke
 comment on column public.clients.consent_source is 'intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent.';
 comment on column public.clients.bill_translation is
   'Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only.';
+comment on column public.clients.request_token is
+  'Secret in the parent''s own booking link (/b/{token}), where they ask for a stay. renew_request_link() replaces it, so an old link stops working; erasing the parent clears it.';
 comment on column public.clients.deleted_at is 'Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense.';
 comment on column public.clients.erased_at is
   'When the parent''s details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it.';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeKennels, petMatches, sharedWith, stayFromForm, type KennelHold } from "./bookings";
+import { freeKennels, payFromPacks, petMatches, seriesDates, sharedWith, stayFromForm, type KennelHold } from "./bookings";
 
 describe("the stay a booking form describes", () => {
   it("reads an empty check-out as one day of day boarding", () => {
@@ -96,5 +96,29 @@ describe("who a kennel would be shared with", () => {
       { id: "b3", kennelId: "c", clientId: "p1", kind: "boarding", startDate: "2027-05-04", endDate: "2027-05-06", petName: "Later" },
     ] as const;
     expect([...sharedWith(stay, holds)]).toEqual([["a", ["Bruno"]]]);
+  });
+});
+
+describe("repeating day boarding", () => {
+  it("lists the chosen weekdays between two dates", () => {
+    // 5 April 2027 is a Monday.
+    expect(seriesDates("2027-04-05", "2027-04-18", [1, 3])).toEqual(["2027-04-05", "2027-04-07", "2027-04-12", "2027-04-14"]);
+    expect(seriesDates("2027-04-05", "2027-04-05", [1])).toEqual(["2027-04-05"]);
+    expect(seriesDates("2027-04-05", "2027-04-04", [1])).toBeNull();
+    expect(seriesDates("2027-04-06", "2027-04-06", [1])).toBeNull();
+    expect(seriesDates("2027-04-05", "2027-04-18", [])).toBeNull();
+    expect(seriesDates("2027-04-05", "2027-04-18", [7])).toBeNull();
+    expect(seriesDates("2027-01-01", "2027-12-31", [0, 1, 2, 3, 4, 5, 6])).toBeNull();
+  });
+
+  it("pays each day from the pack that ends soonest and covers it, while it has days", () => {
+    const packs = [
+      { id: "late", startsOn: "2027-04-01", validUntil: "2027-05-31", daysLeft: 5 },
+      { id: "soon", startsOn: "2027-04-01", validUntil: "2027-04-10", daysLeft: 1 },
+    ];
+    expect(payFromPacks(["2027-04-05", "2027-04-07", "2027-04-12"], packs)).toEqual(["soon", "late", "late"]);
+    expect(payFromPacks(["2027-06-01"], packs)).toEqual([null]);
+    // Two pets a day take two days.
+    expect(payFromPacks(["2027-04-05", "2027-04-06"], [{ id: "p", startsOn: "2027-04-01", validUntil: "2027-04-30", daysLeft: 3 }], 2)).toEqual(["p", null]);
   });
 });

@@ -1091,3 +1091,102 @@ test("a manager takes back part of a paid bill with a credit note, and the paren
   expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await parent.context.close();
 });
+
+test("Today lists the reminders to send, and one sent leaves the list", async ({ page, context }) => {
+  await signIn(page, "staff");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  await page.locator("select[name=kind]").selectOption("daycare");
+  await page.getByLabel("Check-in date").fill(day(1));
+  await page.getByLabel("Check-out date").fill(day(1));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+
+  await page.goto("/app");
+  const toSend = page.locator("section").filter({ has: page.getByRole("heading", { name: new RegExp(`^${en.today.toSend}`) }) });
+  const arrival = toSend.getByRole("listitem").filter({ hasText: en.today.reminderKinds.arrival }).filter({ hasText: "Tofu" });
+  await expect(arrival).toBeVisible();
+  const link = arrival.getByRole("link", { name: /Neha Placeholder/ });
+  expect(decodeURIComponent((await link.getAttribute("href"))!)).toContain("see you and Tofu tomorrow");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  // Send opens WhatsApp in a new tab and marks it sent.
+  const [whatsapp] = await Promise.all([context.waitForEvent("page"), link.click()]);
+  await whatsapp.close();
+  await expect(arrival).toHaveCount(0);
+});
+
+test("a parent asks for a stay through their own link, and it waits as a request", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await openPet(page, "Rocky");
+  await page.getByRole("link", { name: "Vikram Mock" }).click();
+  const send = page.getByRole("link", { name: en.parent.requestLink.send });
+  const text = decodeURIComponent((await send.getAttribute("href"))!);
+  const url = /https?:\/\/\S+\/b\/[0-9a-f]{64}/.exec(text)![0];
+
+  const parent = await privateWindow(browser);
+  await parent.page.goto(url.replace(/^https?:\/\/[^/]+/, ""));
+  await expect(parent.page.getByText(/Hello Vikram/)).toBeVisible();
+  await parent.page.getByRole("checkbox", { name: "Luna" }).check();
+  await parent.page.getByLabel(en.requestForm.checkIn).fill(day(120));
+  await parent.page.getByLabel(en.requestForm.checkOut).fill(day(123));
+  await parent.page.getByLabel(en.requestForm.note).fill("Luna is nervous of thunder");
+  await parent.page.getByRole("button", { name: en.requestForm.send }).click();
+  await expect(parent.page.getByText(en.requestForm.sent)).toBeVisible();
+  await parent.page.reload();
+  await expect(parent.page.getByText(en.requestForm.status.requested, { exact: true })).toBeVisible();
+  expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await parent.context.close();
+
+  await page.goto("/app");
+  await expect(page.getByText("One request from a parent is waiting.")).toBeVisible();
+  // A new link, and the old one stops working.
+  await openPet(page, "Rocky");
+  await page.getByRole("link", { name: "Vikram Mock" }).click();
+  await page.getByRole("button", { name: en.parent.requestLink.renew }).click();
+  await expect(page.getByText(en.parent.requestLink.renewed)).toBeVisible();
+  // The page streams, so the old link answers with the not-found page rather than a 404 status.
+  const old = await privateWindow(browser);
+  await old.page.goto(url.replace(/^https?:\/\/[^/]+/, ""));
+  await expect(old.page.getByRole("button", { name: en.requestForm.send })).toHaveCount(0);
+  await expect(old.page.getByText(/Hello Vikram/)).toHaveCount(0);
+  await old.context.close();
+});
+
+test("a regular buys a pack of days, and repeating day boarding is paid from it", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/extras");
+  const packForm = page.locator("form").filter({ has: page.getByRole("button", { name: en.extras.addPack }) });
+  await packForm.getByLabel(en.extras.packName, { exact: true }).fill("10 days");
+  await packForm.getByLabel(en.extras.packDays, { exact: true }).fill("10");
+  await packForm.getByLabel(en.extras.packPrice, { exact: true }).fill("6000");
+  await packForm.getByLabel(en.extras.packValid).fill("60");
+  await packForm.getByRole("button", { name: en.extras.addPack }).click();
+  await expect(page.getByText("Added 10 days.")).toBeVisible();
+
+  await openPet(page, "Tofu");
+  await page.getByRole("link", { name: "Neha Placeholder" }).click();
+  await page.getByLabel(en.parent.packs.startsOn).fill(day(90));
+  await page.getByRole("button", { name: en.parent.packs.sell }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
+  await expect(page.getByText(/10 days: 10 days of day boarding/)).toBeVisible();
+  await page.getByRole("button", { name: "Issue bill" }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
+  await page.locator("select[name=kind]").selectOption("daycare");
+  await page.getByLabel("Check-in date").fill(day(91));
+  await page.getByText(en.newBooking.repeat, { exact: true }).click();
+  for (const box of await page.locator("input[name=repeat_day]").all()) await box.check();
+  await page.locator("input[name=repeat_until]").fill(day(97));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  await expect(page.getByText("Repeats: 7 days in all, 7 still to come.")).toBeVisible();
+  await expect(page.getByText("Paid from the pack 10 days.")).toBeVisible();
+  await expect(page.getByText("Day boarding, from a pack, 1 x ₹0")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+  await openPet(page, "Tofu");
+  await page.getByRole("link", { name: "Neha Placeholder" }).click();
+  await expect(page.getByText(/10 days: 3 of 10 days left/)).toBeVisible();
+});

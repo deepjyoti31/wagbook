@@ -34,6 +34,8 @@ export const RATE_RULES: RateRule[] = [
   // A parent sends the form once, perhaps again after fixing a mistake.
   { name: "intake", matches: (p) => p.startsWith("/i/"), limit: 10, windowSeconds: 10 * 60 },
   { name: "join", matches: (p) => p.startsWith("/join/"), limit: 20, windowSeconds: 10 * 60 },
+  // A parent asking for a stay through their own booking link.
+  { name: "requests", matches: (p) => p.startsWith("/b/"), limit: 10, windowSeconds: 10 * 60 },
 ];
 
 export function rateRuleFor(path: string): RateRule | null {

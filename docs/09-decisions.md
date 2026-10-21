@@ -699,3 +699,77 @@ copied onto each booking and extra when it is made, and from there onto the bill
 **Cost.** A changed rate applies to bookings made after the change; bookings already made keep the rate they were
 given, and a manager changes one by hand if needed.
 
+## D36. A known parent asks for a stay through their own link
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** Regular parents ask for dates on WhatsApp, and staff type the booking in. The intake form is for a new
+parent and asks for everything again.
+
+**Decision.** Each parent has a booking link of their own (`/b/{token}`, `clients.request_token`), sent from their
+page by WhatsApp or copied. Behind it the parent sees their pets' names and their stays already asked for or booked,
+and asks for pets, a kind of stay and dates, with a note. Each pet becomes a booking with status `requested`, priced at
+the kennel's usual price, from the parent (`source = 'parent'`). A request holds no kennel; staff confirm it as any
+request, and Today says how many are waiting. Two public functions do this (`get_public_booking_form`,
+`submit_booking_request`), with the limits in `05`. Any member can make a new link, which ends the old one; Settings
+can turn requests off; erasing the parent clears the link.
+
+**Why.** It saves the back and forth, and a request can never take space from anyone, so a forwarded link costs at
+most a request to decline.
+
+**Cost.** Two more things a stranger can call (eight in all). A parent sees their own stays' dates through the link,
+so a forwarded link shows them to whoever holds it.
+
+## D37. Day boarding regulars: repeating days and prepaid packs
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** A regular comes for day boarding on set weekdays, and many kennels sell days in advance.
+
+**Decision.** New booking repeats day boarding on chosen weekdays until a date (70 days at most, one pet): each day is
+its own booking, sharing `series_id`, so check in, care and cancelling work as for any day; the booking page says how
+many are left and cancels the rest in one go. Kennels define packs on Extras (`day_packs`: days, price, how long it
+lasts, tax rate and code), and owners and managers sell one from the parent's page (`passes`), which makes a draft bill
+for it. A day boarding booking paid from a pack costs nothing on its own (`pass_id`, rate 0); New booking pays from
+the parent's packs when asked (the pack ending soonest first), and the booking page offers "Pay from the pack" when
+one covers it, which staff may use. The database keeps a pack from giving more days than were bought, inside its
+dates, for its own parent's day boarding (`bookings_check_pass`, `WB110` to `WB112`); requests and cancelled days hold
+none. What a pack has left is `pass_balances`.
+
+**Why.** Regulars are a large share of day boarding, and paying in advance is how they usually pay.
+
+**Cost.** A series is not billed together: a day not on a pack is billed on its own. A day that did not come (no-show)
+still uses a pack day. Selling a pack is for owners and managers.
+
+## D38. GSTR-1 files for the accountant
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** A GST-registered kennel files GSTR-1 each month, and its accountant retypes bills from the bills
+download.
+
+**Decision.** Reports offers, for a GST kennel, the month's GSTR-1 as CSV files in the columns of the GST offline tool:
+b2b, b2cl (another state, over ₹1 lakh, from August 2024), b2cs (added up, less credit notes on such bills), cdnr,
+cdnur, hsn and docs (`gstr1Sheet()` in `src/lib/core/gstr1.ts`). Column names are the tool's own, in English, and the
+files have no byte order mark.
+
+**Why.** The numbers already exist; laying them out saves the accountant a day.
+
+**Cost.** The column names were written from the tool's templates as we know them and could not be checked against
+the tool from here: check them before the first upload. The newer split of the HSN table into B2B and B2C is not done.
+
+## D39. Reminders are a list to send, not messages Wagbook sends
+
+**Status:** Decided, 21 October 2026, by the owner.
+
+**Situation.** Staff forget to ask for a vaccination card, say see you tomorrow, or chase an unpaid bill.
+
+**Decision.** Today lists what is due (`remindersToSend()`): a vaccination card for a stay within a week, arrivals
+and pick-ups tomorrow, and bills issued three or more days ago with money owed. Send opens WhatsApp with the message
+typed, in the kennel's language for parents, and records it (`reminders_sent`), so it leaves the list; an unpaid bill
+comes back three days later. Wagbook sends nothing itself (`07`).
+
+**Why.** The staff member's own WhatsApp, at no cost, as everywhere else in Wagbook.
+
+**Cost.** Tapping Send marks it sent even if the person then does not press Send in WhatsApp.
+

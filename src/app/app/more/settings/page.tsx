@@ -250,6 +250,10 @@ async function Settings() {
             <input type="checkbox" name="intake_enabled" defaultChecked={org.intake_enabled} className="mt-1 size-5" />
             <span>{s.intake.enabled}</span>
           </label>
+          <label className="flex items-start gap-3">
+            <input type="checkbox" name="requests_enabled" defaultChecked={org.requests_enabled} className="mt-1 size-5" />
+            <span>{s.intake.requestsEnabled}</span>
+          </label>
           <Field label={s.intake.notice} hint={s.intake.noticeHint}>
             <Textarea name="intake_notice" defaultValue={org.intake_notice ?? ""} maxLength={1500} />
           </Field>

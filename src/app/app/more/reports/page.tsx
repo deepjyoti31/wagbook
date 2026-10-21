@@ -7,7 +7,7 @@ import { Rich } from "@/components/rich";
 import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { taxLabel } from "@/lib/billing";
-import { formatDate, formatMoney, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
+import { formatDate, formatMoney, GSTR1_PARTS, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { DOWNLOADS } from "@/lib/reports";
@@ -205,6 +205,21 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         )}
         <p className="mt-2 text-sm text-slate">{fill(r.extrasNote, { month: name })}</p>
       </Section>
+
+      {gst ? (
+        <Section title={r.gstr1.title}>
+          <p className="mb-3 text-slate">{r.gstr1.about}</p>
+          <ul className="space-y-1">
+            {GSTR1_PARTS.map((part) => (
+              <li key={part}>
+                <a href={`/app/more/reports/gstr1?month=${month}&part=${part}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+                  {r.gstr1[part]}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
       <Section title={r.downloadTitle}>
         <form action="/app/more/reports/download" method="get" className="space-y-4 rounded-xl border border-rule bg-paper p-4">

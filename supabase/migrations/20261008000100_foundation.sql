@@ -173,6 +173,7 @@ create table public.organizations (
   play_break_start time,
   play_break_end time,
   intake_enabled boolean not null default true,
+  requests_enabled boolean not null default true,
   intake_notice text,
   parent_language text not null default 'en' check (parent_language in ('en', 'hi', 'kn')),
   created_at timestamptz not null default now(),
@@ -215,6 +216,7 @@ comment on column public.organizations.play_day_end is 'When the play yards clos
 comment on column public.organizations.play_break_start is 'Start of an optional break in play, such as the midday heat. Empty for no break.';
 comment on column public.organizations.play_break_end is 'End of the optional break in play.';
 comment on column public.organizations.intake_enabled is 'Whether the public intake form at /i/{slug} accepts submissions.';
+comment on column public.organizations.requests_enabled is 'Whether parents can ask for stays through their own booking link (/b/{token}, submit_booking_request).';
 comment on column public.organizations.intake_notice is 'Privacy and consent text shown on the intake form, in the kennel''s own words. A default, in the parent pages'' language, is used when empty.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 

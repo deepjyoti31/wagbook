@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { formatDate, isISODate, parseMoney, todayIn } from "@/lib/core";
+import { diffDays, formatDate, isISODate, parseMoney, payFromPacks, seriesDates, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
-import { text, type FormState } from "@/lib/forms";
+import { checked, text, type FormState } from "@/lib/forms";
 import { searchPets, type PetChoice } from "@/lib/pet-search";
 import { fill } from "@/lib/i18n";
 import { getAppI18n, type I18n } from "@/lib/i18n-server";
-import type { TablesUpdate } from "@/lib/supabase/database.types";
+import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
@@ -102,13 +102,65 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
   const rateMinor = typed ?? service.data?.price_minor ?? null;
   if (rateMinor === null) return { error: (canManage ? e.noPriceManager : e.noPriceStaff)[b.kind] };
 
+  // Day boarding that repeats (D37): one booking a day, sharing a series id, for one pet.
+  const repeatDays = form.getAll("repeat_day").map(Number);
+  const repeatUntil = text(form, "repeat_until");
+  let days: string[] | null = null;
+  if (repeatDays.length > 0 || repeatUntil) {
+    if (b.kind !== "daycare") return { error: e.repeatDaycare };
+    if (b.petIds.length !== 1) return { error: e.repeatOnePet };
+    days = seriesDates(b.startDate, repeatUntil ?? "", repeatDays);
+    if (!days) return { error: e.repeatDates };
+  }
+
+  // Days paid from the parent's day boarding packs, when asked: the pack that ends soonest first.
+  const firstDay = days?.[0] ?? b.startDate;
+  const lastDay = days?.[days.length - 1] ?? b.endDate;
+  let packFor: (string | null)[] = [];
+  if (b.kind === "daycare" && checked(form, "use_pack")) {
+    const packs = await supabase
+      .from("pass_balances")
+      .select("pass_id, starts_on, valid_until, days_left")
+      .eq("org_id", org.id)
+      .eq("client_id", clientId)
+      .gt("days_left", 0)
+      .lte("starts_on", lastDay)
+      .gte("valid_until", firstDay);
+    if (packs.error) return { error: friendlyError(packs.error, t) };
+    const usable = packs.data.map((p) => ({ id: p.pass_id as string, startsOn: p.starts_on as string, validUntil: p.valid_until as string, daysLeft: p.days_left ?? 0 }));
+    if (days) packFor = payFromPacks(days, usable);
+    else {
+      // One stay of one or more days, for each pet: a pack must cover all of it.
+      const units = diffDays(b.startDate, b.endDate) + 1;
+      const left = new Map(usable.map((p) => [p.id, p.daysLeft]));
+      packFor = b.petIds.map(() => {
+        const pack = [...usable]
+          .sort((x, y) => x.validUntil.localeCompare(y.validUntil))
+          .find((p) => p.startsOn <= b.startDate && b.endDate <= p.validUntil && (left.get(p.id) ?? 0) >= units);
+        if (!pack) return null;
+        left.set(pack.id, (left.get(pack.id) ?? 0) - units);
+        return pack.id;
+      });
+    }
+  }
+  const paid = (i: number): Partial<TablesInsert<"bookings">> => (packFor[i] ? { rate_minor: 0, alone_rate_minor: null, pass_id: packFor[i] } : {});
+
   const groupId = b.petIds.length > 1 ? crypto.randomUUID() : null;
+  const seriesId = days ? crypto.randomUUID() : null;
   // The second of two sharing pays the shared kennel price, and the usual price for any night it has the kennel to itself.
   const sharedMinor = together ? (service.data?.shared_price_minor ?? null) : null;
-  const { data, error } = await supabase
-    .from("bookings")
-    .insert(
-      b.petIds.map((petId, i) => ({
+  const base = {
+    org_id: org.id,
+    client_id: clientId,
+    kind: b.kind,
+    status: b.status,
+    tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
+    sac_code: service.data?.sac_code ?? null,
+    notes: b.notes,
+  };
+  const rows: TablesInsert<"bookings">[] = days
+    ? days.map((d, i) => ({ ...base, pet_id: b.petIds[0], start_date: d, end_date: d, kennel_id: b.kennelId, rate_minor: rateMinor, series_id: seriesId, ...paid(i) }))
+    : b.petIds.map((petId, i) => ({
         org_id: org.id,
         client_id: clientId,
         pet_id: petId,
@@ -120,13 +172,13 @@ export async function createBooking(_state: FormState, form: FormData): Promise<
         kennel_id: i === 0 || together ? b.kennelId : null,
         rate_minor: i === 1 && sharedMinor !== null ? sharedMinor : rateMinor,
         alone_rate_minor: i === 1 && sharedMinor !== null ? rateMinor : null,
-        tax_rate_bp: org.tax_mode === "none" ? 0 : (service.data?.tax_rate_bp ?? org.default_tax_rate_bp),
-        sac_code: service.data?.sac_code ?? null,
+        tax_rate_bp: base.tax_rate_bp,
+        sac_code: base.sac_code,
         notes: b.notes,
         group_id: groupId,
-      })),
-    )
-    .select("id");
+        ...paid(i),
+      }));
+  const { data, error } = await supabase.from("bookings").insert(rows).select("id");
   if (error) return { error: friendlyError(error, t) };
 
   revalidatePath("/app", "layout");
@@ -423,4 +475,68 @@ export async function findPets(query: string): Promise<PetChoice[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Cancel this day of a repeating series and every later day not yet started
+ * (D37). Anyone who may cancel a booking; a reason is required, as for one.
+ */
+export async function cancelSeriesRest(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.booking.errors;
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: t.m.errors.bookingNotFound };
+  const reason = text(form, "reason");
+  if (!reason) return { error: e.cancelReason };
+  if (reason.length > 500) return { error: e.cancelReasonLong };
+  const supabase = await createClient();
+  const current = await supabase.from("bookings").select("series_id, start_date").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  if (current.error) return { error: friendlyError(current.error, t) };
+  if (!current.data?.series_id) return { error: t.m.errors.bookingNotFound };
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled", cancel_reason: reason })
+    .eq("org_id", org.id)
+    .eq("series_id", current.data.series_id)
+    .gte("start_date", current.data.start_date)
+    .in("status", ["requested", "confirmed"]);
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  redirect(`/app/bookings/${id.data}?done=series_cancelled`);
+}
+
+/**
+ * Pay a day boarding booking from the parent's pack (D37): the pack that ends
+ * soonest among those covering its days with enough left. Staff may do it;
+ * the database checks the pack (bookings_check_pass) and refuses taking a day
+ * back off a pack to anyone but owners and managers.
+ */
+export async function payFromPack(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const id = Id.safeParse(form.get("bookingId"));
+  if (!id.success) return { error: t.m.errors.bookingNotFound };
+  const supabase = await createClient();
+  const b = await supabase.from("bookings").select("client_id, kind, start_date, end_date, pass_id, pet_id").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  if (b.error) return { error: friendlyError(b.error, t) };
+  if (!b.data || b.data.kind !== "daycare" || b.data.pass_id) return { error: t.m.errors.bookingNotFound };
+  const units = diffDays(b.data.start_date, b.data.end_date) + 1;
+  const packs = await supabase
+    .from("pass_balances")
+    .select("pass_id, days_left")
+    .eq("org_id", org.id)
+    .eq("client_id", b.data.client_id)
+    .lte("starts_on", b.data.start_date)
+    .gte("valid_until", b.data.end_date)
+    .gte("days_left", units)
+    .order("valid_until")
+    .limit(1);
+  if (packs.error) return { error: friendlyError(packs.error, t) };
+  const pass = packs.data[0]?.pass_id;
+  if (!pass) return { error: t.m.booking.errors.noPack };
+  const { error } = await supabase.from("bookings").update({ pass_id: pass, rate_minor: 0 }).eq("org_id", org.id).eq("id", id.data).is("pass_id", null);
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  redirect(`/app/bookings/${id.data}?done=pack`);
 }

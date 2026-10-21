@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { isGstStateCode, isValidGstin, normalizePhone } from "@/lib/core";
+import { addDays, formatDate, isGstStateCode, isISODate, isValidGstin, normalizePhone, todayIn } from "@/lib/core";
+import { billFromLines, draftPayload } from "@/lib/billing";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { setHidden } from "@/lib/hiding";
@@ -92,6 +93,19 @@ export async function updateClient(_state: FormState, form: FormData): Promise<F
   return { ok: m.common.saved };
 }
 
+/** A new booking link for a parent (D36); the old one stops working. Any member; the database makes the secret. */
+export async function renewRequestLink(_state: FormState, form: FormData): Promise<FormState> {
+  await requireOrg();
+  const t = await getAppI18n();
+  const clientId = Id.safeParse(form.get("clientId"));
+  if (!clientId.success) return { error: t.m.errors.parentNotFound };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("renew_request_link", { p_client: clientId.data });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.parent.requestLink.renewed };
+}
+
 /**
  * Merge a duplicate into this parent: their pets, stays, bills and payments
  * move here and the duplicate disappears from lists. Owners and managers; the
@@ -155,4 +169,57 @@ export async function eraseClient(_state: FormState, form: FormData): Promise<Fo
   if (filesLeft) console.error("eraseClient: some files were not removed", clientId.data);
   revalidatePath("/app", "layout");
   redirect(`/app/dogs?done=${filesLeft ? "erased-files-left" : "erased"}`);
+}
+
+/**
+ * Sell a parent a day boarding pack (D37): the pack, and a draft bill for it
+ * to issue. Owners and managers (the database's policy on passes says so too).
+ * The bill line is stored in English like every bill line (D31).
+ */
+export async function sellPack(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const w = t.m.parent.packs;
+  if (!canManage) return { error: t.m.errors.codes.WB002 };
+  const clientId = Id.safeParse(form.get("clientId"));
+  const packId = Id.safeParse(form.get("packId"));
+  if (!clientId.success) return { error: t.m.errors.parentNotFound };
+  if (!packId.success) return { error: w.choose };
+  const startsOn = text(form, "starts_on") ?? todayIn(org.time_zone);
+  if (!isISODate(startsOn)) return { error: t.m.booking.errors.validDate };
+
+  const supabase = await createClient();
+  const pack = await supabase.from("day_packs").select("id, name, days, price_minor, valid_days, tax_rate_bp, sac_code").eq("org_id", org.id).eq("id", packId.data).eq("is_active", true).maybeSingle();
+  if (pack.error) return { error: friendlyError(pack.error, t) };
+  if (!pack.data) return { error: w.choose };
+  const p = pack.data;
+  const validUntil = addDays(startsOn, p.valid_days - 1);
+
+  const totals = billFromLines(org, [
+    {
+      description: `${p.name}: ${p.days} days of day boarding, ${formatDate(startsOn)} to ${formatDate(validUntil)}`.slice(0, 300),
+      quantity: 1,
+      unitPriceMinor: p.price_minor,
+      taxRateBp: org.tax_mode === "none" ? 0 : (p.tax_rate_bp ?? org.default_tax_rate_bp),
+      sacCode: p.sac_code,
+    },
+  ]);
+  const bill = await supabase.from("invoices").insert({ org_id: org.id, client_id: clientId.data }).select("id").single();
+  if (bill.error) return { error: friendlyError(bill.error, t) };
+  const saved = await supabase.rpc("save_invoice_draft", { p_invoice: bill.data.id, ...draftPayload(totals) });
+  if (saved.error) return { error: friendlyError(saved.error, t) };
+  const pass = await supabase.from("passes").insert({
+    org_id: org.id,
+    client_id: clientId.data,
+    day_pack_id: p.id,
+    name: p.name,
+    days: p.days,
+    price_minor: p.price_minor,
+    starts_on: startsOn,
+    valid_until: validUntil,
+    invoice_id: bill.data.id,
+  });
+  if (pass.error) return { error: friendlyError(pass.error, t) };
+  revalidatePath("/app", "layout");
+  redirect(`/app/bills/${bill.data.id}`);
 }

@@ -20,3 +20,5 @@ export * from "./tax";
 export * from "./upi";
 export * from "./vaccinations";
 export * from "./whatsapp";
+export * from "./reminders";
+export * from "./gstr1";

@@ -797,6 +797,149 @@ create trigger organizations_lock_billing_settings
   for each row execute function public.organizations_lock_billing_settings();
 
 -- ---------------------------------------------------------------------------
+-- Day boarding packs
+--
+-- A kennel sells regulars a pack of day boarding days (10 days within 60 days)
+-- up front, on one bill. Each day boarding booking paid from the pack then
+-- costs nothing on its own (bookings.pass_id, rate 0), and the pack can never
+-- give more days than were bought.
+-- ---------------------------------------------------------------------------
+
+create table public.day_packs (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 80),
+  days integer not null check (days between 1 and 365),
+  price_minor bigint not null check (price_minor >= 0),
+  valid_days integer not null check (valid_days between 1 and 730),
+  tax_rate_bp integer check (tax_rate_bp is null or tax_rate_bp between 0 and 10000),
+  sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id, id)
+);
+
+comment on table public.day_packs is 'The day boarding packs a kennel sells: so many days, at a price, to use within so many days.';
+comment on column public.day_packs.days is 'How many days of day boarding the pack gives.';
+comment on column public.day_packs.valid_days is 'How long it lasts from the day it starts, in days: 60 means the start day and the 59 after it.';
+comment on column public.day_packs.tax_rate_bp is 'Tax rate on the pack''s bill, in basis points. Empty: the kennel''s usual rate.';
+comment on column public.day_packs.sac_code is 'Service code printed on the pack''s bill. The kennel''s accountant decides it.';
+comment on column public.day_packs.is_active is 'False once taken off the list: packs already sold keep working.';
+
+create trigger day_packs_set_updated_at
+  before update on public.day_packs
+  for each row execute function public.set_updated_at();
+
+create table public.passes (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  client_id uuid not null,
+  day_pack_id uuid,
+  name text not null check (char_length(name) between 1 and 80),
+  days integer not null check (days between 1 and 365),
+  price_minor bigint not null check (price_minor >= 0),
+  starts_on date not null,
+  valid_until date not null,
+  invoice_id uuid,
+  created_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  unique (org_id, id),
+  foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
+  foreign key (org_id, day_pack_id) references public.day_packs (org_id, id) on delete set null (day_pack_id),
+  foreign key (org_id, invoice_id) references public.invoices (org_id, id) on delete set null (invoice_id),
+  constraint passes_dates_in_order check (valid_until >= starts_on and valid_until - starts_on <= 730)
+);
+
+comment on table public.passes is
+  'A day boarding pack a parent bought: so many days to use between two dates. Day boarding bookings paid from it name it (bookings.pass_id).';
+comment on column public.passes.name is 'The pack''s name when it was sold, so renaming the pack later does not change what the parent bought.';
+comment on column public.passes.days is 'Days of day boarding bought. pass_balances says how many are used and left.';
+comment on column public.passes.invoice_id is 'The bill the pack was sold on.';
+
+create index passes_org_client_idx on public.passes (org_id, client_id, valid_until);
+
+create trigger passes_stamp_actor
+  before insert or update on public.passes
+  for each row execute function public.stamp_actor('created_by');
+
+alter table public.bookings
+  add constraint bookings_pass_fkey foreign key (org_id, pass_id) references public.passes (org_id, id) on delete restrict;
+
+-- The days of a pack that bookings hold: confirmed, in house, gone home, or
+-- did not come (the kennel kept the place). Not requests, not cancellations.
+create view public.pass_balances
+with (security_invoker = true)
+as
+select
+  p.id as pass_id,
+  p.org_id,
+  p.client_id,
+  p.name,
+  p.days,
+  p.starts_on,
+  p.valid_until,
+  p.invoice_id,
+  coalesce(u.used, 0)::integer as days_used,
+  (p.days - coalesce(u.used, 0))::integer as days_left
+from public.passes p
+left join lateral (
+  select sum(b.end_date - b.start_date + 1) as used
+  from public.bookings b
+  where b.org_id = p.org_id and b.pass_id = p.id and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show')
+) u on true;
+
+comment on view public.pass_balances is 'Each day boarding pack with the days used (bookings that hold a place) and the days left.';
+
+-- A day paid from a pack must be day boarding of the parent who bought it,
+-- inside the pack's dates, and the pack must have the days. Bookings on one
+-- pack queue while counting, so two at the same moment cannot both take its
+-- last day. Runs as the caller (row level security applies).
+create function public.bookings_check_pass()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_pass public.passes;
+  v_used integer;
+begin
+  -- Merging two parents moves bookings before their packs (merge_clients).
+  if new.pass_id is null or new.status not in ('requested', 'confirmed', 'checked_in', 'checked_out', 'no_show')
+     or coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    return new;
+  end if;
+  -- One booking at a time per pack: a lock on the pack's id, which staff may
+  -- take (a row lock would need the right to change the pack).
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('pass:' || new.pass_id::text, 0));
+  select * into v_pass from public.passes p where p.org_id = new.org_id and p.id = new.pass_id;
+  if v_pass.id is null or v_pass.client_id <> new.client_id or new.kind <> 'daycare' then
+    raise exception 'WB110: a day boarding pack is for day boarding of the parent who bought it' using errcode = '23514';
+  end if;
+  if new.start_date < v_pass.starts_on or new.end_date > v_pass.valid_until then
+    raise exception 'WB111: the pack is for % to %, and these days are outside it', v_pass.starts_on, v_pass.valid_until using errcode = '23514';
+  end if;
+  if new.status = 'requested' then
+    return new;
+  end if;
+  select coalesce(sum(b.end_date - b.start_date + 1), 0) into v_used
+  from public.bookings b
+  where b.org_id = new.org_id and b.pass_id = new.pass_id and b.id <> new.id
+    and b.status in ('confirmed', 'checked_in', 'checked_out', 'no_show');
+  if v_used + (new.end_date - new.start_date + 1) > v_pass.days then
+    raise exception 'WB112: the pack has % days left', greatest(v_pass.days - v_used, 0) using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.bookings_check_pass() is
+  'Trigger: a day boarding booking paid from a pack must be day boarding of the pack''s parent (WB110), inside its dates (WB111), and, once it holds a place, within the days left (WB112).';
+
+create trigger bookings_check_pass
+  before insert or update of pass_id, status, start_date, end_date, kind, client_id on public.bookings
+  for each row execute function public.bookings_check_pass();
+
+-- ---------------------------------------------------------------------------
 -- Credit notes
 --
 -- A credit note takes back all or part of an issued bill, in the month it is
@@ -1158,6 +1301,8 @@ begin
   -- Anything else that names the parent.
   update public.bookings b set client_id = v_keep.id where b.org_id = v_keep.org_id and b.client_id = v_merge.id;
   update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
+  -- Day boarding packs go with the parent, and so do the days paid from them.
+  update public.passes ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
   perform set_config('wagbook.merging', 'off', true);
   -- Play sessions copy their parent from the booking whenever they are written.
   update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;

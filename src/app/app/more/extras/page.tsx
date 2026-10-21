@@ -6,7 +6,7 @@ import { formatMoney, toDecimalString } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
-import { addExtraService, changeExtraPrice, removeExtraService } from "./actions";
+import { addDayPack, addExtraService, changeExtraPrice, removeDayPack, removeExtraService } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.extras.title);
 
@@ -25,6 +25,8 @@ async function Extras() {
   const supabase = await createClient();
   const { data, error } = await supabase.from("services").select("id, name, unit, price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name");
   if (error) throw new Error("Could not load extras.");
+  const packs = await supabase.from("day_packs").select("id, name, days, price_minor, valid_days").eq("org_id", org.id).eq("is_active", true).order("days");
+  if (packs.error) throw new Error("Could not load packs.");
   // Rates and codes matter only to a kennel that charges tax (D35).
   const taxed = org.tax_mode !== "none";
 
@@ -132,6 +134,61 @@ async function Extras() {
           </ActionForm>
         </Section>
       ) : null}
+
+      <Section title={x.packsTitle} count={packs.data.length}>
+        <p className="mb-3 text-slate">{x.packsAbout}</p>
+        {packs.data.length === 0 ? (
+          <Empty>{x.packsEmpty}</Empty>
+        ) : (
+          <Ledger>
+            {packs.data.map((p) => (
+              <LedgerRow key={p.id}>
+                <span className="min-w-0 flex-1">
+                  <span className="font-bold">{p.name}</span>{" "}
+                  <span className="text-slate">
+                    {fill(x.packShown, { days: p.days, price: formatMoney(p.price_minor, { currency: org.currency, locale, trimZeros: true }), valid: p.valid_days })}
+                  </span>
+                </span>
+                {canManage ? (
+                  <ActionForm action={removeDayPack} className="contents">
+                    <input type="hidden" name="packId" value={p.id} />
+                    <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
+                      {m.common.remove}
+                    </SubmitButton>
+                  </ActionForm>
+                ) : null}
+              </LedgerRow>
+            ))}
+          </Ledger>
+        )}
+        {canManage ? (
+          <ActionForm action={addDayPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
+            <Field label={x.packName}>
+              <Input name="name" required maxLength={80} placeholder={x.packNameExample} />
+            </Field>
+            <Field label={x.packDays}>
+              <Input name="days" inputMode="numeric" required />
+            </Field>
+            <Field label={x.packPrice}>
+              <Input name="price" inputMode="decimal" required />
+            </Field>
+            <Field label={x.packValid}>
+              <Input name="valid_days" inputMode="numeric" required defaultValue="60" />
+            </Field>
+            {taxed ? (
+              <>
+                <Field label={x.rate} hint={x.rateHint}>
+                  <Input name="rate" inputMode="decimal" />
+                </Field>
+                <Field label={x.sac}>
+                  <Input name="sac" inputMode="numeric" maxLength={8} />
+                </Field>
+              </>
+            ) : null}
+            <SubmitButton pendingLabel={m.common.saving}>{x.addPack}</SubmitButton>
+          </ActionForm>
+        ) : null}
+      </Section>
     </>
   );
 }

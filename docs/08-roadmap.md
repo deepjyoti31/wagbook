@@ -369,14 +369,36 @@ settings, security review and fixes, documentation.
 
 ---
 
+## M16. Reminders to send
+
+- [x] Finished 21 October 2026. Today lists vaccination cards to ask for, arrivals and pick-ups tomorrow, and unpaid
+  bills; Send opens WhatsApp and the reminder leaves the list (D39).
+
+---
+
+## M17. Booking requests from parents
+
+- [x] Finished 21 October 2026. A parent's own link, requests that hold no kennel, two public functions (D36).
+
+---
+
+## M18. Day boarding regulars
+
+- [x] Finished 21 October 2026. Repeating day boarding, day boarding packs sold with a bill, days paid from packs (D37).
+
+---
+
+## M19. GSTR-1 files
+
+- [x] Finished 21 October 2026. The month's bills and credit notes as the GST offline tool's CSV files (D38).
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
-- Recurring day boarding (every weekday).
 - Waiting list when full.
-- Packages and prepaid passes.
-- Parent self-booking requests from a public page.
 - Multiple sites under one owner with combined reports.
 - Staff rota and attendance.
 - Stock of food and medicines.

@@ -98,6 +98,7 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
             defaultEnd: end && isISODate(end) ? end : "",
             defaultKennelId: kennel && kennels.data.some((k) => k.id === kennel) ? kennel : "",
             sharedPrice: { boarding: sharedPrice("boarding"), daycare: sharedPrice("daycare") },
+            locale,
           }}
         />
         {canManage ? (

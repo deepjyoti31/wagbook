@@ -79,3 +79,42 @@ export async function removeExtraService(_state: FormState, form: FormData): Pro
   revalidatePath("/app", "layout");
   return { ok: t.m.extras.removed };
 }
+
+/** Add a day boarding pack to sell (D37): so many days, at a price, to use within so many days. Owners and managers. */
+export async function addDayPack(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.extras.errors;
+  if (!canManage) return { error: e.onlyManagers };
+  const name = text(form, "name");
+  if (!name || name.length > 80) return { error: e.packName };
+  const days = Number(text(form, "days"));
+  if (!Number.isInteger(days) || days < 1 || days > 365) return { error: e.packDays };
+  const valid = Number(text(form, "valid_days"));
+  if (!Number.isInteger(valid) || valid < 1 || valid > 730) return { error: e.packValid };
+  const price = parseMoney(text(form, "price") ?? "");
+  if (price === null || price < 0) return { error: e.price };
+  const tax = form.has("rate") ? extraTax(form, e) : null;
+  if (tax && "error" in tax) return tax;
+  const supabase = await createClient();
+  const { error } = await supabase.from("day_packs").insert({ org_id: org.id, name, days, valid_days: valid, price_minor: price, ...(tax ?? {}) });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: fill(t.m.extras.packAdded, { name }) };
+}
+
+/** Take a pack off the list. Packs already sold keep working. */
+export async function removeDayPack(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.extras.errors;
+  if (!canManage) return { error: e.onlyManagers };
+  const id = Id.safeParse(form.get("packId"));
+  if (!id.success) return { error: e.notFound };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("day_packs").update({ is_active: false }).eq("org_id", org.id).eq("id", id.data).select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: e.notFound };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.extras.packRemoved };
+}

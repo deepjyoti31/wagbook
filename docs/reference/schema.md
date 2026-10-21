@@ -6,13 +6,13 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 11. Tables: 26. Views: 1. Functions: 72.
+Migrations applied: 11. Tables: 29. Views: 2. Functions: 76.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
-- Views: [invoice_balances](#invoice_balances)
+- Tables: [audit_log](#audit_log), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [clients](#clients), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [expenses](#expenses), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [reminders_sent](#reminders_sent), [services](#services), [stay_updates](#stay_updates), [vaccinations](#vaccinations)
+- Views: [invoice_balances](#invoice_balances), [pass_balances](#pass_balances)
 - [Functions](#functions)
 
 ## Enumerated types
@@ -157,8 +157,10 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `vaccinations_checked_at` | `timestamp with time zone` |  |  | When a staff member confirmed at check-in that they had seen the pet's vaccination certificates. Stamped by the database. |
 | `vaccinations_checked_by` | `uuid` |  |  | Who confirmed the vaccinations at check-in. Stamped by the database. |
 | `notes` | `text` |  |  |  |
-| `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. |
+| `source` | `text` | yes | `'staff'::text` | staff: entered by the kennel. intake: started from the public intake form. parent: asked for by the parent through their booking link, as a request. |
 | `group_id` | `uuid` |  |  | Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill. |
+| `series_id` | `uuid` |  |  | Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own. |
+| `pass_id` | `uuid` |  |  | The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero. |
 | `public_token` | `text` | yes | `new_token()` | Secret in the parent's stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else. |
 | `created_by` | `uuid` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -177,6 +179,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - Foreign key `bookings_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
 - Foreign key `bookings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `bookings_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE SET NULL (kennel_id)`
+- Foreign key `bookings_pass_fkey`: `FOREIGN KEY (org_id, pass_id) REFERENCES passes(org_id, id) ON DELETE RESTRICT`
 - Foreign key `bookings_vaccinations_checked_by_fkey`: `FOREIGN KEY (vaccinations_checked_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Exclusion `bookings_no_kennel_overlap`: `EXCLUDE USING gist (kennel_id WITH =, stay_range(kind, start_date, end_date) WITH &&, client_id WITH <>) WHERE (((kennel_id IS NOT NULL) AND (status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status]))))`
 - Exclusion `bookings_no_pet_overlap`: `EXCLUDE USING gist (pet_id WITH =, stay_range(kind, start_date, end_date) WITH &&) WHERE ((status = ANY (ARRAY['confirmed'::booking_status, 'checked_in'::booking_status])))`
@@ -188,16 +191,20 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - Check `bookings_day_part_has_a_price`: `CHECK (((boarding_from IS NULL) = (day_rate_minor IS NULL)))`
 - Check `bookings_day_rate_minor_check`: `CHECK (((day_rate_minor IS NULL) OR (day_rate_minor >= 0)))`
 - Check `bookings_discount_minor_check`: `CHECK ((discount_minor >= 0))`
+- Check `bookings_pass_covers_the_price`: `CHECK (((pass_id IS NULL) OR ((kind = 'daycare'::booking_kind) AND (rate_minor = 0) AND (discount_minor = 0) AND (alone_rate_minor IS NULL) AND (boarding_from IS NULL))))`
 - Check `bookings_rate_minor_check`: `CHECK ((rate_minor >= 0))`
 - Check `bookings_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
-- Check `bookings_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'intake'::text])))`
+- Check `bookings_series_is_day_boarding`: `CHECK (((series_id IS NULL) OR (kind = 'daycare'::booking_kind)))`
+- Check `bookings_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'intake'::text, 'parent'::text])))`
 - Check `bookings_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
 
 **Indexes**
 
 - `CREATE INDEX bookings_org_client_idx ON public.bookings USING btree (org_id, client_id)`
 - `CREATE INDEX bookings_org_dates_idx ON public.bookings USING btree (org_id, start_date, end_date)`
+- `CREATE INDEX bookings_org_pass_idx ON public.bookings USING btree (org_id, pass_id) WHERE (pass_id IS NOT NULL)`
 - `CREATE INDEX bookings_org_pet_idx ON public.bookings USING btree (org_id, pet_id)`
+- `CREATE INDEX bookings_org_series_idx ON public.bookings USING btree (org_id, series_id) WHERE (series_id IS NOT NULL)`
 - `CREATE INDEX bookings_org_status_idx ON public.bookings USING btree (org_id, status)`
 
 **Triggers**
@@ -205,6 +212,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
+- `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
 - `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
@@ -342,6 +350,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 | `consent_at` | `timestamp with time zone` |  |  | When the parent agreed to the kennel holding their details. Evidence for DPDP. |
 | `consent_source` | `text` |  |  | intake_form: the parent ticked the box themselves. staff: a staff member recorded verbal consent. |
 | `bill_translation` | `text` |  |  | Bills are in English. A parent who asks gets each heading of their bills also in this language, in brackets: hi or kn. Empty: English only. |
+| `request_token` | `text` |  | `new_token()` | Secret in the parent's own booking link (/b/{token}), where they ask for a stay. renew_request_link() replaces it, so an old link stops working; erasing the parent clears it. |
 | `created_by` | `uuid` |  |  |  |
 | `deleted_at` | `timestamp with time zone` |  |  | Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense. |
 | `erased_at` | `timestamp with time zone` |  |  | When the parent's details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it. |
@@ -352,6 +361,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 
 - Primary key `clients_pkey`: `PRIMARY KEY (id)`
 - Unique `clients_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `clients_request_token_key`: `UNIQUE (request_token)`
 - Foreign key `clients_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Foreign key `clients_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `clients_alt_phone_check`: `CHECK (((alt_phone IS NULL) OR (alt_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
@@ -502,6 +512,49 @@ A credit note: takes back all or part of an issued bill, counted in the month it
 
 - Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
 - `credit_notes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### day_packs
+
+The day boarding packs a kennel sells: so many days, at a price, to use within so many days.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `name` | `text` | yes |  |  |
+| `days` | `integer` | yes |  | How many days of day boarding the pack gives. |
+| `price_minor` | `bigint` | yes |  |  |
+| `valid_days` | `integer` | yes |  | How long it lasts from the day it starts, in days: 60 means the start day and the 59 after it. |
+| `tax_rate_bp` | `integer` |  |  | Tax rate on the pack's bill, in basis points. Empty: the kennel's usual rate. |
+| `sac_code` | `text` |  |  | Service code printed on the pack's bill. The kennel's accountant decides it. |
+| `is_active` | `boolean` | yes | `true` | False once taken off the list: packs already sold keep working. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `day_packs_pkey`: `PRIMARY KEY (id)`
+- Unique `day_packs_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `day_packs_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `day_packs_days_check`: `CHECK (((days >= 1) AND (days <= 365)))`
+- Check `day_packs_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `day_packs_price_minor_check`: `CHECK ((price_minor >= 0))`
+- Check `day_packs_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `day_packs_tax_rate_bp_check`: `CHECK (((tax_rate_bp IS NULL) OR ((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000))))`
+- Check `day_packs_valid_days_check`: `CHECK (((valid_days >= 1) AND (valid_days <= 730)))`
+
+**Triggers**
+
+- `day_packs_forbid_org_change` (before update) runs `forbid_org_change()`
+- `day_packs_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `day_packs_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `day_packs_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `day_packs_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `day_packs_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### expenses
 
@@ -1017,6 +1070,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `play_break_start` | `time without time zone` |  |  | Start of an optional break in play, such as the midday heat. Empty for no break. |
 | `play_break_end` | `time without time zone` |  |  | End of the optional break in play. |
 | `intake_enabled` | `boolean` | yes | `true` | Whether the public intake form at /i/{slug} accepts submissions. |
+| `requests_enabled` | `boolean` | yes | `true` | Whether parents can ask for stays through their own booking link (/b/{token}, submit_booking_request). |
 | `intake_notice` | `text` |  |  | Privacy and consent text shown on the intake form, in the kennel's own words. A default, in the parent pages' language, is used when empty. |
 | `parent_language` | `text` | yes | `'en'::text` | Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request). |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -1058,6 +1112,56 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - `organizations_delete` (delete): rows where `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 - `organizations_select` (select): rows where `(id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `organizations_update` (update): rows where `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### passes
+
+A day boarding pack a parent bought: so many days to use between two dates. Day boarding bookings paid from it name it (bookings.pass_id).
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  |  |
+| `day_pack_id` | `uuid` |  |  |  |
+| `name` | `text` | yes |  | The pack's name when it was sold, so renaming the pack later does not change what the parent bought. |
+| `days` | `integer` | yes |  | Days of day boarding bought. pass_balances says how many are used and left. |
+| `price_minor` | `bigint` | yes |  |  |
+| `starts_on` | `date` | yes |  |  |
+| `valid_until` | `date` | yes |  |  |
+| `invoice_id` | `uuid` |  |  | The bill the pack was sold on. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `passes_pkey`: `PRIMARY KEY (id)`
+- Unique `passes_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `passes_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `passes_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE RESTRICT`
+- Foreign key `passes_org_id_day_pack_id_fkey`: `FOREIGN KEY (org_id, day_pack_id) REFERENCES day_packs(org_id, id) ON DELETE SET NULL (day_pack_id)`
+- Foreign key `passes_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `passes_org_id_invoice_id_fkey`: `FOREIGN KEY (org_id, invoice_id) REFERENCES invoices(org_id, id) ON DELETE SET NULL (invoice_id)`
+- Check `passes_dates_in_order`: `CHECK (((valid_until >= starts_on) AND ((valid_until - starts_on) <= 730)))`
+- Check `passes_days_check`: `CHECK (((days >= 1) AND (days <= 365)))`
+- Check `passes_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `passes_price_minor_check`: `CHECK ((price_minor >= 0))`
+
+**Indexes**
+
+- `CREATE INDEX passes_org_client_idx ON public.passes USING btree (org_id, client_id, valid_until)`
+
+**Triggers**
+
+- `passes_forbid_org_change` (before update) runs `forbid_org_change()`
+- `passes_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `passes_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `passes_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `passes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `passes_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### payments
 
@@ -1302,6 +1406,43 @@ A fenced area where one pet at a time plays or exercises.
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### reminders_sent
+
+A reminder a person sent a parent from Today, on WhatsApp from their own phone: so it leaves the list. Wagbook sends nothing itself.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `kind` | `text` | yes |  | vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed. |
+| `subject_id` | `uuid` | yes |  | The booking (vaccination, arrival, pickup) or the bill (unpaid) it was about. |
+| `sent_on` | `date` | yes |  | The kennel's date it was sent. An unpaid bill comes back three days later. |
+| `sent_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `reminders_sent_pkey`: `PRIMARY KEY (id)`
+- Foreign key `reminders_sent_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `reminders_sent_sent_by_fkey`: `FOREIGN KEY (sent_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `reminders_sent_kind_check`: `CHECK ((kind = ANY (ARRAY['vaccination'::text, 'arrival'::text, 'pickup'::text, 'unpaid'::text])))`
+
+**Indexes**
+
+- `CREATE INDEX reminders_sent_org_subject_idx ON public.reminders_sent USING btree (org_id, subject_id, kind)`
+
+**Triggers**
+
+- `reminders_sent_forbid_org_change` (before update) runs `forbid_org_change()`
+- `reminders_sent_stamp_actor` (before insert) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `reminders_sent_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `reminders_sent_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `reminders_sent_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### services
 
 The rate card. A boarding or daycare row sets the price of a stay; addon rows are extras such as grooming or pick-up.
@@ -1470,6 +1611,25 @@ Each invoice with what has been paid against it, what credit notes took off it, 
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
+### pass_balances
+
+Each day boarding pack with the days used (bookings that hold a place) and the days left.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `pass_id` | `uuid` |  |  |  |
+| `org_id` | `uuid` |  |  |  |
+| `client_id` | `uuid` |  |  |  |
+| `name` | `text` |  |  |  |
+| `days` | `integer` |  |  |  |
+| `starts_on` | `date` |  |  |  |
+| `valid_until` | `date` |  |  |  |
+| `invoice_id` | `uuid` |  |  |  |
+| `days_used` | `integer` |  |  |  |
+| `days_left` | `integer` |  |  |  |
+
+**Access**: signed-in users may select. Runs with the caller's row level security.
+
 ## Functions
 
 Who may call: **public** means anyone, signed in or not. **signed-in** means any authenticated user (the function itself then checks membership and role). **internal** means no API role can call it; it runs only from triggers or other functions.
@@ -1557,6 +1717,18 @@ bookings_check_group() returns trigger
 - Volatility: volatile
 
 Trigger: every booking sharing a group_id has the same client (WB024), and a booking's group_id never changes (WB026).
+
+### bookings_check_pass
+
+```
+bookings_check_pass() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a day boarding booking paid from a pack must be day boarding of the pack's parent (WB110), inside its dates (WB111), and, once it holds a place, within the days left (WB112).
 
 ### bookings_check_shared_price
 
@@ -1773,6 +1945,18 @@ get_invitation_link(p_token text) returns TABLE(org_name text, role member_role,
 - Volatility: stable
 
 What an invitation link is for (kennel name, role, name), for a signed-in person holding it, and whether it can still be used.
+
+### get_public_booking_form
+
+```
+get_public_booking_form(p_token text) returns jsonb
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, and their stays already asked for or booked (dates and status only). Nothing for a hidden or erased parent.
 
 ### get_public_intake_form
 
@@ -2098,6 +2282,18 @@ protect_last_owner() returns trigger
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
 
+### renew_request_link
+
+```
+renew_request_link(p_client uuid) returns text
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Gives a parent a new booking link and returns its token; the old link stops working. Any member of the parent's kennel.
+
 ### report_extras
 
 ```
@@ -2301,6 +2497,18 @@ storage_org_id(p_object_name text) returns uuid
 - Volatility: immutable
 
 The organisation a stored file belongs to, read from the first folder of its path. Null when the path does not start with an organisation id.
+
+### submit_booking_request
+
+```
+submit_booking_request(p_token text, p_payload jsonb) returns integer
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).
 
 ### submit_intake
 

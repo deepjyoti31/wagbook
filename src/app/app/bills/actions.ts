@@ -36,7 +36,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
   // The stays this bill covers: the booking, or its family.
   const stays = await supabase
     .from("bookings")
-    .select("id, client_id, kind, start_date, end_date, boarding_from, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
+    .select("id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)")
     .eq("org_id", org.id)
     .in(group ? "group_id" : "id", [group ?? booking.data.id])
     .in("status", group ? [...BILLABLE_IN_FAMILY] : ["confirmed", "checked_in", "checked_out", "no_show"])

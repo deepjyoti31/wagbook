@@ -160,3 +160,38 @@ export function sharedWith(
   }
   return names;
 }
+
+/** The most days one repeating series makes. */
+export const MAX_SERIES_DAYS = 70;
+
+/**
+ * The days of a repeating day boarding series: every date from `start` to
+ * `until` (both included) that falls on one of `weekdays` (0 Sunday to 6
+ * Saturday). At most MAX_SERIES_DAYS; null when the series is not valid.
+ */
+export function seriesDates(start: ISODate, until: ISODate, weekdays: readonly number[]): ISODate[] | null {
+  if (!isISODate(start) || !isISODate(until) || until < start || weekdays.length === 0) return null;
+  if (weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) return null;
+  const out: ISODate[] = [];
+  for (let d = start; d <= until; d = addDays(d, 1)) {
+    if (weekdays.includes(new Date(`${d}T00:00:00Z`).getUTCDay())) out.push(d);
+    if (out.length > MAX_SERIES_DAYS) return null;
+  }
+  return out.length > 0 ? out : null;
+}
+
+/**
+ * Which days of a series a parent's packs pay for: each day goes on the pack
+ * that ends soonest among those that cover it and still have days left. A day
+ * no pack covers is null (it is priced as usual).
+ */
+export function payFromPacks(dates: readonly ISODate[], packs: readonly { id: string; startsOn: ISODate; validUntil: ISODate; daysLeft: number }[], petsPerDay = 1): (string | null)[] {
+  const left = new Map(packs.map((p) => [p.id, p.daysLeft]));
+  const order = [...packs].sort((a, b) => a.validUntil.localeCompare(b.validUntil));
+  return dates.map((d) => {
+    const pack = order.find((p) => p.startsOn <= d && d <= p.validUntil && (left.get(p.id) ?? 0) >= petsPerDay);
+    if (!pack) return null;
+    left.set(pack.id, (left.get(pack.id) ?? 0) - petsPerDay);
+    return pack.id;
+  });
+}

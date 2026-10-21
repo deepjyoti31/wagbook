@@ -150,6 +150,8 @@ export type Database = {
           notes: string | null;
           source: string;
           group_id: string | null;
+          series_id: string | null;
+          pass_id: string | null;
           public_token: string;
           created_by: string | null;
           created_at: string;
@@ -187,6 +189,8 @@ export type Database = {
           notes?: string | null;
           source?: string;
           group_id?: string | null;
+          series_id?: string | null;
+          pass_id?: string | null;
           public_token?: string;
           created_by?: string | null;
           created_at?: string;
@@ -224,6 +228,8 @@ export type Database = {
           notes?: string | null;
           source?: string;
           group_id?: string | null;
+          series_id?: string | null;
+          pass_id?: string | null;
           public_token?: string;
           created_by?: string | null;
           created_at?: string;
@@ -256,6 +262,13 @@ export type Database = {
             columns: ["org_id", "kennel_id"];
             isOneToOne: false;
             referencedRelation: "kennels";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "bookings_pass_fkey";
+            columns: ["org_id", "pass_id"];
+            isOneToOne: false;
+            referencedRelation: "passes";
             referencedColumns: ["org_id", "id"];
           },
         ];
@@ -418,6 +431,7 @@ export type Database = {
           consent_at: string | null;
           consent_source: string | null;
           bill_translation: string | null;
+          request_token: string | null;
           created_by: string | null;
           deleted_at: string | null;
           erased_at: string | null;
@@ -442,6 +456,7 @@ export type Database = {
           consent_at?: string | null;
           consent_source?: string | null;
           bill_translation?: string | null;
+          request_token?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
@@ -466,6 +481,7 @@ export type Database = {
           consent_at?: string | null;
           consent_source?: string | null;
           bill_translation?: string | null;
+          request_token?: string | null;
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
@@ -635,6 +651,56 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "invoices";
             referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      day_packs: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          days: number;
+          price_minor: number;
+          valid_days: number;
+          tax_rate_bp: number | null;
+          sac_code: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          days: number;
+          price_minor: number;
+          valid_days: number;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          days?: number;
+          price_minor?: number;
+          valid_days?: number;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "day_packs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -1276,6 +1342,7 @@ export type Database = {
           play_break_start: string | null;
           play_break_end: string | null;
           intake_enabled: boolean;
+          requests_enabled: boolean;
           intake_notice: string | null;
           parent_language: string;
           created_at: string;
@@ -1320,6 +1387,7 @@ export type Database = {
           play_break_start?: string | null;
           play_break_end?: string | null;
           intake_enabled?: boolean;
+          requests_enabled?: boolean;
           intake_notice?: string | null;
           parent_language?: string;
           created_at?: string;
@@ -1364,12 +1432,87 @@ export type Database = {
           play_break_start?: string | null;
           play_break_end?: string | null;
           intake_enabled?: boolean;
+          requests_enabled?: boolean;
           intake_notice?: string | null;
           parent_language?: string;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
+        ];
+      };
+      passes: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          day_pack_id: string | null;
+          name: string;
+          days: number;
+          price_minor: number;
+          starts_on: string;
+          valid_until: string;
+          invoice_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          day_pack_id?: string | null;
+          name: string;
+          days: number;
+          price_minor: number;
+          starts_on: string;
+          valid_until: string;
+          invoice_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          day_pack_id?: string | null;
+          name?: string;
+          days?: number;
+          price_minor?: number;
+          starts_on?: string;
+          valid_until?: string;
+          invoice_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "passes_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "passes_org_id_day_pack_id_fkey";
+            columns: ["org_id", "day_pack_id"];
+            isOneToOne: false;
+            referencedRelation: "day_packs";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "passes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "passes_org_id_invoice_id_fkey";
+            columns: ["org_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["org_id", "id"];
+          },
         ];
       };
       payments: {
@@ -1706,6 +1849,44 @@ export type Database = {
           },
         ];
       };
+      reminders_sent: {
+        Row: {
+          id: string;
+          org_id: string;
+          kind: string;
+          subject_id: string;
+          sent_on: string;
+          sent_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kind: string;
+          subject_id: string;
+          sent_on: string;
+          sent_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kind?: string;
+          subject_id?: string;
+          sent_on?: string;
+          sent_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reminders_sent_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       services: {
         Row: {
           id: string;
@@ -1900,6 +2081,21 @@ export type Database = {
         };
         Relationships: [];
       };
+      pass_balances: {
+        Row: {
+          pass_id: string | null;
+          org_id: string | null;
+          client_id: string | null;
+          name: string | null;
+          days: number | null;
+          starts_on: string | null;
+          valid_until: string | null;
+          invoice_id: string | null;
+          days_used: number | null;
+          days_left: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       accept_intake: {
@@ -1961,6 +2157,10 @@ export type Database = {
       get_invitation_link: {
         Args: { p_token: string };
         Returns: { org_name: string; role: Database["public"]["Enums"]["member_role"]; display_name: string; usable: boolean; already_member: boolean }[];
+      };
+      get_public_booking_form: {
+        Args: { p_token: string };
+        Returns: Json;
       };
       get_public_intake_form: {
         Args: { p_slug: string };
@@ -2030,6 +2230,10 @@ export type Database = {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
       };
+      renew_request_link: {
+        Args: { p_client: string };
+        Returns: string;
+      };
       report_extras: {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { name: string; stays: number; quantity: number; amount_minor: number }[];
@@ -2081,6 +2285,10 @@ export type Database = {
       storage_org_id: {
         Args: { p_object_name: string };
         Returns: string;
+      };
+      submit_booking_request: {
+        Args: { p_token: string; p_payload: Json };
+        Returns: number;
       };
       submit_intake: {
         Args: { p_slug: string; p_payload: Json };

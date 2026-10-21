@@ -38,6 +38,11 @@ describe("stay lines", () => {
     ]);
   });
 
+  it("says a day was paid from a pack", () => {
+    const lines = stayLines({ kind: "daycare", petName: "Tofu", startDate: "2027-04-14", endDate: "2027-04-14", rateMinor: 0, fromPack: true });
+    expect(lines[0]).toMatchObject({ description: "Day boarding: Tofu, 1 day from a pack (14 Apr 2027 to 14 Apr 2027)", unitPriceMinor: 0 });
+  });
+
   it("reads an unknown part as the whole stay", () => {
     expect(toStayCharges([{ part: "other", quantity: 1, unit_price_minor: 1, discount_minor: 0 }])[0].part).toBe("stay");
   });

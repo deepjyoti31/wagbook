@@ -28,6 +28,8 @@ export const bookingsArea = {
       no_show: "Marked as did not arrive. The space is free again.",
       extended: "Stay extended to today.",
       boarding: "Now boarding. The days before the first night are billed as day boarding.",
+      series_cancelled: "The rest of the series is cancelled. Those days are free again.",
+      pack: "Paid from the pack. The day costs nothing on its own now.",
     },
     // {name} is the name of a busy period the kennel set, like "Diwali".
     peakNoRefund: "{name}, no refund",
@@ -45,6 +47,13 @@ export const bookingsArea = {
     kennelWith: "{kennel}, with {pets}",
     // On a booking whose kennel holds a sibling too.
     sharesWith: "Shares {kennel} with {pets}.",
+    // Day boarding regulars (D37).
+    seriesNote: "Repeats: {n} days in all, {left} still to come.",
+    cancelRest: "Cancel the rest of the series",
+    cancelRestHint: "Cancels this day and every later day of the series that has not started.",
+    cancellingRest: "Cancelling",
+    fromPackNote: "Paid from the pack {name}.",
+    usePack: "Pay from the pack {name} ({left} days left)",
     // A stay that began as day boarding and now stays nights. {date} is the last day of day boarding, {night} the first night.
     dayThenBoarding: "Day boarding until {date}, then staying nights from {night}.",
     costs: {
@@ -58,6 +67,7 @@ export const bookingsArea = {
       // A pet at the shared kennel price: nights with its sibling, and nights it had the kennel to itself. {what} is "Boarding" or "Day boarding".
       shared: "{what}, sharing a kennel",
       alone: "{what}, kennel to itself",
+      fromPack: "{what}, from a pack",
     },
     extra: {
       title: "Add an extra",
@@ -192,6 +202,10 @@ export const bookingsArea = {
     },
     // What the booking Server Actions say.
     errors: {
+      noPack: "The parent has no pack with enough days for this stay.",
+      repeatOnePet: "A repeating series is for one pet. Book each pet on its own.",
+      repeatDates: "Choose at least one day of the week and an end date, up to 70 days in all.",
+      repeatDaycare: "Only day boarding repeats.",
       validDate: "Choose a valid date.",
       clock: "Enter a time like 10:30.",
       choosePet: "Choose a pet.",
@@ -250,6 +264,12 @@ export const bookingsArea = {
     checkInDate: "Check-in date",
     checkOutDate: "Check-out date",
     checkOutHint: "For a single day of day boarding, leave this empty.",
+    // Day boarding that repeats on weekdays (D37). Weekday names come from the browser's language.
+    repeat: "Repeat",
+    repeatOn: "Repeat on these days",
+    repeatUntil: "Until",
+    repeatHint: "For a regular. Each day becomes its own booking, up to 70 days.",
+    usePack: "Pay from the parent's day boarding pack when they have days on one",
     kennel: "Kennel",
     kennelHint: "You can leave this until check-in. Space is still held. Other pets booked together get theirs at check-in.",
     decideAtCheckIn: "Decide at check-in",

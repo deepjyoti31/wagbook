@@ -158,6 +158,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     prices_include_tax: checked(form, "prices_include_tax"),
     invoice_prefix: prefix,
     intake_enabled: checked(form, "intake_enabled"),
+    requests_enabled: checked(form, "requests_enabled"),
     intake_notice: text(form, "intake_notice"),
     parent_language: parentLanguage,
   };

@@ -199,6 +199,29 @@ export const petsArea = {
       gstState: "Choose the state from the list.",
       onlyManagersMerge: "Only an owner or manager can merge parents.",
     },
+    // The parent's own booking link (D36). {name} is the parent's name.
+    // Day boarding packs the parent bought (D37).
+    packs: {
+      title: "Day boarding packs",
+      none: "No packs yet.",
+      line: "{name}: {left} of {days} days left, until {until}",
+      ended: "ended {date}",
+      sell: "Sell a pack",
+      which: "Pack",
+      startsOn: "Starts on",
+      selling: "Making the bill",
+      addFirst: "Add packs on Extras first.",
+      choose: "Choose a pack.",
+      bill: "Bill",
+    },
+    requestLink: {
+      title: "Booking link",
+      about: "Send this to {name}. They pick dates for their pets, and it arrives here as a request. Nothing is booked until you confirm it.",
+      send: "Send on WhatsApp",
+      renew: "Make a new link",
+      renewHint: "The old link stops working.",
+      renewed: "New link made. The old one no longer works.",
+    },
     privacy: {
       title: "What we hold about them",
       intro: "A parent may ask for a copy of everything the kennel holds about them, or ask for it to be erased.",

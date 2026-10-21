@@ -303,6 +303,22 @@ Write the answers in your own records, not in this repository.
 10. Which rate and SAC apply to boarding, day boarding and grooming (998612, 996311 or another), and is any of it
     exempt?
 
+## GSTR-1 files
+
+Reports offers a GST-registered kennel the month's GSTR-1 as the GST offline tool's CSV files (D38,
+`src/lib/core/gstr1.ts`): b2b (bills to a buyer with a GSTIN, one row per bill and rate), b2cl (no GSTIN, another state,
+over ₹1 lakh, the limit from 1 August 2024 under Rule 59(4)), b2cs (every other bill, added up by place of supply and
+rate, less the month's credit notes on such bills), cdnr and cdnur (credit notes on b2b and b2cl bills), hsn (value
+and tax by SAC and rate, less credit notes) and docs (the numbers used, with cancelled bills). Dates are written
+14-Apr-2027, places of supply 29-Karnataka, and the files have no byte order mark. The column names were written from
+the tool's templates as we know them: check them against the tool before the first upload. The HSN table's newer split
+into B2B and B2C rows is not done.
+
+## Day boarding packs
+
+A pack is sold on its own bill (one line: the pack, its days and dates, at its price, rate and code). Days paid from it
+are at ₹0 on their own bills, described "from a pack" (D37).
+
 ## Not built
 
 - Debit notes.

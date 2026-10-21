@@ -34,6 +34,8 @@ export interface BillableBooking {
   boarding_from?: string | null;
   /** The stay's lines from stay_charges() in the database. Without them, every night at rate_minor. */
   charges?: readonly StayCharge[];
+  /** The day boarding pack it is paid from, if any. */
+  pass_id?: string | null;
 }
 
 export interface BillableItem {
@@ -61,6 +63,7 @@ export function billForBooking(org: OrgTax, petName: string, b: BillableBooking,
     sacCode: b.sac_code,
     boardingFrom: b.boarding_from,
     charges: b.charges,
+    fromPack: Boolean(b.pass_id),
     addOns: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp, sacCode: i.sac_code })),
   });
   return computeInvoice(lines, taxContext(org), { roundToWholeUnit: org.round_invoice_totals });
@@ -96,6 +99,7 @@ export function billForFamily(org: OrgTax, members: readonly FamilyMember[]): In
       sacCode: b.sac_code,
       boardingFrom: b.boarding_from,
       charges: b.charges,
+      fromPack: Boolean(b.pass_id),
       addOns: items.map((i) => ({
         description: `${petName}: ${i.description}`.slice(0, 300),
         quantity: Number(i.quantity),

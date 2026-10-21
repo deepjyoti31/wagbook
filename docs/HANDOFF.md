@@ -2,11 +2,15 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after milestones M14 (the owner's answers) and M15 (credit notes, the kennel's own tax rates).
+Last updated: 21 October 2026, after milestones M16 to M19 (reminders, booking requests, day boarding regulars, GSTR-1 files).
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M15. The latest (M15): credit notes take back all or part of an issued
+Every milestone on the roadmap is built, M2 to M19. The latest: Today lists the reminders to send on WhatsApp (M16,
+D39); a known parent asks for a stay through their own link, as a request that holds no kennel (M17, D36, two more
+public functions, eight in all); day boarding repeats on chosen weekdays, and packs of days are sold with a bill and
+paid from (M18, D37); and a GST kennel downloads the month's GSTR-1 as the offline tool's CSV files (M19, D38). Before
+that (M15): credit notes take back all or part of an issued
 bill with their own numbers, counted in their own month, and a tax invoice from an earlier month is credited, never
 cancelled (D34); each kennel sets its own tax rate and SAC code for boarding, day boarding and each extra (D35). Before
 that (M14, the owner's answers of 21 October 2026): a pet at
@@ -18,8 +22,8 @@ keeping records and erasure is written up for the accountant and the lawyer (`06
 kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
 owner confirmed the licence (AGPL),
 dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (226 database tests, 144 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 40 tests). What has still never
+kennel. The database rules are tested in-process (239 database tests, 156 unit tests), and the whole day is walked in a
+real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 43 tests). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 ## What is verified, and how
@@ -92,6 +96,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Credit notes: part and whole of a bill, own numbers per year, never more than is left (`WB092`), a rate the bill charged (`WB093`), reason (`WB091`), owners and managers only, sums checked (`WB037`), not writable or deletable by anyone, on the parent's bill; an earlier month's tax invoice and a credited bill not cancelled (`WB095`, `WB096`); reports and the money report count them in their own month; prefix `CN` refused | `tests/db/credit-notes.test.ts`; the month rule and the limit each removed once to see the tests fail; `src/lib/billing.test.ts` | High |
 | A credit note made on the bill page, owed shown as paid over, Cancel replaced by a sentence, the parent opens the credit note | End-to-end at 360 pixels | High for the local stack |
 | Tax rate and SAC code per stay and per extra, typed as a percent and 4 to 8 digits | `src/lib/core/tax-input.test.ts`; Settings and Extras looked at in a browser at 360 pixels | Medium: not walked by an end-to-end test |
+| Reminders: which are due (vaccination within a week, arrivals and pick-ups tomorrow, unpaid three days), once sent gone, an unpaid bill back after three days; the sent record stamped and never changed | `src/lib/core/reminders.test.ts`, `tests/db/care.test.ts`; end-to-end: Send opens WhatsApp and the reminder leaves the list | High |
+| Booking requests: the link shows only the parent's own pets and stays; requests at the usual price holding no kennel; other parents' pets, past or long dates, a kind with no price, a flood and a switched-off kennel refused; a new link ends the old; the token cannot be set by hand | `tests/db/requests.test.ts`, `tests/db/security.test.ts` (eight public functions); end-to-end from a private window | High |
+| Packs: paid days at ₹0, never beyond the days bought (a family counts each pet), inside the dates, for the pack's parent; requests hold none until confirmed; staff move a day onto a pack but not off; sold only by owners and managers; packs move when parents merge; a series is day boarding | `tests/db/regulars.test.ts`; `src/lib/core/bookings.test.ts` (series dates, which pack pays); end-to-end: a pack sold and issued, seven repeating days paid from it | High |
+| GSTR-1 sheets: b2b, b2cl over ₹1 lakh to another state, b2cs net of credit notes, cdnr, hsn, docs with cancelled bills | `src/lib/core/gstr1.test.ts` | Medium: column names not checked against the GST offline tool; not walked in a browser (the demo kennel charges no tax) |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -130,6 +138,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, which the kennel can now set itself;
    quarterly filers and cancelling; the tax by rate figure), and **the erasure questions in `05` to a lawyer** (Rule
    8(3), pets' free text). The research in both is a starting point, read from public commentary, not advice.
+
+8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
+   name it rejects (`src/lib/core/gstr1.ts`).
 
 After that the roadmap is empty: new work starts from issues with a kennel reason ("Ideas not scheduled" in `08`).
 
@@ -199,6 +210,9 @@ price" as साझा केनेल का दाम and ಹಂಚಿಕೊ�
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
 
+Drafted on 21 October 2026 (M16 to M19), also unchecked: the reminder messages to parents (the most important to get
+right, as parents read them), the booking request page, repeating days and packs, and the GSTR-1 file names on Reports.
+
 Drafted on 21 October 2026 (M15), also unchecked: credit notes (क्रेडिट नोट, ಕ್ರೆಡಿಟ್ ನೋಟ್ kept close to English) and
 the tax rate and SAC code boxes.
 
@@ -267,6 +281,11 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ## Known rough edges in what is built
 
+- A repeating series is not billed together; a day not paid from a pack is billed on its own. A no-show uses a pack
+  day.
+- Tapping Send on a reminder marks it sent even if WhatsApp's own Send is not pressed.
+- A parent's booking link shows the dates of their stays to whoever holds it.
+
 - No debit notes, and no composition scheme mode (a bill of supply's own words are not printed).
 - The credit note form offers "the whole bill" only while nothing has been credited; after that, an amount.
 
@@ -296,7 +315,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 370 tests, build
+npm run check        # dash check, lint, typecheck, 395 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -306,6 +325,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 21 October 2026. M16 to M19: reminders to send on Today, booking requests through a parent's own link, repeating
+  day boarding and day boarding packs, GSTR-1 files. e2e walk extended to 43 tests.
 - 21 October 2026. M15: credit notes (bill page, parent's bill, reports, download) and the kennel's own tax rate and
   SAC code per stay and per extra.
 - 21 October 2026. M14, the owner's answers: stays priced in parts (`stay_charges`: nights alone, day boarding then

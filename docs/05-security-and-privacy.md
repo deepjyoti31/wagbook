@@ -7,7 +7,7 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly six things, and can read no table.
+2. Someone who is not signed in can do exactly eight things, and can read no table.
 3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
 5. An issued invoice cannot be changed by anyone, including owners.
@@ -67,7 +67,7 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Six functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+Eight functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
 is changed on purpose.
 
 | Function | Returns | Guard |
@@ -76,6 +76,8 @@ is changed on purpose.
 | `submit_intake(slug, payload)` | The folder for this form's certificates and its upload secret | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
+| `get_public_booking_form(token)` | A known parent's own booking link: kennel name, WhatsApp number and usual times, the parent's first name, their pets' names, the kinds of stay they can ask for, and their stays already asked for or booked (dates and status) | 64 character secret per parent (`clients.request_token`); nothing for a hidden or erased parent; no prices, notes or other parents |
+| `submit_booking_request(token, payload)` | How many pets were asked for | Same secret; refused when the kennel turns requests off (`WB100`); only the parent's own listed pets (`WB102`); dates from today to a year ahead, 90 days at most (`WB103`); a usual price must exist (`WB104`); 12 requested pets a day at most (`WB105`); size cap. Makes bookings with status `requested`, which hold no kennel |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
 | `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
 
@@ -86,6 +88,13 @@ of the kennel (the folder is the kennel's own). The bucket keeps its limits: 10 
 photo into a JPEG without its hidden data first; someone calling Storage directly could send a file as it is, which
 only staff ever open, from Supabase's address rather than Wagbook's. Worst case for a kennel that is flooded: 60
 waiting forms an hour (`WB048`), six files each.
+
+**Booking requests from parents (milestone M17).** A known parent gets a link of their own from the kennel (Copy or
+Send on the parent page). Behind it, the parent sees their pets' names and the dates of their own stays, and can ask
+for a stay. Each pet asked for becomes a booking with status `requested` at the kennel's usual price. A request holds
+no kennel, so a forwarded or leaked link cannot take space from anyone: at worst it adds requests that staff decline.
+Staff renew the link (`renew_request_link`, any member), and the old one stops working; the token is not writable
+through the API. Erasing the parent clears it. The app limits posts to the page per address, like the intake form.
 
 **Photos on the stay page (milestone M5).** A parent has no account, Postgres cannot sign storage links, and the
 service role key is never used. So the stay page asks Storage for signed links as the anonymous role, sending the stay

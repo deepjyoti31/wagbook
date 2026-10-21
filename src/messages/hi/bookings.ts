@@ -26,6 +26,8 @@ export const bookingsArea: typeof English = {
       no_show: "नहीं आया, ऐसा लिख दिया। जगह फिर से खाली है।",
       extended: "ठहराव आज तक बढ़ा दिया।",
       boarding: "अब बोर्डिंग है। पहली रात से पहले के दिन डे बोर्डिंग के रूप में बिल होंगे।",
+      series_cancelled: "श्रृंखला के बाकी दिन रद्द हो गए। वे दिन फिर खाली हैं।",
+      pack: "पैक से चुकाया गया। अब इस दिन का अलग से कोई दाम नहीं।",
     },
     peakNoRefund: "{name}, कोई रिफ़ंड नहीं",
     cancelledBecause: "रद्द: {reason}",
@@ -39,6 +41,13 @@ export const bookingsArea: typeof English = {
     bookedTogetherTitle: "एक साथ बुक हुए",
     kennelWith: "{kennel}, {pets} के साथ",
     sharesWith: "{pets} के साथ {kennel} में।",
+    // Day boarding regulars (D37).
+    seriesNote: "दोहराया गया: कुल {n} दिन, {left} अभी बाकी।",
+    cancelRest: "श्रृंखला के बाकी दिन रद्द करें",
+    cancelRestHint: "यह दिन और श्रृंखला के बाद के सभी दिन जो शुरू नहीं हुए, रद्द होते हैं।",
+    cancellingRest: "रद्द कर रहे हैं",
+    fromPackNote: "पैक {name} से चुकाया गया।",
+    usePack: "पैक {name} से चुकाएं ({left} दिन बाकी)",
     // A stay that began as day boarding and now stays nights. {date} is the last day of day boarding, {night} the first night.
     dayThenBoarding: "{date} तक डे बोर्डिंग, फिर {night} से रात को रुकना।",
     costs: {
@@ -51,6 +60,7 @@ export const bookingsArea: typeof English = {
       // A pet at the shared kennel price: nights with its sibling, and nights it had the kennel to itself. {what} is "Boarding" or "Day boarding".
       shared: "{what}, केनेल साझा",
       alone: "{what}, केनेल में अकेले",
+      fromPack: "{what}, पैक से",
     },
     extra: {
       title: "एक्स्ट्रा जोड़ें",
@@ -178,6 +188,10 @@ export const bookingsArea: typeof English = {
       didNotArrive: "नहीं आया",
     },
     errors: {
+      noPack: "पेरेंट के पास इस ठहराव के लिए पर्याप्त दिनों वाला पैक नहीं है।",
+      repeatOnePet: "दोहराई जाने वाली श्रृंखला एक पालतू के लिए है। हर पालतू को अलग से बुक करें।",
+      repeatDates: "हफ़्ते का कम से कम एक दिन और आखिरी तारीख चुनें, कुल 70 दिनों तक।",
+      repeatDaycare: "सिर्फ़ डे बोर्डिंग दोहराई जा सकती है।",
       validDate: "सही तारीख चुनें।",
       clock: "समय ऐसे लिखें, जैसे 10:30।",
       choosePet: "एक पालतू चुनें।",
@@ -233,6 +247,12 @@ export const bookingsArea: typeof English = {
     checkInDate: "चेक इन की तारीख",
     checkOutDate: "चेक आउट की तारीख",
     checkOutHint: "सिर्फ़ एक दिन की डे बोर्डिंग हो तो इसे खाली छोड़ दें।",
+    // Day boarding that repeats on weekdays (D37). Weekday names come from the browser's language.
+    repeat: "दोहराएं",
+    repeatOn: "इन दिनों दोहराएं",
+    repeatUntil: "तक",
+    repeatHint: "नियमित आने वालों के लिए। हर दिन अपनी अलग बुकिंग बनता है, 70 दिनों तक।",
+    usePack: "पेरेंट के डे बोर्डिंग पैक में दिन हों तो उससे चुकाएं",
     kennel: "केनेल",
     kennelHint: "इसे चेक इन तक छोड़ सकते हैं। जगह फिर भी रुकी रहती है। साथ में बुक हुए दूसरे पालतुओं को उनका केनेल चेक इन पर मिलता है।",
     decideAtCheckIn: "चेक इन पर तय करें",

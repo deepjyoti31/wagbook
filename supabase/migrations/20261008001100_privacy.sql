@@ -141,6 +141,10 @@ begin
         order by i.created_at)
       from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id
     ), '[]'::jsonb),
+    'packs', coalesce((
+      select jsonb_agg(to_jsonb(pb) - 'org_id' order by pb.starts_on)
+      from public.pass_balances pb where pb.org_id = v_client.org_id and pb.client_id = v_client.id
+    ), '[]'::jsonb),
     'payments', coalesce((
       select jsonb_agg(to_jsonb(pay) - 'org_id' order by pay.received_on, pay.created_at)
       from public.payments pay where pay.org_id = v_client.org_id and pay.client_id = v_client.id
@@ -250,7 +254,7 @@ begin
   update public.clients c
   set full_name = 'Erased', phone = '', alt_phone = null, email = null, address = null, city = null,
       postal_code = null, gst_state_code = null, tax_id = null, emergency_name = null, emergency_phone = null,
-      notes = null, consent_at = null, consent_source = null, bill_translation = null,
+      notes = null, consent_at = null, consent_source = null, bill_translation = null, request_token = null,
       deleted_at = coalesce(c.deleted_at, now()), erased_at = now()
   where c.id = v_client.id;
 

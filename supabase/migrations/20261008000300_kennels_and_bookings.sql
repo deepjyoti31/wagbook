@@ -156,8 +156,10 @@ create table public.bookings (
   vaccinations_checked_at timestamptz,
   vaccinations_checked_by uuid references auth.users (id) on delete set null,
   notes text,
-  source text not null default 'staff' check (source in ('staff', 'intake')),
+  source text not null default 'staff' check (source in ('staff', 'intake', 'parent')),
   group_id uuid,
+  series_id uuid,
+  pass_id uuid,
   public_token text not null unique default public.new_token(),
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now(),
@@ -177,6 +179,13 @@ create table public.bookings (
   -- boarding_from are day boarding at day_rate_minor, the nights from it on are
   -- boarding at rate_minor. Both set or neither.
   constraint bookings_day_part_has_a_price check ((boarding_from is null) = (day_rate_minor is null)),
+  -- A repeating series is day boarding, one day a booking.
+  constraint bookings_series_is_day_boarding check (series_id is null or kind = 'daycare'),
+  -- A day paid from a pack costs nothing more on its own (bookings_check_pass checks the pack).
+  constraint bookings_pass_covers_the_price check (
+    pass_id is null
+    or (kind = 'daycare' and rate_minor = 0 and discount_minor = 0 and alone_rate_minor is null and boarding_from is null)
+  ),
   constraint bookings_boarding_from_inside_stay check (
     boarding_from is null or (kind = 'boarding' and boarding_from > start_date and boarding_from < end_date)
   ),
@@ -204,6 +213,10 @@ comment on column public.bookings.start_date is 'Check-in date (calendar date at
 comment on column public.bookings.end_date is 'Check-out date. Boarding nights = end_date - start_date. For day boarding, the last day attended (so a single day has start_date = end_date).';
 comment on column public.bookings.kennel_id is 'The kennel assigned. May stay empty until check-in; capacity is still checked. Two bookings of one parent may name the same kennel on the same days (a shared kennel).';
 comment on column public.bookings.rate_minor is 'Price per night (boarding) or per day (daycare), copied from the rate card when booked so later price changes do not rewrite history.';
+comment on column public.bookings.series_id is
+  'Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own.';
+comment on column public.bookings.pass_id is
+  'The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero.';
 comment on column public.bookings.alone_rate_minor is
   'For a pet booked at the shared kennel price: the price per night or day for the nights or days it has the kennel to itself (its sibling left early or came late), usually the kennel''s usual price. Empty: rate_minor applies throughout. See stay_charges().';
 comment on column public.bookings.boarding_from is
@@ -217,10 +230,12 @@ comment on column public.bookings.gate_notes is 'Anything the parent said at dro
 comment on column public.bookings.vaccinations_checked_at is
   'When a staff member confirmed at check-in that they had seen the pet''s vaccination certificates. Stamped by the database.';
 comment on column public.bookings.vaccinations_checked_by is 'Who confirmed the vaccinations at check-in. Stamped by the database.';
-comment on column public.bookings.source is 'staff: entered by the kennel. intake: started from the public intake form.';
+comment on column public.bookings.source is 'staff: entered by the kennel. intake: started from the public intake form. parent: asked for by the parent through their booking link, as a request.';
 comment on column public.bookings.group_id is 'Shared by bookings made together, e.g. two dogs from one family. Set when booked and never changed, because the family is billed on one bill.';
 comment on column public.bookings.public_token is 'Secret in the parent''s stay page link (/s/{token}). Anyone holding the link can see the stay, nothing else.';
 
+create index bookings_org_series_idx on public.bookings (org_id, series_id) where series_id is not null;
+create index bookings_org_pass_idx on public.bookings (org_id, pass_id) where pass_id is not null;
 create index bookings_org_dates_idx on public.bookings (org_id, start_date, end_date);
 create index bookings_org_status_idx on public.bookings (org_id, status);
 create index bookings_org_pet_idx on public.bookings (org_id, pet_id);
@@ -303,6 +318,9 @@ returns trigger
 language plpgsql
 set search_path = ''
 as $$
+declare
+  -- Staff may put a day on the parent's pack: it then costs nothing here.
+  v_to_pack boolean;
 begin
   if (select auth.uid()) is null
      or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
@@ -311,7 +329,9 @@ begin
   end if;
 
   if tg_op = 'UPDATE' then
-    if new.rate_minor is distinct from old.rate_minor
+    v_to_pack := old.pass_id is null and new.pass_id is not null and new.rate_minor = 0;
+    if (new.rate_minor is distinct from old.rate_minor and not v_to_pack)
+       or (new.pass_id is distinct from old.pass_id and not v_to_pack)
        or new.discount_minor is distinct from old.discount_minor
        or new.tax_rate_bp is distinct from old.tax_rate_bp
        or new.sac_code is distinct from old.sac_code
@@ -331,6 +351,10 @@ begin
   -- once the whole statement is in, because a family is inserted together).
   -- A pet at the shared price pays the usual price for nights it has the
   -- kennel to itself, so that price goes with it.
+  -- A day paid from a pack costs nothing; bookings_check_pass checks the pack.
+  if new.pass_id is not null then
+    return new;
+  end if;
   if new.discount_minor <> 0 or new.boarding_from is not null or not exists (
     select 1
     from public.services s
@@ -367,6 +391,8 @@ as $$
 begin
   if (select auth.uid()) is null
      or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+     -- A day paid from a pack: bookings_check_pass has the last word.
+     or new.pass_id is not null
      or exists (
        select 1 from public.services s
        where s.org_id = new.org_id and s.is_active and s.kind::text = new.kind::text and s.price_minor = new.rate_minor

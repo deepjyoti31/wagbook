@@ -55,6 +55,12 @@ Press **New booking** on Today. Choose the pet (or add a new one with its parent
 it. Wagbook will not let two pets share a kennel on the same night, and will not let you take more pets than you have
 kennels. If something clashes, it tells you in a sentence what and when.
 
+A regular in day boarding can be booked once for set weekdays: tick **Repeat**, the days, and an end date. If you sell
+**day boarding packs** (add them on **Extras**, sell one from the parent's page), their days are paid from the pack.
+
+Parents you know can ask for a stay themselves: on a parent's page, **Booking link** sends them their own link. What
+they ask for arrives as a request, which holds no kennel until you confirm it.
+
 Two pets of one family can be booked together, in a kennel each or in one kennel, the second at your shared kennel
 price. If one goes home early, the nights the other has the kennel to itself are billed at your usual price. A booking
 can also start as a **request**, which holds no kennel until you confirm it.
@@ -78,6 +84,9 @@ the next shift need to know.
 If the phone loses its connection, ticks are kept on the phone and sent when it is back.
 
 **Play** (top right) plans solo play in your yards, one pet at a time, so dogs that should not meet never do.
+
+Today's **To send** list has the messages due: a vaccination card to ask for, see you tomorrow, going home tomorrow,
+and bills still unpaid. **Send** opens WhatsApp with the message written; send it, and it leaves the list.
 
 ## Pets and parents
 
@@ -129,7 +138,7 @@ invoices** for boarding and day boarding, and on **Extras** for each extra. Wagb
 <img src="guide/10-reports.jpg" alt="Reports" width="270">
 
 **More, Reports** (owners and managers) shows how full you were each day, money in and out by month, tax by rate, and
-which extras sell. **Expenses** is where you note what the kennel spent, with a photo of the receipt. Everything can be
+which extras sell. If you charge GST, it also has the month's **GSTR-1 files** for your accountant. **Expenses** is where you note what the kennel spent, with a photo of the receipt. Everything can be
 downloaded for your accountant.
 
 **More, History of changes** shows who changed a booking, a price, a bill or a setting, and when.

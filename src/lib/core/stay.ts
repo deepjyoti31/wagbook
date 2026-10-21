@@ -77,6 +77,8 @@ export interface StayQuoteInput {
   discountMinor?: Minor;
   /** A stay that began as day boarding and became boarding: its first night. */
   boardingFrom?: ISODate | null;
+  /** Day boarding paid from a day boarding pack, so it costs nothing here. */
+  fromPack?: boolean;
   /**
    * What the stay costs, from stay_charges() in the database, when it is more
    * than every night at the booked rate. Without it: the whole stay at rateMinor.
@@ -100,6 +102,7 @@ function describeCharge(input: StayQuoteInput, c: StayCharge): string {
   const units = input.kind === "boarding" ? `${c.quantity} ${c.quantity === 1 ? "night" : "nights"}` : days(c.quantity);
   if (c.part === "shared") return `${kind}: ${input.petName}, ${units} sharing a kennel ${dates(from, input.endDate)}`;
   if (c.part === "alone") return `${kind}: ${input.petName}, ${units} with the kennel to itself`;
+  if (input.fromPack) return `${kind}: ${input.petName}, ${units} from a pack ${dates(from, input.endDate)}`;
   return `${kind}: ${input.petName}, ${units} ${dates(from, input.endDate)}`;
 }
 

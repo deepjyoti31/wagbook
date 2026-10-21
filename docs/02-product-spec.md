@@ -323,6 +323,19 @@ the kennel's square, and its top row counts kennels in use, with the number of p
 
 The family pays on one bill (E1).
 
+### C4b. Day boarding regulars. Built (M18, D37).
+
+**Repeat.** On New booking, day boarding for one pet can repeat on chosen weekdays until a date (70 days at most). Each
+day is its own booking, sharing a series (`series_id`); the booking page says "Repeats: 7 days in all, 5 still to come"
+and offers Cancel the rest of the series (this day and every later one not started, with a reason).
+
+**Packs.** Extras lists day boarding packs (name, days, price, how many days it lasts, and a tax rate and code when the
+kennel charges tax). On the parent page, owners and managers sell one with a start date: the pack and a draft bill for
+it, opened to issue. The parent page lists each pack with its days left. New booking pays day boarding from the
+parent's packs when ticked (on by default; the pack ending soonest first), at ₹0 on the stay, and the booking page
+offers "Pay from the pack" for a day not yet on one. The database keeps a pack within its days, dates and parent
+(`WB110` to `WB112`); a cancelled day gives its day back; a request holds none until confirmed.
+
 ### C5. Calendar. Built.
 
 `/app/calendar`. Kennels down the side, fourteen days across, Earlier and Later to move, scrolling sideways on a phone
@@ -368,6 +381,14 @@ linking to the Care screen, a prompt when forms from parents are waiting, then t
   which pet the kennel is promised to and what to do instead.
 
 Pet flags (for example "bite history" or "escape risk") show in red on every row.
+
+### D1b. Reminders to send. Built (M16, D39).
+
+On Today, "To send": a vaccination card to ask for (a confirmed stay within a week with no record, or one that lapses
+before the pet goes home), see you tomorrow (with the usual drop-off time), going home tomorrow (with the pick-up
+time), and bills issued three or more days ago with money owed (with the bill's link). Each says the pet or bill, the
+parent, and Send, which opens WhatsApp with the message typed in the kennel's language for parents and takes it off the
+list (an unpaid bill comes back three days later). Today also says how many requests from parents are waiting.
 
 ### D2. Daily care tasks. Built.
 
@@ -502,6 +523,12 @@ changes keeps it). Receipt files are for owners and managers only, like the expe
 The numbers come from database functions (`report_occupancy`, `report_money`, `report_tax`, `report_extras`) that
 refuse anyone who is not an owner or manager of the kennel.
 
+### E5b. GSTR-1 files. Built (M19, D38).
+
+On Reports, for a GST-registered kennel: the month's bills and credit notes as the GST offline tool's CSV files, one
+link each: b2b, b2cl, b2cs, cdnr, cdnur, hsn and docs. Owners and managers. Check the columns against the tool before
+the first upload.
+
 ### E6. History of changes. Built.
 
 `/app/more/history`, owners and managers only: the audit log in words, newest first. "Booking changed" by whom and
@@ -511,6 +538,14 @@ person; a link to the booking, bill or pet where there is one. Staff do not see 
 ---
 
 ## F. For parents
+
+### F0. Asking for a stay. Built (M17, D36).
+
+`/b/{token}`, a known parent's own link, sent from their page (Send on WhatsApp, or Copy; Make a new link ends the old
+one). In the kennel's language for parents: hello and the usual times, their pets to tick, the kind of stay (when both
+have a usual price), dates, a note, Send request; then "Sent. The kennel will confirm on WhatsApp." It lists their
+stays already asked for or booked. Each pet asked for becomes a request at the usual price, which holds no kennel until
+staff confirm it. Settings can turn requests off; the page then says to message the kennel.
 
 ### F1. Stay page. Built.
 

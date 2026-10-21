@@ -20,6 +20,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB070 to WB079 | A parent's details: export and erase |
 | WB080 to WB089 | Daily care and incidents |
 | WB090 to WB099 | Credit notes |
+| WB100 to WB109 | Booking requests from parents |
+| WB110 to WB119 | Day boarding packs |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -86,3 +88,12 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB094` | a credit note needs at least one line | `20261008000500_billing.sql` |
 | `WB095` | this bill was issued in an earlier month. Make a credit note instead of cancelling it. | `20261008000500_billing.sql` |
 | `WB096` | this bill has a credit note. Credit what is left instead of cancelling it. | `20261008000500_billing.sql` |
+| `WB100` | this link is not taking requests | `20261008000600_intake_and_public_pages.sql` |
+| `WB101` | the request could not be read | `20261008000600_intake_and_public_pages.sql` |
+| `WB102` | choose one or more of your pets | `20261008000600_intake_and_public_pages.sql` |
+| `WB103` | those dates cannot be asked for. Check them and try again. | `20261008000600_intake_and_public_pages.sql` |
+| `WB104` | the kennel is not taking requests for that kind of stay | `20261008000600_intake_and_public_pages.sql` |
+| `WB105` | that is a lot of requests for one day. The kennel will be in touch. | `20261008000600_intake_and_public_pages.sql` |
+| `WB110` | a day boarding pack is for day boarding of the parent who bought it | `20261008000500_billing.sql` |
+| `WB111` | the pack is for % to %, and these days are outside it | `20261008000500_billing.sql` |
+| `WB112` | the pack has % days left | `20261008000500_billing.sql` |

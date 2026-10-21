@@ -494,3 +494,166 @@ as $$
 $$;
 comment on function public.get_public_invoice(text) is
   'PUBLIC. One issued (or voided) invoice, found by its secret token, with its lines, what has been paid, its credit notes with their lines, the kennel''s UPI details for a pay link, and the language the parent asked for alongside English (clients.bill_translation). Drafts are never shown.';
+
+-- ---------------------------------------------------------------------------
+-- A parent asks for a stay, through their own booking link (/b/{token})
+--
+-- The kennel sends a known parent their link. The parent picks pets and
+-- dates, and each pet becomes a booking with status 'requested': it holds no
+-- kennel until staff confirm it, so a request can never take a kennel away
+-- from anyone. Priced from the kennel's usual prices; staff adjust as usual.
+-- ---------------------------------------------------------------------------
+
+create function public.get_public_booking_form(p_token text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'kennel', jsonb_build_object(
+      'name', o.name,
+      'whatsapp_phone', coalesce(o.whatsapp_phone, o.phone),
+      'check_in_time', o.check_in_time,
+      'check_out_time', o.check_out_time,
+      'language', o.parent_language,
+      'locale', o.locale
+    ),
+    'enabled', o.requests_enabled,
+    'parent', split_part(btrim(c.full_name), ' ', 1),
+    'today', (now() at time zone o.time_zone)::date,
+    'pets', coalesce((
+      select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name) order by p.name)
+      from public.pets p
+      where p.org_id = c.org_id and p.client_id = c.id and p.deleted_at is null
+    ), '[]'::jsonb),
+    -- Kinds of stay the kennel has a usual price for, so a request can be priced.
+    'kinds', coalesce((
+      select jsonb_agg(distinct s.kind::text)
+      from public.services s
+      where s.org_id = o.id and s.is_default and s.is_active and s.kind in ('boarding', 'daycare')
+    ), '[]'::jsonb),
+    -- What is already asked for or booked, so the parent does not ask twice.
+    'stays', coalesce((
+      select jsonb_agg(jsonb_build_object('pet', p.name, 'kind', b.kind, 'start_date', b.start_date, 'end_date', b.end_date, 'status', b.status)
+                       order by b.start_date, p.name)
+      from public.bookings b
+      join public.pets p on p.org_id = b.org_id and p.id = b.pet_id
+      where b.org_id = c.org_id and b.client_id = c.id
+        and b.status in ('requested', 'confirmed', 'checked_in')
+        and b.end_date >= (now() at time zone o.time_zone)::date
+    ), '[]'::jsonb)
+  )
+  from public.clients c
+  join public.organizations o on o.id = c.org_id
+  where char_length(p_token) = 64
+    and c.request_token = p_token
+    and c.deleted_at is null
+    and c.erased_at is null;
+$$;
+comment on function public.get_public_booking_form(text) is
+  'PUBLIC. The parent''s own booking link: the kennel''s name, WhatsApp number and usual times, the parent''s first name, their pets'' names, which kinds of stay can be asked for, and their stays already asked for or booked (dates and status only). Nothing for a hidden or erased parent.';
+
+create function public.submit_booking_request(p_token text, p_payload jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_client public.clients;
+  v_org public.organizations;
+  v_today date;
+  v_kind public.booking_kind;
+  v_start date;
+  v_end date;
+  v_note text;
+  v_pets uuid[];
+  v_service public.services;
+  v_group uuid;
+begin
+  -- SECURITY DEFINER: the anonymous role has no access to any table. The
+  -- secret link is the parent's key; everything they send is checked here.
+  select * into v_client from public.clients c
+  where char_length(p_token) = 64 and c.request_token = p_token and c.deleted_at is null and c.erased_at is null;
+  if v_client.id is null then
+    raise exception 'WB100: this link is not taking requests' using errcode = 'P0002';
+  end if;
+  select * into v_org from public.organizations o where o.id = v_client.org_id;
+  if not v_org.requests_enabled then
+    raise exception 'WB100: this link is not taking requests' using errcode = 'P0002';
+  end if;
+  if p_payload is null or jsonb_typeof(p_payload) <> 'object' or octet_length(p_payload::text) > 5000
+     or jsonb_typeof(p_payload -> 'pet_ids') is distinct from 'array' then
+    raise exception 'WB101: the request could not be read' using errcode = '22023';
+  end if;
+
+  v_today := (now() at time zone v_org.time_zone)::date;
+  v_kind := case p_payload ->> 'kind' when 'daycare' then 'daycare'::public.booking_kind else 'boarding'::public.booking_kind end;
+  v_start := public.safe_date(p_payload ->> 'start_date');
+  v_end := coalesce(public.safe_date(p_payload ->> 'end_date'), case when v_kind = 'daycare' then v_start end);
+  if v_start is null or v_end is null or v_start < v_today or v_start > v_today + 365 or v_end < v_start
+     or v_end - v_start > 90 or (v_kind = 'boarding' and v_end = v_start) then
+    raise exception 'WB103: those dates cannot be asked for. Check them and try again.' using errcode = '22023';
+  end if;
+
+  -- Only this parent's own pets, shown in lists, at most six.
+  select coalesce(array_agg(distinct p.id), '{}') into v_pets
+  from public.pets p
+  where p.org_id = v_client.org_id and p.client_id = v_client.id and p.deleted_at is null
+    and p.id::text in (select jsonb_array_elements_text(p_payload -> 'pet_ids'));
+  if cardinality(v_pets) = 0 or cardinality(v_pets) > 6
+     or cardinality(v_pets) <> jsonb_array_length(p_payload -> 'pet_ids') then
+    raise exception 'WB102: choose one or more of your pets' using errcode = '22023';
+  end if;
+
+  select * into v_service from public.services s
+  where s.org_id = v_org.id and s.kind::text = v_kind::text and s.is_default and s.is_active;
+  if v_service.id is null then
+    raise exception 'WB104: the kennel is not taking requests for that kind of stay' using errcode = '22023';
+  end if;
+
+  -- A request is a few taps; a flood is something else.
+  if (select count(*) from public.bookings b
+      where b.org_id = v_org.id and b.client_id = v_client.id and b.source = 'parent'
+        and b.created_at > now() - interval '1 day') + cardinality(v_pets) > 12 then
+    raise exception 'WB105: that is a lot of requests for one day. The kennel will be in touch.' using errcode = '54000';
+  end if;
+
+  v_note := nullif(left(btrim(coalesce(p_payload ->> 'note', '')), 1000), '');
+  v_group := case when cardinality(v_pets) > 1 then gen_random_uuid() end;
+  insert into public.bookings (org_id, client_id, pet_id, kind, status, start_date, end_date, rate_minor, tax_rate_bp, sac_code, notes, source, group_id)
+  select v_org.id, v_client.id, pid, v_kind, 'requested', v_start, v_end, v_service.price_minor,
+         case when v_org.tax_mode = 'none' then 0 else coalesce(v_service.tax_rate_bp, v_org.default_tax_rate_bp) end,
+         v_service.sac_code, v_note, 'parent', v_group
+  from unnest(v_pets) as pid;
+  return cardinality(v_pets);
+end;
+$$;
+comment on function public.submit_booking_request(text, jsonb) is
+  'PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel''s usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).';
+
+-- A new link for a parent: the old one stops working. Any member may do it.
+create function public.renew_request_link(p_client uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_token text;
+begin
+  -- SECURITY DEFINER: the link token is not writable through the API, so a
+  -- member cannot choose one; it is made here. Membership is checked here.
+  update public.clients c set request_token = public.new_token()
+  where c.id = p_client and c.org_id in (select public.my_org_ids()) and c.erased_at is null
+  returning c.request_token into v_token;
+  if v_token is null then
+    raise exception 'WB003: parent not found' using errcode = 'P0002';
+  end if;
+  return v_token;
+end;
+$$;
+comment on function public.renew_request_link(uuid) is
+  'Gives a parent a new booking link and returns its token; the old link stops working. Any member of the parent''s kennel.';

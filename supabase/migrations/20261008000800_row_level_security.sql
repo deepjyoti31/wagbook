@@ -51,6 +51,9 @@ alter table public.play_yards enable row level security;
 alter table public.play_sessions enable row level security;
 alter table public.stay_updates enable row level security;
 alter table public.incidents enable row level security;
+alter table public.reminders_sent enable row level security;
+alter table public.day_packs enable row level security;
+alter table public.passes enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_lines enable row level security;
 alter table public.invoice_counters enable row level security;
@@ -165,10 +168,10 @@ grant update (org_id, created_by, full_name, phone, alt_phone, email, address, c
 -- client may send.
 revoke insert, update on public.bookings from authenticated;
 grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
-              boarding_from, day_rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
+              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
-              boarding_from, day_rate_minor, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
+              boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
               vaccinations_checked_at, notes, group_id)
   on public.bookings to authenticated;
 -- Who may change a price is decided by a trigger, not here: owners, managers
@@ -181,7 +184,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards'] loop
+  foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -207,6 +210,29 @@ create policy care_items_insert_for_pet on public.care_items for insert to authe
 create policy care_items_update_for_pet on public.care_items for update to authenticated
   using (pet_id is not null and org_id in (select public.my_org_ids()))
   with check (pet_id is not null and org_id in (select public.my_org_ids()));
+
+-- Day boarding packs sold to parents: any member reads them (to book a day on
+-- one); owners and managers sell and correct them; owners delete.
+grant select, insert, update, delete on public.passes to authenticated;
+create policy passes_select on public.passes for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy passes_insert on public.passes for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy passes_update on public.passes for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy passes_delete on public.passes for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select on public.pass_balances to authenticated;
+
+-- Reminders sent: any member reads and records one; nobody changes one; owners delete.
+grant select, insert, delete on public.reminders_sent to authenticated;
+create policy reminders_sent_select on public.reminders_sent for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy reminders_sent_insert on public.reminders_sent for insert to authenticated
+  with check (org_id in (select public.my_org_ids()));
+create policy reminders_sent_delete on public.reminders_sent for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- ---------------------------------------------------------------------------
 -- invoices and their lines
@@ -370,6 +396,7 @@ grant execute on function public.generate_care_tasks(uuid, date) to authenticate
 grant execute on function public.issue_invoice(uuid) to authenticated;
 grant execute on function public.void_invoice(uuid, text) to authenticated;
 grant execute on function public.issue_credit_note(uuid, text, jsonb, jsonb) to authenticated;
+grant execute on function public.renew_request_link(uuid) to authenticated;
 grant execute on function public.save_invoice_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.stay_charges(uuid, uuid[]) to authenticated;
 grant execute on function public.accept_intake(uuid) to authenticated;
@@ -382,3 +409,5 @@ grant execute on function public.get_public_intake_form(text) to anon, authentic
 grant execute on function public.submit_intake(text, jsonb) to anon, authenticated;
 grant execute on function public.get_public_stay(text) to anon, authenticated;
 grant execute on function public.get_public_invoice(text) to anon, authenticated;
+grant execute on function public.get_public_booking_form(text) to anon, authenticated;
+grant execute on function public.submit_booking_request(text, jsonb) to anon, authenticated;
