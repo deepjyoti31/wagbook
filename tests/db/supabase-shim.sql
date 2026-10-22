@@ -94,6 +94,8 @@ create table storage.objects (
   name text not null,
   owner uuid,
   created_at timestamptz not null default now(),
+  -- As on Supabase: what Storage knows of the file, such as its size in bytes.
+  metadata jsonb,
   -- As on Supabase: one file per name in a bucket.
   unique (bucket_id, name)
 );

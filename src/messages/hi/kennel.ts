@@ -27,6 +27,9 @@ export const kennelArea: typeof English = {
       rota: { title: "रोस्टर", about: "शिफ़्ट, कौन कब काम करता है, और कौन यहीं रहता है।" },
       leave: { title: "छुट्टी", about: "छुट्टी मांगें, और दूसरों की मांग का जवाब दें।" },
       attendance: { title: "हाज़िरी", about: "आने और जाने का समय, और वेतन के लिए महीने की शीट।" },
+      import: { title: "पेरेंट और पालतू लाएं", about: "स्प्रेडशीट से, जब आप Wagbook पर आते हैं। मालिक और मैनेजर।" },
+      photos: { title: "फ़ोटो और जगह", about: "फ़ोटो कितनी जगह लेती हैं, और पुराने महीनों को संभालना। मालिक और मैनेजर।" },
+      problems: { title: "समस्याएं और रात के काम", about: "रात के काम हुए या नहीं, और ऐसी गड़बड़ियां जो किसी को बतानी हैं। मालिक और मैनेजर।" },
     },
     // {role} is one of roleInSentence, written as it sits in the middle of a sentence.
     signedInAs: "{name} ({email}) के रूप में साइन इन, {kennel} में {role}।",

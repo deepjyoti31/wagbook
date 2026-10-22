@@ -307,6 +307,10 @@ export const core = {
       WB228: "A clock time cannot be later than now.",
       WB230: "A kennel goes in or out of service today or on a day before.",
       WB231: "That is before the kennel's last change.",
+      WB240: "Bring in at most 2,000 rows at a time. Split the spreadsheet and try again.",
+      WB241: "Photos are archived a month at a time, for a month that has ended.",
+      WB242: "Only an owner removes photos from Wagbook.",
+      WB243: "Download this month's photos first, then remove them.",
     },
   },
   labels: {

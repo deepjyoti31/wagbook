@@ -25,3 +25,12 @@ export async function siteOrigin(): Promise<string> {
   const host = (await headers()).get("host") ?? "localhost:3000";
   return `http://${host}`;
 }
+
+/**
+ * True when this Wagbook offers "Continue with Google": whoever deploys it has
+ * set up a Google client in Supabase Auth and set GOOGLE_SIGN_IN=on
+ * (docs/10-setup-and-deploy.md, "Sign in with Google"). Off, the button is not shown.
+ */
+export function googleSignInOn(): boolean {
+  return process.env.GOOGLE_SIGN_IN === "on";
+}

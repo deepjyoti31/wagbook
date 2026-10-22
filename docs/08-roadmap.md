@@ -954,16 +954,17 @@ and messaging many parents at once (not needed).
 
 ## M45. Sign-in: forgotten passwords, changing a password, Google
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (L1 in `02`, D50). Google sign-in is built and switched off by default; it was not tried
+  against a real Google account (no Google client here), see `HANDOFF.md`.
 
 **Build**
 
-1. "Forgot your password?" on the sign-in page: Supabase Auth sends a reset link by email, it lands on
+1. [x] "Forgot your password?" on the sign-in page: Supabase Auth sends a reset link by email, it lands on
    `/auth/confirm`, and the person sets a new password. The same answer whether or not the email has an account.
-2. "Change password" under More, for a person signed in. Asks for the current password first.
-3. "Continue with Google" on the sign-in page, through Supabase Auth's Google provider. A Google account with the same
+2. [x] "Change password" under More, for a person signed in. Asks for the current password first.
+3. [x] "Continue with Google" on the sign-in page, through Supabase Auth's Google provider. A Google account with the same
    email as an existing account signs in to that account (Supabase links them).
-4. `10-setup-and-deploy.md` and `14-self-hosting.md`: how to make the Google OAuth client and switch the provider on,
+4. [x] `10-setup-and-deploy.md` and `14-self-hosting.md`: how to make the Google OAuth client and switch the provider on,
    and the email template for the reset link. Google sign-in is optional: with no client set up, the button is not
    shown.
 
@@ -972,7 +973,9 @@ and messaging many parents at once (not needed).
 - Two-step sign-in still applies after a password reset and after Google: a session without the second step reaches
   nothing in the database, as today (D24).
 - Invitation links work the same whichever way a person signs in.
-- The reset form and Google sign-in count against the sign-in rate limit (`src/lib/rate-limit.ts`).
+- The reset form counts against the sign-in rate limit (`src/lib/rate-limit.ts`). Google sign-in starts from a link (a
+  GET, which the app's limits do not count, so the `form-action` rule can stay `'self'`); Supabase Auth's own limits
+  apply to it. Changing a password has a limit of its own.
 - The service role key is still never used.
 
 **Done when**
@@ -984,18 +987,19 @@ and messaging many parents at once (not needed).
 
 ## M46. Jobs that run by themselves overnight
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (L2 in `02`, D50). Credit that ends, Today's reminders and forgotten clock-outs needed no
+  job: Wagbook works each of them out when it is read. The jobs are making deliveries ahead and forgetting old rows.
 
 **Build**
 
-1. A nightly run inside the database with Supabase's `pg_cron`, one job per task, each a plain function that can also
+1. [x] A nightly run inside the database with Supabase's `pg_cron`, one job per task, each a plain function that can also
    be run by hand:
    - make food deliveries ahead for every active subscription (what opening the Kitchen does today);
-   - close credit that has run out;
-   - prepare Today's reminders, so the list is ready before the first person opens the app;
-   - mark a stretch of attendance still open after its shift ended plus a margin, so a manager sees it (M60 uses it).
-2. More, Settings: when the last nightly run happened and whether each job worked.
-3. Self-hosting: how to switch `pg_cron` on, and what happens without it (the jobs still run when the screens open, as
+   - forget problems and job runs older than 90 days (M48);
+   - not needed as jobs, because they are worked out when read: credit that has run out, Today's reminders, and a
+     stretch of attendance still open after its shift (M60 shows it from the rows).
+2. [x] More, Problems and overnight jobs: when the last nightly run happened and whether each job worked.
+3. [x] Self-hosting: how to switch `pg_cron` on, and what happens without it (the jobs still run when the screens open, as
    today).
 
 **Rules**
@@ -1013,14 +1017,14 @@ and messaging many parents at once (not needed).
 
 ## M47. Bring in parents and pets from a spreadsheet
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (L3 in `02`, D50).
 
 **Build**
 
-1. More, Import: a CSV template to download (parents, their pets, vaccinations), and an upload.
-2. A preview before anything is saved: rows that will be added, rows that look like an existing parent (same phone),
+1. [x] More, Import: a CSV template to download (parents, their pets, vaccinations), and an upload.
+2. [x] A preview before anything is saved: rows that will be added, rows that look like an existing parent (same phone),
    and rows with problems, each with a plain sentence.
-3. Import saves the good rows in one go; the rows with problems can be downloaded, fixed and uploaded again.
+3. [x] Import saves the good rows in one go; the rows with problems can be downloaded, fixed and uploaded again.
 
 **Rules**
 
@@ -1039,15 +1043,16 @@ and messaging many parents at once (not needed).
 
 ## M48. Knowing when something breaks
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (L4 in `02`, D50). Errors are written down only while someone is signed in: an error on
+  a public page stays in the server's log (writing it would need the service role key).
 
 **Build**
 
-1. `/api/health`: answers "ok" when the app can reach the database, for an uptime service (UptimeRobot, Better Stack
+1. [x] `/api/health`: answers "ok" when the app can reach the database, for an uptime service (UptimeRobot, Better Stack
    or similar, free plans) to watch every few minutes.
-2. Errors on the server written to a table (time, page, a short message, no personal data), and More, Problems for
-   owners: the last 100, with how often each happened.
-3. `10-setup-and-deploy.md`: set up an uptime service that sends a message to the owner's phone when the health check
+2. [x] Errors on the server written to a table (time, page, a short message, no personal data), and More, Problems and
+   overnight jobs for owners: the last 90 days, the same error once with how often it happened.
+3. [x] `10-setup-and-deploy.md`: set up an uptime service that sends a message to the owner's phone when the health check
    fails.
 
 **Rules**
@@ -1064,14 +1069,15 @@ and messaging many parents at once (not needed).
 
 ## M49. Photo archive: download, then free the space
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (L5 in `02`, D49, D50). On its own page, More, Photos and space, rather than in Settings.
+  "Archived" is not written under a small copy: the page simply shows the small copy where the photo was.
 
 **Build**
 
-1. More, Settings, Photos: how much space photos and files take, month by month.
-2. "Download photos for a month": a ZIP of every photo taken that month (updates, grooming before and after,
-   incidents, a rider's door photos, care task proof), in folders by pet, named by date.
-3. "Remove these from Wagbook": offered only after that month's ZIP was downloaded, for owners, with "This cannot be
+1. [x] More, Photos and space: how much space photos and files take, month by month.
+2. [x] "Download photos for a month": a ZIP of every photo taken that month (updates, grooming before and after, a
+   rider's door photos, care task proof once M54 adds it; incidents have no photos), in folders by pet, named by date.
+3. [x] "Remove these from Wagbook": offered only after that month's ZIP was downloaded, for owners, with "This cannot be
    undone." and a second tap. The full photos are removed from storage; the small copy (480 pixels) stays, so pages
    still show something, with "Archived" under it.
 
@@ -1079,9 +1085,10 @@ and messaging many parents at once (not needed).
 
 - Photos are already made smaller on the phone before they are sent (1600 pixels on the long edge, JPEG). They are kept
   in full until the owner archives them. Nothing is removed by itself.
-- Not archived: vaccination certificates and other health papers, and expense receipts (tax records).
+- Not archived: vaccination certificates and other health papers, expense receipts (tax records), and pets' own
+  photos (staff need them every day).
 - Only owners remove (D29). Each archive is a row: which month, who, when, how many files.
-- The ZIP is built one month at a time, so it fits in memory on a small server.
+- The ZIP is built one month at a time and sent a photo at a time, so it fits in memory on a small server.
 
 **Done when**
 

@@ -63,18 +63,19 @@ export function smallPath(path: string): string {
 
 /**
  * Short-lived links (an hour) to show files on a page. With `small`, each
- * photo's small copy when there is one, otherwise the photo itself.
+ * photo's small copy when there is one, otherwise the photo itself. Without,
+ * the photo itself, or its small copy once the photo was archived (M49).
  */
 export async function signedUrls(supabase: Supabase, paths: (string | null | undefined)[], opts: { small?: boolean } = {}): Promise<Map<string, string>> {
   const wanted = [...new Set(paths.filter((p): p is string => Boolean(p)))];
   const out = new Map<string, string>();
   if (wanted.length === 0) return out;
-  const ask = opts.small ? [...wanted.map(smallPath), ...wanted] : wanted;
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(ask, 3600);
+  const photos = wanted.filter((p) => p.endsWith(".jpg"));
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls([...wanted, ...photos.map(smallPath)], 3600);
   if (error || !data) return out;
   const byPath = new Map(data.filter((d) => d.signedUrl && !d.error).map((d) => [d.path, d.signedUrl]));
   for (const p of wanted) {
-    const url = (opts.small ? byPath.get(smallPath(p)) : undefined) ?? byPath.get(p);
+    const url = opts.small ? (byPath.get(smallPath(p)) ?? byPath.get(p)) : (byPath.get(p) ?? byPath.get(smallPath(p)));
     if (url) out.set(p, url);
   }
   return out;

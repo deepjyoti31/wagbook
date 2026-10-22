@@ -5,8 +5,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
-import { Field, Input, Loading } from "@/components/ui";
+import { buttonStyles, Field, Input, Loading } from "@/components/ui";
 import { getVisitorI18n } from "@/lib/i18n-server";
+import { googleSignInOn } from "@/lib/site";
 import { signIn, signUp } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -41,7 +42,21 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
           {a.linkExpired}
         </p>
       ) : null}
+      {params.error === "google" ? (
+        <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">
+          {m.account.google.failed}
+        </p>
+      ) : null}
       {next?.startsWith("/join/") ? <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">{signup ? a.invitedSignUp : a.invitedSignIn}</p> : null}
+      {googleSignInOn() ? (
+        <>
+          {/* A plain link: the route sends the browser on to Google (src/app/auth/google/route.ts). */}
+          <a href={`/auth/google${next ? `?next=${encodeURIComponent(next)}` : ""}`} className={`${buttonStyles.secondary} w-full`}>
+            {m.account.google.continue}
+          </a>
+          <p className="my-4 text-center text-slate">{m.account.google.or}</p>
+        </>
+      ) : null}
       <ActionForm action={signup ? signUp : signIn}>
         {next ? <input type="hidden" name="next" value={next} /> : null}
         <Field label={a.email}>
@@ -54,6 +69,13 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
           {signup ? a.createAccount : a.signIn}
         </SubmitButton>
       </ActionForm>
+      {signup ? null : (
+        <p className="mt-4">
+          <Link href="/login/forgot" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {m.account.forgotLink}
+          </Link>
+        </p>
+      )}
       <p className="mt-6 text-slate">
         <Rich
           text={signup ? a.haveAccount : a.newHere}

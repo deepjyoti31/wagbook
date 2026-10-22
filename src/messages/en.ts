@@ -16,6 +16,7 @@ import { kitchenArea } from "./en/kitchen";
 import { appointmentsArea } from "./en/appointments";
 import { rulesArea } from "./en/rules";
 import { teamArea } from "./en/team";
+import { runningArea } from "./en/running";
 
 export const en = {
   ...core,
@@ -29,6 +30,7 @@ export const en = {
   ...appointmentsArea,
   ...rulesArea,
   ...teamArea,
+  ...runningArea,
 };
 
 export type Messages = typeof en;

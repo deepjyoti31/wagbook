@@ -249,6 +249,21 @@ whole area shows while `organizations.keeps_rota` is on. Leave and attendance ar
 write their own rows, owners and managers everyone's, and `who_is_on()` tells everyone the names of who is clocked in
 now. Attendance is kept for pay: a person with some cannot be removed (`attendance_keeps_member`), only suspended.
 
+## Running for real
+
+Phase 5 (M46 to M49, D50), in `20261008000750_operations.sql`. **job_runs** is each time an overnight job ran for a
+kennel: `run_nightly_jobs()` runs every job for every kennel, each in its own sub-transaction, and pg_cron calls it
+each night where it is installed (the migration schedules it). The jobs are plain functions, safe to run twice:
+`job_plan_deliveries()` makes subscriptions' deliveries 21 days ahead, `job_forget_old_rows()` removes problems and job
+runs older than 90 days. **app_errors** are errors on the server while someone was signed in, written only by
+`log_app_error()` (scrubbed of contacts, 200 an hour at most) and read by owners. **photo_archives** is one row a
+month of photos downloaded as a ZIP and then removed by an owner (never removed before downloaded,
+`photo_archives_removed_after_download`). Which files a photo archive covers is `archivable_photo()`: photos under
+`updates`, `deliveries` and `care`, never their small copies, pets' own photos, certificates or receipts.
+`photo_space()` and `photo_month_files()` read Storage's own `storage.objects` as the caller. Importing a spreadsheet
+(M47) adds no table: `import_parents_and_pets()` writes clients, addresses, pets, weights and vaccinations as the
+caller, all or nothing.
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

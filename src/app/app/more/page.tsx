@@ -39,6 +39,9 @@ const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; mana
   { href: "/app/more/appointments", key: "appointmentSetup", when: (o) => o.offers_appointments },
   { href: "/app/more/settings", key: "settings" },
   { href: "/app/more/history", key: "history", managers: true },
+  { href: "/app/more/import", key: "import", managers: true },
+  { href: "/app/more/photos", key: "photos", managers: true },
+  { href: "/app/more/problems", key: "problems", managers: true },
 ];
 
 export default function MorePage({ searchParams }: PageProps<"/app/more">) {
@@ -120,6 +123,11 @@ async function Account() {
       <p className="mt-4">
         <Link href="/app/more/two-step" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
           {m.more.twoStepLink}: {twoStepOn ? m.more.twoStepOn : m.more.twoStepOff}
+        </Link>
+      </p>
+      <p>
+        <Link href="/app/more/password" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+          {m.account.passwordLink}
         </Link>
       </p>
       <ActionForm action={setMyLanguage} className="mt-6 flex flex-wrap items-end gap-2">

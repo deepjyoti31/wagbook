@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crc32, readZipStore, zipStore } from "./zip";
+import { crc32, readZipStore, ZipWriter, zipStore } from "./zip";
 
 /** Reads a ZIP back through its central directory, as an unzip tool does. */
 function readZip(zip: Uint8Array): { name: string; bytes: Uint8Array; crc: number; flags: number }[] {
@@ -56,5 +56,23 @@ describe("zip files", () => {
     const damaged = zip.slice();
     damaged[30 + 5] ^= 1;
     expect(() => readZipStore(damaged)).toThrow("damaged");
+  });
+
+  it("are the same written a piece at a time", () => {
+    const at = new Date(Date.UTC(2026, 9, 22, 10, 30));
+    const files = [
+      { name: "Mithai/2026-09-01 1.jpg", bytes: new Uint8Array([255, 216, 1, 2, 3]) },
+      { name: "Laddoo/2026-09-02 1.jpg", bytes: new Uint8Array([255, 216, 9]) },
+    ];
+    const writer = new ZipWriter(at);
+    const pieces = [...files.map((f) => writer.add(f)), writer.end()];
+    const joined = new Uint8Array(pieces.reduce((n, p) => n + p.length, 0));
+    let i = 0;
+    for (const p of pieces) {
+      joined.set(p, i);
+      i += p.length;
+    }
+    expect(joined).toEqual(zipStore(files, at));
+    expect(readZipStore(joined).map((f) => f.name)).toEqual(files.map((f) => f.name));
   });
 });

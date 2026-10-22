@@ -34,6 +34,15 @@ Under **More**:
 
 You can change all of this later.
 
+### Moving in from a notebook or a spreadsheet
+
+**More, Bring in parents and pets** saves typing every parent in by hand. Press **Download the template (CSV)**, open
+it in Excel or Google Sheets, and write one pet on each line: the parent's name and phone, the pet's name, and anything
+else you have (breed, birthday, weight, up to three vaccinations). Two dogs of one family are two lines with the same
+phone number. Save it as CSV and send it on the same page. **Check the file** shows what would go in, and which lines
+have a problem and why; nothing is saved yet. Press **Bring in** to save the good lines, then download the lines with
+problems, fix them, and send that file. A parent you already have is recognised by phone and left as they are.
+
 ## Every morning: Today
 
 <img src="guide/02-today.jpg" alt="Today: pets in house, arrivals, care counts" width="270">
@@ -188,8 +197,23 @@ Switch on **A rota for the team** in Settings, under What this kennel offers.
 - **Give each person their own account.** Never share the owner's password. When someone leaves, open **More, People**
   and suspend them.
 - **Shared phone at the kennel?** Sign out at the end of the shift (More, Sign out).
+- **Forgot a password?** "Forgot your password?" on the sign-in page emails a link to choose a new one. To change your
+  password while signed in: More, Change password. If your Wagbook offers it, you can also sign in with **Continue with
+  Google**.
+- **Is everything working?** More, Problems and overnight jobs shows whether the jobs that run each night worked, and
+  any errors Wagbook met while your team used it. If the same error keeps appearing, tell whoever set Wagbook up and
+  send them the code shown with it.
 - **Backups.** Whoever set Wagbook up should take regular copies (see
   [15-backup-and-restore.md](15-backup-and-restore.md)). Ask them when they last did.
+
+## Photos and space
+
+Every photo staff send is made smaller on the phone first, and Wagbook keeps it until you decide. **More, Photos and
+space** shows how much each month takes. When space runs short (Supabase's free plan holds about a gigabyte, a few
+thousand photos), pick an old month: **Download photos (ZIP)** saves that month's photos to your phone or computer, in a
+folder for each pet. Keep the ZIP safe (Google Drive is a good place), then press **Remove these from Wagbook**. Only an
+owner can, and only after the download. A small copy of each photo stays, so old stays still show their pictures.
+Pets' own photos, vaccination cards and receipts are never removed this way.
 
 ## When a parent asks about their details
 

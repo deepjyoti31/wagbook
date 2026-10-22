@@ -2,12 +2,17 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after adding M45 to M65 to the roadmap (D49). Nothing of them is built yet.
+Last updated: 22 October 2026, after Phase 5 (M45 to M49: passwords and Google, overnight jobs, import, problems, the photo archive).
 
 ## In one paragraph
 
-Every milestone from M2 to M44 is built, and the launch work in M1 waits for the owner. M45 to M65 ("Running for
-real", D49) were added on 22 October 2026 and are not started: start with M45. Phase 4 (M43
+Every milestone from M2 to M49 is built, and the launch work in M1 waits for the owner. M45 to M65 ("Running for
+real", D49) were added on 22 October 2026; Phase 5 (M45 to M49, `02` section L, D50) is built: "Forgot your password?"
+by email, Change password under More, and "Continue with Google" when an installation sets it up (`GOOGLE_SIGN_IN=on`);
+overnight jobs run by pg_cron in the database (deliveries made ahead, old rows forgotten), each run written down;
+parents, pets and vaccinations brought in from a CSV with a preview and the bad lines to download, all or nothing;
+`/api/health` for an uptime service and errors on the server listed for owners, scrubbed of contacts; and a photo
+archive, a month downloaded as a ZIP and then removed by an owner, the small copies kept. Next is Phase 6, from M50. Phase 4 (M43
 and M44, `02` section K, D48): shifts and a week's rota planned by owners and managers, who lives on site, clocking in
 and out from Today with the time stamped by the database and "On now" for everyone, leave asked for and answered
 (never one's own, unless an owner) taking the person off the rota, and a month's attendance for pay with a CSV; a
@@ -164,6 +169,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Kennels in and out of service by date (M44): counted from the day added, a change dated earlier, never after today (`WB230`) or before the last change (`WB231`), out and back on one day, the history written only by the database; the occupancy report and the calendar count the kennels there each day | `tests/db/kennel-service.test.ts`; the report's per-day count removed once to see the test fail | High |
 | The week's days, shift spans across midnight, who is on the rota now, hours, leave days in a month, the month's sheet (a night shift on its evening, open stretches flagged), times typed by hand; the ZIP writer (CRC-32, UTF-8 names, read back, damage noticed) | `src/lib/core/team.test.ts`, `src/lib/core/zip.test.ts`; a ZIP from `zipStore()` passes `unzip -t` | High |
 | Phase 4 in a browser at 360 pixels: the rota switched on, the usual shifts, Meena on three mornings and Ravi living on site; Meena clocking in on Today and seeing On now; her leave asked for and granted, the rota then refusing her; clocking out; a manager writing yesterday by hand, the month's sheet and its CSV; Meena seeing only her own; a kennel out of service from three days ago and back; Send asking whether the message went ("Not yet" keeps it); a parent's export as a ZIP holding the certificate | `npm run test:e2e` against the local Supabase: the whole walk (65 steps passing, the team step then failing on a vanishing message, fixed with `?done=`), then the 2 new steps alone after the fix; screenshots taken 22 October 2026 | High for the local stack |
+| Phase 5 in the database: overnight jobs make deliveries ahead once (a second run makes none), a failing job written down while the others and other kennels still run, old problems forgotten, the jobs out of the app's reach; problems scrubbed of emails and phone numbers (dates kept), written for the person's own kennel, read by owners only, 200 an hour; the import matching parents by phone and pets by name, all or nothing, owners and managers only, 2,000 rows; the photo archive's space by month, a month's files with their pets, this month refused (`WB241`), removal only by an owner (`WB242`) after a download (`WB243`), the small copies left; and the migration with pg_cron on Supabase's Postgres (`cron.job` holds `wagbook-nightly`) | `tests/db/operations.test.ts` (14 tests); `supabase db reset` on the local Supabase | High |
+| The CSV reader and import checker, error scrubbing, the reset link's session check, file sizes, the ZIP written a piece at a time | `src/lib/core/import.test.ts`, `problems.test.ts`, `sign-in.test.ts`, `sizes.test.ts`, `zip.test.ts` | High |
+| Phase 5 in a browser at 360 pixels: a new owner asks for a reset link (the same answer for an unknown address), opens it from the local mail catcher, chooses a new password, the old one refused, changes it again under More (a wrong current one refused), a normal session refused the reset page, the link refused a second time; a manager checks a CSV (a bad phone named by line), brings in a parent with two pets, the same file then finding them known, staff kept out; `/api/health` answering ok; owners seeing the overnight jobs after `run_nightly_jobs()`, a page made to fail on purpose listed under Problems by the error hook, managers seeing jobs only, staff kept out; a month of update photos downloaded as a ZIP with a folder for the pet, removed by the owner after the manager's download, the small copies left | `npm run test:e2e` against the local Supabase: the whole walk, 71 steps passing, 22 October 2026; screenshots taken | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -200,6 +208,11 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 4 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The rota's day cards and the attendance summary may wrap in Kannada |
 | Clocking in on a real phone, at a real shift change | Walked in Chromium at 360 pixels only | Two people clocking in from one phone works (each signs in), but a shared phone left signed in clocks in whoever is signed in |
 | The attendance CSV opened in a spreadsheet for pay | Checked as text in the walk | Low: the same CSV writer as the reports |
+| "Continue with Google" with a real Google account | No Google client here; the button, the route to Supabase Auth and the return through `/auth/confirm` are the same code paths as the email link, which is walked | Medium: the Google client's redirect URI and Supabase's provider settings are the usual mistakes (`10`) |
+| The reset email with the recommended template, opened on another phone | The walk uses the local default template (a code tied to the browser that asked) | Low: `/auth/confirm` handles both kinds of link, as it does for sign-up |
+| pg_cron firing at night on a hosted project | On the local Supabase the migration scheduled it (`cron.job` shows `wagbook-nightly`) and the walk ran `run_nightly_jobs()` by hand; nobody waited for 02:00 | Low |
+| An uptime service watching `/api/health` | Checked with a request in the walk; no service set up | Low |
+| A month's ZIP of thousands of photos | Built a photo at a time (`ZipWriter`), so memory holds one photo; the walk zips a handful | Low; a ZIP over 4 GB or 65,535 photos would need ZIP64, which is not written |
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
@@ -220,12 +233,18 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
    cancellation charge, with tax), whether a monthly bill for a regular's days is issued in time, and when credit kept
    from a cancellation carries tax (kept, spent, or run out).
 
-8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
+8. **Upgrade Next.js.** `npm audit` lists two advisories for `next` 16.4.0 (a critical one in image optimization with
+   SVG files, and a denial of service through Server Actions), and `next build` sometimes stops once with an upgrade
+   notice (it builds on a second try). Upgrade to the first patched release and run the gate and the walk again.
+
+9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: M45 to M65 are next**, in order, starting with M45 (sign-in: forgotten passwords, changing a password,
-Google). The owner chose them on 22 October 2026 (D49); `02` section L lists them as Planned. Phase 5 (M45 to M49) is
-what a kennel needs before it starts. Alongside, steps 1 to 8 above still need the owner, then the migration freeze.
+**Building: M50 to M65 are next**, in order, starting with M50 (kennel cleaning between guests). The owner chose them
+on 22 October 2026 (D49); `02` section L lists them. Phase 5 (M45 to M49) is built. Alongside, steps 1 to 9 above still
+need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
+template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
+check `cron.job` has `wagbook-nightly`, and point an uptime service at `/api/health`.
 Ideas beyond M65 wait for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
 owner has said production is not soon, so migrations stay editable in place until then. Worth doing before
 production without the owner: have a person read the Phase 1 to 4 Hindi and Kannada, and walk the team screens on a
@@ -425,6 +444,20 @@ Chosen in M25 as the simplest thing:
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
 
+Chosen in Phase 5 (M45 to M49) as the simplest thing:
+
+- A spreadsheet's parent who is already known by phone is left exactly as they are: a new email or address in the file
+  is not written. The first line's parent details win when one phone has several lines.
+- An imported parent gets no consent date (`consent_source` is "staff", as a parent added by hand). Should an import
+  record that the kennel holds consent on paper?
+- The import's PIN code problem says "six digits" even outside India, where any postal code with a digit is taken.
+- A month's photos are noted as downloaded when the ZIP has been sent in full; Wagbook cannot know the owner kept it.
+  The page says to keep it before removing.
+- Removing a month removes every archivable photo taken that month, including any taken after the download (none can
+  be: only a month that has ended is offered).
+- Errors are written for the kennel in the person's `wb_org` cookie, or their first kennel; a person working at two
+  kennels may see an error from one listed under the other's owner.
+
 Chosen in Phase 4 (M43, M44) as the simplest thing:
 
 - The rota has no repeating pattern: a manager puts someone on a shift for up to 31 days in a row, and again next
@@ -542,6 +575,9 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
   rows; other ids read "a record no longer here". An erasure shows as a change to "clients".
 - An erased parent appears as "Erased" (stored in English) where a past stay or bill names them. Their pets keep their
   names but are hidden for good, because their parent stays hidden.
+- Phase 5: the photo page does not refresh itself after a download: reload to see "Remove these from Wagbook". The
+  import's preview is lost if the page is reloaded (send the file again). Errors on public pages are not listed.
+  Archived small copies are shown without the word "Archived".
 - Rota and attendance: no repeating rota, no cover requests or swaps, no overtime rules, no pay worked out, no
   clocking in tied to the kennel's place. A shift taken off the list keeps its old rota rows; its name cannot change.
 - A certificate sent with the intake form is lost if the form arrives but the upload fails: the parent is told to send
@@ -555,7 +591,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 635 tests, build
+npm run check        # dash check, lint, typecheck, 665 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -565,6 +601,7 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 22 October 2026: Phase 5 built (M45 to M49, D50): passwords and Google, overnight jobs, import, problems, photo archive.
 - 22 October 2026: the owner chose what comes after M44; M45 to M65 written into the roadmap, `02` section L and D49.
 
 - 22 October 2026. Phase 4, M43 and M44: shifts, the rota, living on site, clocking in and out with On now on Today,
