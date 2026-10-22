@@ -71,6 +71,8 @@ export function errorCodes(): string {
     "| WB160 to WB169 | Batches and packing |",
     "| WB170 to WB179 | Delivery runs, riders and problems |",
     "| WB180 to WB189 | Food orders from the website and parents' links |",
+    "| WB190 to WB199 | Appointments |",
+    "| WB200 to WB209 | Appointments: bills, courses and packages |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

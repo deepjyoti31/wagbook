@@ -24,3 +24,4 @@ export * from "./reminders";
 export * from "./gstr1";
 export * from "./groundwork";
 export * from "./food";
+export * from "./appointments";

@@ -82,6 +82,15 @@ alter table public.batches enable row level security;
 alter table public.delivery_runs enable row level security;
 alter table public.delivery_problems enable row level security;
 alter table public.food_orders enable row level security;
+alter table public.appointment_places enable row level security;
+alter table public.appointment_services enable row level security;
+alter table public.appointment_service_prices enable row level security;
+alter table public.pet_grooming enable row level security;
+alter table public.courses enable row level security;
+alter table public.packages enable row level security;
+alter table public.package_parts enable row level security;
+alter table public.appointments enable row level security;
+alter table public.appointment_items enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -152,7 +161,8 @@ begin
   foreach t in array array[
     'clients', 'pets', 'vaccinations', 'bookings', 'booking_items',
     'care_tasks', 'play_sessions', 'stay_updates', 'incidents',
-    'pet_food', 'subscriptions', 'deliveries', 'delivery_runs', 'delivery_problems'
+    'pet_food', 'subscriptions', 'deliveries', 'delivery_runs', 'delivery_problems',
+    'appointments', 'appointment_items', 'pet_grooming'
   ] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
@@ -192,8 +202,9 @@ grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, ken
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
-              vaccinations_checked_at, notes, group_id, waitlisted_at)
+              vaccinations_checked_at, notes, group_id, waitlisted_at, package_id, package_price_minor)
   on public.bookings to authenticated;
+-- A package is put on a stay only through apply_package() (bookings_check_package).
 -- Who may change a price is decided by a trigger, not here: owners, managers
 -- and staff all sign in as the same role. See bookings_guard_price().
 
@@ -205,7 +216,8 @@ declare
   t text;
 begin
   foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
-                          'suppliers', 'stock_items', 'recipes', 'food_products'] loop
+                          'suppliers', 'stock_items', 'recipes', 'food_products',
+                          'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -245,6 +257,20 @@ create policy passes_update on public.passes for update to authenticated
 create policy passes_delete on public.passes for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 grant select on public.pass_balances to authenticated;
+
+-- Training courses (M36), sold as packs are: any member reads them (to book a
+-- session from one); owners and managers sell and correct them; owners delete.
+grant select, insert, update, delete on public.courses to authenticated;
+create policy courses_select on public.courses for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy courses_insert on public.courses for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy courses_update on public.courses for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy courses_delete on public.courses for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select on public.course_balances to authenticated;
 
 -- Weighings: any member weighs a pet and reads the weights; owners and
 -- managers correct one; owners delete (D29).
@@ -338,10 +364,10 @@ create policy reminders_sent_delete on public.reminders_sent for delete to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -532,6 +558,10 @@ grant execute on function public.confirm_food_order(uuid) to authenticated;
 grant execute on function public.record_purchase(uuid, uuid, bigint, bigint, date, uuid, date, text, text, text) to authenticated;
 grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;
+-- Appointments (M34 to M37).
+grant execute on function public.appointment_price(uuid, uuid, uuid) to authenticated;
+grant execute on function public.first_free_start(uuid, uuid, uuid, date, integer, integer, time, boolean) to authenticated;
+grant execute on function public.apply_package(uuid, uuid, bigint) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.

@@ -6,6 +6,424 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      appointment_items: {
+        Row: {
+          id: string;
+          org_id: string;
+          appointment_id: string;
+          service_id: string;
+          description: string;
+          quantity: number;
+          unit_price_minor: number;
+          tax_rate_bp: number;
+          sac_code: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          appointment_id: string;
+          service_id: string;
+          description: string;
+          quantity?: number;
+          unit_price_minor: number;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          appointment_id?: string;
+          service_id?: string;
+          description?: string;
+          quantity?: number;
+          unit_price_minor?: number;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointment_items_org_id_appointment_id_fkey";
+            columns: ["org_id", "appointment_id"];
+            isOneToOne: false;
+            referencedRelation: "appointments";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointment_items_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appointment_items_org_id_service_id_fkey";
+            columns: ["org_id", "service_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_services";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      appointment_places: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          opens: string;
+          closes: string;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          opens?: string;
+          closes?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          opens?: string;
+          closes?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointment_places_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      appointment_service_prices: {
+        Row: {
+          id: string;
+          org_id: string;
+          service_id: string;
+          size: Database["public"]["Enums"]["size_band"] | null;
+          coat: Database["public"]["Enums"]["pet_coat"] | null;
+          breed: string | null;
+          price_minor: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          service_id: string;
+          size?: Database["public"]["Enums"]["size_band"] | null;
+          coat?: Database["public"]["Enums"]["pet_coat"] | null;
+          breed?: string | null;
+          price_minor: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          service_id?: string;
+          size?: Database["public"]["Enums"]["size_band"] | null;
+          coat?: Database["public"]["Enums"]["pet_coat"] | null;
+          breed?: string | null;
+          price_minor?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointment_service_prices_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appointment_service_prices_org_id_service_id_fkey";
+            columns: ["org_id", "service_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_services";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      appointment_services: {
+        Row: {
+          id: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["appointment_kind"];
+          name: string;
+          minutes: number;
+          cleanup_minutes: number;
+          place_id: string | null;
+          pricing: Database["public"]["Enums"]["appointment_pricing"];
+          price_minor: number;
+          tax_rate_bp: number | null;
+          sac_code: string | null;
+          skill: Database["public"]["Enums"]["staff_skill"] | null;
+          checks_vaccinations: boolean;
+          is_addon: boolean;
+          max_people: number | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["appointment_kind"];
+          name: string;
+          minutes?: number;
+          cleanup_minutes?: number;
+          place_id?: string | null;
+          pricing?: Database["public"]["Enums"]["appointment_pricing"];
+          price_minor?: number;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          skill?: Database["public"]["Enums"]["staff_skill"] | null;
+          checks_vaccinations?: boolean;
+          is_addon?: boolean;
+          max_people?: number | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kind?: Database["public"]["Enums"]["appointment_kind"];
+          name?: string;
+          minutes?: number;
+          cleanup_minutes?: number;
+          place_id?: string | null;
+          pricing?: Database["public"]["Enums"]["appointment_pricing"];
+          price_minor?: number;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          skill?: Database["public"]["Enums"]["staff_skill"] | null;
+          checks_vaccinations?: boolean;
+          is_addon?: boolean;
+          max_people?: number | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointment_services_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appointment_services_org_id_place_id_fkey";
+            columns: ["org_id", "place_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_places";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      appointments: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          service_id: string;
+          kind: Database["public"]["Enums"]["appointment_kind"];
+          place_id: string | null;
+          booking_id: string | null;
+          course_id: string | null;
+          in_package: boolean;
+          status: Database["public"]["Enums"]["appointment_status"];
+          starts_at: string;
+          ends_at: string;
+          cleanup_minutes: number;
+          held_until: string;
+          staff_id: string | null;
+          price_minor: number | null;
+          tax_rate_bp: number;
+          sac_code: string | null;
+          vaccinations_checked_at: string | null;
+          vaccinations_checked_by: string | null;
+          life_jacket: boolean | null;
+          guest_pet_id: string | null;
+          guest_vaccinations_checked_at: string | null;
+          guest_vaccinations_checked_by: string | null;
+          people: number | null;
+          notes: string | null;
+          after_notes: string | null;
+          homework: string | null;
+          cancel_reason: string | null;
+          cancelled_at: string | null;
+          done_at: string | null;
+          done_by: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          service_id: string;
+          kind?: Database["public"]["Enums"]["appointment_kind"];
+          place_id?: string | null;
+          booking_id?: string | null;
+          course_id?: string | null;
+          in_package?: boolean;
+          status?: Database["public"]["Enums"]["appointment_status"];
+          starts_at: string;
+          ends_at: string;
+          cleanup_minutes?: number;
+          held_until?: string;
+          staff_id?: string | null;
+          price_minor?: number | null;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
+          life_jacket?: boolean | null;
+          guest_pet_id?: string | null;
+          guest_vaccinations_checked_at?: string | null;
+          guest_vaccinations_checked_by?: string | null;
+          people?: number | null;
+          notes?: string | null;
+          after_notes?: string | null;
+          homework?: string | null;
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          done_at?: string | null;
+          done_by?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          pet_id?: string;
+          service_id?: string;
+          kind?: Database["public"]["Enums"]["appointment_kind"];
+          place_id?: string | null;
+          booking_id?: string | null;
+          course_id?: string | null;
+          in_package?: boolean;
+          status?: Database["public"]["Enums"]["appointment_status"];
+          starts_at?: string;
+          ends_at?: string;
+          cleanup_minutes?: number;
+          held_until?: string;
+          staff_id?: string | null;
+          price_minor?: number | null;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          vaccinations_checked_at?: string | null;
+          vaccinations_checked_by?: string | null;
+          life_jacket?: boolean | null;
+          guest_pet_id?: string | null;
+          guest_vaccinations_checked_at?: string | null;
+          guest_vaccinations_checked_by?: string | null;
+          people?: number | null;
+          notes?: string | null;
+          after_notes?: string | null;
+          homework?: string | null;
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          done_at?: string | null;
+          done_by?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointments_org_id_booking_id_pet_id_fkey";
+            columns: ["org_id", "booking_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id", "pet_id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_client_id_pet_id_fkey";
+            columns: ["org_id", "client_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "client_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_course_id_fkey";
+            columns: ["org_id", "course_id"];
+            isOneToOne: false;
+            referencedRelation: "courses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_guest_pet_id_fkey";
+            columns: ["org_id", "guest_pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_place_id_fkey";
+            columns: ["org_id", "place_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_places";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_service_id_fkey";
+            columns: ["org_id", "service_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_services";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "appointments_org_id_staff_id_fkey";
+            columns: ["org_id", "staff_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           id: number;
@@ -134,6 +552,7 @@ export type Database = {
           unit_price_minor: number;
           tax_rate_bp: number;
           sac_code: string | null;
+          in_package: boolean;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -148,6 +567,7 @@ export type Database = {
           unit_price_minor: number;
           tax_rate_bp?: number;
           sac_code?: string | null;
+          in_package?: boolean;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -162,6 +582,7 @@ export type Database = {
           unit_price_minor?: number;
           tax_rate_bp?: number;
           sac_code?: string | null;
+          in_package?: boolean;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -225,6 +646,8 @@ export type Database = {
           group_id: string | null;
           series_id: string | null;
           pass_id: string | null;
+          package_id: string | null;
+          package_price_minor: number | null;
           waitlisted_at: string | null;
           public_token: string;
           created_by: string | null;
@@ -265,6 +688,8 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           pass_id?: string | null;
+          package_id?: string | null;
+          package_price_minor?: number | null;
           waitlisted_at?: string | null;
           public_token?: string;
           created_by?: string | null;
@@ -305,6 +730,8 @@ export type Database = {
           group_id?: string | null;
           series_id?: string | null;
           pass_id?: string | null;
+          package_id?: string | null;
+          package_price_minor?: number | null;
           waitlisted_at?: string | null;
           public_token?: string;
           created_by?: string | null;
@@ -338,6 +765,13 @@ export type Database = {
             columns: ["org_id", "kennel_id"];
             isOneToOne: false;
             referencedRelation: "kennels";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "bookings_package_fkey";
+            columns: ["org_id", "package_id"];
+            isOneToOne: false;
+            referencedRelation: "packages";
             referencedColumns: ["org_id", "id"];
           },
           {
@@ -634,6 +1068,90 @@ export type Database = {
           },
         ];
       };
+      courses: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          service_id: string;
+          name: string;
+          sessions: number;
+          price_minor: number;
+          starts_on: string;
+          invoice_id: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          pet_id: string;
+          service_id: string;
+          name: string;
+          sessions: number;
+          price_minor: number;
+          starts_on: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          pet_id?: string;
+          service_id?: string;
+          name?: string;
+          sessions?: number;
+          price_minor?: number;
+          starts_on?: string;
+          invoice_id?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "courses_invoice_fkey";
+            columns: ["org_id", "invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "courses_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "courses_org_id_client_id_pet_id_fkey";
+            columns: ["org_id", "client_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "client_id", "id"];
+          },
+          {
+            foreignKeyName: "courses_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "courses_org_id_service_id_fkey";
+            columns: ["org_id", "service_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_services";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       credit_note_lines: {
         Row: {
           id: string;
@@ -876,6 +1394,8 @@ export type Database = {
           delivered_at: string | null;
           proof_path: string | null;
           replaces_id: string | null;
+          appointment_id: string | null;
+          inscription: string | null;
           note: string | null;
           created_by: string | null;
           created_at: string;
@@ -916,6 +1436,8 @@ export type Database = {
           delivered_at?: string | null;
           proof_path?: string | null;
           replaces_id?: string | null;
+          appointment_id?: string | null;
+          inscription?: string | null;
           note?: string | null;
           created_by?: string | null;
           created_at?: string;
@@ -956,6 +1478,8 @@ export type Database = {
           delivered_at?: string | null;
           proof_path?: string | null;
           replaces_id?: string | null;
+          appointment_id?: string | null;
+          inscription?: string | null;
           note?: string | null;
           created_by?: string | null;
           created_at?: string;
@@ -967,6 +1491,13 @@ export type Database = {
             columns: ["org_id", "address_id"];
             isOneToOne: false;
             referencedRelation: "client_addresses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "deliveries_org_id_appointment_id_fkey";
+            columns: ["org_id", "appointment_id"];
+            isOneToOne: false;
+            referencedRelation: "appointments";
             referencedColumns: ["org_id", "id"];
           },
           {
@@ -1698,6 +2229,7 @@ export type Database = {
           period_start: string | null;
           period_end: string | null;
           delivery_id: string | null;
+          appointment_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           number: string | null;
           fiscal_year: string | null;
@@ -1740,6 +2272,7 @@ export type Database = {
           period_start?: string | null;
           period_end?: string | null;
           delivery_id?: string | null;
+          appointment_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1782,6 +2315,7 @@ export type Database = {
           period_start?: string | null;
           period_end?: string | null;
           delivery_id?: string | null;
+          appointment_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -1818,6 +2352,13 @@ export type Database = {
             columns: ["org_id", "delivery_id"];
             isOneToOne: false;
             referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "invoices_org_id_appointment_id_fkey";
+            columns: ["org_id", "appointment_id"];
+            isOneToOne: false;
+            referencedRelation: "appointments";
             referencedColumns: ["org_id", "id"];
           },
           {
@@ -2006,6 +2547,7 @@ export type Database = {
           cook_margin_bp: number;
           problem_window_hours: number;
           food_orders_enabled: boolean;
+          item_lead_hours: number;
           created_at: string;
           updated_at: string;
         };
@@ -2067,6 +2609,7 @@ export type Database = {
           cook_margin_bp?: number;
           problem_window_hours?: number;
           food_orders_enabled?: boolean;
+          item_lead_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -2128,10 +2671,129 @@ export type Database = {
           cook_margin_bp?: number;
           problem_window_hours?: number;
           food_orders_enabled?: boolean;
+          item_lead_hours?: number;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
+        ];
+      };
+      package_parts: {
+        Row: {
+          id: string;
+          org_id: string;
+          package_id: string;
+          service_id: string | null;
+          extra_id: string | null;
+          on_day: Database["public"]["Enums"]["package_day"] | null;
+          quantity: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          package_id: string;
+          service_id?: string | null;
+          extra_id?: string | null;
+          on_day?: Database["public"]["Enums"]["package_day"] | null;
+          quantity?: number;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          package_id?: string;
+          service_id?: string | null;
+          extra_id?: string | null;
+          on_day?: Database["public"]["Enums"]["package_day"] | null;
+          quantity?: number;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "package_parts_org_id_extra_id_fkey";
+            columns: ["org_id", "extra_id"];
+            isOneToOne: false;
+            referencedRelation: "services";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "package_parts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "package_parts_org_id_package_id_fkey";
+            columns: ["org_id", "package_id"];
+            isOneToOne: false;
+            referencedRelation: "packages";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "package_parts_org_id_service_id_fkey";
+            columns: ["org_id", "service_id"];
+            isOneToOne: false;
+            referencedRelation: "appointment_services";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      packages: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          kind: Database["public"]["Enums"]["booking_kind"];
+          price_minor: number | null;
+          tax_rate_bp: number | null;
+          sac_code: string | null;
+          about: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          kind?: Database["public"]["Enums"]["booking_kind"];
+          price_minor?: number | null;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          about?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          kind?: Database["public"]["Enums"]["booking_kind"];
+          price_minor?: number | null;
+          tax_rate_bp?: number | null;
+          sac_code?: string | null;
+          about?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "packages_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
         ];
       };
       passes: {
@@ -2404,6 +3066,60 @@ export type Database = {
           },
         ];
       };
+      pet_grooming: {
+        Row: {
+          org_id: string;
+          pet_id: string;
+          usual_cut: string | null;
+          products: string | null;
+          skin: string | null;
+          behaviour: string | null;
+          every_weeks: number | null;
+          updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          pet_id: string;
+          usual_cut?: string | null;
+          products?: string | null;
+          skin?: string | null;
+          behaviour?: string | null;
+          every_weeks?: number | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          pet_id?: string;
+          usual_cut?: string | null;
+          products?: string | null;
+          skin?: string | null;
+          behaviour?: string | null;
+          every_weeks?: number | null;
+          updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pet_grooming_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pet_grooming_org_id_pet_id_fkey";
+            columns: ["org_id", "pet_id"];
+            isOneToOne: true;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       pet_weights: {
         Row: {
           id: string;
@@ -2472,6 +3188,7 @@ export type Database = {
           weight_g: number | null;
           target_weight_g: number | null;
           color: string | null;
+          coat: Database["public"]["Enums"]["pet_coat"] | null;
           microchip: string | null;
           photo_path: string | null;
           food_notes: string | null;
@@ -2498,6 +3215,7 @@ export type Database = {
           weight_g?: number | null;
           target_weight_g?: number | null;
           color?: string | null;
+          coat?: Database["public"]["Enums"]["pet_coat"] | null;
           microchip?: string | null;
           photo_path?: string | null;
           food_notes?: string | null;
@@ -2524,6 +3242,7 @@ export type Database = {
           weight_g?: number | null;
           target_weight_g?: number | null;
           color?: string | null;
+          coat?: Database["public"]["Enums"]["pet_coat"] | null;
           microchip?: string | null;
           photo_path?: string | null;
           food_notes?: string | null;
@@ -3441,6 +4160,21 @@ export type Database = {
       };
     };
     Views: {
+      course_balances: {
+        Row: {
+          course_id: string | null;
+          org_id: string | null;
+          client_id: string | null;
+          pet_id: string | null;
+          service_id: string | null;
+          name: string | null;
+          sessions: number | null;
+          invoice_id: string | null;
+          sessions_used: number | null;
+          sessions_left: number | null;
+        };
+        Relationships: [];
+      };
       invoice_balances: {
         Row: {
           invoice_id: string | null;
@@ -3512,6 +4246,14 @@ export type Database = {
         Args: { p_token: string };
         Returns: string;
       };
+      apply_package: {
+        Args: { p_booking: string; p_package: string; p_price?: number };
+        Returns: number;
+      };
+      appointment_price: {
+        Args: { p_org: string; p_service: string; p_pet: string };
+        Returns: number;
+      };
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string; p_client?: string; p_pets?: number };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
@@ -3572,6 +4314,10 @@ export type Database = {
         Args: { p_org: string; p_weekdays?: number[] };
         Returns: string;
       };
+      first_free_start: {
+        Args: { p_org: string; p_place: string; p_pet: string; p_day: string; p_minutes: number; p_cleanup: number; p_latest_end?: string; p_latest?: boolean };
+        Returns: string;
+      };
       fiscal_year_label: {
         Args: { p_date: string; p_start_month?: number };
         Returns: string;
@@ -3625,7 +4371,7 @@ export type Database = {
         Returns: string[];
       };
       invoice_expected_lines: {
-        Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"]; p_series?: string; p_month?: string };
+        Args: { p_org: string; p_booking: string; p_group: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"]; p_series?: string; p_month?: string; p_appointment?: string };
         Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
       };
       issue_credit_note: {
@@ -3815,6 +4561,9 @@ export type Database = {
     };
     Enums: {
       address_kind: "home" | "work" | "other";
+      appointment_kind: "groom" | "swim" | "training" | "party" | "other";
+      appointment_pricing: "fixed" | "by_size" | "by_coat" | "quote";
+      appointment_status: "requested" | "confirmed" | "done" | "no_show" | "cancelled";
       boarder_food: "kitchen" | "kibble" | "own";
       booking_kind: "boarding" | "daycare";
       booking_status: "requested" | "confirmed" | "checked_in" | "checked_out" | "cancelled" | "no_show";
@@ -3832,12 +4581,15 @@ export type Database = {
       intake_status: "new" | "accepted" | "rejected" | "spam";
       invoice_status: "draft" | "issued" | "void";
       member_role: "owner" | "manager" | "staff" | "rider";
+      package_day: "first" | "middle" | "last";
       pay_period: "week" | "month";
       payment_method: "upi" | "cash" | "card" | "bank_transfer" | "other";
+      pet_coat: "short" | "double" | "long" | "curly" | "wire";
       pet_sex: "male" | "female" | "unknown";
       problem_kind: "damaged" | "late" | "wrong";
       problem_outcome: "replaced" | "refunded" | "none";
       service_kind: "boarding" | "daycare" | "addon";
+      size_band: "small" | "medium" | "large";
       staff_skill: "cook" | "groomer" | "trainer" | "swim_supervisor" | "rider";
       stock_kind: "meat" | "organ" | "egg" | "grain" | "vegetable" | "oil" | "supplement" | "packaging" | "fuel" | "grooming" | "medicine" | "other";
       stock_move_kind: "purchase" | "used" | "waste" | "count";

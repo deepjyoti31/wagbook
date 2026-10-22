@@ -330,7 +330,7 @@ export const core: typeof English = {
     seeRequests: "देखें",
     toSend: "भेजने हैं",
     toSendAbout: "आज भेजने वाले संदेश। भेजें दबाने पर WhatsApp में संदेश लिखा हुआ खुलता है; फिर यह इस सूची से हट जाता है।",
-    reminderKinds: { vaccination: "टीकों का कार्ड", arrival: "कल आ रहा है", pickup: "कल घर जा रहा है", unpaid: "बिल बाकी" },
+    reminderKinds: { vaccination: "टीकों का कार्ड", arrival: "कल आ रहा है", pickup: "कल घर जा रहा है", unpaid: "बिल बाकी", groom: "ग्रूमिंग का समय" },
     send: "भेजें",
     // For a screen reader: who the message goes to.
     sendTo: "{name} को WhatsApp पर भेजें",
@@ -392,6 +392,7 @@ export const core: typeof English = {
       pickup: "नमस्ते {parent}, {pet} कल, {date}, {kennel} से घर जाएगा।",
       pickUpBy: "{time} तक ले जाएं।",
       unpaid: "नमस्ते {parent}, {kennel} से एक याद: बिल {number} पर {amount} चुकाना बाकी है। {url}",
+      groom: "नमस्ते {parent}, {kennel} में {pet} की ग्रूमिंग {date} के आसपास होनी है। क्या समय बुक करें?",
     },
   },
   copy: {

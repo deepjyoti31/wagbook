@@ -1,4 +1,5 @@
 import { addDays, formatDate, type ISODate } from "./dates";
+import { groomsDue, type GroomCard } from "./appointments";
 import { formatMoney, type Minor } from "./money";
 import { vaccinationWarnings } from "./vaccinations";
 
@@ -12,12 +13,14 @@ import { vaccinationWarnings } from "./vaccinations";
  *   arrival      a stay starts tomorrow
  *   pickup       a pet in the kennel goes home tomorrow
  *   unpaid       a bill issued three or more days ago still has money owed
+ *   groom        a pet is due a groom again (M35): its last groom plus its
+ *                weeks, from three days before; once for each groom
  *
  * Once sent, a reminder leaves the list for good, except an unpaid bill,
  * which comes back three days after the last reminder.
  */
 
-export type ReminderKind = "vaccination" | "arrival" | "pickup" | "unpaid";
+export type ReminderKind = "vaccination" | "arrival" | "pickup" | "unpaid" | "groom";
 
 /** How many days ahead a missing vaccination card is asked for. */
 export const VACCINATION_REMINDER_DAYS = 7;
@@ -33,6 +36,7 @@ export interface ReminderWords {
   pickup: string;
   pickUpBy: string;
   unpaid: string;
+  groom: string;
 }
 
 export interface ReminderStay {
@@ -57,13 +61,15 @@ export interface ReminderInput {
   inHouse: readonly ReminderStay[];
   /** Issued bills with money still owed. */
   unpaid: readonly { id: string; number: string; parentName: string; phone: string; issuedOn: ISODate; dueMinor: Minor; url: string }[];
+  /** Grooming cards of pets that have been groomed, for grooms due again (M35). */
+  grooms?: readonly GroomCard[];
   /** What was sent already. */
   sent: readonly { kind: string; subjectId: string; sentOn: ISODate }[];
 }
 
 export interface Reminder {
   kind: ReminderKind;
-  /** The booking, or the bill for an unpaid one. */
+  /** The booking, the bill for an unpaid one, or the last groom for a groom due. */
   subjectId: string;
   parentName: string;
   phone: string;
@@ -79,7 +85,7 @@ function fillIn(template: string, vars: Record<string, string | number>): string
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
-/** The reminders due today, in the order: vaccinations, arrivals, pick-ups, unpaid bills. */
+/** The reminders due today, in the order: vaccinations, arrivals, pick-ups, unpaid bills, grooms due. */
 export function remindersToSend(w: ReminderWords, i: ReminderInput, locale = "en-IN"): Reminder[] {
   const tomorrow = addDays(i.today, 1);
   const sentFor = (kind: ReminderKind, id: string) => i.sent.filter((s) => s.kind === kind && s.subjectId === id);
@@ -123,6 +129,12 @@ export function remindersToSend(w: ReminderWords, i: ReminderInput, locale = "en
       url: b.url,
     });
     out.push({ kind: "unpaid", subjectId: b.id, parentName: b.parentName, phone: b.phone, about: b.number, text });
+  }
+
+  const groomed = new Set(i.sent.filter((s) => s.kind === "groom").map((s) => s.subjectId));
+  for (const g of groomsDue(i.grooms ?? [], i.today, groomed)) {
+    const text = fillIn(w.groom, { parent: firstName(g.parentName), pet: g.petName, kennel: i.kennelName, date: date(g.dueOn) });
+    out.push({ kind: "groom", subjectId: g.last!.id, parentName: g.parentName, phone: g.phone, about: g.petName, text });
   }
   return out;
 }

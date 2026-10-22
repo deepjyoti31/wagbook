@@ -29,6 +29,7 @@ create table public.invoices (
   period_start date,
   period_end date,
   delivery_id uuid,
+  appointment_id uuid,
   status public.invoice_status not null default 'draft',
   number text,
   fiscal_year text,
@@ -63,10 +64,12 @@ create table public.invoices (
   unique (org_id, fiscal_year, seq),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete restrict,
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete set null (booking_id),
+  foreign key (org_id, appointment_id) references public.appointments (org_id, id) on delete restrict,
   -- A bill is for one stay, for a family booked together, for a month of a
   -- repeating series, for a week or month of a food subscription, for one
-  -- food order, or for none of them (a one-off bill). Never two.
-  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id) <= 1),
+  -- food order, for a visitor's appointment, or for none of them (a one-off
+  -- bill). Never two.
+  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id, appointment_id) <= 1),
   -- A subscription is billed for a period: a week or a month, ahead.
   constraint invoices_subscription_period check (
     (subscription_id is null) = (period_start is null)
@@ -105,6 +108,8 @@ comment on column public.invoices.subscription_id is
 comment on column public.invoices.period_start is 'With subscription_id: the first day whose deliveries this bill covers.';
 comment on column public.invoices.period_end is 'With subscription_id: the last day whose deliveries this bill covers (a week or a month after period_start).';
 comment on column public.invoices.delivery_id is 'The one-off food order this bill is for: a trial, food by the kilo or a made-to-order item (M29).';
+comment on column public.invoices.appointment_id is
+  'The appointment of a visitor this bill is for (M34), with its add-ons. A boarder''s appointment is on its stay''s bill instead (WB200).';
 comment on column public.invoices.number is 'Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused.';
 comment on column public.invoices.fiscal_year is 'Financial year the number belongs to, e.g. 2027-28.';
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
@@ -135,6 +140,10 @@ comment on index public.invoices_one_live_per_family is 'A family booking has at
 create unique index invoices_one_live_per_series_month on public.invoices (org_id, series_id, series_month)
   where series_id is not null and status <> 'void';
 comment on index public.invoices_one_live_per_series_month is 'A month of a repeating series has at most one draft or issued invoice, so its days cannot be billed twice.';
+-- And one bill per visitor's appointment.
+create unique index invoices_one_live_per_appointment on public.invoices (org_id, appointment_id)
+  where appointment_id is not null and status <> 'void';
+comment on index public.invoices_one_live_per_appointment is 'A visitor''s appointment has at most one draft or issued bill.';
 create index invoices_org_client_idx on public.invoices (org_id, client_id);
 create index invoices_org_booking_idx on public.invoices (org_id, booking_id);
 
@@ -184,14 +193,27 @@ begin
   then
     raise exception 'WB054: that family booking was not found for this parent' using errcode = '23514';
   end if;
+  -- Only a visitor's appointment has a bill of its own: a boarder's is on its
+  -- stay's bill, and a course or package session is paid for already.
+  if new.appointment_id is not null
+     and (tg_op = 'INSERT' or new.appointment_id is distinct from old.appointment_id or new.client_id is distinct from old.client_id)
+     and not exists (
+       select 1 from public.appointments a
+       where a.org_id = new.org_id and a.id = new.appointment_id and a.client_id = new.client_id
+         and a.booking_id is null and a.course_id is null and not a.in_package
+     )
+     and coalesce(current_setting('wagbook.merging', true), '') <> 'on'
+  then
+    raise exception 'WB200: a boarder''s appointment goes on its stay''s bill, and a course''s sessions on the course''s' using errcode = '23514';
+  end if;
   return new;
 end;
 $$;
 comment on function public.invoices_check_stay() is
-  'Trigger: a pet booked with others is billed only on the family''s bill (WB053), and a family''s bill names a family booking of that parent (WB054). A day of a repeating series is billed only on its month''s bill (WB055), which names a series of that parent (WB056).';
+  'Trigger: a pet booked with others is billed only on the family''s bill (WB053), and a family''s bill names a family booking of that parent (WB054). A day of a repeating series is billed only on its month''s bill (WB055), which names a series of that parent (WB056). A bill of its own is only for a visitor''s appointment of that parent (WB200).';
 
 create trigger invoices_check_stay
-  before insert or update of booking_id, group_id, series_id, client_id on public.invoices
+  before insert or update of booking_id, group_id, series_id, client_id, appointment_id on public.invoices
   for each row execute function public.invoices_check_stay();
 
 create table public.invoice_lines (
@@ -463,7 +485,12 @@ as $$
     group by b.id
   ),
   parts as (
-    select b.id, 1 as position, 'days'::text as part, (b.boarding_from - b.start_date) as quantity, b.day_rate_minor as unit_price_minor
+    -- A stay with a package is the package, one line (M37).
+    select b.id, 0 as position, 'package'::text as part, 1 as quantity, b.package_price_minor as unit_price_minor
+    from b
+    where b.package_id is not null
+    union all
+    select b.id, 1, 'days'::text, (b.boarding_from - b.start_date), b.day_rate_minor
     from b
     where b.boarding_from is not null
     union all
@@ -471,6 +498,7 @@ as $$
            case when b.alone_rate_minor is null then c.total else c.shared end, b.rate_minor
     from b
     join counted c on c.id = b.id
+    where b.package_id is null
     union all
     select b.id, 3, 'alone', c.total - c.shared, b.alone_rate_minor
     from b
@@ -488,10 +516,11 @@ as $$
   order by array_position(p_bookings, k.id), k.position;
 $$;
 comment on function public.stay_charges(uuid, uuid[]) is
-  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
+  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
 
 create function public.invoice_expected_lines(
-  p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode, p_series uuid default null, p_month date default null)
+  p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode, p_series uuid default null, p_month date default null,
+  p_appointment uuid default null)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
 language sql
 stable
@@ -517,10 +546,25 @@ as $$
   union all
   select bi.quantity, bi.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else bi.tax_rate_bp end
   from public.booking_items bi
-  where bi.org_id = p_org and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month));
+  where bi.org_id = p_org and not bi.in_package
+    and bi.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month))
+  union all
+  -- Appointments (M34): a boarder's on its stay's bill, a visitor's on its
+  -- own; not requests or cancellations; a course or package session is free.
+  -- A quote not priced yet comes with no price, so no bill matches it.
+  select 1::numeric(10, 2), a.price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else a.tax_rate_bp end
+  from public.appointments a
+  where a.org_id = p_org and a.status in ('confirmed', 'done', 'no_show') and a.course_id is null and not a.in_package
+    and (a.id = p_appointment or a.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month)))
+  union all
+  select ai.quantity::numeric(10, 2), ai.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else ai.tax_rate_bp end
+  from public.appointment_items ai
+  join public.appointments a on a.org_id = ai.org_id and a.id = ai.appointment_id
+  where ai.org_id = p_org and a.status in ('confirmed', 'done', 'no_show')
+    and (a.id = p_appointment or a.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month)));
 $$;
-comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode, uuid, date) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()) and each extra. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts).';
+comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode, uuid, date, uuid) is
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons; or a visitor''s appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.';
 
 -- One line of a bill or credit note, checked against the same rules as
 -- src/lib/core/tax.ts. The app does the sums; the database refuses a document
@@ -685,6 +729,23 @@ begin
          except all
          (select f.quantity, f.unit_price_minor, f.discount_minor, f.tax_rate_bp
           from public.food_bill_lines(v_inv.org_id, v_inv.subscription_id, v_inv.period_start, v_inv.period_end, v_inv.delivery_id) f)
+       )
+    then
+      raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
+    end if;
+  elsif v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+        and v_inv.appointment_id is not null then
+    -- A visitor's appointment: exactly the appointment and its add-ons (M34).
+    if not exists (select 1 from public.invoice_expected_lines(v_inv.org_id, null, null, v_org.tax_mode, null, null, v_inv.appointment_id))
+       or exists (
+         (select * from public.invoice_expected_lines(v_inv.org_id, null, null, v_org.tax_mode, null, null, v_inv.appointment_id))
+         except all
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+       )
+       or exists (
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+         except all
+         (select * from public.invoice_expected_lines(v_inv.org_id, null, null, v_org.tax_mode, null, null, v_inv.appointment_id))
        )
     then
       raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
@@ -973,6 +1034,10 @@ create index passes_org_client_idx on public.passes (org_id, client_id, valid_un
 create trigger passes_stamp_actor
   before insert or update on public.passes
   for each row execute function public.stamp_actor('created_by');
+
+-- A training course is sold on a bill of its own, as a pack is (M36).
+alter table public.courses
+  add constraint courses_invoice_fkey foreign key (org_id, invoice_id) references public.invoices (org_id, id) on delete set null (invoice_id);
 
 alter table public.bookings
   add constraint bookings_pass_fkey foreign key (org_id, pass_id) references public.passes (org_id, id) on delete restrict;

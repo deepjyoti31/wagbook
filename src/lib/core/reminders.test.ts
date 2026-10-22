@@ -9,6 +9,7 @@ const w: ReminderWords = {
   pickup: "P {pet} {date}",
   pickUpBy: "by {time}",
   unpaid: "U {number} {amount} {url}",
+  groom: "G {parent} {pet} {date}",
 };
 
 const stay = (id: string, startDate: string, endDate: string) => ({ id, petName: "Bruno", parentName: "Priya Demo", phone: "+919800000101", startDate, endDate });
@@ -43,5 +44,15 @@ describe("reminders to send", () => {
     expect(remindersToSend(w, { ...base, unpaid: [bill], sent: [{ kind: "unpaid", subjectId: "i1", sentOn: "2027-04-12" }] })).toEqual([]);
     expect(remindersToSend(w, { ...base, unpaid: [bill], sent: [{ kind: "unpaid", subjectId: "i1", sentOn: "2027-04-11" }] })).toHaveLength(1);
     expect(remindersToSend(w, { ...base, unpaid: [{ ...bill, dueMinor: 0 }] })).toEqual([]);
+  });
+
+  it("says a pet is due a groom again from three days before, once for each groom", () => {
+    const card = { petId: "p1", petName: "Bruno", parentName: "Priya Demo", phone: "+91", everyWeeks: 6, last: { id: "a1", day: "2027-03-06" } };
+    // Due on 17 April: on the list from the 14th.
+    expect(remindersToSend(w, { ...base, grooms: [card] }).map((r) => [r.kind, r.subjectId, r.text])).toEqual([["groom", "a1", "G Priya Bruno 17 Apr 2027"]]);
+    expect(remindersToSend(w, { ...base, today: "2027-04-13", grooms: [card] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, grooms: [card], sent: [{ kind: "groom", subjectId: "a1", sentOn: "2027-04-14" }] })).toEqual([]);
+    // No weeks set, or never groomed: nothing.
+    expect(remindersToSend(w, { ...base, grooms: [{ ...card, everyWeeks: null }, { ...card, last: null }] })).toEqual([]);
   });
 });

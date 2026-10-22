@@ -90,6 +90,12 @@ create trigger expenses_audit after insert or update or delete on public.expense
   for each row execute function public.audit_row();
 create trigger services_audit after insert or update or delete on public.services
   for each row execute function public.audit_row();
+create trigger appointments_audit after insert or update or delete on public.appointments
+  for each row execute function public.audit_row();
+create trigger appointment_services_audit after insert or update or delete on public.appointment_services
+  for each row execute function public.audit_row();
+create trigger courses_audit after insert or update or delete on public.courses
+  for each row execute function public.audit_row();
 create trigger incidents_audit after insert or update or delete on public.incidents
   for each row execute function public.audit_row();
 create trigger organizations_audit after insert or update or delete on public.organizations

@@ -196,6 +196,7 @@ create table public.organizations (
   cook_margin_bp integer not null default 1000 check (cook_margin_bp between 0 and 5000),
   problem_window_hours smallint not null default 24 check (problem_window_hours between 1 and 168),
   food_orders_enabled boolean not null default true,
+  item_lead_hours smallint not null default 24 check (item_lead_hours between 0 and 336),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Food is delivered from the kennel's own kitchen (D44).
@@ -260,6 +261,7 @@ comment on column public.organizations.food_cutoff_hours is 'How many hours befo
 comment on column public.organizations.monthly_food_discount_bp is 'Discount on food paid a month ahead, in basis points: 500 is 5%. 0 for none.';
 comment on column public.organizations.cook_margin_bp is 'Extra food the cook plan adds on top of what is needed, in basis points: 1000 is 10%.';
 comment on column public.organizations.problem_window_hours is 'How many hours after a delivery a parent may report it damaged, late or wrong.';
+comment on column public.organizations.item_lead_hours is 'How many hours ahead a made-to-order item (a birthday cake) must be ordered: the database refuses one for sooner (WB156).';
 comment on column public.organizations.food_orders_enabled is 'Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 

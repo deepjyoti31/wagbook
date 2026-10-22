@@ -92,6 +92,9 @@ create trigger clients_guard_phone
 create type public.pet_sex as enum ('male', 'female', 'unknown');
 comment on type public.pet_sex is 'unknown is the honest default when nobody has said.';
 
+create type public.pet_coat as enum ('short', 'double', 'long', 'curly', 'wire');
+comment on type public.pet_coat is 'A pet''s coat, for grooming prices (M35): short, double (a thick undercoat), long, curly, wire.';
+
 create table public.pets (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations (id) on delete cascade,
@@ -105,6 +108,7 @@ create table public.pets (
   weight_g integer,
   target_weight_g integer check (target_weight_g is null or target_weight_g between 1 and 199999),
   color text,
+  coat public.pet_coat,
   microchip text,
   photo_path text,
   food_notes text,
@@ -128,6 +132,7 @@ comment on column public.pets.photo_path is 'Path of the profile photo inside th
 comment on column public.pets.weight_g is
   'The latest weight in grams, from pet_weights. Kept by the database (pets_latest_weight): whatever is written here is replaced.';
 comment on column public.pets.target_weight_g is 'The weight the pet should get to, in grams, when it has one. Food portions (M28) use it.';
+comment on column public.pets.coat is 'Its coat, for grooming: grooming services priced by coat use it (appointment_price()).';
 comment on column public.pets.food_notes is 'What the pet eats, how much and when, in the parent''s words.';
 comment on column public.pets.flags is
   'Short warning tags staff must see at a glance, e.g. escape_risk, bite_history, dog_reactive, anxious, on_medication, senior.';

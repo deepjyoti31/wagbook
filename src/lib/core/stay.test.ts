@@ -46,4 +46,10 @@ describe("stay lines", () => {
   it("reads an unknown part as the whole stay", () => {
     expect(toStayCharges([{ part: "other", quantity: 1, unit_price_minor: 1, discount_minor: 0 }])[0].part).toBe("stay");
   });
+
+  it("bills a stay with a package as one line, the package for the whole stay (M37)", () => {
+    const charges = toStayCharges([{ part: "package", quantity: 1, unit_price_minor: 1500000, discount_minor: 0 }]);
+    const lines = stayLines({ kind: "boarding", petName: "Biscuit", startDate: "2026-11-03", endDate: "2026-11-10", rateMinor: 0, charges, packageName: "Holiday package" });
+    expect(lines.map((l) => [l.description, l.quantity, l.unitPriceMinor])).toEqual([["Holiday package: Biscuit, 7 nights (3 Nov 2026 to 10 Nov 2026)", 1, 1500000]]);
+  });
 });

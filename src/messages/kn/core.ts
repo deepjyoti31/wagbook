@@ -331,7 +331,7 @@ export const core: typeof English = {
     seeRequests: "ನೋಡಿ",
     toSend: "ಕಳುಹಿಸಬೇಕಾದವು",
     toSendAbout: "ಇಂದು ಕಳುಹಿಸಬೇಕಾದ ಸಂದೇಶಗಳು. ಕಳುಹಿಸಿ ಒತ್ತಿದರೆ WhatsApp ನಲ್ಲಿ ಸಂದೇಶ ಬರೆದಿರುತ್ತದೆ; ನಂತರ ಇದು ಈ ಪಟ್ಟಿಯಿಂದ ಹೋಗುತ್ತದೆ.",
-    reminderKinds: { vaccination: "ಲಸಿಕೆ ಕಾರ್ಡ್", arrival: "ನಾಳೆ ಬರುತ್ತಿದೆ", pickup: "ನಾಳೆ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆ", unpaid: "ಬಿಲ್ ಬಾಕಿ" },
+    reminderKinds: { vaccination: "ಲಸಿಕೆ ಕಾರ್ಡ್", arrival: "ನಾಳೆ ಬರುತ್ತಿದೆ", pickup: "ನಾಳೆ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆ", unpaid: "ಬಿಲ್ ಬಾಕಿ", groom: "ಗ್ರೂಮಿಂಗ್ ಸಮಯ" },
     send: "ಕಳುಹಿಸಿ",
     // For a screen reader: who the message goes to.
     sendTo: "{name} ಗೆ WhatsApp ನಲ್ಲಿ ಕಳುಹಿಸಿ",
@@ -393,6 +393,7 @@ export const core: typeof English = {
       pickup: "ನಮಸ್ಕಾರ {parent}, {pet} ನಾಳೆ, {date}, {kennel} ನಿಂದ ಮನೆಗೆ ಹೋಗುತ್ತದೆ.",
       pickUpBy: "{time} ಒಳಗೆ ಕರೆದುಕೊಂಡು ಹೋಗಿ.",
       unpaid: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಿಂದ ಒಂದು ನೆನಪು: ಬಿಲ್ {number} ನಲ್ಲಿ {amount} ಪಾವತಿ ಬಾಕಿ ಇದೆ. {url}",
+      groom: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ {pet} ಗೆ {date} ಸುಮಾರಿಗೆ ಗ್ರೂಮಿಂಗ್ ಸಮಯ. ಸಮಯ ಬುಕ್ ಮಾಡೋಣವೇ?",
     },
   },
   copy: {

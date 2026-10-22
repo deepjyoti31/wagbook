@@ -771,6 +771,8 @@ create table public.deliveries (
   delivered_at timestamptz,
   proof_path text,
   replaces_id uuid,
+  appointment_id uuid,
+  inscription text check (inscription is null or char_length(inscription) between 1 and 60),
   note text check (note is null or char_length(note) <= 300),
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
@@ -786,6 +788,7 @@ create table public.deliveries (
   foreign key (org_id, batch_id) references public.batches (org_id, id) on delete restrict,
   foreign key (org_id, run_id) references public.delivery_runs (org_id, id) on delete set null (run_id),
   foreign key (org_id, replaces_id) references public.deliveries (org_id, id) on delete restrict,
+  foreign key (org_id, appointment_id) references public.appointments (org_id, id) on delete set null (appointment_id),
   constraint deliveries_subscription_kind check ((kind = 'subscription') = (subscription_id is not null)),
   constraint deliveries_product_unless_replacement check (kind = 'replacement' or product_id is not null),
   constraint deliveries_replacement_names_original check ((kind = 'replacement') = (replaces_id is not null)),
@@ -812,6 +815,8 @@ comment on column public.deliveries.run_position is 'Its place in the run; staff
 comment on column public.deliveries.delivered_at is 'When it was handed over, or found nobody home, or refused.';
 comment on column public.deliveries.proof_path is 'Photo taken at the door, under {org_id}/deliveries/{delivery_id}/.';
 comment on column public.deliveries.replaces_id is 'For a replacement: the delivery it replaces.';
+comment on column public.deliveries.appointment_id is 'For a made-to-order item for a party (M36): the party it is for.';
+comment on column public.deliveries.inscription is 'For a made-to-order item: the name or words to write on it ("Happy birthday Biscuit").';
 comment on column public.deliveries.note is 'For the kitchen or the rider ("no carrots this time").';
 
 -- One delivery per subscription per day; a trial once per pet.
@@ -907,6 +912,12 @@ begin
       new.quantity := 1;
     end if;
   end if;
+  -- A made-to-order item needs its notice (M36): its slot no sooner than the kennel's lead time.
+  if tg_op = 'INSERT' and new.kind = 'item'
+     and ((new.delivery_date + case new.slot when 'morning' then time '08:00' when 'afternoon' then time '13:00' else time '18:00' end)
+          at time zone v_org.time_zone) < now() + make_interval(hours => v_org.item_lead_hours) then
+    raise exception 'WB156: a made-to-order item needs % hours'' notice. Choose a later day.', v_org.item_lead_hours using errcode = '23514';
+  end if;
   if new.kind = 'item' then
     new.grams := 0;
     new.packs := 0;
@@ -928,7 +939,7 @@ begin
 end;
 $$;
 comment on function public.deliveries_price() is
-  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address. Only owners and managers give another unit price (WB022). A replacement costs nothing.';
+  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address. Only owners and managers give another unit price (WB022). A replacement costs nothing. A made-to-order item is refused sooner than the kennel''s lead time (WB156).';
 
 create trigger deliveries_price
   before insert or update of kind, product_id, grams, quantity, unit_price_minor, address_id on public.deliveries

@@ -324,7 +324,7 @@ export const core = {
     seeRequests: "See them",
     toSend: "To send",
     toSendAbout: "Messages due today. Send opens WhatsApp with the message typed; it then leaves this list.",
-    reminderKinds: { vaccination: "Vaccination card", arrival: "Arriving tomorrow", pickup: "Going home tomorrow", unpaid: "Bill unpaid" },
+    reminderKinds: { vaccination: "Vaccination card", arrival: "Arriving tomorrow", pickup: "Going home tomorrow", unpaid: "Bill unpaid", groom: "Due for a groom" },
     send: "Send",
     // For a screen reader: who the message goes to.
     sendTo: "Send to {name} on WhatsApp",
@@ -395,6 +395,7 @@ export const core = {
       pickup: "Hi {parent}, {pet} goes home tomorrow, {date}, from {kennel}.",
       pickUpBy: "Pick-up by {time}.",
       unpaid: "Hi {parent}, a gentle reminder from {kennel}: bill {number} has {amount} still to pay. {url}",
+      groom: "Hi {parent}, {pet} is due for a groom at {kennel} around {date}. Shall we book a time?",
     },
   },
   copy: {

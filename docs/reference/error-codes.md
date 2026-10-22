@@ -29,12 +29,14 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB160 to WB169 | Batches and packing |
 | WB170 to WB179 | Delivery runs, riders and problems |
 | WB180 to WB189 | Food orders from the website and parents' links |
+| WB190 to WB199 | Appointments |
+| WB200 to WB209 | Appointments: bills, courses and packages |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
 | `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
-| `WB003` | invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>submission not found<br>parent not found<br>that order was not found | `20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
+| `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>submission not found<br>parent not found<br>that order was not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
 | `WB006` | turn on two-step sign-in first | `20261008000100_foundation.sql` |
@@ -51,10 +53,10 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB019` | this has a stay in the kennel now or still to come. Check it out or cancel it first.<br>this pet's parent is hidden. Show the parent again first. | `20261008000300_kennels_and_bookings.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
-| `WB022` | only an owner or manager can change the price or the kind of stay<br>only an owner or manager can change a price | `20261008000300_kennels_and_bookings.sql`<br>`20261008000550_kitchen.sql` |
+| `WB022` | only an owner or manager can change the price or the kind of stay<br>only an owner or manager can change a price | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql`<br>`20261008000550_kitchen.sql` |
 | `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
 | `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
-| `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql` |
+| `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql` |
 | `WB026` | a pet cannot be moved into or out of a family booking. Book it on its own instead. | `20261008000300_kennels_and_bookings.sql` |
 | `WB027` | a kennel holds two pets at most, both of one parent | `20261008000300_kennels_and_bookings.sql` |
 | `WB030` | an issued invoice cannot be deleted. Void it instead. | `20261008000500_billing.sql` |
@@ -93,6 +95,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |
 | `WB074` | only an owner can erase a parent's details | `20261008001100_privacy.sql` |
 | `WB075` | this parent has food deliveries still to come. Cancel them first. | `20261008001100_privacy.sql` |
+| `WB076` | this parent has appointments still to come. Cancel them first. | `20261008001100_privacy.sql` |
 | `WB080` | only an owner or manager can change what an incident says | `20261008000400_daily_care.sql` |
 | `WB081` | only an owner can take a photo off an update | `20261008000400_daily_care.sql` |
 | `WB090` | a credit note is made against an issued bill | `20261008000500_billing.sql` |
@@ -129,6 +132,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB153` | a cancelled delivery stays cancelled. Make a new one.<br>this delivery has been to the door. Report a problem instead. | `20261008000550_kitchen.sql` |
 | `WB154` | bill a subscription's deliveries with the subscription, and an order of this parent on its own | `20261008000550_kitchen.sql` |
 | `WB155` | some of these days are on another bill of this subscription | `20261008000550_kitchen.sql` |
+| `WB156` | a made-to-order item needs % hours' notice. Choose a later day. | `20261008000550_kitchen.sql` |
 | `WB160` | this delivery is not that batch's recipe | `20261008000550_kitchen.sql` |
 | `WB161` | batch % is used by %, and this delivery goes on % | `20261008000550_kitchen.sql` |
 | `WB170` | the rider must be working at this kennel | `20261008000550_kitchen.sql` |
@@ -145,3 +149,21 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB186` | choose one of your food subscriptions | `20261008000600_intake_and_public_pages.sql` |
 | `WB187` | those dates or amounts cannot be asked for. Check them and try again. | `20261008000600_intake_and_public_pages.sql` |
 | `WB188` | this order has already been dealt with | `20261008000600_intake_and_public_pages.sql` |
+| `WB190` | that service cannot be booked. Choose another. | `20261008000450_appointments.sql` |
+| `WB191` | that place is out of service | `20261008000450_appointments.sql` |
+| `WB192` | % is open from % to %. Choose a time inside its hours. | `20261008000450_appointments.sql` |
+| `WB193` | this appointment is not on a day of the pet's stay | `20261008000450_appointments.sql` |
+| `WB194` | check the pet's vaccination certificates first | `20261008000450_appointments.sql` |
+| `WB195` | say who supervised the swim and whether the dog wore a life jacket | `20261008000450_appointments.sql` |
+| `WB196` | check the guest dog's vaccination certificates first | `20261008000450_appointments.sql` |
+| `WB197` | a party takes % people at most | `20261008000450_appointments.sql` |
+| `WB198` | a cancelled appointment stays cancelled. Book a new one. | `20261008000450_appointments.sql` |
+| `WB199` | this service is priced on quote. An owner or manager sets the price before it is confirmed. | `20261008000450_appointments.sql` |
+| `WB200` | a boarder's appointment goes on its stay's bill, and a course's sessions on the course's | `20261008000500_billing.sql` |
+| `WB201` | the course has % sessions left | `20261008000450_appointments.sql` |
+| `WB202` | a course is for its own pet and its own kind of session | `20261008000450_appointments.sql` |
+| `WB203` | that is not an add-on. Choose one from the list. | `20261008000450_appointments.sql` |
+| `WB204` | that package is for another kind of stay | `20261008000450_appointments.sql` |
+| `WB205` | a package goes only on a stay still to come or in the kennel, booked on its own price and not billed yet | `20261008000450_appointments.sql` |
+| `WB206` | only an owner or manager sets the price of a package priced on request | `20261008000450_appointments.sql` |
+| `WB207` | the stay's package does not include that, or it is booked already | `20261008000450_appointments.sql` |
