@@ -509,7 +509,7 @@ medicine has a red edge and badge and is never folded away. One tap on Done; a s
 the first who and when). Skip opens a note; a medicine cannot be skipped without one (constraint
 `care_tasks_skipped_medication_needs_note`). Undo puts a task back. Filters: Still to do, and by kind.
 
-Proof photos on care tasks are not built; the field meant for them was removed (M13).
+Proof photos on care tasks are not built; the field meant for them was removed (M13). Planned again in M54.
 
 ### D3. Solo play timetable. Built.
 
@@ -1022,6 +1022,38 @@ shifts on the rota, and stretches not clocked out, then day by day with the time
 day it began, so a night shift counts on its evening (`attendanceSheet()`). **Download the month (CSV)**: a line for
 each person and day, with first in, last out, hours as a decimal, leave, shifts and notes. Staff see and download their
 own.
+
+---
+
+## L. Running for real (M45 to M65, D49)
+
+Chosen by the owner on 22 October 2026 for a kennel that runs on Wagbook every day. Each milestone writes its own
+section here when it starts, and marks it "Built" when it ends. The roadmap holds what to build, the rules and when
+each is done.
+
+| Feature | Milestone | State |
+| --- | --- | --- |
+| Forgotten password by email, change password, sign in with Google | M45 | Planned |
+| Jobs that run by themselves overnight (`pg_cron`) | M46 | Planned |
+| Bring in parents, pets and vaccinations from a spreadsheet | M47 | Planned |
+| A health check for an uptime service, and server errors for owners | M48 | Planned |
+| Photo archive: download a month, then free the space (the owner's choice, never by itself) | M49 | Planned |
+| Kennels to clean between guests | M50 | Planned |
+| Opening and closing checklists, repeating cleaning jobs, repairs | M51 | Planned |
+| A pet that has passed away: nothing more sent, flowers to the parent | M52 | Planned |
+| A stay report for the parent at check-out | M53 | Planned |
+| Photo proof on care tasks, and "Pack all" in the kitchen | M54 | Planned |
+| A parent's own food and medicines, counted down | M55 | Planned |
+| A trial day for new dogs, never required | M56 | Planned |
+| Vet visits during a stay, on the bill and the expenses | M57 | Planned |
+| Move an appointment | M58 | Planned |
+| Book an appointment and report a delivery problem from the parent's link | M59 | Planned |
+| A rota that repeats each week, and forgotten clock-outs put right | M60 | Planned |
+| Alerts on staff phones (web push) | M61 | Planned |
+| Treats, toys and accessories sold over the counter, from stock | M62 | Planned |
+| Orders to suppliers, received into stock | M63 | Planned |
+| Export for Tally | M64 | Planned |
+| Several sites under one owner, with combined reports | M65 | Planned |
 
 ---
 

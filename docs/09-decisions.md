@@ -1028,3 +1028,41 @@ hundreds of photos is built in memory on the server.
 **Look again** if kennels want repeating rotas, overtime rules, pay worked out in Wagbook, riders on the rota, or
 clocking in tied to being at the kennel (location or a code on the wall).
 
+
+## D49. Running for real: what comes after the roadmap, and photos kept until the owner archives them
+
+**Status:** Decided, 22 October 2026, by the owner, adding M45 to M65 to the roadmap.
+
+**Situation.** Every milestone to M44 is built. Asked what a kennel will need once it runs on Wagbook every day, the
+owner chose: forgotten and changed passwords and Google sign-in; jobs that run overnight; importing from a
+spreadsheet; knowing when the site breaks; cleaning kennels between guests; checklists and repairs; a pet that has
+passed away; a stay report; photo proof on care tasks and "Pack all"; a parent's own food and medicines; a trial day;
+vet visits; moving an appointment; booking an appointment and reporting a delivery problem from the parent's link; a
+repeating rota; alerts on staff phones; selling over the counter; orders to suppliers; an export for Tally; and
+several sites under one owner.
+
+**Decision.**
+
+- **Photos are kept until the owner archives them.** They are already made smaller on the phone before upload (1600
+  pixels on the long edge, JPEG, and a 480 pixel copy). Nothing is removed by itself. When space runs short, the owner
+  downloads a month of photos as a ZIP (to keep on Google Drive or elsewhere), and only then may remove that month's
+  full photos from Wagbook. The small copy stays so pages still show something. Health papers and expense receipts are
+  never archived this way.
+- **A trial day is offered, never required.** A kennel may book one; nothing stops a first stay without it.
+- **When a pet passes away, the kennel sends flowers.** Wagbook stops every reminder, delivery and request for the
+  pet and puts "Send flowers" on Today with the parent's address.
+- **Several sites stay separate kennels.** Each keeps its own parents, pets, prices and bills; an owner of several
+  sees combined reports. Sharing a parent's record across sites is not done: it would widen who sees personal data,
+  and change row level security everywhere.
+- **Not now:** online payment through a payment provider (the owner will add it later), and messaging many parents at
+  once (not needed).
+
+**Why.** Deleting a parent's photos is a choice that cannot be undone, so it is the owner's, made with a copy in hand,
+never a timer's. Separate sites keep the access model as it is and still answer the owner's question, "how are all my
+sites doing?".
+
+**Cost.** A kennel on a small storage plan has to remember to archive; Settings shows the space used (M49). An owner
+cannot see one parent's stays across two sites in one place.
+
+**Look again** if storage costs become a burden even with archiving, or if parents regularly use more than one site
+and want one link for all of them.

@@ -2,11 +2,12 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after Phase 4 (M43 and M44: the team, and rough edges before production).
+Last updated: 22 October 2026, after adding M45 to M65 to the roadmap (D49). Nothing of them is built yet.
 
 ## In one paragraph
 
-Every milestone on the roadmap is built, M2 to M44, except the launch work in M1 that needs the owner. Phase 4 (M43
+Every milestone from M2 to M44 is built, and the launch work in M1 waits for the owner. M45 to M65 ("Running for
+real", D49) were added on 22 October 2026 and are not started: start with M45. Phase 4 (M43
 and M44, `02` section K, D48): shifts and a week's rota planned by owners and managers, who lives on site, clocking in
 and out from Today with the time stamped by the database and "On now" for everyone, leave asked for and answered
 (never one's own, unless an owner) taking the person off the rota, and a month's attendance for pay with a CSV; a
@@ -222,8 +223,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: the roadmap is done** (M2 to M44). What is left needs the owner: steps 1 to 8 above, then the migration
-freeze. New building waits for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
+**Building: M45 to M65 are next**, in order, starting with M45 (sign-in: forgotten passwords, changing a password,
+Google). The owner chose them on 22 October 2026 (D49); `02` section L lists them as Planned. Phase 5 (M45 to M49) is
+what a kennel needs before it starts. Alongside, steps 1 to 8 above still need the owner, then the migration freeze.
+Ideas beyond M65 wait for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
 owner has said production is not soon, so migrations stay editable in place until then. Worth doing before
 production without the owner: have a person read the Phase 1 to 4 Hindi and Kannada, and walk the team screens on a
 real phone at a shift change. The
@@ -270,6 +273,10 @@ reminded, not forced (D24); erasing a parent keeps the pets' records (D30); only
 phone numbers (D33); a pet left alone in a shared kennel pays the usual price for those nights, and day boarding that
 turns into boarding is billed as days then nights (D32); credit notes (D34); each kennel sets its own GST rate and code
 (D35); a microchip number is not the parent's personal data and stays with the pet.
+On 22 October 2026 (D49): M45 to M65 added; photos are kept, already made smaller on the phone, until the owner
+downloads a month and then removes it, never by themselves; a trial day is offered, never required; when a pet passes
+away the kennel sends flowers; several sites stay separate kennels with combined reports; online payment through a
+provider is for later, and messaging many parents at once is not wanted.
 
 ## Translations waiting for a native speaker
 
@@ -557,6 +564,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 22 October 2026: the owner chose what comes after M44; M45 to M65 written into the roadmap, `02` section L and D49.
 
 - 22 October 2026. Phase 4, M43 and M44: shifts, the rota, living on site, clocking in and out with On now on Today,
   leave, the month's attendance and its CSV (D48); Send asks whether the message went; kennels in and out of service
