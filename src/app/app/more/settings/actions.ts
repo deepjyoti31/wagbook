@@ -132,6 +132,10 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   const parentLanguage = form.get("parent_language") ?? org.parent_language;
   if (!isLanguage(parentLanguage)) return { error: t.m.errors.codes.WB013 };
 
+  // Where parents leave a review (M42). The database checks it starts with https://.
+  const reviewUrl = text(form, "review_url");
+  if (reviewUrl !== null && !/^https:\/\/\S+$/.test(reviewUrl)) return { error: t.m.reviews.error };
+
   const update: TablesUpdate<"organizations"> = {
     time_zone: timeZone,
     currency,
@@ -160,6 +164,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     intake_enabled: checked(form, "intake_enabled"),
     requests_enabled: checked(form, "requests_enabled"),
     intake_notice: text(form, "intake_notice"),
+    review_url: reviewUrl,
     parent_language: parentLanguage,
     // What else the kennel offers (D44). The database refuses delivery without the kitchen.
     offers_appointments: checked(form, "offers_appointments"),

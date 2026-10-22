@@ -16,6 +16,8 @@ export function PaymentForm({
   today,
   canRefund,
   refundOnly = false,
+  creditMinor = 0,
+  creditText,
   words,
 }: {
   invoiceId?: string;
@@ -25,6 +27,9 @@ export function PaymentForm({
   canRefund: boolean;
   /** Only the refund button: for money going back on a cancelled stay. */
   refundOnly?: boolean;
+  /** The parent's credit that can be spent now (M38), offered as a way to pay a bill, and the sentence saying how much. */
+  creditMinor?: number;
+  creditText?: string;
   words: Pick<Messages, "payments" | "labels">;
 }) {
   const w = words.payments;
@@ -33,6 +38,7 @@ export function PaymentForm({
       {invoiceId ? <input type="hidden" name="invoiceId" value={invoiceId} /> : null}
       {bookingId ? <input type="hidden" name="bookingId" value={bookingId} /> : null}
       <p className="font-bold">{refundOnly ? w.recordRefundTitle : bookingId ? w.recordAdvanceTitle : w.recordPaymentTitle}</p>
+      {creditMinor > 0 && creditText ? <p className="text-slate">{creditText}</p> : null}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label={w.amount}>
           <Input name="amount" inputMode="decimal" required defaultValue={defaultAmount} />
@@ -44,6 +50,7 @@ export function PaymentForm({
                 {words.labels.paymentMethod[m]}
               </option>
             ))}
+            {creditMinor > 0 && invoiceId ? <option value="credit">{words.labels.paymentMethod.credit}</option> : null}
           </Select>
         </Field>
         <Field label={w.date}>

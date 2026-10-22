@@ -95,6 +95,9 @@ describe("tenant isolation", () => {
     "organizations", "memberships", "clients", "pets", "vaccinations", "kennels", "services", "peak_periods",
     "bookings", "booking_items", "care_items", "care_tasks", "play_yards", "play_sessions", "stay_updates",
     "incidents", "invoices", "invoice_lines", "credit_notes", "credit_note_lines", "reminders_sent", "day_packs", "passes", "payments", "expenses", "intake_submissions", "audit_log",
+    "appointment_places", "appointment_services", "appointment_service_prices", "appointments", "appointment_items", "pet_grooming",
+    "courses", "packages", "package_parts",
+    "trips", "required_vaccines", "health_overrides", "cancellation_rules", "credits", "credit_uses",
   ];
 
   it("shows a member only their own organisation's rows, in every table", async () => {

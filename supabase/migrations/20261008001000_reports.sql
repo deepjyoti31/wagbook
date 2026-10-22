@@ -102,7 +102,8 @@ begin
            sum(p.amount_minor) filter (where p.direction = 'in') as received,
            sum(p.amount_minor) filter (where p.direction = 'out') as refunded
     from public.payments p
-    where p.org_id = p_org and p.received_on between p_from and p_to
+    -- Payments from and into credit move no money (M38).
+    where p.org_id = p_org and p.received_on between p_from and p_to and p.method <> 'credit'
     group by 1
   ),
   spent as (
@@ -129,7 +130,7 @@ begin
 end;
 $$;
 comment on function public.report_money(uuid, date, date) is
-  'For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.';
+  'For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved; not from or into credit, which moves none), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.';
 
 -- ---------------------------------------------------------------------------
 

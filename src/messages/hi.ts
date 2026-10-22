@@ -12,6 +12,8 @@ import { petsArea } from "./hi/pets";
 import { kennelArea } from "./hi/kennel";
 import { beyondArea } from "./hi/beyond";
 import { kitchenArea } from "./hi/kitchen";
+import { appointmentsArea } from "./hi/appointments";
+import { rulesArea } from "./hi/rules";
 
 export const hi: Messages = {
   ...core,
@@ -22,4 +24,6 @@ export const hi: Messages = {
   ...kennelArea,
   ...beyondArea,
   ...kitchenArea,
+  ...appointmentsArea,
+  ...rulesArea,
 };

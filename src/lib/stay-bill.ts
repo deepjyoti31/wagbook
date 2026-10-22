@@ -1,5 +1,5 @@
 import { BILLABLE_IN_FAMILY, bookingLines, creditContext, differenceCredit, familyLines, moneyLines, seriesLines, staysChanged, type CreditableBill } from "./billing";
-import { computeInvoice, toStayCharges, type InvoiceTotals, type LineInput } from "./core";
+import { appointmentLines, computeInvoice, toStayCharges, tripLines, unpricedAppointments, type BillableAddOn, type BillableAppointment, type InvoiceTotals, type LineInput } from "./core";
 import { foodLines } from "./food-bill";
 import type { createClient } from "./supabase/server";
 
@@ -16,7 +16,8 @@ export type BillScope =
   | { group: string }
   | { series: string; month: string }
   | { subscription: string; from: string; to: string }
-  | { delivery: string };
+  | { delivery: string }
+  | { appointment: string };
 
 interface ScopeColumns {
   booking_id: string | null;
@@ -27,12 +28,14 @@ interface ScopeColumns {
   period_start?: string | null;
   period_end?: string | null;
   delivery_id?: string | null;
+  appointment_id?: string | null;
 }
 
 /** The scope of a bill, from its row. Null for a one-off bill that covers no stay. */
 export function scopeOf(inv: ScopeColumns): BillScope | null {
   if (inv.subscription_id && inv.period_start && inv.period_end) return { subscription: inv.subscription_id, from: inv.period_start, to: inv.period_end };
   if (inv.delivery_id) return { delivery: inv.delivery_id };
+  if (inv.appointment_id) return { appointment: inv.appointment_id };
   if (inv.group_id) return { group: inv.group_id };
   if (inv.series_id && inv.series_month) return { series: inv.series_id, month: inv.series_month };
   if (inv.booking_id) return { booking: inv.booking_id };
@@ -44,7 +47,33 @@ export function monthOf(date: string): string {
   return `${date.slice(0, 7)}-01`;
 }
 
-const STAY = "id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name)" as const;
+const STAY = "id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name), packages(name)" as const;
+
+const APPOINTMENT = "id, booking_id, status, starts_at, price_minor, tax_rate_bp, sac_code, course_id, in_package, appointment_services(name), pets!appointments_org_id_client_id_pet_id_fkey(name)" as const;
+
+/** A stay's or a visitor's appointments and their add-ons, as bills take them (M34). */
+async function billableAppointments(supabase: Supabase, orgId: string, by: { bookings: string[] } | { appointment: string }) {
+  let query = supabase.from("appointments").select(APPOINTMENT).eq("org_id", orgId);
+  query = "bookings" in by ? query.in("booking_id", by.bookings) : query.eq("id", by.appointment);
+  const rows = await query.order("starts_at");
+  if (rows.error) return { error: rows.error };
+  const ids = rows.data.map((a) => a.id);
+  const items = ids.length
+    ? await supabase.from("appointment_items").select("appointment_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("appointment_id", ids).order("created_at")
+    : { data: [], error: null };
+  if (items.error) return { error: items.error };
+  const appointments = rows.data.map(
+    (a): BillableAppointment & { booking_id: string | null; pet_name: string } => ({
+      ...a,
+      service_name: a.appointment_services?.name ?? "Appointment",
+      pet_name: a.pets?.name ?? "Pet",
+    }),
+  );
+  return { appointments, addOns: items.data as BillableAddOn[] };
+}
+
+/** Thrown out of stayBillLines when an appointment on quote has no price yet, so no bill can be made. */
+export const UNPRICED = { code: "unpriced", message: "An appointment on quote has no price yet." } as const;
 
 /**
  * The stays a bill covers and the lines they come to today, before tax is
@@ -54,6 +83,17 @@ const STAY = "id, client_id, kind, start_date, end_date, boarding_from, pass_id,
  */
 export async function stayBillLines(supabase: Supabase, orgId: string, scope: BillScope) {
   if ("subscription" in scope || "delivery" in scope) return foodBillLines(supabase, orgId, scope);
+  const tz = await supabase.from("organizations").select("time_zone").eq("id", orgId).single();
+  if (tz.error) return { error: tz.error };
+  const timeZone = tz.data.time_zone;
+  if ("appointment" in scope) {
+    // A visitor's appointment and its add-ons (M34).
+    const a = await billableAppointments(supabase, orgId, scope);
+    if ("error" in a) return { error: a.error };
+    if (unpricedAppointments(a.appointments).length) return { error: UNPRICED };
+    const pet = a.appointments[0]?.pet_name ?? "Pet";
+    return { stays: [] as { id: string }[], lines: appointmentLines(pet, a.appointments, a.addOns, timeZone) };
+  }
   let query = supabase.from("bookings").select(STAY).eq("org_id", orgId).in("status", [...BILLABLE_IN_FAMILY]);
   if ("group" in scope) query = query.eq("group_id", scope.group);
   else if ("series" in scope) query = query.eq("series_id", scope.series).gte("start_date", scope.month).lt("start_date", nextMonth(scope.month));
@@ -63,26 +103,43 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
   if (stays.data.length === 0) return { stays: stays.data, lines: [] as LineInput[] };
 
   const ids = stays.data.map((b) => b.id);
-  const [items, charges] = await Promise.all([
-    supabase.from("booking_items").select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).order("created_at"),
+  const [items, charges, appts, trips] = await Promise.all([
+    // A package's own extras are in its price, not lines of their own (M37).
+    supabase.from("booking_items").select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).eq("in_package", false).order("created_at"),
     // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
     supabase.rpc("stay_charges", { p_org: orgId, p_bookings: ids }),
+    billableAppointments(supabase, orgId, { bookings: ids }),
+    // Pick-ups and drops (M39), after the appointments.
+    supabase.from("trips").select("booking_id, kind, status, trip_date, at_time, price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).neq("status", "cancelled"),
   ]);
-  if (items.error || charges.error) return { error: items.error ?? charges.error };
-  const billable = stays.data.map((b) => ({ ...b, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
+  if (items.error || charges.error || trips.error) return { error: items.error ?? charges.error ?? trips.error };
+  if ("error" in appts) return { error: appts.error };
+  if (unpricedAppointments(appts.appointments).length) return { error: UNPRICED };
+  const billable = stays.data.map((b) => ({ ...b, package_name: b.packages?.name ?? null, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
   const itemsOf = (id: string) => items.data.filter((i) => i.booking_id === id);
+  // Each stay's appointments (M34) and trips (M39), after its stay and extras.
+  const appointmentsOf = (id: string, petName: string) => {
+    const mine = appts.appointments.filter((a) => a.booking_id === id);
+    return [
+      ...appointmentLines(petName, mine, appts.addOns.filter((x) => mine.some((a) => a.id === x.appointment_id)), timeZone),
+      ...tripLines(petName, trips.data.filter((t) => t.booking_id === id)),
+    ];
+  };
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
   const name = (b: (typeof billable)[number]) => b.pets?.name ?? "Pet";
 
   let lines: LineInput[];
   if ("series" in scope) {
-    lines = seriesLines(name(billable[0]), scope.month, billable.map((b) => ({ booking: b, items: itemsOf(b.id) })));
+    lines = [
+      ...seriesLines(name(billable[0]), scope.month, billable.map((b) => ({ booking: b, items: itemsOf(b.id) }))),
+      ...billable.flatMap((b) => appointmentsOf(b.id, name(b))),
+    ];
   } else if ("group" in scope) {
     // A family's pets in the order they were booked.
     const family = [...billable].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
-    lines = familyLines(family.map((b) => ({ petName: name(b), booking: b, items: itemsOf(b.id) })));
+    lines = [...familyLines(family.map((b) => ({ petName: name(b), booking: b, items: itemsOf(b.id) }))), ...family.flatMap((b) => appointmentsOf(b.id, name(b)))];
   } else {
-    lines = bookingLines(name(billable[0]), billable[0], itemsOf(billable[0].id));
+    lines = [...bookingLines(name(billable[0]), billable[0], itemsOf(billable[0].id)), ...appointmentsOf(billable[0].id, name(billable[0]))];
   }
   return { stays: stays.data, lines };
 }

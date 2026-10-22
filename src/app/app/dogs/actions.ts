@@ -13,6 +13,9 @@ import type { Messages } from "@/messages";
 import { INCIDENT_CATEGORIES, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
 
+/** A date from a form, or nothing when it is empty or not a date. */
+const dateOrNull = (value: string | null) => (value && isISODate(value) ? value : null);
+
 const newPet = (m: Messages) =>
   z.object({
     parentName: z.string().min(1, m.newPet.errors.parentName).max(120),
@@ -150,6 +153,8 @@ export async function updatePet(_state: FormState, form: FormData): Promise<Form
       microchip: p.microchip,
       date_of_birth: p.dateOfBirth,
       is_neutered: neutered === "yes" ? true : neutered === "no" ? false : null,
+      dewormed_on: dateOrNull(text(form, "dewormedOn")),
+      tick_treated_on: dateOrNull(text(form, "tickTreatedOn")),
       food_notes: p.foodNotes,
       medical_notes: p.medicalNotes,
       allergies: p.allergies,

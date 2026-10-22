@@ -41,7 +41,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, public_token, void_reason, notes, client_id, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -91,6 +91,14 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const due = balance.data?.due_minor ?? 0;
   const paid = balance.data?.paid_minor ?? 0;
   const credited = balance.data?.credited_minor ?? 0;
+  // The parent's credit that can be spent now (M38), offered as a way to pay.
+  const creditLeft =
+    inv.status === "issued" && due > 0
+      ? ((await supabase.from("credit_balances").select("left_minor").eq("org_id", org.id).eq("client_id", inv.client_id).eq("spendable", true)).data ?? []).reduce(
+          (sum, c) => sum + (c.left_minor ?? 0),
+          0,
+        )
+      : 0;
   // A tax invoice from an earlier month may be in a return already, and a credited bill is credited the rest of the way: no cancelling (WB095, WB096).
   const today = todayIn(org.time_zone);
   const earlierMonth = inv.is_tax_invoice && inv.issued_on !== null && inv.issued_on.slice(0, 7) < today.slice(0, 7);
@@ -147,6 +155,11 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
           {food && inv.delivery_id ? (
             <Link href="/app/food" className="underline underline-offset-4">
               {fill(m.billFood.order, { pet: food.pets?.name ?? "" })}
+            </Link>
+          ) : null}
+          {inv.appointment_id ? (
+            <Link href={`/app/appointments/${inv.appointment_id}`} className="underline underline-offset-4">
+              {m.appointment.title}
             </Link>
           ) : null}
           {inv.series_month && stays[0] ? (
@@ -364,7 +377,15 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
           )}
           {inv.status === "issued" && due < 0 ? <p className="mt-3 font-semibold">{fill(canManage ? m.bill.refundOwed : m.bill.refundOwedStaff, { amount: money(-due) })}</p> : null}
           {inv.status === "issued" ? (
-            <PaymentForm invoiceId={inv.id} defaultAmount={due > 0 ? decimal(due) : due < 0 && canManage ? decimal(-due) : ""} today={today} canRefund={canManage} words={m} />
+            <PaymentForm
+              invoiceId={inv.id}
+              defaultAmount={due > 0 ? decimal(due) : due < 0 && canManage ? decimal(-due) : ""}
+              today={today}
+              canRefund={canManage}
+              creditMinor={due > 0 ? creditLeft : 0}
+              creditText={fill(m.credit.billHas, { amount: money(creditLeft) })}
+              words={m}
+            />
           ) : null}
         </Section>
       ) : null}

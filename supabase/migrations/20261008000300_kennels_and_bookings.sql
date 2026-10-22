@@ -76,6 +76,7 @@ create table public.peak_periods (
   start_date date not null,
   end_date date not null,
   no_refund boolean not null default false,
+  is_holiday boolean not null default false,
   play_session_minutes smallint check (play_session_minutes is null or play_session_minutes between 5 and 240),
   notes text,
   created_at timestamptz not null default now(),
@@ -87,6 +88,7 @@ comment on table public.peak_periods is
   'Busy stretches such as Diwali week or a long weekend. Used to warn about cancellation terms and to shorten play sessions when the house is full.';
 comment on column public.peak_periods.end_date is 'Last day of the period, inclusive.';
 comment on column public.peak_periods.no_refund is 'True when bookings touching this period are not refunded on cancellation.';
+comment on column public.peak_periods.is_holiday is 'Its days are holidays for cancellation rules (M38): their nights follow the weekend rule.';
 comment on column public.peak_periods.play_session_minutes is 'Play session length during this period. Empty means the organisation''s normal length.';
 
 create index peak_periods_org_dates_idx on public.peak_periods (org_id, start_date, end_date);
@@ -151,6 +153,8 @@ create table public.bookings (
   checked_out_by uuid references auth.users (id) on delete set null,
   cancelled_at timestamptz,
   cancel_reason text,
+  cancel_asked_at timestamptz,
+  cancelled_by_kennel boolean not null default false,
   belongings text,
   gate_notes text,
   vaccinations_checked_at timestamptz,
@@ -160,6 +164,8 @@ create table public.bookings (
   group_id uuid,
   series_id uuid,
   pass_id uuid,
+  package_id uuid,
+  package_price_minor bigint check (package_price_minor is null or package_price_minor >= 0),
   waitlisted_at timestamptz,
   public_token text not null unique default public.new_token(),
   created_by uuid references auth.users (id) on delete set null,
@@ -188,6 +194,12 @@ create table public.bookings (
   constraint bookings_pass_covers_the_price check (
     pass_id is null
     or (kind = 'daycare' and rate_minor = 0 and discount_minor = 0 and alone_rate_minor is null and boarding_from is null)
+  ),
+  -- A stay with a package (M37) is billed as the package, one line at its price.
+  constraint bookings_package_is_the_price check (
+    (package_id is null and package_price_minor is null)
+    or (package_id is not null and package_price_minor is not null and rate_minor = 0 and alone_rate_minor is null
+        and boarding_from is null and pass_id is null and series_id is null)
   ),
   constraint bookings_boarding_from_inside_stay check (
     boarding_from is null or (kind = 'boarding' and boarding_from > start_date and boarding_from < end_date)
@@ -220,6 +232,9 @@ comment on column public.bookings.series_id is
   'Day boarding booked to repeat (every Monday and Wednesday until a date): each day is its own booking, and they share this id. Not a family: each is billed on its own.';
 comment on column public.bookings.pass_id is
   'The day boarding pack (passes) this day is paid from: then it costs nothing on its own (rate 0). bookings_check_pass keeps the pack from going below zero.';
+comment on column public.bookings.package_id is
+  'The package this stay was booked as (M37), put on it by apply_package(): the stay is billed as one line at package_price_minor, and the package''s appointments and extras cost nothing on their own.';
+comment on column public.bookings.package_price_minor is 'With package_id: what the whole stay costs as the package. Set by apply_package(), never changed.';
 comment on column public.bookings.waitlisted_at is
   'For a request on the waiting list: when it joined, which is its place in line (the earliest first). Stamped by the database with the real time, never moved, and cleared when the request is confirmed or cancelled. Empty: not waiting.';
 comment on column public.bookings.alone_rate_minor is
@@ -230,6 +245,8 @@ comment on column public.bookings.day_rate_minor is 'With boarding_from: the pri
 comment on column public.bookings.discount_minor is 'Discount on the stay itself, before tax. On a bill it goes on the stay''s largest line (stay_charges()).';
 comment on column public.bookings.tax_rate_bp is 'Tax rate for the stay, copied when booked.';
 comment on column public.bookings.expected_arrival is 'When the parent said they would drop off. For planning the day; not enforced.';
+comment on column public.bookings.cancel_asked_at is 'When the parent asked to cancel, which decides each night''s notice (M38). Empty: when it was cancelled.';
+comment on column public.bookings.cancelled_by_kennel is 'True when the kennel cancelled the stay, so the parent chooses a refund or credit (M38).';
 comment on column public.bookings.belongings is 'What came with the pet (bed, leash, food, medicines) so it all goes home again.';
 comment on column public.bookings.gate_notes is 'Anything the parent said at drop-off: a change of food, a recent illness, who will collect.';
 comment on column public.bookings.vaccinations_checked_at is
@@ -339,8 +356,10 @@ declare
   -- Staff may put a day on the parent's pack: it then costs nothing here.
   v_to_pack boolean;
 begin
+  -- apply_package() checks a package's price itself (M37).
   if (select auth.uid()) is null
      or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+     or coalesce(current_setting('wagbook.packaging', true), '') = 'on'
   then
     return new;
   end if;
@@ -582,15 +601,18 @@ create table public.booking_items (
   unit_price_minor bigint not null check (unit_price_minor >= 0),
   tax_rate_bp integer not null default 0 check (tax_rate_bp between 0 and 10000),
   sac_code text check (sac_code is null or sac_code ~ '^[0-9]{4,8}$'),
+  in_package boolean not null default false,
   created_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   foreign key (org_id, booking_id) references public.bookings (org_id, id) on delete cascade,
+  constraint booking_items_package_is_free check (not in_package or unit_price_minor = 0),
   foreign key (org_id, service_id) references public.services (org_id, id) on delete set null (service_id)
 );
 
 comment on table public.booking_items is
   'Add-ons charged on top of the stay: grooming, pick-up and drop, a vet bill paid on the parent''s behalf.';
+comment on column public.booking_items.in_package is 'Part of the stay''s package (M37): put there by apply_package(), at no charge, and not a line of the bill.';
 comment on column public.booking_items.service_id is 'The rate card row this came from, if any. Description and price are copied so the item survives rate card edits.';
 
 create index booking_items_org_booking_idx on public.booking_items (org_id, booking_id);
@@ -615,8 +637,13 @@ as $$
 begin
   if (select auth.uid()) is null
      or new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+     -- A package's extras, put on by apply_package() at no charge (M37).
+     or coalesce(current_setting('wagbook.packaging', true), '') = 'on'
   then
     return new;
+  end if;
+  if new.in_package or (tg_op = 'UPDATE' and old.in_package) then
+    raise exception 'WB025: only an owner or manager can change what an extra costs' using errcode = '42501';
   end if;
 
   if tg_op = 'UPDATE' then

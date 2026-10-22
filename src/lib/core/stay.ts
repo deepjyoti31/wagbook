@@ -43,9 +43,10 @@ export interface AddOn {
  * One line of what a stay costs. Usually the whole stay ("stay"). A stay that
  * began as day boarding and became boarding has its "days" first. A pet at the
  * shared kennel price has its nights "shared" with a sibling and its nights
- * "alone" with the kennel to itself (at the usual price).
+ * "alone" with the kennel to itself (at the usual price). A stay with a
+ * package (M37) is the "package", one line for the whole stay.
  */
-export type StayPart = "stay" | "days" | "shared" | "alone";
+export type StayPart = "stay" | "days" | "shared" | "alone" | "package";
 
 export interface StayCharge {
   part: StayPart;
@@ -57,7 +58,7 @@ export interface StayCharge {
 /** Turn the rows of stay_charges() in the database into charges. */
 export function toStayCharges(rows: readonly { part: string; quantity: number; unit_price_minor: number; discount_minor: number }[]): StayCharge[] {
   return rows.map((r) => ({
-    part: r.part === "days" || r.part === "shared" || r.part === "alone" ? r.part : "stay",
+    part: r.part === "days" || r.part === "shared" || r.part === "alone" || r.part === "package" ? r.part : "stay",
     quantity: r.quantity,
     unitPriceMinor: r.unit_price_minor,
     discountMinor: r.discount_minor,
@@ -84,6 +85,8 @@ export interface StayQuoteInput {
    * than every night at the booked rate. Without it: the whole stay at rateMinor.
    */
   charges?: readonly StayCharge[];
+  /** The package's name, for a stay with a package (part "package"). */
+  packageName?: string | null;
   addOns?: readonly AddOn[];
 }
 
@@ -97,6 +100,11 @@ function describeCharge(input: StayQuoteInput, c: StayCharge): string {
   const from = input.boardingFrom ?? input.startDate;
   const dates = (a: ISODate, b: ISODate) => `(${formatDate(a)} to ${formatDate(b)})`;
   const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+  if (c.part === "package") {
+    const n = chargeableUnits(input.kind, input.startDate, input.endDate);
+    const units = input.kind === "boarding" ? `${n} ${n === 1 ? "night" : "nights"}` : days(n);
+    return `${input.packageName ?? "Package"}: ${input.petName}, ${units} ${dates(input.startDate, input.endDate)}`;
+  }
   if (c.part === "days") return `Day boarding: ${input.petName}, ${days(c.quantity)} ${dates(input.startDate, addDays(from, -1))}`;
   const kind = input.kind === "boarding" ? "Boarding" : "Day boarding";
   const units = input.kind === "boarding" ? `${c.quantity} ${c.quantity === 1 ? "night" : "nights"}` : days(c.quantity);

@@ -15,6 +15,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
+import { PetAppointments } from "@/components/pet-appointments";
 import { createClient } from "@/lib/supabase/server";
 import { addWeight, markPortionReviewed, removeWeight, savePetFood, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
 
@@ -42,7 +43,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const res = await supabase
     .from("pets")
     .select(
-      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
+      "id, name, species, breed, sex, is_neutered, date_of_birth, dewormed_on, tick_treated_on, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -189,6 +190,8 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         </div>
       </Section>
 
+      {org.offers_appointments ? <PetAppointments t={t} petId={pet.id} /> : null}
+
       {org.offers_kitchen ? (
         <FoodSection t={t} orgId={org.id} pet={pet} canManage={canManage} today={today} offersDelivery={org.offers_food_delivery} settings={portionSettings(org)} />
       ) : null}
@@ -257,6 +260,12 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
             </Field>
             <Field label={f.dateOfBirth}>
               <Input name="dateOfBirth" type="date" defaultValue={pet.date_of_birth ?? ""} />
+            </Field>
+            <Field label={m.health.dewormedOn}>
+              <Input name="dewormedOn" type="date" defaultValue={pet.dewormed_on ?? ""} />
+            </Field>
+            <Field label={m.health.tickTreatedOn}>
+              <Input name="tickTreatedOn" type="date" defaultValue={pet.tick_treated_on ?? ""} />
             </Field>
             <Field label={f.colour}>
               <Input name="color" maxLength={80} defaultValue={pet.color ?? ""} />

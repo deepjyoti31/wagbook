@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
 
 const MAX_PETS = 6;
+const dateOrNull = (value: string | null) => (value && isISODate(value) ? value : null);
 /** Pets are numbered by a key that grows each time one is added on the page (intake-form.tsx). */
 const MAX_PET_KEYS = 60;
 
@@ -72,6 +73,8 @@ export async function submitIntake(slug: string, kennelName: string, language: s
       behaviour_notes: text(form, `pets.${i}.behaviour_notes`),
       vet_name: text(form, `pets.${i}.vet_name`),
       vet_phone: text(form, `pets.${i}.vet_phone`),
+      dewormed_on: dateOrNull(text(form, `pets.${i}.dewormed_on`)),
+      tick_treated_on: dateOrNull(text(form, `pets.${i}.tick_treated_on`)),
       vaccinations,
     });
     // The first card belongs to the first vaccine written; the second card to the second.

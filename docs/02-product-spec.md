@@ -66,6 +66,13 @@ One person can belong to several kennels, with a different role in each.
 /app/food/subscriptions/{id}  One subscription, its deliveries and bills  signed in (delivery on)
 /app/food/runs        Delivery runs for a day                        signed in (delivery on)
 /app/food/orders      Orders from the website and parents' requests  signed in (delivery on)
+/app/appointments     Appointments for a day, a column per place     signed in (appointments on)
+/app/appointments/new Book an appointment: pet, service, free times  signed in (appointments on)
+/app/appointments/{id}  One appointment: confirm, done, add-ons, bill  signed in (appointments on)
+/app/more/appointments  Places, services, prices by size and coat, packages  signed in (appointments on)
+/app/more/cancellation  Weekend days, credit months, cancellation rules  signed in
+/app/more/health      Health rules at the door                       signed in
+/book/{slug}          A kennel's booking form for new parents        public
 /rider                A rider's own run for today                    riders (D45)
 /f/{slug}             A kennel's food order page                     public
 /i/{slug}             A kennel's intake form                         public
@@ -254,7 +261,7 @@ Settings, **What this kennel offers**: three switches, all off for a new kennel.
 
 | Switch | Turns on |
 | --- | --- |
-| Appointments: grooming, swimming, training and parties | The skills groomer, trainer and swim supervisor (M34 onwards adds the rest) |
+| Appointments: grooming, swimming, training and parties | Appointments and Appointment setup under More, appointments on Today, on a stay and on the pet page (grooming card, courses), and the skills groomer, trainer and swim supervisor (I1 to I7) |
 | A kitchen that cooks fresh food | Kitchen under More (stock, recipes, the cook plan, batches, labels, kitchen settings), Food on the pet page, boarders' food on the care round, the kitchen on Today, food reports, and the skill cook (H1 to H5, H8) |
 | Food delivered to parents' homes | Parents' addresses, Areas you serve and Food for homes under More (subscriptions, orders, runs), the address and PIN code on the intake form, the food order page, food on parents' own links, the role and skill rider (H4, H6, H7) |
 
@@ -813,6 +820,158 @@ then subscribed; deliveries, kilos delivered and a day, and food sold; kilos coo
 kilo (from each batch's own version and that day's prices); what was thrown away and its cost; deliveries by rider by
 day; and where customers came from. Downloads as CSV: food month by month for the year, and deliveries by rider.
 Owners and managers only, refused in the database (`WB060`, as D20).
+
+## I. Appointments (Phase 2, M34 to M37, D46)
+
+All of it shows only while the kennel offers appointments (B10). A kennel with it off sees none of it. Times are
+`timestamptz`; the day an appointment is on is the kennel's (its time zone). Money in paise, lengths in whole minutes.
+
+### I1. Places and services. Built (M34).
+
+**More, Appointment setup**, for owners and managers (staff read it). **Places**: things that take one booking at a time
+(the pool, a grooming table, a training ground, the party yard), each with its hours (09:00 to 18:00 by default) and in
+service or not. **Services**: name, kind (grooming, swimming, training, party, other), how long it takes, the place it
+uses, the minutes to clean up after it (the place stays taken), the price, the tax rate and code (D35), the skill it
+needs (groomer, trainer, swim supervisor), whether vaccinations are checked (on by default), and for a party the most
+people. A price is **fixed**, **by size** (small, medium, large from the pet's latest weight, using the kitchen's size
+bands), **by coat** (I5), or **on quote**. An **add-on** is a service priced on top of another (nails with a bath,
+decorations for a party): it takes no place and no time of its own.
+
+### I2. Booking an appointment. Built (M34).
+
+**Appointments** (More, and Today): **Book an appointment** for a pet staying in or visiting for the day. Find the pet,
+choose the service, the day, the place (the service's own by default) and the person (people with the service's skill
+first). Wagbook offers the free times, every 30 minutes inside the place's hours: those where the place (with its
+clean-up), the pet and the person are all free, and not in the past. A pet in the kennel that day is booked on its stay.
+
+States: **requested** (written down, holds nothing), **confirmed** (holds the place, the pet and the person), **done**,
+**no-show** and **cancelled** with a reason (it stays cancelled). The database refuses two appointments in one place at
+once, clean-up included (`appointments_no_place_overlap`), one pet in two places (`appointments_no_pet_overlap`) and one
+person in two places (`appointments_no_person_overlap`); a time outside the place's hours (`WB192`); a place out of
+service (`WB191`); a boarder's appointment on a day that is not of its stay (`WB193`); and **done** for a service that
+checks vaccinations until someone has seen the certificates, on the appointment or at the stay's check-in (`WB194`).
+
+**The price** is worked out by the database when booked (`appointment_price()`) and copied onto the appointment, with its
+tax rate and code; staff cannot change it (`WB022`, D15). A service on quote is booked by staff as a request, and an
+owner or manager sets the price before it is confirmed (`WB199`).
+
+### I3. The day. Built (M34).
+
+**Today** lists the day's appointments: time, pet, service, place, person and state. **Appointments** shows a day with
+each place as a column and the hours down the side, at 360 pixels wide (the columns scroll inside their box, never the
+page), with the day before and after, and a list of the day under it. An appointment's page has Confirm, Done, Did not
+come, Cancel with a reason, add-ons, the price (owners and managers change it), notes for whoever does it, and its bill.
+
+### I4. Bills for appointments. Built (M34).
+
+A boarder's appointment is a line on its stay's bill ("Full groom for Biscuit (14 Nov, 10:00)"), with its add-ons,
+when it is confirmed, done or a no-show; not when requested or cancelled. A visitor's appointment has a bill of its own
+(`invoices.appointment_id`); a boarder's never does (`WB200`). Staff issue either only as the database prices it
+(`WB050`, `invoice_expected_lines()`). An appointment cancelled after its bill went out is offered back as a credit note,
+as a stay is (D34, D40).
+
+### I5. Grooming. Built (M35).
+
+**The grooming menu**: grooming services (bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea
+bath, teeth) priced **by coat**: a price for each coat type (short, double, long, curly, wire), with a price for a named
+breed overriding it, and the service's own price when neither is set. Add-ons go on top.
+
+**On the pet page, Grooming**: the coat, the usual cut, products to use or avoid, skin conditions, how the pet behaves on
+the table, how often it should be groomed, and the last groom. A pet due for a groom again (its last groom plus its
+weeks) is on Today's list to send (D39), once for each groom.
+
+**Before and after photos**: a boarder's groom has "Send before and after photos", which writes an update on its stay
+(F3), so the parent sees them on the stay page. **Groom before going home** on a stay books the groom on its last day, at
+the latest free time that finishes by the pick-up time (the stay's expected departure, or the kennel's check-out time).
+
+### I6. Swimming, training and parties. Built (M36).
+
+**Swimming**: one dog at a time (the place's rule, I2). Marking a swim done asks whether the dog wore a life jacket and
+who supervised; the database refuses a swim done without both (`WB195`).
+
+**Training courses**: owners and managers sell a course of sessions for a pet (a training service, so many sessions, the
+price the trainer quoted), on a bill of its own, as a day boarding pack is (D37). Each session booked from the course
+costs nothing on its own, and the course never gives more sessions than were bought (`WB201`). After a session, notes and
+homework, and **Send to the parent** on WhatsApp.
+
+**Birthday parties**: the party yard for a set time, the birthday pet and one guest dog (a pet of the kennel, so its
+parent and vaccinations are recorded), the number of people (never more than the service allows, `WB197`), decorations
+as add-ons, and a cake from the kitchen. A party is marked done only once the guest's certificates have been seen too
+(`WB196`): a guest meets the same rule as a boarder.
+
+**Made-to-order items** (H4): the name to write on it, and a lead time the database checks (24 hours by default, a kitchen
+setting, `WB156`); delivered on a run with the area's charge, or collected at the party.
+
+### I7. Packages. Built (M37).
+
+**More, Appointment setup, Packages**: a stay with appointments and extras included (a swim on the middle day, a groom on
+the last day, three extra play sessions), for boarding or day boarding, at one price or a price on request.
+
+On a stay, **Add a package** (owners and managers; staff for a package with a set price): the stay is then billed as
+the package, one line ("Holiday package: Biscuit, 7 nights (3 Nov 2026 to 10 Nov 2026)"), and its parts are booked in
+the same step (`apply_package()`): its extras, and each appointment at the first free time on its day (a groom on the
+last day finishing by pick-up). A part with no free time is listed on the stay with **Book a time**. Parts cost nothing
+on their own. Cancelling the stay cancels its appointments still to come; a stay shortened (going home early) cancels
+those on days it no longer has.
+
+## J. Boarding as the public rules promise (Phase 3, M38 to M42, D47)
+
+### J1. Cancellation rules and credit. Built (M38).
+
+**More, Cancellation rules** (owners and managers change it): which weekdays count as the weekend (Saturday and
+Sunday by default), how many months credit lasts (12), and a rule for each of boarding and day boarding: the notice
+needed (24 hours), and what happens to a weekday and to a weekend or holiday night with that notice and without it:
+**refund**, **credit**, or **keep**. Holidays are peak periods ticked "a holiday" (C7). The database also takes a rule
+for appointments, but no screen sets it yet: appointments take no advance (they are paid on their own bill), so there
+is nothing for it to decide (see Open questions in `HANDOFF.md`).
+
+**Cancelling a stay** records when the parent asked (now, or earlier when they rang yesterday) and whether the kennel
+cancelled. Wagbook then works out each night (each day for day boarding) on its own: its notice is the time from the
+ask to that day's check-in time; its rule is the weekday or the weekend one (`cancellationOutcome()`, unit tested). When
+the kennel cancels, the parent chooses: everything refunded, or everything as credit. The money paid in advance goes to
+the refund first, then to credit; the rest is kept. An owner or manager confirms both in one step on the stay's page:
+the refund, and the credit, which is a refund paid "as credit" (`payments.method = 'credit'`). A different refund agreed
+with the parent can still be recorded by hand under it.
+
+**Credit** is a ledger (`credits`, `credit_uses`): each amount kept as credit, or given as goodwill by an owner or
+manager with a reason, ends on a set date. It is spent on any bill as a payment "from credit", the soonest to end first,
+never more than what is left and never after it ends (`WB211`), and a payment from credit is never changed (`WB212`).
+The parent page shows what is left and when it ends; a bill's payment form offers it. Today lists a reminder to send a
+month before credit runs out (D39). Reports leave payments from and into credit out of money in and out: no money moved.
+
+### J2. Pick-up and drop from home. Built (M39).
+
+While the kennel delivers (B10), a stay has **Pick-up** and **Drop**: an address of the parent (B11) and a time. The
+price is the area's trip charge (B12, the delivery charge when none is set), copied when added; an owner or manager may
+give another, and must for an address outside the areas served (`WB215`). A trip is a line on the stay's bill ("Pick-up
+for Biscuit (3 Nov, 09:00)"). Pick-up is on the stay's first day and drop on its last (`WB216`); cancelling the stay
+cancels its trips and changing its dates moves them. **Tell the parent** opens WhatsApp with the time. Trips join the
+day's runs (H6) by their slot, and a rider sees and marks them like deliveries (`my_runs()`, `rider_mark_trip()`).
+
+### J3. Health papers at the door. Built (M40).
+
+**More, Health papers** (owners and managers): the vaccines the kennel requires and how many months each lasts when the
+card gives no date, deworming and tick treatment within so many days, spayed or neutered above an age in months, and
+whether failing them **warns** or **refuses** (off by default). Pets have the days they were last dewormed and treated
+for ticks, on the pet page and the intake form. `pet_health_problems()` says what a pet lacks on a day. A stay's page (before check-in) and a visitor's appointment page show the problems, and while the kennel refuses, the database refuses them (`WB210`)
+unless an owner or manager let the pet in with a note (`health_overrides`, in History of changes). Today lists stays
+starting within a week whose pet will lack something, to send the parent (D39).
+
+### J4. A booking form for new parents. Built (M41).
+
+`/book/{slug}`: what (boarding, day boarding, or an appointment service the kennel offers), when (dates, or a day and a
+time), pick-up from home with its address (while the kennel delivers), one pet's name, animal, breed, sex, neutering and
+date of birth, a tick that vaccinations are up to date, the parent's name and phone, a note, and consent. It shows an estimate from the kennel's prices and says nothing is
+charged. It lands in Forms from parents (B4) through the intake form's own function: accepting it makes the parent and
+pet and the request (a stay or an appointment) and opens it, so staff confirm in one place. A request the kennel cannot
+take as asked (no usual price, a time outside the place's hours) is left for staff to book by hand. Its link is on
+Forms from parents. No new public function, and the intake form's rate limit (D47).
+
+### J5. Reviews from parents. Built (M42).
+
+Settings, **Review link** (an https address, such as the kennel's Google review page). With it, Today lists parents to
+ask for a review: a stay checked out or a visitor's appointment done in the last week, once each and only the latest for
+each parent (not each day of a daycare series), with the WhatsApp message carrying the link (D39). A review page of Wagbook's own is not built.
 
 ---
 

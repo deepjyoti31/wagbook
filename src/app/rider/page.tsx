@@ -10,24 +10,28 @@ import { fill, plural } from "@/lib/i18n";
 import { i18nFor } from "@/lib/i18n-server";
 import { placeLink, routeLink } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
-import { markStop } from "./actions";
+import { markStop, markTrip } from "./actions";
 
 export const metadata: Metadata = { title: "Wagbook" };
 
 interface Stop {
-  delivery_id: string;
+  /** A delivery, or a boarder's pick-up from home or drop back home (M39). */
+  kind: "delivery" | "pickup" | "drop";
+  delivery_id?: string;
+  trip_id?: string;
+  time?: string;
   name: string;
   phone: string;
   pet: string;
-  packs: number;
-  quantity: number | null;
+  packs?: number;
+  quantity?: number | null;
   line: string | null;
   area: string | null;
   postal_code: string | null;
   map_url: string | null;
   door_note: string | null;
   note: string | null;
-  status: "planned" | "packed" | "out" | "delivered" | "not_home" | "refused" | "cancelled";
+  status: "planned" | "packed" | "out" | "delivered" | "not_home" | "refused" | "cancelled" | "done";
 }
 
 interface Run {
@@ -54,10 +58,12 @@ export default function RiderPage({ searchParams }: PageProps<"/rider">) {
 }
 
 const MARKED = ["out", "delivered", "not_home", "refused"] as const;
+const TRIP_MARKED = ["trip_out", "trip_done", "trip_not_home"] as const;
 
 async function RiderRuns({ searchParams }: Pick<PageProps<"/rider">, "searchParams">) {
   const done = (await searchParams).done;
   const marked = MARKED.find((s) => s === done);
+  const tripMarked = TRIP_MARKED.find((s) => s === done);
   const { language } = await requireRider();
   const { m } = i18nFor(language);
   const w = m.rider;
@@ -76,6 +82,7 @@ async function RiderRuns({ searchParams }: Pick<PageProps<"/rider">, "searchPara
         </form>
       </PageTitle>
       {marked ? <Notice tone="ok">{fill(w.marked, { status: m.deliveryStatus[marked] })}</Notice> : null}
+      {tripMarked ? <Notice tone="ok">{fill(w.marked, { status: m.trips.statuses[tripMarked.slice(5) as "out" | "done" | "not_home"] })}</Notice> : null}
       {runs.length === 0 ? <Empty>{w.none}</Empty> : null}
       {runs.map((run) => (
         <section key={run.run_id} className="mb-7">
@@ -85,15 +92,51 @@ async function RiderRuns({ searchParams }: Pick<PageProps<"/rider">, "searchPara
             {w.route}
           </a>
           <ol className="space-y-3">
-            {run.stops.map((s, i) => (
+            {run.stops.map((s, i) =>
+              s.kind !== "delivery" ? (
+                <li key={s.trip_id} className="rounded-xl border border-rule bg-paper p-4">
+                  <p className="flex flex-wrap items-center gap-2 text-lg font-bold">
+                    {i + 1}. {s.name}
+                    <Badge tone={s.status === "done" ? "good" : s.status === "out" ? "attention" : "neutral"}>{m.trips.statuses[s.status as "planned" | "out" | "done" | "not_home"]}</Badge>
+                  </p>
+                  <p>{[s.line, s.area, s.postal_code].filter(Boolean).join(", ")}</p>
+                  <p className="font-semibold">{fill(m.trips.riderStop[s.kind], { pet: s.pet, time: s.time ?? "" })}</p>
+                  {s.door_note ? <p className="text-slate">{fill(w.door, { note: s.door_note })}</p> : null}
+                  {s.note ? <p className="text-slate">{s.note}</p> : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <a href={placeLink(s)} target="_blank" rel="noreferrer" className={buttonStyles.secondary}>
+                      {w.map}
+                    </a>
+                    <a href={`tel:${s.phone}`} className={buttonStyles.secondary}>
+                      {w.call} {formatPhone(s.phone)}
+                    </a>
+                  </div>
+                  {s.status === "planned" || s.status === "out" ? (
+                    <ActionForm action={markTrip} className="mt-3 flex flex-wrap gap-2 border-t border-rule pt-3">
+                      <input type="hidden" name="tripId" value={s.trip_id} />
+                      {s.status === "planned" ? (
+                        <SubmitButton variant="secondary" name="status" value="out" pendingLabel={m.common.saving}>
+                          {w.onTheWay}
+                        </SubmitButton>
+                      ) : null}
+                      <SubmitButton name="status" value="done" pendingLabel={m.common.saving}>
+                        {m.trips.riderDone[s.kind]}
+                      </SubmitButton>
+                      <SubmitButton variant="secondary" name="status" value="not_home" pendingLabel={m.common.saving}>
+                        {w.notHome}
+                      </SubmitButton>
+                    </ActionForm>
+                  ) : null}
+                </li>
+              ) : (
               <li key={s.delivery_id} className="rounded-xl border border-rule bg-paper p-4">
                 <p className="flex flex-wrap items-center gap-2 text-lg font-bold">
                   {i + 1}. {s.name}
-                  <Badge tone={s.status === "delivered" ? "good" : s.status === "out" ? "attention" : "neutral"}>{m.deliveryStatus[s.status]}</Badge>
+                  <Badge tone={s.status === "delivered" ? "good" : s.status === "out" ? "attention" : "neutral"}>{m.deliveryStatus[s.status as Exclude<Stop["status"], "done">]}</Badge>
                 </p>
                 <p>{[s.line, s.area, s.postal_code].filter(Boolean).join(", ")}</p>
                 <p className="font-semibold">
-                  {s.pet}: {s.quantity !== null ? plural(language, s.quantity, w.pieces) : plural(language, s.packs, w.packs)}
+                  {s.pet}: {s.quantity != null ? plural(language, s.quantity, w.pieces) : plural(language, s.packs ?? 0, w.packs)}
                 </p>
                 {s.door_note ? <p className="text-slate">{fill(w.door, { note: s.door_note })}</p> : null}
                 {s.note ? <p className="text-slate">{s.note}</p> : null}
@@ -143,7 +186,8 @@ async function RiderRuns({ searchParams }: Pick<PageProps<"/rider">, "searchPara
                   </div>
                 ) : null}
               </li>
-            ))}
+              ),
+            )}
           </ol>
         </section>
       ))}

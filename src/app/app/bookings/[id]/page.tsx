@@ -19,7 +19,7 @@ import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  addDays, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, peaksTouching, quoteStay,
+  addDays, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, peaksTouching, quoteStay,
   sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -27,6 +27,10 @@ import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
 import { monthOf } from "@/lib/stay-bill";
+import { StayAppointments } from "@/components/stay-appointments";
+import { StayCancellation } from "@/components/stay-cancellation";
+import { HealthAtTheDoor } from "@/components/stay-health";
+import { StayTrips } from "@/components/stay-trips";
 import { createClient } from "@/lib/supabase/server";
 import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, setWaitlist, switchToBoarding, updateBooking } from "../actions";
 
@@ -41,7 +45,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, packages(name), pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -65,7 +69,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const parent = b.clients;
 
   const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs, waiting] = await Promise.all([
-    supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
+    supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code, in_package").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
     b.group_id
@@ -159,6 +163,21 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const sharesWith = b.kennel_id ? sharing.get(b.kennel_id) : undefined;
 
   const stayCharges = toStayCharges(charges.data);
+  // A package's own extras are in its price (M37); the stay's appointments are lines after its extras (M34).
+  const billedItems = items.data.filter((i) => !i.in_package);
+  const stayAppointments = await supabase
+    .from("appointments")
+    .select("id, status, starts_at, price_minor, tax_rate_bp, sac_code, course_id, in_package, service_id, appointment_services(name), appointment_items(appointment_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code)")
+    .eq("org_id", org.id)
+    .eq("booking_id", b.id)
+    .order("starts_at");
+  if (stayAppointments.error) throw new Error("Could not load the booking.");
+  const appointmentCharges = appointmentLines(
+    pet?.name ?? w.pet,
+    stayAppointments.data.map((a) => ({ ...a, service_name: a.appointment_services?.name ?? "" })),
+    stayAppointments.data.flatMap((a) => a.appointment_items),
+    org.time_zone,
+  );
   const place = (waiting.data ?? []).findIndex((x) => x.booking_id === b.id);
   const waitPlace = b.waitlisted_at ? { place: place + 1, hasSpace: place >= 0 && (waiting.data ?? [])[place].has_space } : null;
   const paidFrom = b.pass_id ? (packs.data ?? []).find((x) => x.pass_id === b.pass_id) : undefined;
@@ -170,6 +189,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   // How a line of the stay reads on this page: "Boarding", "Day boarding", "Boarding, sharing a kennel".
   const chargeLabel = (c: StayCharge) => {
     const what = m.labels.bookingKind[c.part === "days" ? "daycare" : b.kind];
+    if (c.part === "package") return b.packages?.name ?? what;
     if (b.pass_id) return fill(w.costs.fromPack, { what });
     return c.part === "shared" ? fill(w.costs.shared, { what }) : c.part === "alone" ? fill(w.costs.alone, { what }) : what;
   };
@@ -185,7 +205,11 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       boardingFrom: b.boarding_from,
       charges: stayCharges,
       fromPack: Boolean(b.pass_id),
-      addOns: items.data.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp })),
+      packageName: b.packages?.name,
+      addOns: [
+        ...billedItems.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp })),
+        ...appointmentCharges,
+      ],
     },
     { mode: org.tax_mode, sellerStateCode: org.gst_state_code, placeOfSupplyStateCode: org.gst_state_code, pricesIncludeTax: org.prices_include_tax },
     { roundToWholeUnit: org.round_invoice_totals },
@@ -276,6 +300,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       {b.status === "requested" || b.status === "confirmed" ? (
         <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
       ) : null}
+      {(b.status === "requested" || b.status === "confirmed") && pet ? (
+        <HealthAtTheDoor t={t} petId={pet.id} on={b.start_date > today ? b.start_date : today} bookingId={b.id} />
+      ) : null}
 
       {open ? (
         <Section title={w.next}>
@@ -339,9 +366,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 })}
               </span>
               <span className="font-semibold">{money(l.totalMinor)}</span>
-              {i >= stayCharges.length && canDelete && open ? (
+              {i >= stayCharges.length && i < stayCharges.length + billedItems.length && canDelete && open ? (
                 <ActionForm action={removeExtra} className="contents">
-                  <input type="hidden" name="itemId" value={items.data[i - stayCharges.length].id} />
+                  <input type="hidden" name="itemId" value={billedItems[i - stayCharges.length].id} />
                   <ConfirmStep label={m.common.remove} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.common.removing} />
                 </ActionForm>
               ) : null}
@@ -405,6 +432,30 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         ) : null}
       </Section>
+
+      {org.offers_appointments || b.package_id ? (
+        <StayAppointments
+          t={t}
+          booking={b}
+          open={open}
+          appointments={stayAppointments.data}
+          packageItems={items.data.filter((i) => i.in_package)}
+          notice={query.package === "applied" || query.package === "left" ? query.package : null}
+        />
+      ) : null}
+
+      {org.offers_food_delivery && parent && b.status !== "no_show" ? (
+        <StayTrips t={t} booking={{ ...b, client_id: parent.id, clients: parent }} open={b.status === "requested" || b.status === "confirmed" || b.status === "checked_in"} />
+      ) : null}
+
+      {b.status === "cancelled" && !bill.data ? (
+        <StayCancellation
+          t={t}
+          bookingId={b.id}
+          choice={query.choice === "credit" ? "credit" : query.choice === "refund" ? "refund" : null}
+          settled={query.money === "settled"}
+        />
+      ) : null}
 
       {b.status !== "requested" && (b.status !== "cancelled" || bill.data || advances.data.length > 0) ? (
         <Section title={w.bill.title}>
@@ -477,7 +528,11 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <p className="font-semibold">{fill(w.refund.paid, { amount: money(advanceMinor) })}</p>
                 {noRefundText ? <p className="text-slate">{noRefundText}</p> : null}
                 {canManage ? (
-                  <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+                  // The rules above say what the advance becomes; a different refund agreed with the parent is recorded here.
+                  <details>
+                    <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.cancelRules.otherRefund}</summary>
+                    <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+                  </details>
                 ) : (
                   <p className="text-slate">{w.refund.managersOnly}</p>
                 )}
@@ -493,7 +548,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         <Section title={w.change.title}>
           <ActionForm action={updateBooking} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="bookingId" value={b.id} />
-            {canManage ? (
+            {canManage && !b.package_id ? (
               <Field label={m.newBooking.stay} hint={w.change.kindHint}>
                 <Select name="kind" defaultValue={b.kind}>
                   <option value="boarding">{m.newBooking.boarding}</option>
@@ -527,7 +582,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <Input name="expectedDeparture" type="time" defaultValue={b.expected_departure?.slice(0, 5) ?? ""} />
               </Field>
             </div>
-            {canManage ? (
+            {canManage && !b.package_id ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={b.kind === "boarding" ? w.change.pricePerNight : w.change.pricePerDay}>
                   <Input name="rate" inputMode="decimal" required defaultValue={toDecimalString(b.rate_minor).replace(/\.00$/, "")} />
@@ -741,6 +796,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             <Field label={w.cancel.why}>
               <Input name="reason" required maxLength={500} />
             </Field>
+            <Field label={m.cancelRules.askedAt} hint={m.cancelRules.askedAtHint}>
+              <Input name="askedAt" type="datetime-local" max={`${today}T23:59`} />
+            </Field>
+            <label className="flex min-h-12 items-start gap-3">
+              <input type="checkbox" name="byKennel" className="mt-1 size-5 shrink-0" />
+              <span>{m.cancelRules.byKennel}</span>
+            </label>
             <SubmitButton variant="secondary" pendingLabel={w.cancel.cancelling}>
               {w.cancel.button}
             </SubmitButton>

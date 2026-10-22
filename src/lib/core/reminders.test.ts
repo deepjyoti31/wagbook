@@ -9,6 +9,10 @@ const w: ReminderWords = {
   pickup: "P {pet} {date}",
   pickUpBy: "by {time}",
   unpaid: "U {number} {amount} {url}",
+  groom: "G {parent} {pet} {date}",
+  health: "H {pet} {date} {lacks}",
+  credit: "C {parent} {amount} {date}",
+  review: "R {parent} {pet} {url}",
 };
 
 const stay = (id: string, startDate: string, endDate: string) => ({ id, petName: "Bruno", parentName: "Priya Demo", phone: "+919800000101", startDate, endDate });
@@ -43,5 +47,42 @@ describe("reminders to send", () => {
     expect(remindersToSend(w, { ...base, unpaid: [bill], sent: [{ kind: "unpaid", subjectId: "i1", sentOn: "2027-04-12" }] })).toEqual([]);
     expect(remindersToSend(w, { ...base, unpaid: [bill], sent: [{ kind: "unpaid", subjectId: "i1", sentOn: "2027-04-11" }] })).toHaveLength(1);
     expect(remindersToSend(w, { ...base, unpaid: [{ ...bill, dueMinor: 0 }] })).toEqual([]);
+  });
+
+  it("says a pet is due a groom again from three days before, once for each groom", () => {
+    const card = { petId: "p1", petName: "Bruno", parentName: "Priya Demo", phone: "+91", everyWeeks: 6, last: { id: "a1", day: "2027-03-06" } };
+    // Due on 17 April: on the list from the 14th.
+    expect(remindersToSend(w, { ...base, grooms: [card] }).map((r) => [r.kind, r.subjectId, r.text])).toEqual([["groom", "a1", "G Priya Bruno 17 Apr 2027"]]);
+    expect(remindersToSend(w, { ...base, today: "2027-04-13", grooms: [card] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, grooms: [card], sent: [{ kind: "groom", subjectId: "a1", sentOn: "2027-04-14" }] })).toEqual([]);
+    // No weeks set, or never groomed: nothing.
+    expect(remindersToSend(w, { ...base, grooms: [{ ...card, everyWeeks: null }, { ...card, last: null }] })).toEqual([]);
+  });
+
+  it("asks for health papers within a week of a stay, once, only when something is lacking", () => {
+    const fine = [{ vaccine: "rabies", valid_until: "2028-01-01" }];
+    const input = { ...base, upcoming: [{ ...stay("b1", "2027-04-18", "2027-04-20"), vaccinations: fine, lacks: ["deworming", "tick treatment"] }] };
+    expect(remindersToSend(w, input).map((r) => [r.kind, r.text])).toEqual([["health", "H Bruno 18 Apr 2027 deworming, tick treatment"]]);
+    expect(remindersToSend(w, { ...input, sent: [{ kind: "health", subjectId: "b1", sentOn: "2027-04-13" }] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, upcoming: [{ ...stay("b1", "2027-04-18", "2027-04-20"), vaccinations: fine, lacks: [] }] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, upcoming: [{ ...stay("b1", "2027-04-25", "2027-04-26"), vaccinations: fine, lacks: ["deworming"] }] })).toEqual([]);
+  });
+
+  it("tells a parent a month before credit ends, once, while some is left", () => {
+    const credit = { id: "c1", parentName: "Priya Demo", phone: "+91", leftMinor: 150000, expiresOn: "2027-05-14" };
+    expect(remindersToSend(w, { ...base, credits: [credit] }).map((r) => [r.kind, r.about, r.text])).toEqual([["credit", "₹1,500", "C Priya ₹1,500 14 May 2027"]]);
+    expect(remindersToSend(w, { ...base, credits: [{ ...credit, expiresOn: "2027-05-15" }] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, credits: [{ ...credit, expiresOn: "2027-04-13" }] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, credits: [{ ...credit, leftMinor: 0 }] })).toEqual([]);
+    expect(remindersToSend(w, { ...base, credits: [credit], sent: [{ kind: "credit", subjectId: "c1", sentOn: "2027-04-14" }] })).toEqual([]);
+  });
+
+  it("asks for a review in the week after a stay or visit, only with a review link, once", () => {
+    const ended = { id: "b9", petName: "Bruno", parentName: "Priya Demo", phone: "+91", endedOn: "2027-04-10" };
+    const input = { ...base, reviewUrl: "https://g.page/r/x", ended: [ended] };
+    expect(remindersToSend(w, input).map((r) => [r.kind, r.text])).toEqual([["review", "R Priya Bruno https://g.page/r/x"]]);
+    expect(remindersToSend(w, { ...input, reviewUrl: null })).toEqual([]);
+    expect(remindersToSend(w, { ...input, ended: [{ ...ended, endedOn: "2027-04-06" }] })).toEqual([]);
+    expect(remindersToSend(w, { ...input, sent: [{ kind: "review", subjectId: "b9", sentOn: "2027-04-11" }] })).toEqual([]);
   });
 });

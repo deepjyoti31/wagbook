@@ -2,11 +2,26 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after Phase 1 (M26 to M33: the kitchen and food).
+Last updated: 22 October 2026, after Phase 3 (M38 to M42: boarding as the public rules promise).
 
 ## In one paragraph
 
-Every boarding milestone is built, M2 to M24, and so is all of Phase 1 of the roadmap's second part (D44): the
+Every boarding milestone is built, M2 to M24, and so are Phases 1, 2 and 3 of the roadmap's second part (D44). Phase 3
+(M38 to M42, `02` section J, D47): cancellation rules by weekday and weekend or holiday and by notice, worked out night
+by night and confirmed by an owner or manager as a refund and credit; credit as a ledger the database keeps (spent on
+any bill, never below nothing or after it ends) with goodwill credit and a reminder before it ends; pick-up from home
+and drop back home, priced by the area, on the bill and on the day's runs for the rider; health papers at the door
+(required vaccines, deworming, ticks, neutering) warned or refused by the database, with a manager able to let a pet
+in with a reason, and a reminder before the stay; a public booking form for new parents with an estimate, landing in
+Forms from parents through the intake form's own function (still twelve public functions); and review reminders on
+Today from a review link. Phase 2,
+appointments (M34 to M37, `02` section I, D46): places that take one booking at a time with their hours; grooming,
+swims, training and parties priced fixed, by size, by coat and breed, or on quote, with add-ons; free times offered,
+and the database keeping a place (with its clean-up), a pet and a person to one appointment at a time; a day's view
+with a column per place; a boarder's appointment on its stay's bill and a visitor's on its own; grooming cards, groom
+before going home, before and after photos and groom reminders; swims with the life jacket and supervisor; training
+courses sold up front; parties with one guest dog and a cake; packages billed as one line with their parts booked by
+the database. Phase 1 was the
 groundwork (M25), then stock, recipes, food prices and portions, subscriptions and orders, the cook plan and batches,
 delivery runs with a rider role, a public food order page, and food reports (M26 to M33, `02` section H). Each is
 switched on per kennel (Settings, What this kennel offers): a kennel with the kitchen and delivery off sees exactly
@@ -16,7 +31,7 @@ portions from each dog's weight; subscriptions that make their deliveries ahead 
 recipe, closing to changes at a cut-off; food bills checked by the database like stays and credited for cancelled
 deliveries; batches that take stock out and answer who received them; riders, a fourth role that reaches no table
 (D45); and twelve public functions now, four for food (`05`). The owner's earlier answers (boarders' food, riders,
-monthly payment, credit reminders) are built in. Next is Phase 2, appointments (M34 to M37). What has still never
+monthly payment, credit reminders) are built in. Next is Phase 4 (M43 onwards). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 Before Phase 1: M25 added what the kennel offers, parents' addresses matched to the areas served by PIN code, people's
@@ -25,8 +40,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (318 database tests, 196 unit tests), and the whole day is walked in a real
-browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 55 tests).
+database rules are tested in-process (372 database tests, 229 unit tests), and the whole day is walked in a real
+browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 65 tests).
 
 ## What is verified, and how
 
@@ -125,6 +140,16 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Erasing a parent with food: refused while a subscription or delivery is still to come (`WB075`); then their food orders, addresses and the subscription's notes go; door photos are in the list of files to remove | `tests/db/food-orders.test.ts` | High |
 | Merging parents with food: subscriptions and deliveries follow their pets (`on update cascade`), today's included past the cut-off | `tests/db/subscriptions.test.ts` | High |
 | The kitchen and food in a browser at 360 pixels: stock, a recipe costed, food prices, Biscuit's portion, a subscription every day billed for two weeks and credited for a cancelled delivery, paused; the cook plan, a batch, packing, labels, who got the batch; a rider joining by link and seeing only their run, marking a stop delivered; an order from the food page (portion and price as typed, UPI, I have paid), an area not served, Confirm making a subscription; a parent's pause from their own link; the food report and its CSV, staff refused | `npm run test:e2e` against the local Supabase (55 tests), screenshots taken 22 October 2026 | High for the local stack |
+| Appointments (M34): a place, a pet and a person in one appointment at a time, the place held through its clean-up; requests hold nothing; hours (`WB192`), places out of service (`WB191`), add-ons not booked alone (`WB190`); the price copied for the pet, by coat with a breed first, staff refused a change (`WB022`), quotes only requests until priced (`WB199`); done needs the certificates seen (`WB194`) and stays cancelled once cancelled (`WB198`); a boarder's appointment on a day of its stay (`WB193`), on its stay's bill (staff refused without it, `WB050`) and never on its own (`WB200`); cancelled with its stay or when the stay no longer has its day; a visitor's bill with its add-ons priced by the database (`WB203`, `WB025`); another kennel sees none of it | `tests/db/appointments.test.ts`; the place exclusion, the certificates rule and the course limit each removed once to see the tests fail | High |
+| Grooming cards, swims (`WB195`), courses sold by managers only and never beyond their sessions (`WB201`, `WB202`), parties' people (`WB197`) and guest (`WB196`, another pet), the cake's lead time (`WB156`), appointments in a parent's export and erasure (`WB076`) | `tests/db/appointment-services.test.ts` | High |
+| Packages (M37): only through `apply_package()` (`WB205`), one line on the bill which staff issue, extras and appointments free, the swim on the middle day and the groom by the check-out time, prices on request for managers (`WB206`, `WB022`), the stay's kind (`WB204`), parts with no free time counted, parts not booked twice (`WB207`), cancelled with the stay | `tests/db/packages.test.ts` | High |
+| Free times, prices by size and coat, appointment bill lines, the package line, grooms due | `src/lib/core/appointments.test.ts`, `stay.test.ts`, `reminders.test.ts` | High |
+| Appointments in a browser at 360 pixels: setup (places, services by coat, an add-on, a package), two swims at overlapping times refused with the sentence after booking in two tabs, the day's board, a visitor's groom priced by coat with an add-on and its own bill issued, a boarder's groom before going home on the stay's bill with the after photo on the parent's stay page, a stay with a package billed as one line with its swim and groom booked | `npm run test:e2e` (5 new tests, 60 in all) against the local Supabase; screenshots taken 22 October 2026 | High for the local stack |
+| Credit (M38): a refund kept as credit never more than the advance and ending after the kennel's months, staff refused (they cannot pay out), spent as a payment never beyond what is left (`WB211`), soonest to end first and never once ended, never changed (`WB212`) and given back when its payment is removed, goodwill for owners and managers only and cancellation credit only through a refund (`WB213`), no money moved in the month's report | `tests/db/credit.test.ts` | High |
+| Trips (M39): first and last days in the slot of their time at the area's charge, outside the areas only for owners and managers (`WB215`), staff never changing a price, lines on the stay's bill staff issue only with them, moved and cancelled with the stay (`WB216`), on a run of their own day and slot, marked only by that run's rider today; health at the door (M40): check-in refused saying what is lacking (`WB210`), the database and `healthProblems()` agreeing, let in by an owner or manager only, warn refusing nothing | `tests/db/trips-and-health.test.ts` | High |
+| The booking form (M41): the public prices and services for the estimate, a stay request at the usual price for each pet with the pick-up noted, an appointment request at the time asked, the parent and pet made when the request cannot be taken | `tests/db/booking-form.test.ts`, `tests/db/intake.test.ts`, `security.test.ts` (still twelve public functions) | High |
+| Night-by-night cancellation across a weekend and a holiday with and without notice, the kennel cancelling, packages, packs and discounts; health problems; the booking form's estimate; trip lines; health, credit and review reminders | `src/lib/core/cancellation.test.ts`, `health.test.ts`, `estimate.test.ts`, `trips.test.ts`, `reminders.test.ts` | High |
+| Phase 3 in a browser at 360 pixels: cancellation rules saved; a paid stay cancelled by the kennel, the parent's choice of credit confirmed, the credit on the parent page and goodwill added; a pet with no rabies card refused at check-in with the sentence, let in with a reason, then checked in; a pick-up added to a stay at the area's price, on the day's run, and on the stay's bill; the booking form in a private window with its estimate, accepted by staff into a request; a review reminder on Today with the link | `npm run test:e2e` (5 new tests, 65 in all) against the local Supabase; screenshots taken 22 October 2026 | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -154,6 +179,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A rider's photo at the door through real Storage | The storage policy is tested in the database (`rider_upload_allowed`); the walk marks Delivered without a photo | Low |
 | Labels printed on paper | Looked at on screen only | Sizes and cutting lines may want adjusting for the kennel's printer |
 | An independent security review of M9 | The second review was Claude Code's own pass | Have a person outside the project review before a public instance |
+| A rider marking a pick-up or drop in the browser | The walk puts a trip on a run and sees it there; `rider_mark_trip()` is tested in the database only | Low: the rider page's trip buttons call the same tested function |
+| The booking form asking for an appointment, in the browser | The walk sends a boarding request; appointment requests are tested in the database (`tests/db/booking-form.test.ts`) | Low |
+| Spending credit on a bill in the browser | The walk keeps an advance as credit and adds goodwill; spending it is tested in the database (`tests/db/credit.test.ts`) | Low |
+| Phase 3 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | Long Kannada words may wrap on the cancellation panel |
 
 ## Do this next
 
@@ -169,15 +198,17 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
    quarterly filers and cancelling; the tax by rate figure), and **the erasure questions in `05` to a lawyer** (Rule
    8(3), pets' free text). The research in both is a starting point, read from public commentary, not advice.
 
-7. **Ask the accountant questions 11 and 12 in `06`**: whether a kept advance on a cancelled stay needs a bill (a
-   cancellation charge, with tax), and whether a monthly bill for a regular's days is issued in time.
+7. **Ask the accountant questions 11, 12 and 15 in `06`**: whether a kept advance on a cancelled stay needs a bill (a
+   cancellation charge, with tax), whether a monthly bill for a regular's days is issued in time, and when credit kept
+   from a cancellation carries tax (kept, spent, or run out).
 
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: start M34** (services by appointment), then go through Phase 2 in order (M35 to M37). Each milestone first writes its
-section in `02-product-spec.md`. The owner has said production is not soon, so the launch steps above can wait and
-migrations stay editable in place until then. Steps 1 to 8 need the owner; M34 onwards does not. Before a kennel sells food, the accountant should answer questions
+**Building: start M43** (rota and attendance), then M44 (rough edges before production). Each milestone first writes
+its section in `02-product-spec.md`. The owner has said production is not soon, so the launch steps above
+can wait and migrations stay editable in place until then. Steps 1 to 8 need the owner; M43 onwards does not. The
+accountant should also give the SAC codes and rates for grooming, swimming and training (question 1 in `06`). Before a kennel sells food, the accountant should answer questions
 13 and 14 in `06` (the food's HSN code and rate, the delivery charge, and any kitchen licence or label wording).
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
@@ -245,6 +276,20 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 22 October 2026 (Phase 3), also unchecked: the whole of `src/messages/hi/rules.ts` and
+`src/messages/kn/rules.ts` (cancellation rules and the cancelled stay's panel, credit, pick-up and drop, health papers,
+the booking form, the review link), the three new reminders parents read (health papers, credit ending, asking for a
+review) in `core.ts`, and the payment method "credit" (क्रेडिट, ಕ್ರೆಡಿಟ್). Parents read the booking form, the trip
+message and the three reminders: check those first. Deworming was drafted as कीड़े की दवा and ಜಂತು ಔಷಧಿ, tick treatment
+as टिक का इलाज and ಉಣ್ಣಿ ಚಿಕಿತ್ಸೆ, neutering as नसबंदी and ಸಂತಾನಹರಣ, goodwill as सद्भावना and ಸದ್ಭಾವನೆ.
+
+Drafted on 22 October 2026 (Phase 2), also unchecked: the whole of `src/messages/hi/appointments.ts` and
+`src/messages/kn/appointments.ts` (appointment setup, booking, the day, grooming, courses, packages), the 21 new error
+sentences and 13 constraint sentences in `core.ts`, and the groom reminder parents read. Coats were drafted as
+छोटे बाल / दोहरी परत / लंबे बाल / घुंघराले / खुरदरे बाल and ಚಿಕ್ಕ ಕೂದಲು / ಎರಡು ಪದರ / ಉದ್ದ ಕೂದಲು / ಗುಂಗುರು / ಒರಟು ಕೂದಲು;
+"on quote" as पूछकर तय and ಕೇಳಿ ನಿಗದಿ; "add-on" kept as ऐड-ऑन and ಆಡ್-ಆನ್; "homework" as होमवर्क and ಮನೆಗೆಲಸ. The
+training notes message goes to parents: check it first.
 
 Drafted on 22 October 2026 (Phase 1), also unchecked: the whole of `src/messages/hi/kitchen.ts` and
 `src/messages/kn/kitchen.ts` (the kitchen, food for homes, riders, the food order page, food reports), and the 32 new
@@ -347,6 +392,44 @@ Chosen in M25 as the simplest thing:
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
 
+Chosen in Phase 3 (M38 to M42) as the simplest thing:
+
+- Cancellation rules are on screen for boarding and day boarding only. Appointments take no advance (they are paid on
+  their own bill after), so the database's rule for them has nothing to decide yet. Should appointments take an
+  advance, and be refunded or kept as credit by the same kind of rule?
+- A night's notice is the time from when the parent asked to that night's check-in time. "When the parent asked" is
+  now unless staff type an earlier time (never a later one).
+- The advance goes to the refund first, then to credit; what is left is kept. A package stay is spread evenly over its
+  nights, the remainder on the last; a discount comes off the last nights; a night paid from a day pack is worth
+  nothing (the pack keeps its day).
+- When the kennel cancels, everything goes back: all as money or all as credit, as the parent chooses. There is no
+  mix.
+- Settling is one step for an owner or manager; a different refund agreed with the parent is still recorded by hand.
+- Credit lasts the kennel's months from the day it is given (12 by default), is spent oldest first, and is offered on
+  a bill's payment form only while something is owed. It is never an advance or a refund.
+- A trip is on the stay's first day (pick-up) or last day (drop), at most one of each; its date moves with the stay.
+  Staff add a trip only to an address in an area served; an owner or manager can price one outside.
+- Health papers are checked on the stay's first day, or today if later; a pet of unknown age is not held to the
+  neutering rule. While the kennel only warns, nothing is refused.
+- The booking form takes one pet; a family uses the intake form. The estimate is the usual price times nights (at
+  least one) or days; appointments show their price, "from" when it depends on the dog.
+- A review is asked for once per stay or visit, and only the latest for each parent within the week; a daycare series
+  is never asked day by day.
+
+Chosen in Phase 2 (M34 to M37) as the simplest thing:
+
+- Requested appointments hold nothing, as stay requests do; Confirm is refused if the time was taken meanwhile.
+- A no-show is billed, as a stay's no-show is. A cancelled appointment is not.
+- A person is busy only for the appointment itself; the clean-up holds the place, not the person.
+- Done needs the pet's certificates seen when the service checks them; a boarder's check-in counts. A swim done needs
+  a supervisor and the life jacket answered (yes or no). Is "no life jacket" ever acceptable, or should it be refused?
+- A groom is due again from three days before its weeks are up, and is reminded once for each groom.
+- Groom before going home takes the latest free time that ends by the stay's expected pick-up, or the kennel's
+  check-out time.
+- A package's appointment on the "middle" day goes on the day halfway through the stay, rounded down.
+- Cancelling or shortening a stay cancels its appointments still to come that no longer fit, with a reason in English.
+- Staff may put a package with a set price on a stay; one priced on request needs an owner or manager.
+
 Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 - A subscription is for one pet. A parent with two dogs has two subscriptions, delivered to the same door as two stops
@@ -374,7 +457,13 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - Deliveries are made ahead only when someone opens the Kitchen or Food for homes (three weeks each time); nothing runs
   by itself overnight.
 
-- The Appointments switch has nothing behind it yet except the skills on People; Phase 2 (M34 onwards) builds it.
+- Appointments: an appointment cannot be moved to another time; it is cancelled and booked again. Two pets of one
+  family cannot share one appointment (two dogs in the pool together). There is no group class. A visitor's add-ons on
+  a course session have no bill to go on. Before and after photos reach the parent only for a boarder (a visitor has no
+  stay page; send them on WhatsApp). Parents cannot book appointments themselves yet (M41). Appointment setup has no
+  way to rename a place or a service: take it off the list and add it again. The day's board draws an appointment from
+  its start to its end rounded to the half hour. The grooming menu is what the kennel types in; no list is filled in
+  for it. A party's cake is a one-off food order with its own bill, not a line of the party's bill.
 - Managers may correct a weighing through the database, but the pet page offers only Remove (owners).
 
 - A no-show uses a pack day. A series that runs across two months gets a bill for each month; days paid from a pack
@@ -415,7 +504,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 514 tests, build
+npm run check        # dash check, lint, typecheck, 562 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -424,6 +513,11 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 22 October 2026. Phase 2, M34 to M37: places, services and prices, appointments held by the database by place, pet
+  and person, the day's board, bills for boarders and visitors, grooming cards and reminders, swims, courses, parties,
+  made-to-order lead time, packages (D46). 34 database tests, 5 browser steps (60 in all), run against the local
+  Supabase (images pulled through `mirror.gcr.io` when Docker Hub and ECR refused).
 
 - 22 October 2026. Phase 1, M26 to M33: stock, recipes, food prices and portions, subscriptions and orders, the cook
   plan and batches, delivery runs and riders (D45), the food order page (four more public functions, twelve in all),

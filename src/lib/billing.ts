@@ -36,6 +36,8 @@ export interface BillableBooking {
   charges?: readonly StayCharge[];
   /** The day boarding pack it is paid from, if any. */
   pass_id?: string | null;
+  /** For a stay with a package (M37): its name, on the bill's one line. */
+  package_name?: string | null;
 }
 
 export interface BillableItem {
@@ -69,6 +71,7 @@ export function bookingLines(petName: string, b: BillableBooking, items: readonl
     boardingFrom: b.boarding_from,
     charges: b.charges,
     fromPack: Boolean(b.pass_id),
+    packageName: b.package_name,
     addOns: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp, sacCode: i.sac_code })),
   });
 }
@@ -109,6 +112,7 @@ export function familyLines(members: readonly FamilyMember[]): LineInput[] {
       boardingFrom: b.boarding_from,
       charges: b.charges,
       fromPack: Boolean(b.pass_id),
+      packageName: b.package_name,
       addOns: items.map((i) => ({
         description: `${petName}: ${i.description}`.slice(0, 300),
         quantity: Number(i.quantity),

@@ -171,6 +171,26 @@ begin
       from public.food_orders fo
       where fo.org_id = v_client.org_id and (fo.client_id = v_client.id or fo.phone = v_client.phone)
     ), '[]'::jsonb),
+    'appointments', coalesce((
+      select jsonb_agg(
+        to_jsonb(a) - 'org_id'
+        || jsonb_build_object('add_ons', coalesce((select jsonb_agg(to_jsonb(ai) - 'org_id' order by ai.created_at)
+                                                   from public.appointment_items ai where ai.org_id = a.org_id and ai.appointment_id = a.id), '[]'::jsonb))
+        order by a.starts_at)
+      from public.appointments a where a.org_id = v_client.org_id and a.client_id = v_client.id
+    ), '[]'::jsonb),
+    'trips', coalesce((
+      select jsonb_agg(to_jsonb(t) - 'org_id' order by t.trip_date)
+      from public.trips t where t.org_id = v_client.org_id and t.client_id = v_client.id
+    ), '[]'::jsonb),
+    'credit', coalesce((
+      select jsonb_agg(to_jsonb(cb) - 'org_id' order by cb.expires_on)
+      from public.credit_balances cb where cb.org_id = v_client.org_id and cb.client_id = v_client.id
+    ), '[]'::jsonb),
+    'courses', coalesce((
+      select jsonb_agg(to_jsonb(cb) - 'org_id' order by cb.name)
+      from public.course_balances cb where cb.org_id = v_client.org_id and cb.client_id = v_client.id
+    ), '[]'::jsonb),
     'packs', coalesce((
       select jsonb_agg(to_jsonb(pb) - 'org_id' order by pb.starts_on)
       from public.pass_balances pb where pb.org_id = v_client.org_id and pb.client_id = v_client.id
@@ -189,7 +209,7 @@ begin
 end;
 $$;
 comment on function public.export_client(uuid) is
-  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
+  'Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, appointments with their add-ons and training courses, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).';
 
 -- ---------------------------------------------------------------------------
 
@@ -237,6 +257,12 @@ begin
                 where d.org_id = v_client.org_id and d.client_id = v_client.id
                   and d.status in ('planned', 'packed', 'out') and d.delivery_date >= public.org_today(d.org_id)) then
     raise exception 'WB075: this parent has food deliveries still to come. Cancel them first.' using errcode = '23514';
+  end if;
+
+  if exists (select 1 from public.appointments a
+             where a.org_id = v_client.org_id and a.client_id = v_client.id and a.status in ('requested', 'confirmed')
+               and a.starts_at > now()) then
+    raise exception 'WB076: this parent has appointments still to come. Cancel them first.' using errcode = '23514';
   end if;
 
   select coalesce(array_agg(p.id), '{}') into v_pets
@@ -304,6 +330,15 @@ begin
   set belongings = null, gate_notes = null, notes = null, cancel_reason = null,
       expected_arrival = null, expected_departure = null
   where b.id = any (v_bookings);
+  -- Appointments keep their times and prices, and lose the arrangements made
+  -- with the parent and the notes and homework sent to them.
+  update public.appointments a
+  set notes = null, after_notes = null, homework = null,
+      cancel_reason = case when a.status = 'cancelled' then 'Erased' end
+  where a.org_id = v_client.org_id and a.client_id = v_client.id;
+  update public.courses c set notes = null where c.org_id = v_client.org_id and c.client_id = v_client.id;
+  update public.trips t set note = null, cancel_reason = case when t.status = 'cancelled' then 'Erased' end
+  where t.org_id = v_client.org_id and t.client_id = v_client.id;
 
   -- The pets stay as they are, with their health, routines, incidents, care
   -- and play (the owner's decision, D30): they are the kennel's record of the
@@ -334,7 +369,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Refused while a pet is in house (WB071), a stay is still to come (WB072) or food is still to be delivered (WB075). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

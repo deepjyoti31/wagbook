@@ -26,7 +26,7 @@ async function Peaks() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("peak_periods")
-    .select("id, name, start_date, end_date, no_refund, play_session_minutes")
+    .select("id, name, start_date, end_date, no_refund, is_holiday, play_session_minutes")
     .eq("org_id", org.id)
     .gte("end_date", todayIn(org.time_zone))
     .order("start_date");
@@ -49,6 +49,7 @@ async function Peaks() {
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-bold">{p.name}</span>
                     {p.no_refund ? <Badge tone="attention">{k.noRefund}</Badge> : null}
+                    {p.is_holiday ? <Badge>{m.cancelSetup.holidayBadge}</Badge> : null}
                     {p.play_session_minutes ? <Badge>{fill(k.playMinutes, { n: p.play_session_minutes })}</Badge> : null}
                   </span>
                   <span className="block text-slate">
@@ -86,6 +87,10 @@ async function Peaks() {
             <label className="flex min-h-12 items-center gap-3">
               <input type="checkbox" name="noRefund" className="size-5" />
               <span>{k.noRefundRule}</span>
+            </label>
+            <label className="flex min-h-12 items-center gap-3">
+              <input type="checkbox" name="isHoliday" className="size-5" />
+              <span>{m.cancelSetup.holiday}</span>
             </label>
             <Field label={k.playLength} hint={k.playLengthHint}>
               <Input name="playMinutes" type="number" min={5} max={240} />

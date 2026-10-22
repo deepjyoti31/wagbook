@@ -1,4 +1,5 @@
 import { addDays, formatDate, type ISODate } from "./dates";
+import { groomsDue, type GroomCard } from "./appointments";
 import { formatMoney, type Minor } from "./money";
 import { vaccinationWarnings } from "./vaccinations";
 
@@ -12,17 +13,28 @@ import { vaccinationWarnings } from "./vaccinations";
  *   arrival      a stay starts tomorrow
  *   pickup       a pet in the kennel goes home tomorrow
  *   unpaid       a bill issued three or more days ago still has money owed
+ *   groom        a pet is due a groom again (M35): its last groom plus its
+ *                weeks, from three days before; once for each groom
+ *   health       a stay starts within a week and the pet will lack what
+ *                the kennel requires at the door on its first day (M40)
+ *   credit       a parent's credit ends within a month (M38)
+ *   review       a stay or a visit ended in the last week and the kennel
+ *                has a review link (M42); once for each stay or visit
  *
  * Once sent, a reminder leaves the list for good, except an unpaid bill,
  * which comes back three days after the last reminder.
  */
 
-export type ReminderKind = "vaccination" | "arrival" | "pickup" | "unpaid";
+export type ReminderKind = "vaccination" | "arrival" | "pickup" | "unpaid" | "groom" | "health" | "credit" | "review";
 
 /** How many days ahead a missing vaccination card is asked for. */
 export const VACCINATION_REMINDER_DAYS = 7;
 /** Days after a bill is issued, and between reminders, before an unpaid bill is on the list. */
 export const UNPAID_REMINDER_DAYS = 3;
+/** Days before credit ends that the parent is told (a month, the owner's answer of 21 October 2026). */
+export const CREDIT_REMINDER_DAYS = 30;
+/** Days after a stay or visit ends that asking for a review still makes sense. */
+export const REVIEW_REMINDER_DAYS = 7;
 
 /** The words of the messages, in the parent's language (m.whatsapp.reminders). */
 export interface ReminderWords {
@@ -33,6 +45,10 @@ export interface ReminderWords {
   pickup: string;
   pickUpBy: string;
   unpaid: string;
+  groom: string;
+  health: string;
+  credit: string;
+  review: string;
 }
 
 export interface ReminderStay {
@@ -52,18 +68,25 @@ export interface ReminderInput {
   pickUp?: string | null;
   currency?: string;
   /** Confirmed stays starting from tomorrow, with the pet's vaccinations. */
-  upcoming: readonly (ReminderStay & { vaccinations: readonly { vaccine: string; valid_until: ISODate | null }[] })[];
+  upcoming: readonly (ReminderStay & { vaccinations: readonly { vaccine: string; valid_until: ISODate | null }[]; lacks?: readonly string[] })[];
   /** Pets in the kennel. */
   inHouse: readonly ReminderStay[];
   /** Issued bills with money still owed. */
   unpaid: readonly { id: string; number: string; parentName: string; phone: string; issuedOn: ISODate; dueMinor: Minor; url: string }[];
+  /** Grooming cards of pets that have been groomed, for grooms due again (M35). */
+  grooms?: readonly GroomCard[];
+  /** Credit with something left, and when it ends (M38). */
+  credits?: readonly { id: string; parentName: string; phone: string; leftMinor: Minor; expiresOn: ISODate }[];
+  /** The kennel's review link (M42), and the stays and visits that ended lately. */
+  reviewUrl?: string | null;
+  ended?: readonly { id: string; petName: string; parentName: string; phone: string; endedOn: ISODate }[];
   /** What was sent already. */
   sent: readonly { kind: string; subjectId: string; sentOn: ISODate }[];
 }
 
 export interface Reminder {
   kind: ReminderKind;
-  /** The booking, or the bill for an unpaid one. */
+  /** The booking, the bill for an unpaid one, the last groom for a groom due, the credit, or the stay or visit for a review. */
   subjectId: string;
   parentName: string;
   phone: string;
@@ -79,7 +102,7 @@ function fillIn(template: string, vars: Record<string, string | number>): string
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
-/** The reminders due today, in the order: vaccinations, arrivals, pick-ups, unpaid bills. */
+/** The reminders due today, in the order: vaccinations, health papers, arrivals, pick-ups, unpaid bills, grooms due, credit ending, reviews. */
 export function remindersToSend(w: ReminderWords, i: ReminderInput, locale = "en-IN"): Reminder[] {
   const tomorrow = addDays(i.today, 1);
   const sentFor = (kind: ReminderKind, id: string) => i.sent.filter((s) => s.kind === kind && s.subjectId === id);
@@ -96,6 +119,12 @@ export function remindersToSend(w: ReminderWords, i: ReminderInput, locale = "en
         ? fillIn(w.vaccinationNone, vars)
         : fillIn(w.vaccinationLapses, { ...vars, vaccine: (warning.vaccine ?? "").replaceAll("_", " "), until: date(warning.date) });
     out.push({ kind: "vaccination", subjectId: s.id, parentName: s.parentName, phone: s.phone, about: s.petName, text });
+  }
+
+  for (const s of i.upcoming) {
+    if (!s.lacks?.length || s.startDate < tomorrow || s.startDate > addDays(i.today, VACCINATION_REMINDER_DAYS) || sentFor("health", s.id).length) continue;
+    const text = fillIn(w.health, { parent: firstName(s.parentName), pet: s.petName, kennel: i.kennelName, date: date(s.startDate), lacks: s.lacks.join(", ") });
+    out.push({ kind: "health", subjectId: s.id, parentName: s.parentName, phone: s.phone, about: s.petName, text });
   }
 
   for (const s of i.upcoming) {
@@ -123,6 +152,27 @@ export function remindersToSend(w: ReminderWords, i: ReminderInput, locale = "en
       url: b.url,
     });
     out.push({ kind: "unpaid", subjectId: b.id, parentName: b.parentName, phone: b.phone, about: b.number, text });
+  }
+
+  const groomed = new Set(i.sent.filter((s) => s.kind === "groom").map((s) => s.subjectId));
+  for (const g of groomsDue(i.grooms ?? [], i.today, groomed)) {
+    const text = fillIn(w.groom, { parent: firstName(g.parentName), pet: g.petName, kennel: i.kennelName, date: date(g.dueOn) });
+    out.push({ kind: "groom", subjectId: g.last!.id, parentName: g.parentName, phone: g.phone, about: g.petName, text });
+  }
+
+  for (const c of i.credits ?? []) {
+    if (c.leftMinor <= 0 || c.expiresOn < i.today || c.expiresOn > addDays(i.today, CREDIT_REMINDER_DAYS) || sentFor("credit", c.id).length) continue;
+    const amount = formatMoney(c.leftMinor, { currency: i.currency, locale, trimZeros: true });
+    const text = fillIn(w.credit, { parent: firstName(c.parentName), kennel: i.kennelName, amount, date: date(c.expiresOn) });
+    out.push({ kind: "credit", subjectId: c.id, parentName: c.parentName, phone: c.phone, about: amount, text });
+  }
+
+  if (i.reviewUrl) {
+    for (const e of i.ended ?? []) {
+      if (e.endedOn > i.today || e.endedOn < addDays(i.today, -REVIEW_REMINDER_DAYS) || sentFor("review", e.id).length) continue;
+      const text = fillIn(w.review, { parent: firstName(e.parentName), pet: e.petName, kennel: i.kennelName, url: i.reviewUrl });
+      out.push({ kind: "review", subjectId: e.id, parentName: e.parentName, phone: e.phone, about: e.petName, text });
+    }
   }
   return out;
 }

@@ -26,7 +26,10 @@ export default function UpdatePage({ params, searchParams }: PageProps<"/app/boo
 
 async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]/update">, "params" | "searchParams">) {
   const { id } = await params;
-  const saved = (await searchParams).saved;
+  const query = await searchParams;
+  const saved = query.saved;
+  // Words to start from, as "Before and after: Full groom" from an appointment (M35).
+  const start = typeof query.text === "string" ? query.text.slice(0, 200) : undefined;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org } = await requireOrg();
   const { m } = await getAppI18n();
@@ -99,7 +102,7 @@ async function Update({ params, searchParams }: Pick<PageProps<"/app/bookings/[i
         <ActionForm action={createUpdate}>
           <input type="hidden" name="bookingId" value={id} />
           <Field label={w.how}>
-            <Textarea name="body" required maxLength={2000} rows={4} placeholder={w.placeholder} />
+            <Textarea name="body" required maxLength={2000} rows={4} placeholder={w.placeholder} defaultValue={start} />
           </Field>
           <PhotoInput name="photos" label={w.photos} words={m.photos} multiple max={4} />
           <label className="flex min-h-12 items-center gap-3">

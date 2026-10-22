@@ -49,6 +49,14 @@ export async function acceptSubmission(_state: FormState, form: FormData): Promi
     .maybeSingle();
 
   revalidatePath("/app", "layout");
+  // From the booking form (M41): accepting made the request already, so open it.
+  const payload = IntakePayload.parse(sub.data.payload);
+  if (payload.request) {
+    const made = payload.request.service_id
+      ? await supabase.from("appointments").select("id").eq("org_id", org.id).eq("client_id", accepted.data).eq("status", "requested").order("created_at", { ascending: false }).limit(1).maybeSingle()
+      : await supabase.from("bookings").select("id").eq("org_id", org.id).eq("client_id", accepted.data).eq("status", "requested").eq("source", "intake").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (made.data) redirect(payload.request.service_id ? `/app/appointments/${made.data.id}` : `/app/bookings/${made.data.id}`);
+  }
   const params = new URLSearchParams();
   if (pet.data) params.set("pet", pet.data.id);
   if (sub.data.requested_start) params.set("start", sub.data.requested_start);

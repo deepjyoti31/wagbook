@@ -918,3 +918,72 @@ are the narrowest possible door.
 rider's language comes from their membership, as anyone's does.
 
 **Look again** if riders need to see yesterday's runs, or if pick-ups of boarders (M39) need more than an address.
+
+---
+
+## D46. Appointments are held by the database, by place, pet and person
+
+**Status:** Decided, 22 October 2026, building Phase 2 (M34 to M37).
+
+**Situation.** Grooming, swims, training and parties are booked by the hour, not by the night. A pool or a grooming
+table takes one dog at a time and needs cleaning afterwards; a groomer cannot be at two tables; a pet cannot be in the
+pool and on the table. Some are for pets staying in, some for visitors. Prices depend on the dog (its size or coat), or
+are quoted by the trainer.
+
+**Decision.** Appointments are rows with `timestamptz` start and end, in a **place** with its daily hours. Three
+exclusion constraints, like the kennel overlap for stays (D3), refuse a place, a pet or a person in two appointments at
+once; the place is held to the end of the service's clean-up (`held_until`, kept by a trigger). Requests hold nothing,
+as stay requests do. The database works out the price for the pet (`appointment_price()`: fixed, by size from the latest
+weight, by coat with a named breed first, or on quote) and copies it, with the tax rate and code, onto the appointment;
+only owners and managers give another (D15), and an appointment on quote can only be a request until it is priced. A
+boarder's appointment names its stay and is a line of the stay's bill; a visitor's has a bill of its own
+(`invoices.appointment_id`); `invoice_expected_lines()` knows both, so staff issue either only as the database prices
+it (`WB050`). A training course is sold up front as a day boarding pack is (D37). A **package** is put on a stay by
+`apply_package()`, which bills the stay as one line and books its parts at the first free times; the parts then cost
+nothing on their own. Cancelling or shortening a stay cancels its appointments that no longer fit.
+
+**Why.** The same reasons as for stays: rules about money and double booking belong in the database, where a second
+tab, a slow phone or a bug in a screen cannot get round them. Copying the price keeps old appointments as they were
+sold. Billing a boarder's groom on the stay's bill is what parents expect: one bill for the stay.
+
+**Cost.** An appointment cannot move to another time: it is cancelled and booked again (the free times make that quick).
+Add-ons on a visitor's course session have no bill to go on. Two pets of one family cannot share one appointment (two
+dogs in the pool together); each is booked on its own. The free times are offered every 30 minutes from the place's
+opening.
+
+**Look again** if kennels want group sessions (a class of six puppies), appointments moved by dragging, or reminders to
+parents before an appointment.
+
+## D47. Cancellation is worked out in the app and kept in the database; health is checked at the door by the database
+
+**Status:** Decided, 22 October 2026, building Phase 3 (M38 to M42).
+
+**Situation.** The public rules a kennel promises parents say what happens to an advance when a stay is cancelled
+(refunded with enough notice, kept as credit on a weekend or a holiday), that pets need their papers in order to come
+in, that pets can be picked up from home, and that a new parent can ask to book without ringing. Each of these touches
+money, the door or the public internet.
+
+**Decision.** The night-by-night arithmetic of a cancellation is a pure function (`cancellationOutcome()`), shown on
+the stay's page and worked out again from the database when an owner or manager confirms it: the refund is an ordinary
+refund, and the credit a refund paid "as credit" (`payments.method = 'credit'`). Credit itself is a ledger in the
+database (`credits`, `credit_uses`, `credit_balances`), filled and spent only by triggers on payments, oldest first,
+never below zero, never after it ends (`WB211`), and a credit payment is never changed (`WB212`). What a pet lacks at
+the door is `pet_health_problems()`, matched by `healthProblems()` in the app for lists; while a kennel refuses, the
+check-in and a visitor's appointment are refused by triggers (`WB210`) unless a row in `health_overrides` says who let
+the pet in and why. A pick-up or drop is a row of its own (`trips`), priced by the database from the area as deliveries
+are, on the stay's bill and on the day's runs. The booking form for new parents sends the intake form's own payload
+with a `request` in it, through `submit_intake()`; accepting it (`accept_intake()`) also makes the request. Reviews are
+a link and a reminder, nothing more.
+
+**Why.** The rules a parent was promised are about money, so the money is kept where a slow phone or a second tab
+cannot get round it, while the rule itself stays easy to change and to test. Confirming in one step keeps a person in
+charge of a refund. A new public function would be one more thing the anonymous role can call (rule 6); reusing the
+intake form keeps it at twelve, with its rate limit, size limit and checks.
+
+**Cost.** Changing a cancellation rule does not change a cancellation already confirmed. Credit kept is treated as a
+refund for the books until an accountant says otherwise (question 15 in `06`). The booking form takes one pet; a family
+uses the intake form. Appointments take no advance, so no screen sets a cancellation rule for them yet. Wagbook has no
+review page of its own.
+
+**Look again** if kennels want partial refunds per night, credit moved between parents, a review page of their own, or
+appointment advances.

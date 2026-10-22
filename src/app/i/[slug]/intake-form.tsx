@@ -17,6 +17,9 @@ export interface IntakeSharedWords {
   yes: string;
   no: string;
   photos: Messages["photos"];
+  /** Last dewormed, last tick treatment (M40). */
+  dewormedOn: string;
+  tickTreatedOn: string;
 }
 
 /**
@@ -141,6 +144,12 @@ export function IntakeForm({
             </Field>
             <Field label={w.weight}>
               <Input name={`pets.${key}.weight_kg`} inputMode="decimal" />
+            </Field>
+            <Field label={shared.dewormedOn}>
+              <Input name={`pets.${key}.dewormed_on`} type="date" />
+            </Field>
+            <Field label={shared.tickTreatedOn}>
+              <Input name={`pets.${key}.tick_treated_on`} type="date" />
             </Field>
           </div>
           <Field label={w.food} hint={w.foodHint}>

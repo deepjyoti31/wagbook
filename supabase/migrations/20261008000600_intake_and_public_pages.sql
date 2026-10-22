@@ -37,7 +37,7 @@ create table public.intake_submissions (
 comment on table public.intake_submissions is
   'What a parent typed into the public intake form, kept exactly as sent until staff accept it. Nothing here is trusted until a person has reviewed it.';
 comment on column public.intake_submissions.payload is
-  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}.';
+  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), consent}.';
 comment on column public.intake_submissions.consent_text is 'The exact consent wording the parent agreed to, kept as evidence.';
 comment on column public.intake_submissions.client_id is 'The client created or matched when the submission was accepted.';
 comment on column public.intake_submissions.upload_token is
@@ -139,13 +139,29 @@ as $$
     'intake_enabled', o.intake_enabled,
     'language', o.parent_language,
     'delivers', o.offers_food_delivery,
-    'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language))
+    'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language)),
+    -- For the booking form's estimate (M41): the usual prices, nothing private.
+    'currency', o.currency,
+    'locale', o.locale,
+    'prices', jsonb_build_object(
+      'boarding', (select s.price_minor from public.services s where s.org_id = o.id and s.kind = 'boarding' and s.is_default and s.is_active limit 1),
+      'daycare', (select s.price_minor from public.services s where s.org_id = o.id and s.kind = 'daycare' and s.is_default and s.is_active limit 1)
+    ),
+    'services', case when o.offers_appointments then coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', s.id, 'kind', s.kind, 'name', s.name, 'minutes', s.minutes,
+        'price_minor', case when s.pricing = 'quote' then null else s.price_minor end,
+        'from', s.pricing in ('by_size', 'by_coat')
+      ) order by s.kind, s.sort_order, s.name)
+      from public.appointment_services s
+      where s.org_id = o.id and s.is_active and not s.is_addon
+    ), '[]'::jsonb) else '[]'::jsonb end
   )
   from public.organizations o
   where o.slug = lower(btrim(p_slug));
 $$;
 comment on function public.get_public_intake_form(text) is
-  'PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, and whether it delivers (so the form asks for an address with a PIN code).';
+  'PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate.';
 
 create function public.submit_intake(p_slug text, p_payload jsonb)
 returns jsonb
@@ -254,6 +270,15 @@ declare
   v_weight numeric;
   v_postal text;
   v_sent_on date;
+  v_pets uuid[] := '{}';
+  v_org public.organizations;
+  v_kind public.booking_kind;
+  v_start date;
+  v_end date;
+  v_service public.services;
+  v_group uuid;
+  v_appt public.appointment_services;
+  v_time time;
 begin
   select * into v_sub from public.intake_submissions s where s.id = p_submission for update;
   if v_sub.id is null then
@@ -313,10 +338,12 @@ begin
     where p.org_id = v_sub.org_id and p.client_id = v_client and p.deleted_at is null
       and lower(p.name) = lower(left(btrim(v_pet ->> 'name'), 80));
 
-    if v_pet_id is null then
+    if v_pet_id is not null then
+      v_pets := v_pets || v_pet_id;
+    else
       insert into public.pets
         (org_id, client_id, name, species, breed, sex, is_neutered, date_of_birth,
-         food_notes, medical_notes, allergies, behaviour_notes, vet_name, vet_phone)
+         food_notes, medical_notes, allergies, behaviour_notes, vet_name, vet_phone, dewormed_on, tick_treated_on)
       values
         (v_sub.org_id, v_client, left(btrim(v_pet ->> 'name'), 80),
          case when v_pet ->> 'species' in ('dog', 'cat', 'other') then v_pet ->> 'species' else 'dog' end,
@@ -329,8 +356,11 @@ begin
          nullif(left(btrim(v_pet ->> 'allergies'), 200), ''),
          nullif(left(btrim(v_pet ->> 'behaviour_notes'), 2000), ''),
          nullif(left(btrim(v_pet ->> 'vet_name'), 200), ''),
-         nullif(left(btrim(v_pet ->> 'vet_phone'), 200), ''))
+         nullif(left(btrim(v_pet ->> 'vet_phone'), 200), ''),
+         case when public.safe_date(v_pet ->> 'dewormed_on') <= v_sent_on then public.safe_date(v_pet ->> 'dewormed_on') end,
+         case when public.safe_date(v_pet ->> 'tick_treated_on') <= v_sent_on then public.safe_date(v_pet ->> 'tick_treated_on') end)
       returning id into v_pet_id;
+      v_pets := v_pets || v_pet_id;
 
       -- The weight the parent gave, in kilos with up to two decimals, as the
       -- pet's first weighing.
@@ -368,6 +398,52 @@ begin
     end if;
   end loop;
 
+  -- The booking form for new parents (M41) asks for a stay or an appointment:
+  -- it becomes a request staff confirm as any other, at the usual price. One
+  -- the kennel cannot take as asked (no price, outside hours, a pet already
+  -- booked) is left for staff to book by hand; the parent and pets are made.
+  if (v_sub.payload #>> '{request,make}') = 'true' and cardinality(v_pets) > 0 then
+    select * into v_org from public.organizations o where o.id = v_sub.org_id;
+    v_start := public.safe_date(v_sub.payload #>> '{stay,start_date}');
+    v_end := coalesce(public.safe_date(v_sub.payload #>> '{stay,end_date}'), v_start);
+    begin
+      if (v_sub.payload #>> '{request,service_id}') ~ '^[0-9a-f-]{36}$' then
+        select * into v_appt from public.appointment_services s
+        where s.org_id = v_sub.org_id and s.id = (v_sub.payload #>> '{request,service_id}')::uuid and s.is_active and not s.is_addon;
+        v_time := case when (v_sub.payload #>> '{request,time}') ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then (v_sub.payload #>> '{request,time}')::time end;
+        if v_appt.id is not null and v_start is not null and v_time is not null and v_start >= v_sent_on then
+          insert into public.appointments (org_id, client_id, pet_id, service_id, status, starts_at, ends_at, notes)
+          select v_sub.org_id, v_client, p, v_appt.id, 'requested',
+                 (v_start + v_time) at time zone v_org.time_zone,
+                 ((v_start + v_time) at time zone v_org.time_zone) + make_interval(mins => v_appt.minutes),
+                 'Asked for on the booking form'
+          from unnest(v_pets[1:1]) p;
+        end if;
+      elsif v_start is not null and v_start >= v_sent_on and v_end >= v_start then
+        v_kind := case when v_sub.payload #>> '{stay,kind}' = 'daycare' then 'daycare' else 'boarding' end;
+        if v_kind = 'boarding' and v_end = v_start then
+          v_end := v_start + 1;
+        end if;
+        select * into v_service from public.services s
+        where s.org_id = v_sub.org_id and s.kind::text = v_kind::text and s.is_default and s.is_active limit 1;
+        if v_service.id is not null then
+          v_group := case when cardinality(v_pets) > 1 then gen_random_uuid() end;
+          insert into public.bookings (org_id, client_id, pet_id, kind, status, start_date, end_date, rate_minor, tax_rate_bp, sac_code, source, group_id, notes)
+          select v_sub.org_id, v_client, p, v_kind, 'requested', v_start, v_end, v_service.price_minor,
+                 case when v_org.tax_mode = 'none' then 0 else coalesce(v_service.tax_rate_bp, v_org.default_tax_rate_bp) end,
+                 v_service.sac_code, 'intake', v_group,
+                 nullif(concat_ws(E'\n',
+                   case when (v_sub.payload #>> '{request,pickup}') = 'true' then 'Asked for pick-up from home' end,
+                   nullif(left(btrim(v_sub.payload #>> '{stay,notes}'), 500), '')), '')
+          from unnest(v_pets) p;
+        end if;
+      end if;
+    exception when others then
+      -- Left for staff to book by hand.
+      null;
+    end;
+  end if;
+
   update public.intake_submissions s
   set status = 'accepted', client_id = v_client
   where s.id = v_sub.id;
@@ -376,7 +452,7 @@ begin
 end;
 $$;
 comment on function public.accept_intake(uuid) is
-  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. Returns the client id. Creating the booking is a separate step.';
+  'Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. A form from the booking form for new parents (M41, payload.request.make) also makes its request: a stay at the usual price for each pet, or an appointment for the first, left for staff to book by hand when the kennel cannot take it as asked. Returns the client id.';
 
 -- ---------------------------------------------------------------------------
 -- Parent-facing read-only pages

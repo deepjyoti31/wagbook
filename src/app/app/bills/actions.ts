@@ -10,7 +10,7 @@ import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
-import { creditForChange, monthOf, stayBillLines, type BillScope } from "@/lib/stay-bill";
+import { creditForChange, monthOf, stayBillLines, UNPRICED, type BillScope } from "@/lib/stay-bill";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
@@ -38,7 +38,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
 
   // The stays this bill covers, and what they come to.
   const built = await stayBillLines(supabase, org.id, scope);
-  if ("error" in built) return { error: friendlyError(built.error, t) };
+  if ("error" in built) return { error: built.error === UNPRICED ? t.m.appointment.errors.unpriced : friendlyError(built.error, t) };
   if (built.lines.length === 0) return { error: t.m.bill.errors.nothingToBill };
 
   let existingQuery = supabase.from("invoices").select("id, status").eq("org_id", org.id).neq("status", "void");
@@ -315,7 +315,8 @@ export async function recordPayment(_state: FormState, form: FormData): Promise<
 
   const Payment = z.object({
     amount: z.number().int().positive(w.errors.amount),
-    method: z.enum(PAYMENT_METHODS, w.errors.method),
+    // Credit (M38) pays a bill; the database spends the oldest first and never more than is left (WB211).
+    method: z.enum([...PAYMENT_METHODS, "credit"], w.errors.method),
     receivedOn: z.string().refine(isISODate, w.errors.date),
     reference: z.string().max(100, w.errors.reference).nullable(),
     note: z.string().max(500, w.errors.note).nullable(),
@@ -329,6 +330,7 @@ export async function recordPayment(_state: FormState, form: FormData): Promise<
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const p = parsed.data;
+  if (p.method === "credit" && (refund || !invoiceId)) return { error: t.m.credit.errors.billsOnly };
 
   const supabase = await createClient();
   // The parent, and the booking, come from the bill or the booking itself, read through our own session.
