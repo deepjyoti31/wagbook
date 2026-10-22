@@ -9,13 +9,14 @@ import { PetAvatar } from "@/components/pet-avatar";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { formatDate, formatKg, formatPhone, todayIn, weightChange } from "@/lib/core";
+import { dailyGrams, formatDate, formatKg, formatPhone, portionReviewDue, sizeBand, todayIn, weightChange, type PortionSettings } from "@/lib/core";
+import { percentText, portionSettings, weekdayList } from "@/lib/kitchen";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
 import { createClient } from "@/lib/supabase/server";
-import { addWeight, removeWeight, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
+import { addWeight, markPortionReviewed, removeWeight, savePetFood, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.pet.title);
 
@@ -187,6 +188,10 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           <AddVaccinationForm t={t} petId={pet.id} />
         </div>
       </Section>
+
+      {org.offers_kitchen ? (
+        <FoodSection t={t} orgId={org.id} pet={pet} canManage={canManage} today={today} offersDelivery={org.offers_food_delivery} settings={portionSettings(org)} />
+      ) : null}
 
       <WeightSection
         t={t}
@@ -402,6 +407,151 @@ function WeightSection({
             {w.saveTarget}
           </SubmitButton>
         </ActionForm>
+      </div>
+    </Section>
+  );
+}
+
+/** What the pet eats (M28): its portion from the latest weight, or set by hand; what it eats boarding; foods to avoid; its subscriptions. */
+async function FoodSection({
+  t,
+  orgId,
+  pet,
+  canManage,
+  today,
+  offersDelivery,
+  settings,
+}: {
+  t: Awaited<ReturnType<typeof getAppI18n>>;
+  orgId: string;
+  pet: { id: string; name: string; weight_g: number | null };
+  canManage: boolean;
+  today: string;
+  offersDelivery: boolean;
+  settings: PortionSettings;
+}) {
+  const { m, locale } = t;
+  const w = m.petFood;
+  const supabase = await createClient();
+  const [food, subs] = await Promise.all([
+    supabase.from("pet_food").select("plan, goal, grams_by_hand, by_hand_note, boarder_food, kibble_brand, kibble_g_per_day, avoid, started_on, reviewed_on").eq("org_id", orgId).eq("pet_id", pet.id).maybeSingle(),
+    offersDelivery
+      ? supabase.from("subscriptions").select("id, grams_per_day, weekdays, cancelled_on").eq("org_id", orgId).eq("pet_id", pet.id).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const f = food.data;
+  const grams = dailyGrams(pet, f, settings);
+  const band = pet.weight_g ? sizeBand(pet.weight_g, settings) : null;
+  const share = band === "small" ? settings.portion_small_bp : band === "medium" ? settings.portion_medium_bp : settings.portion_large_bp;
+  const portion =
+    f?.grams_by_hand && f.by_hand_note
+      ? fill(w.portionByHand, { grams: f.grams_by_hand, note: f.by_hand_note })
+      : grams && band && pet.weight_g
+        ? fill(w.portionWorked, { grams, band: m.bands[band], share: `${percentText(share)}%`, kg: formatKg(pet.weight_g, locale) })
+        : fill(w.noWeight, { pet: pet.name });
+  const due = f ? portionReviewDue(f, today) : false;
+
+  return (
+    <Section title={w.title}>
+      <div className="space-y-2 rounded-xl border border-rule bg-paper p-4">
+        <p className="text-lg font-bold">{portion}</p>
+        <p className="text-slate">
+          {w.plan}: {m.plans[f?.plan ?? "full"]}. {w.goal}: {m.goals[f?.goal ?? "keep"]}.
+        </p>
+        <p>
+          {w.boarding}:{" "}
+          {f?.boarder_food === "kibble" && f.kibble_brand
+            ? fill(w.kibbleLine, { brand: f.kibble_brand, grams: f.kibble_g_per_day ?? "" })
+            : m.boarderFood[f?.boarder_food ?? "kitchen"]}
+        </p>
+        <p className="text-slate">{f?.avoid ? `${w.avoid}: ${f.avoid}` : w.avoidNone}</p>
+        {f?.started_on ? <p className="text-slate">{fill(w.started, { date: formatDate(f.started_on, locale) })}</p> : null}
+        {due && f?.started_on ? (
+          <ActionForm action={markPortionReviewed} className="space-y-2">
+            <input type="hidden" name="petId" value={pet.id} />
+            <Notice tone="info">{fill(w.review, { date: formatDate(f.started_on, locale) })}</Notice>
+            <SubmitButton variant="secondary" pendingLabel={w.reviewing}>
+              {w.reviewed}
+            </SubmitButton>
+          </ActionForm>
+        ) : null}
+
+        {offersDelivery ? (
+          <div className="border-t border-rule pt-2">
+            <p className="font-semibold">{w.subscriptions}</p>
+            <ul>
+              {(subs.data ?? []).map((s) => (
+                <li key={s.id}>
+                  <Link href={`/app/food/subscriptions/${s.id}`} className="inline-flex min-h-12 items-center underline underline-offset-4">
+                    {s.grams_per_day} g, {weekdayList(m, s.weekdays)}
+                    {s.cancelled_on && s.cancelled_on <= today ? ` (${fill(m.food.cancelled, { date: formatDate(s.cancelled_on, locale) })})` : ""}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link href={`/app/food/new?pet=${pet.id}`} className={buttonStyles.secondary}>
+              {w.startSubscription}
+            </Link>
+          </div>
+        ) : null}
+
+        <details className="border-t border-rule pt-2">
+          <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.change}</summary>
+          <ActionForm action={savePetFood} className="mt-2 grid gap-4 sm:grid-cols-2">
+            <input type="hidden" name="petId" value={pet.id} />
+            <Field label={w.plan}>
+              <Select name="plan" defaultValue={f?.plan ?? "full"}>
+                <option value="full">{m.plans.full}</option>
+                <option value="topper">{m.plans.topper}</option>
+              </Select>
+            </Field>
+            <Field label={w.goal}>
+              <Select name="goal" defaultValue={f?.goal ?? "keep"}>
+                {(["lose", "keep", "gain"] as const).map((g) => (
+                  <option key={g} value={g}>
+                    {m.goals[g]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.boarding}>
+              <Select name="boarderFood" defaultValue={f?.boarder_food ?? "kitchen"}>
+                {(["kitchen", "kibble", "own"] as const).map((b) => (
+                  <option key={b} value={b}>
+                    {m.boarderFood[b]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={w.kibbleBrand}>
+              <Input name="kibbleBrand" maxLength={80} defaultValue={f?.kibble_brand ?? ""} />
+            </Field>
+            <Field label={w.kibbleGrams}>
+              <Input name="kibbleGrams" inputMode="numeric" defaultValue={f?.kibble_g_per_day ?? ""} />
+            </Field>
+            <Field label={w.startedField}>
+              <Input name="startedOn" type="date" defaultValue={f?.started_on ?? ""} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label={w.avoidField}>
+                <Input name="avoid" maxLength={300} defaultValue={f?.avoid ?? ""} />
+              </Field>
+            </div>
+            {canManage ? (
+              <>
+                <Field label={w.byHand} hint={w.byHandHint}>
+                  <Input name="gramsByHand" inputMode="numeric" defaultValue={f?.grams_by_hand ?? ""} />
+                </Field>
+                <Field label={w.byHandNote}>
+                  <Input name="byHandNote" maxLength={300} defaultValue={f?.by_hand_note ?? ""} />
+                </Field>
+              </>
+            ) : null}
+            <div className="sm:col-span-2">
+              <SubmitButton pendingLabel={m.common.saving}>{m.common.save}</SubmitButton>
+            </div>
+          </ActionForm>
+        </details>
       </div>
     </Section>
   );

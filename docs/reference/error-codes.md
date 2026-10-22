@@ -23,12 +23,18 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB100 to WB109 | Booking requests from parents |
 | WB110 to WB119 | Day boarding packs |
 | WB120 to WB129 | Refunds |
+| WB130 to WB139 | Stock |
+| WB140 to WB149 | Recipes and portions |
+| WB150 to WB159 | Food subscriptions, deliveries and their bills |
+| WB160 to WB169 | Batches and packing |
+| WB170 to WB179 | Delivery runs, riders and problems |
+| WB180 to WB189 | Food orders from the website and parents' links |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
 | `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
-| `WB003` | invoice not found<br>submission not found<br>parent not found | `20261008000500_billing.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
+| `WB003` | invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>submission not found<br>parent not found<br>that order was not found | `20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
 | `WB006` | turn on two-step sign-in first | `20261008000100_foundation.sql` |
@@ -45,7 +51,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB019` | this has a stay in the kennel now or still to come. Check it out or cancel it first.<br>this pet's parent is hidden. Show the parent again first. | `20261008000300_kennels_and_bookings.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
-| `WB022` | only an owner or manager can change the price or the kind of stay | `20261008000300_kennels_and_bookings.sql` |
+| `WB022` | only an owner or manager can change the price or the kind of stay<br>only an owner or manager can change a price | `20261008000300_kennels_and_bookings.sql`<br>`20261008000550_kitchen.sql` |
 | `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
 | `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
 | `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql` |
@@ -86,6 +92,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB072` | this parent has stays still to come. Cancel them first. | `20261008001100_privacy.sql` |
 | `WB073` | this parent's details have already been erased | `20261008001100_privacy.sql` |
 | `WB074` | only an owner can erase a parent's details | `20261008001100_privacy.sql` |
+| `WB075` | this parent has food deliveries still to come. Cancel them first. | `20261008001100_privacy.sql` |
 | `WB080` | only an owner or manager can change what an incident says | `20261008000400_daily_care.sql` |
 | `WB081` | only an owner can take a photo off an update | `20261008000400_daily_care.sql` |
 | `WB090` | a credit note is made against an issued bill | `20261008000500_billing.sql` |
@@ -107,3 +114,34 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB120` | a refund is made against a bill or a stay | `20261008000500_billing.sql` |
 | `WB121` | a refund can only give back what was paid over what the bill now comes to. Make a credit note first if the stay costs less. | `20261008000500_billing.sql` |
 | `WB122` | a refund can only give back the advance paid for this stay | `20261008000500_billing.sql` |
+| `WB130` | there is not enough % in stock (% left). Count it first if the shelf says otherwise. | `20261008000550_kitchen.sql` |
+| `WB131` | only an owner or manager records what was bought | `20261008000550_kitchen.sql` |
+| `WB140` | % must never be in a recipe<br>% must never be in a recipe, and a recipe uses it. Make a new version without it first. | `20261008000550_kitchen.sql` |
+| `WB141` | a recipe version never changes. Make a new version instead. | `20261008000550_kitchen.sql` |
+| `WB142` | only an owner or manager changes a recipe | `20261008000550_kitchen.sql` |
+| `WB143` | a recipe needs at least one ingredient | `20261008000550_kitchen.sql` |
+| `WB144` | this recipe has been cooked. Retire it instead. | `20261008000550_kitchen.sql` |
+| `WB145` | costs are for owners and managers | `20261008000550_kitchen.sql` |
+| `WB146` | only an owner or manager sets a portion by hand | `20261008000550_kitchen.sql` |
+| `WB150` | that food is not sold that way | `20261008000550_kitchen.sql` |
+| `WB151` | this delivery is past its cut-off and is being cooked. A manager can cancel it with a reason. | `20261008000550_kitchen.sql` |
+| `WB152` | this delivery is on a bill. Cancel it instead. | `20261008000550_kitchen.sql` |
+| `WB153` | a cancelled delivery stays cancelled. Make a new one.<br>this delivery has been to the door. Report a problem instead. | `20261008000550_kitchen.sql` |
+| `WB154` | bill a subscription's deliveries with the subscription, and an order of this parent on its own | `20261008000550_kitchen.sql` |
+| `WB155` | some of these days are on another bill of this subscription | `20261008000550_kitchen.sql` |
+| `WB160` | this delivery is not that batch's recipe | `20261008000550_kitchen.sql` |
+| `WB161` | batch % is used by %, and this delivery goes on % | `20261008000550_kitchen.sql` |
+| `WB170` | the rider must be working at this kennel | `20261008000550_kitchen.sql` |
+| `WB171` | a delivery goes on a run of its own day and slot | `20261008000550_kitchen.sql` |
+| `WB172` | this run is not today's | `20261008000550_kitchen.sql` |
+| `WB173` | a rider marks a stop on the way, delivered, nobody home or refused | `20261008000550_kitchen.sql` |
+| `WB174` | a problem is reported within % hours of the delivery | `20261008000550_kitchen.sql` |
+| `WB180` | this kennel is not taking food orders here | `20261008000600_intake_and_public_pages.sql` |
+| `WB181` | the order could not be read | `20261008000600_intake_and_public_pages.sql` |
+| `WB182` | fill in your name, phone, dog's name, address and PIN code, and agree to the notice | `20261008000600_intake_and_public_pages.sql` |
+| `WB183` | give the dog's weight in kilos | `20261008000600_intake_and_public_pages.sql` |
+| `WB184` | we already have your order. The kennel will be in touch. | `20261008000600_intake_and_public_pages.sql` |
+| `WB185` | choose the delivery days and the grams a day | `20261008000600_intake_and_public_pages.sql` |
+| `WB186` | choose one of your food subscriptions | `20261008000600_intake_and_public_pages.sql` |
+| `WB187` | those dates or amounts cannot be asked for. Check them and try again. | `20261008000600_intake_and_public_pages.sql` |
+| `WB188` | this order has already been dealt with | `20261008000600_intake_and_public_pages.sql` |

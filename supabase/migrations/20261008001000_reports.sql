@@ -211,13 +211,137 @@ $$;
 comment on function public.report_extras(uuid, date, date) is
   'The extras sold on stays that start in the period, biggest first (at most 20): how many stays had each, how many in all, and their value at the price charged, before discount and tax. Extras from the price list are grouped by its current name; one-off items by their description. Owners and managers only.';
 
+-- ---------------------------------------------------------------------------
+-- Food (M33)
+-- ---------------------------------------------------------------------------
+
+create function public.report_food(p_org uuid, p_from date, p_to date)
+returns table (
+  month date,
+  active_subscriptions integer,
+  subscriptions_started integer,
+  subscriptions_ended integer,
+  trials integer,
+  trials_subscribed integer,
+  deliveries integer,
+  kilos_delivered numeric,
+  food_value_minor bigint,
+  kilos_cooked numeric,
+  cooking_cost_minor bigint,
+  wasted_g bigint,
+  wasted_cost_minor bigint
+)
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  perform public.check_report_access(p_org, p_from, p_to);
+  return query
+  with months as (
+    select greatest(m::date, p_from) as m_from,
+           least((m + interval '1 month' - interval '1 day')::date, p_to) as m_to,
+           m::date as m
+    from generate_series(date_trunc('month', p_from::timestamp), date_trunc('month', p_to::timestamp), interval '1 month') m
+  ),
+  out_deliveries as (
+    select d.* from public.deliveries d
+    where d.org_id = p_org and d.status = 'delivered' and d.delivery_date between p_from and p_to
+  ),
+  trial_deliveries as (
+    select d.* from out_deliveries d where d.kind = 'trial'
+  )
+  select
+    mo.m,
+    (select count(*)::integer from public.subscriptions s
+     where s.org_id = p_org and s.starts_on <= mo.m_to and (s.cancelled_on is null or s.cancelled_on > mo.m_to)),
+    (select count(*)::integer from public.subscriptions s where s.org_id = p_org and s.starts_on between mo.m_from and mo.m_to),
+    (select count(*)::integer from public.subscriptions s where s.org_id = p_org and s.cancelled_on between mo.m_from and mo.m_to),
+    (select count(*)::integer from trial_deliveries t where t.delivery_date between mo.m_from and mo.m_to),
+    (select count(*)::integer from trial_deliveries t
+     where t.delivery_date between mo.m_from and mo.m_to
+       and exists (select 1 from public.subscriptions s where s.org_id = p_org and s.client_id = t.client_id
+                   and greatest(s.starts_on, (s.created_at at time zone (select o.time_zone from public.organizations o where o.id = p_org))::date) >= t.delivery_date)),
+    (select count(*)::integer from out_deliveries d where d.delivery_date between mo.m_from and mo.m_to),
+    (select coalesce(sum(d.grams), 0) / 1000.0 from out_deliveries d where d.delivery_date between mo.m_from and mo.m_to)::numeric(12, 2),
+    (select coalesce(sum(d.price_minor + d.delivery_charge_minor), 0)::bigint from out_deliveries d where d.delivery_date between mo.m_from and mo.m_to),
+    (select coalesce(sum(b.grams), 0) / 1000.0 from public.batches b where b.org_id = p_org and b.cooked_on between mo.m_from and mo.m_to)::numeric(12, 2),
+    (select coalesce(sum(public.batch_cost(p_org, b.id)), 0)::bigint from public.batches b where b.org_id = p_org and b.cooked_on between mo.m_from and mo.m_to),
+    (select coalesce(-sum(sm.quantity), 0)::bigint from public.stock_moves sm
+     join public.stock_items i on i.org_id = sm.org_id and i.id = sm.item_id
+     where sm.org_id = p_org and sm.kind = 'waste' and i.unit = 'g' and sm.happened_on between mo.m_from and mo.m_to),
+    (select coalesce(round(sum(-sm.quantity * (
+        select c.cost_minor::numeric / pm.quantity
+        from public.stock_moves pm
+        join public.stock_costs c on c.org_id = pm.org_id and c.move_id = pm.id
+        where pm.org_id = sm.org_id and pm.item_id = sm.item_id and pm.kind = 'purchase' and pm.happened_on <= sm.happened_on
+        order by pm.happened_on desc, pm.created_at desc limit 1))), 0)::bigint
+     from public.stock_moves sm
+     where sm.org_id = p_org and sm.kind = 'waste' and sm.happened_on between mo.m_from and mo.m_to)
+  from months mo
+  order by mo.m;
+end;
+$$;
+comment on function public.report_food(uuid, date, date) is
+  'For each month of the period: subscriptions active at its end, started and ended in it; trials handed over and how many of those parents then subscribed; deliveries handed over, their kilos and value (food and delivery); kilos cooked and what the batches cost (from their own versions and that day''s prices); grams of stock thrown away and what it cost. Owners and managers only.';
+
+create function public.report_food_riders(p_org uuid, p_from date, p_to date)
+returns table (day date, rider_id uuid, rider_name text, delivered integer, not_home integer, refused integer)
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  perform public.check_report_access(p_org, p_from, p_to);
+  return query
+  select r.run_date, r.rider_id, coalesce(m.display_name, ''),
+         count(*) filter (where d.status = 'delivered')::integer,
+         count(*) filter (where d.status = 'not_home')::integer,
+         count(*) filter (where d.status = 'refused')::integer
+  from public.delivery_runs r
+  join public.deliveries d on d.org_id = r.org_id and d.run_id = r.id
+  left join public.memberships m on m.org_id = r.org_id and m.user_id = r.rider_id
+  where r.org_id = p_org and r.run_date between p_from and p_to
+  group by r.run_date, r.rider_id, m.display_name
+  order by r.run_date, 3;
+end;
+$$;
+comment on function public.report_food_riders(uuid, date, date) is
+  'Deliveries per rider per day in the period: handed over, nobody home, refused. Owners and managers only.';
+
+create function public.report_food_sources(p_org uuid, p_from date, p_to date)
+returns table (source public.customer_source, started integer, still_active integer)
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  perform public.check_report_access(p_org, p_from, p_to);
+  return query
+  select s.source, count(*)::integer,
+         count(*) filter (where s.cancelled_on is null or s.cancelled_on > public.org_today(p_org))::integer
+  from public.subscriptions s
+  where s.org_id = p_org and s.starts_on between p_from and p_to
+  group by s.source
+  order by 2 desc, 1;
+end;
+$$;
+comment on function public.report_food_sources(uuid, date, date) is
+  'Where the food customers who started in the period came from (a boarding parent, a referral, the website, elsewhere), and how many are still subscribed. Owners and managers only.';
+
 revoke all on function public.check_report_access(uuid, date, date) from public, anon;
 revoke all on function public.report_occupancy(uuid, date, date) from public, anon;
 revoke all on function public.report_money(uuid, date, date) from public, anon;
 revoke all on function public.report_tax(uuid, date, date) from public, anon;
 revoke all on function public.report_extras(uuid, date, date) from public, anon;
+revoke all on function public.report_food(uuid, date, date) from public, anon;
+revoke all on function public.report_food_riders(uuid, date, date) from public, anon;
+revoke all on function public.report_food_sources(uuid, date, date) from public, anon;
 grant execute on function public.check_report_access(uuid, date, date) to authenticated;
 grant execute on function public.report_occupancy(uuid, date, date) to authenticated;
 grant execute on function public.report_money(uuid, date, date) to authenticated;
 grant execute on function public.report_tax(uuid, date, date) to authenticated;
 grant execute on function public.report_extras(uuid, date, date) to authenticated;
+grant execute on function public.report_food(uuid, date, date) to authenticated;
+grant execute on function public.report_food_riders(uuid, date, date) to authenticated;
+grant execute on function public.report_food_sources(uuid, date, date) to authenticated;

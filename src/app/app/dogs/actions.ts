@@ -346,3 +346,71 @@ export async function removeWeight(_state: FormState, form: FormData): Promise<F
   revalidatePath("/app", "layout");
   return { ok: t.m.weights.removed };
 }
+
+/**
+ * What a pet eats (M28): its plan and goal for the kitchen's food, what it
+ * eats while boarding, foods to avoid, and grams set by hand, which only an
+ * owner or manager may set, with a note (the database insists: WB146).
+ */
+export async function savePetFood(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.petFood.errors;
+  const pet = z.uuid().safeParse(form.get("petId"));
+  if (!pet.success) return { error: t.m.errors.petNotFound };
+  const plan = z.enum(["full", "topper"]).safeParse(form.get("plan"));
+  const goal = z.enum(["lose", "keep", "gain"]).safeParse(form.get("goal"));
+  const boarder = z.enum(["kitchen", "kibble", "own"]).safeParse(form.get("boarderFood"));
+  if (!plan.success || !goal.success || !boarder.success) return { error: t.m.errors.missing };
+  const kibbleBrand = text(form, "kibbleBrand");
+  const kibbleText = text(form, "kibbleGrams");
+  const kibbleGrams = kibbleText === null ? null : Number(kibbleText);
+  if (boarder.data === "kibble" && !kibbleBrand) return { error: e.kibble };
+  if (kibbleGrams !== null && (!Number.isInteger(kibbleGrams) || kibbleGrams < 10 || kibbleGrams > 5000)) return { error: e.grams };
+  const startedOn = text(form, "startedOn");
+  if (startedOn !== null && !isISODate(startedOn)) return { error: e.date };
+
+  const supabase = await createClient();
+  const current = await supabase.from("pet_food").select("grams_by_hand, by_hand_note").eq("org_id", org.id).eq("pet_id", pet.data).maybeSingle();
+  let byHand = current.data?.grams_by_hand ?? null;
+  let note = current.data?.by_hand_note ?? null;
+  if (canManage) {
+    const gramsText = text(form, "gramsByHand");
+    byHand = gramsText === null ? null : Number(gramsText);
+    if (byHand !== null && (!Number.isInteger(byHand) || byHand < 10 || byHand > 5000)) return { error: e.grams };
+    note = byHand === null ? null : (text(form, "byHandNote")?.slice(0, 300) ?? null);
+    if (byHand !== null && !note) return { error: e.note };
+  }
+  const { error } = await supabase.from("pet_food").upsert(
+    {
+      org_id: org.id,
+      pet_id: pet.data,
+      plan: plan.data,
+      goal: goal.data,
+      boarder_food: boarder.data,
+      kibble_brand: boarder.data === "kibble" ? kibbleBrand!.slice(0, 80) : null,
+      kibble_g_per_day: boarder.data === "kibble" ? kibbleGrams : null,
+      avoid: text(form, "avoid")?.slice(0, 300) ?? null,
+      started_on: startedOn,
+      grams_by_hand: byHand,
+      by_hand_note: note,
+    },
+    { onConflict: "org_id,pet_id" },
+  );
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.petFood.saved };
+}
+
+/** The portion of a pet new to the kitchen's food has been looked at (Today stops asking). Any member. */
+export async function markPortionReviewed(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const pet = z.uuid().safeParse(form.get("petId"));
+  if (!pet.success) return { error: t.m.errors.petNotFound };
+  const supabase = await createClient();
+  const { error } = await supabase.from("pet_food").update({ reviewed_on: todayIn(org.time_zone) }).eq("org_id", org.id).eq("pet_id", pet.data);
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: t.m.petFood.reviewedDone };
+}

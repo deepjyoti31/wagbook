@@ -518,18 +518,18 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M26. Stock
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H1 in `02`).
 
 **Build**
 
-1. Items kept in stock: name, unit (grams, millilitres or pieces), kind (meat, organ, egg, grain, vegetable, oil,
+1. [x] Items kept in stock: name, unit (grams, millilitres or pieces), kind (meat, organ, egg, grain, vegetable, oil,
    supplement, packaging, fuel, grooming product, medicine), usual supplier, a low level.
-2. Suppliers: name, phone, what they supply.
-3. Stock in: a purchase with date, supplier, quantity, cost, use-by date, the supplier's bill number and a photo of it.
+2. [x] Suppliers: name, phone, what they supply.
+3. [x] Stock in: a purchase with date, supplier, quantity, cost, use-by date, the supplier's bill number and a photo of it.
    Saving a purchase can save it as an expense (E4) in the same step.
-4. Stock out: used in cooking (written by M30, not by hand), thrown away with a reason (spoiled, past its date,
+4. [x] Stock out: used in cooking (written by M30, not by hand), thrown away with a reason (spoiled, past its date,
    dropped), and a stock take that sets the counted quantity and records the difference.
-5. The stock page: what is in, what is low, what passes its use-by date in the next two days, oldest first.
+5. [x] The stock page: what is in, what is low, what passes its use-by date in the next two days, oldest first.
 
 **Rules**
 
@@ -545,18 +545,18 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M27. Recipes
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H2 in `02`).
 
 **Build**
 
-1. A recipe: name, what it is good for (parents read this), each stock item with its raw quantity per kilo of cooked
+1. [x] A recipe: name, what it is good for (parents read this), each stock item with its raw quantity per kilo of cooked
    food, the cooked yield, kcal and protein per kilo, who signed it off (a veterinary nutritionist) and when, and when
    it was last lab tested.
-2. Versions: changing a recipe makes a new version. A batch and a delivery keep the version they were made from.
-3. A rotation: recipes in order, one per delivery, repeating (by default every two weeks).
-4. Items marked "never in a recipe" (onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar): the database
+2. [x] Versions: changing a recipe makes a new version. A batch and a delivery keep the version they were made from.
+3. [x] A rotation: recipes in order, one per delivery, repeating (by default every two weeks).
+4. [x] Items marked "never in a recipe" (onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar): the database
    refuses a recipe that uses one.
-5. Cost per kilo from the latest purchase prices, for owners and managers.
+5. [x] Cost per kilo from the latest purchase prices, for owners and managers.
 
 **Rules**
 
@@ -570,18 +570,18 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M28. Food products and portions
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H3 in `02`).
 
 **Build**
 
-1. Food in the rate card: a trial (fixed price and quantity, once per pet), subscription food per kilo, one-off orders
+1. [x] Food in the rate card: a trial (fixed price and quantity, once per pet), subscription food per kilo, one-off orders
    per kilo, and made-to-order items per piece (a birthday cake), each with its own tax rate and code (D35).
-2. Plans: full meal, or topper (a share of the day's food, a third by default).
-3. Portions: grams a day from the pet's latest weight, its size band and a goal (lose, keep, gain), using the kennel's
+2. [x] Plans: full meal, or topper (a share of the day's food, a third by default).
+3. [x] Portions: grams a day from the pet's latest weight, its size band and a goal (lose, keep, gain), using the kennel's
    own percentages (by default 3%, 2.5% and 2% of body weight for small, medium and large dogs). A manager may set the
    grams by hand with a note. Today lists portions to review a week after a pet starts.
-4. On the pet page: the plan, grams a day, foods to avoid, and the weight trend.
-5. What a boarder eats (the owner's answer, 21 October 2026): fresh food from the kitchen by default, or a kibble the
+4. [x] On the pet page: the plan, grams a day, foods to avoid, and the weight trend.
+5. [x] What a boarder eats (the owner's answer, 21 October 2026): fresh food from the kitchen by default, or a kibble the
    parent names (brand, and grams a day), or food the parent sends. Chosen per pet; the care round and the cook plan
    follow it.
 
@@ -599,20 +599,20 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M29. Subscriptions and orders
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H4 in `02`).
 
 **Build**
 
-1. A subscription: parent, pets, plan, grams a day, delivery days (two a week by default), a time slot, an address,
+1. [x] A subscription: parent, pets, plan, grams a day, delivery days (two a week by default), a time slot, an address,
    a start date, and how it is paid: weekly or monthly in advance (the owner's answer, 21 October 2026). The owner
    sets a discount for monthly payment, as a percentage (`_bp`), in Settings.
-2. Deliveries made ahead from it: each covers the days until the next, rounded up to whole packs (pack size a
+2. [x] Deliveries made ahead from it: each covers the days until the next, rounded up to whole packs (pack size a
    setting, 250 g by default), with the recipe the rotation gives it.
-3. Pause (between two dates, or until resumed), change the grams, plan, days or address, or cancel. Changes close a
+3. [x] Pause (between two dates, or until resumed), change the grams, plan, days or address, or cancel. Changes close a
    set time before a delivery (24 hours by default); after that it is cooked.
-4. One-off orders: a trial, food by the kilo, or a made-to-order item, for a date and address.
-5. Today lists trials delivered a few days ago, to ask the parent about a subscription.
-6. Bills: a subscription's deliveries billed ahead for the week (or the month), as a series is (D41). A delivery
+4. [x] One-off orders: a trial, food by the kilo, or a made-to-order item, for a date and address.
+5. [x] Today lists trials delivered a few days ago, to ask the parent about a subscription.
+6. [x] Bills: a subscription's deliveries billed ahead for the week (or the month), as a series is (D41). A delivery
    cancelled before it is cooked is credited (credit notes, D34). Unpaid weeks join the reminders (D39).
 
 **Rules**
@@ -630,17 +630,17 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M30. The cook plan and batches
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H5 in `02`).
 
 **Build**
 
-1. What to cook: kilos of each recipe for tomorrow's deliveries and for boarders on kitchen food (each boarder's grams
+1. [x] What to cook: kilos of each recipe for tomorrow's deliveries and for boarders on kitchen food (each boarder's grams
    a day), plus a margin (a setting).
-2. The shopping list: what those recipes need less what is in stock, by supplier, to send on WhatsApp.
-3. A batch: recipe version, kilos, packs, date, cook, a batch number, and a use-by date (a setting per recipe).
+2. [x] The shopping list: what those recipes need less what is in stock, by supplier, to send on WhatsApp.
+3. [x] A batch: recipe version, kilos, packs, date, cook, a batch number, and a use-by date (a setting per recipe).
    Recording it takes its ingredients out of stock.
-4. Labels for each pack: pet, recipe, grams, batch, cooked on, use by, how to store it. A4 sheets to print.
-5. Packing: each delivery ticked packed, with the batch it was packed from.
+4. [x] Labels for each pack: pet, recipe, grams, batch, cooked on, use by, how to store it. A4 sheets to print.
+5. [x] Packing: each delivery ticked packed, with the batch it was packed from.
 
 **Rules**
 
@@ -656,20 +656,21 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M31. Delivery runs
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H6, D45 in `02`).
 
 **Build**
 
-1. The day's run: one rider's deliveries for a slot, one after another (the owner's answer, 21 October 2026: a rider
+1. [x] The day's run: one rider's deliveries for a slot, one after another (the owner's answer, 21 October 2026: a rider
    sees their own run and nothing else), by area, in an order staff can change, a map link for each stop, and the whole
    route opened in Google Maps.
-2. A rider sees only their run: name, address, phone, packs and the note for the door. No prices, no pets' medical
+2. [x] A rider sees only their run: name, address, phone, packs and the note for the door. No prices, no pets' medical
    notes, no other parents.
-3. At the door: delivered (with a photo), nobody home, or refused. "On the way" as a WhatsApp link from the rider's
+3. [x] At the door: delivered (with a photo), nobody home, or refused. "On the way" as a WhatsApp link from the rider's
    phone.
-4. Problems: a parent reports a pack damaged, late or wrong (with a photo, within 24 hours by default). Staff replace it
+4. [x] Problems: a parent reports a pack damaged, late or wrong (with a photo, within 24 hours by default). Staff replace it
    (a new delivery at no charge) or refund it (a credit note and a refund).
-5. Pick-ups and drops of boarders (M39) join the same run.
+5. [ ] Pick-ups and drops of boarders (M39) join the same run. Waits for M39; runs already hold any delivery of the
+   day and slot.
 
 **Rules**
 
@@ -684,17 +685,17 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M32. Ordering food from the kennel's website
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H7 in `02`).
 
 **Build**
 
-1. A public order page, with a link a kennel can put on its own website: trial or subscription, the dog's name and
+1. [x] A public order page, with a link a kennel can put on its own website: trial or subscription, the dog's name and
    weight, the portion and price worked out, delivery days and slot, address and pincode.
-2. A pincode not served: the details are kept as "waiting for your area" and the parent is told nothing was charged.
+2. [x] A pincode not served: the details are kept as "waiting for your area" and the parent is told nothing was charged.
    Staff see how many wait in each pincode.
-3. Payment: the UPI QR with the amount, then "I have paid". The order lands as a request; staff confirm once the money
+3. [x] Payment: the UPI QR with the amount, then "I have paid". The order lands as a request; staff confirm once the money
    has arrived, which makes or matches the parent (by phone), the pet and the subscription.
-4. A known parent pauses, skips or orders more from their own link (as F0 does for stays).
+4. [x] A known parent pauses, skips or orders more from their own link (as F0 does for stays).
 
 **Rules**
 
@@ -709,14 +710,14 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M33. Food reports
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (H8 in `02`).
 
 **Build**
 
-1. Active subscriptions and trials, kilos a day, deliveries per rider per day, trials that became subscriptions,
+1. [x] Active subscriptions and trials, kilos a day, deliveries per rider per day, trials that became subscriptions,
    subscriptions ended each month, food revenue and cost per kilo (from batches and purchases), waste, and where
    customers came from (a boarding parent, a referral, the website).
-2. CSV downloads, as in M7.
+2. [x] CSV downloads, as in M7.
 
 **Rules**
 

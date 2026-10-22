@@ -206,6 +206,12 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         <p className="mt-2 text-sm text-slate">{fill(r.extrasNote, { month: name })}</p>
       </Section>
 
+      {org.offers_kitchen ? (
+        <Suspense fallback={<Loading />}>
+          <FoodReport orgId={org.id} currency={org.currency} first={first} last={last} yearStart={yearStart} />
+        </Suspense>
+      ) : null}
+
       {gst ? (
         <Section title={r.gstr1.title}>
           <p className="mb-3 text-slate">{r.gstr1.about}</p>
@@ -253,5 +259,80 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         </Link>
       </p>
     </>
+  );
+}
+
+/** The kitchen and food for the month (M33): subscriptions, trials, deliveries, cooking, cost and waste, riders, and where customers came from. */
+async function FoodReport({ orgId, currency, first, last, yearStart }: { orgId: string; currency: string; first: string; last: string; yearStart: string }) {
+  const { m, locale } = await getAppI18n();
+  const f = m.foodReports;
+  const supabase = await createClient();
+  const args = { p_org: orgId, p_from: first, p_to: last };
+  const [food, riders, sources] = await Promise.all([
+    supabase.rpc("report_food", args),
+    supabase.rpc("report_food_riders", args),
+    supabase.rpc("report_food_sources", args),
+  ]);
+  if (food.error || riders.error || sources.error) throw new Error("Could not add up the food reports.");
+  const x = food.data[0];
+  const fmt = (minor: number) => formatMoney(minor, { currency, locale, trimZeros: true });
+  const kg = (n: number | string) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(Number(n));
+  const days = Math.max(1, Math.round((Date.parse(last) - Date.parse(first)) / 86_400_000) + 1);
+  const cooked = Number(x?.kilos_cooked ?? 0);
+  return (
+    <Section title={f.title}>
+      {x ? (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Figure label={f.active}>{x.active_subscriptions}</Figure>
+          <Figure label={f.started}>{x.subscriptions_started}</Figure>
+          <Figure label={f.ended}>{x.subscriptions_ended}</Figure>
+          <Figure label={f.trials} hint={`${f.trialsSubscribed}: ${x.trials_subscribed}`}>
+            {x.trials}
+          </Figure>
+          <Figure label={f.deliveries}>{x.deliveries}</Figure>
+          <Figure label={f.kgDelivered} hint={`${f.kgADay}: ${kg(Number(x.kilos_delivered) / days)}`}>
+            {kg(x.kilos_delivered)}
+          </Figure>
+          <Figure label={f.value}>{fmt(x.food_value_minor)}</Figure>
+          <Figure label={f.kgCooked}>{kg(cooked)}</Figure>
+          <Figure label={f.cost} hint={cooked > 0 ? `${f.costPerKg}: ${fmt(Math.round(x.cooking_cost_minor / cooked))}` : undefined}>
+            {fmt(x.cooking_cost_minor)}
+          </Figure>
+          <Figure label={f.wasted} hint={`${f.wastedCost}: ${fmt(x.wasted_cost_minor)}`}>
+            {kg(x.wasted_g / 1000)} kg
+          </Figure>
+        </div>
+      ) : null}
+      <h3 className="mb-1 font-bold">{f.riders}</h3>
+      {riders.data.length === 0 ? (
+        <p className="mb-4 text-slate">{f.ridersNone}</p>
+      ) : (
+        <ul className="mb-4 space-y-1">
+          {riders.data.map((r) => (
+            <li key={`${r.day}-${r.rider_id}`}>
+              {fill(f.riderLine, { date: formatDate(r.day, locale), rider: r.rider_name, delivered: r.delivered, notHome: r.not_home, refused: r.refused })}
+            </li>
+          ))}
+        </ul>
+      )}
+      <h3 className="mb-1 font-bold">{f.sources}</h3>
+      {sources.data.length === 0 ? (
+        <p className="mb-4 text-slate">{f.sourcesNone}</p>
+      ) : (
+        <ul className="mb-4 space-y-1">
+          {sources.data.map((s) => (
+            <li key={s.source}>{fill(f.sourceLine, { source: m.sources[s.source], started: s.started, active: s.still_active })}</li>
+          ))}
+        </ul>
+      )}
+      <p className="flex flex-col gap-1">
+        <a href={`/app/more/reports/food?what=months&from=${yearStart}&to=${last}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+          {f.download}
+        </a>
+        <a href={`/app/more/reports/food?what=riders&from=${first}&to=${last}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+          {f.downloadRiders}
+        </a>
+      </p>
+    </Section>
   );
 }

@@ -36,6 +36,8 @@ export const RATE_RULES: RateRule[] = [
   { name: "join", matches: (p) => p.startsWith("/join/"), limit: 20, windowSeconds: 10 * 60 },
   // A parent asking for a stay through their own booking link.
   { name: "requests", matches: (p) => p.startsWith("/b/"), limit: 10, windowSeconds: 10 * 60 },
+  // An order from the kennel's food order page, and saying it was paid (M32): as the intake form.
+  { name: "food", matches: (p) => p.startsWith("/f/"), limit: 10, windowSeconds: 10 * 60 },
 ];
 
 export function rateRuleFor(path: string): RateRule | null {
@@ -49,12 +51,13 @@ const MB = 1024 * 1024;
 
 /**
  * The largest body a post to this path may have. Photos, certificates and
- * receipts go to signed-in pages and to the intake form (one certificate per
- * pet); the storage bucket's own limit is 10 MB a file. Everything else is
+ * receipts go to signed-in pages, a rider's page and the intake form (one
+ * certificate per pet); the storage bucket's own limit is 10 MB a file. Everything else is
  * text.
  */
 export function bodyLimitFor(path: string): number {
-  if (path === "/app" || path.startsWith("/app/") || path.startsWith("/i/")) return 12 * MB;
+  // A rider's photo at the door goes from /rider (M31).
+  if (path === "/app" || path.startsWith("/app/") || path.startsWith("/i/") || path === "/rider") return 12 * MB;
   return 1 * MB;
 }
 

@@ -17,6 +17,31 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Skills | `memberships.skills` | What a person can be given to do: cook, groomer, trainer, swim supervisor, rider. Never decides what they see. |
 | Weight | `pet_weights`, `pets.weight_g` | A pet weighed on a day, in kg on screen and grams in the database. |
 | Body condition | `pet_weights.body_condition` | A score from 1 (very thin) to 9 (very heavy). |
+| Rider | `member_role = 'rider'` | Delivers food on a run; sees only their own run for the day (D45). |
+
+## The kitchen and food
+
+| On screen | In code | Meaning |
+| --- | --- | --- |
+| Stock | `stock_items`, `stock_moves`, `stock_levels` | What the kitchen keeps, and every movement in or out. Never edited. |
+| Bought in | `stock_moves.kind = 'purchase'`, `stock_costs` | A purchase, with what it cost (owners and managers only). |
+| Thrown away | `kind = 'waste'` | Stock written off with a reason. |
+| Stock take | `kind = 'count'` | Counting the shelf; the database records the difference. |
+| Supplier | `suppliers` | Who the kennel buys from. |
+| Recipe, version | `recipes`, `recipe_versions`, `recipe_ingredients` | A recipe, and what went into it at one time. A version never changes. |
+| Rotation | `recipes.rotation_position` | The order recipes are given in, one per delivery. |
+| Never in a recipe | `stock_items.never_in_recipe` | Food a dog must never eat. |
+| Food prices | `food_products` | A trial, subscription food and one-off food per kilo, items made to order. |
+| Portion | `portionGrams()`, `pet_food` | Grams of food a day, from the latest weight; or set by hand by a manager. |
+| Topper | `food_plan = 'topper'` | Food on top of what a dog already eats, a third of a day's portion by default. |
+| Subscription | `subscriptions` | Food delivered to a pet's home on set days. |
+| Delivery | `deliveries` | Food going to a home on a day, in whole packs. |
+| Cut-off | `delivery_cutoff()` | When changes to a delivery close: 24 hours before its slot by default. |
+| Batch | `batches` | Food cooked at one time from one recipe version, numbered by its day. |
+| Cook plan | `cookPlan()` | What to cook for a day. |
+| Run | `delivery_runs` | One rider's deliveries for a slot of a day. |
+| Problem | `delivery_problems` | A delivery a parent said was damaged, late or wrong. |
+| Food order | `food_orders` | An order from the food order page, or a parent's change from their own link. |
 
 ## Places
 

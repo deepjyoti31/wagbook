@@ -1492,3 +1492,336 @@ test("a kennel with a kitchen delivers: areas served, a parent's address, weight
   await expect(page.getByText(en.addresses.byManagers)).toBeVisible();
   await expect(page.getByText("We deliver here: Indiranagar, ₹50 a delivery")).toBeVisible();
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1: the kitchen and food (M26 to M33). The kitchen and delivery were
+// switched on above, with Indiranagar (560038) served and Priya's home there.
+// ---------------------------------------------------------------------------
+
+const narrow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+test("a manager sets up the kitchen: stock, a supplier, a recipe in the rotation and food prices", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.kitchen.title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.kitchen.title })).toBeVisible();
+  await page.getByRole("link", { name: en.kitchen.links.stock }).click();
+
+  const addItem = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.addItemButton }) });
+  for (const [name, kind, never] of [["Chicken", "meat", false], ["Rice", "grain", false], ["Onion", "vegetable", true]] as const) {
+    await addItem.getByLabel(en.stock.itemName).fill(name);
+    await addItem.getByLabel(en.stock.kind).selectOption(kind);
+    if (never) await addItem.getByLabel(en.stock.never).check();
+    await addItem.getByRole("button", { name: en.stock.addItemButton }).click();
+    await expect(page.getByText(`${name} added.`)).toBeVisible();
+  }
+  const supplier = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.addSupplierButton }) });
+  await supplier.getByLabel(en.stock.supplierName).fill("Ali Meats");
+  await supplier.getByLabel(en.stock.supplierPhone).fill("98450 11111");
+  await supplier.getByRole("button", { name: en.stock.addSupplierButton }).click();
+  await expect(page.getByText("Ali Meats added.")).toBeVisible();
+
+  // Bought in, with the cost, and written down as an expense in the same step.
+  const buy = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.recordBuy }) });
+  for (const [item, quantity, cost] of [["Chicken (grams)", "20 kg", "4400"], ["Rice (grams)", "15 kg", "900"]]) {
+    await buy.locator("select[name=itemId]").selectOption({ label: item });
+    await buy.getByLabel(en.stock.quantity).fill(quantity);
+    await buy.getByLabel(en.stock.cost).fill(cost);
+    await buy.getByRole("button", { name: en.stock.recordBuy }).click();
+    await expect(page.getByText(new RegExp(`of ${item.split(" ")[0]} recorded`))).toBeVisible();
+  }
+  const waste = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.recordWaste, exact: true }) });
+  await waste.locator("select[name=itemId]").selectOption({ label: "Chicken (grams)" });
+  await waste.getByLabel(en.stock.quantity).fill("500 g");
+  await waste.getByRole("button", { name: en.stock.recordWaste, exact: true }).click();
+  await expect(page.getByText("500 g of Chicken written off.")).toBeVisible();
+  const count = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.recordCount }) });
+  await count.locator("select[name=itemId]").selectOption({ label: "Rice (grams)" });
+  await count.getByLabel(en.stock.counted).fill("14.9 kg");
+  await count.getByRole("button", { name: en.stock.recordCount }).click();
+  await expect(page.getByText("Rice counted: -100 g difference.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("19.5 kg", { exact: true })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m26-stock");
+
+  // A recipe: nothing a dog must never eat goes in.
+  await page.goto("/app/kitchen/recipes");
+  await page.getByLabel(en.recipes.name).fill("Chicken and rice");
+  await page.getByLabel(en.recipes.place).fill("1");
+  await page.getByRole("button", { name: en.recipes.addButton }).click();
+  await expect(page.getByText("Chicken and rice added. Add what goes in it.")).toBeVisible();
+  await expect(page.locator("select[name=item_0] option", { hasText: "Onion" })).toHaveCount(0);
+  await page.locator("select[name=item_0]").selectOption({ label: "Chicken (grams)" });
+  await page.locator("input[name=qty_0]").fill("600 g");
+  await page.locator("select[name=item_1]").selectOption({ label: "Rice (grams)" });
+  await page.locator("input[name=qty_1]").fill("400 g");
+  await page.getByLabel(en.recipePage.goodForField).fill("A gentle everyday meal");
+  await page.getByRole("button", { name: en.recipePage.saveVersion }).click();
+  await expect(page.getByText("Version 1 saved.")).toBeVisible();
+  await page.reload();
+  // Chicken ₹220 a kilo and rice ₹60 a kilo: ₹132 + ₹24.
+  await expect(page.getByText("₹156 a kg")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m27-recipe");
+
+  // Food prices.
+  await page.goto("/app/kitchen/settings");
+  const price = page.locator("form").filter({ has: page.getByRole("button", { name: en.kitchenSettings.addPriceButton }) });
+  await price.getByLabel(en.kitchenSettings.kind).selectOption("subscription");
+  await price.getByLabel(en.kitchenSettings.name).fill("Fresh food");
+  await price.getByLabel(en.kitchenSettings.price, { exact: true }).fill("400");
+  await price.getByRole("button", { name: en.kitchenSettings.addPriceButton }).click();
+  await expect(page.getByText("Fresh food added.")).toBeVisible();
+  await price.getByLabel(en.kitchenSettings.kind).selectOption("trial");
+  await price.getByLabel(en.kitchenSettings.name).fill("Food trial");
+  await price.getByLabel(en.kitchenSettings.price, { exact: true }).fill("499");
+  await price.getByLabel(en.kitchenSettings.trialGrams).fill("1");
+  await price.getByRole("button", { name: en.kitchenSettings.addPriceButton }).click();
+  await expect(page.getByText("Food trial added.")).toBeVisible();
+  await expect(page.getByText("Fresh food: ₹400 a kg")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m28-kitchen-settings");
+});
+
+test("Biscuit's portion, and a food subscription every day: billed ahead and credited for a cancelled delivery", async ({ page }) => {
+  await signIn(page, "manager");
+  await openPet(page, "Biscuit");
+  // 31.2 kg is a large dog: 2% a day.
+  await expect(page.getByText("624 g a day: large dog, 2% of 31.2 kg")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m28-pet-food");
+  await page.getByRole("link", { name: en.petFood.startSubscription }).click();
+  await expect(page.locator("input[name=grams]")).toHaveValue("624");
+  for (const d of [1, 3, 4, 6, 7]) await page.locator(`input[name=day_${d}]`).check();
+  await page.getByLabel(en.food.startsOn).fill(day(2));
+  await page.locator("input[name=grams]").fill("500");
+  await page.getByRole("button", { name: en.food.startButton }).click();
+  await expect(page.getByText(en.food.started)).toBeVisible();
+  // Each day covers one day: two packs of 250 g.
+  await expect(page.getByText(/: 2 packs, 0\.5 kg, Chicken and rice for 1 day/).first()).toBeVisible();
+  await narrow(page);
+  await shot(page, "m29-subscription");
+
+  // Billed ahead: this week and the next.
+  const subscription = page.url().split("?")[0];
+  for (let i = 0; i < 2; i++) {
+    await page.goto(subscription);
+    await page.getByRole("button", { name: /^Make the bill for / }).first().click();
+    await page.getByRole("button", { name: "Issue bill" }).click();
+    await expect(page.getByText(/^Issued\./)).toBeVisible();
+  }
+  await expect(page.getByText(/Fresh food for Biscuit: /).first()).toBeVisible();
+
+  // The first delivery is cancelled before it is cooked: its bill offers the difference back.
+  await page.goto(subscription);
+  const first = page.getByRole("listitem").filter({ has: page.getByText(en.subscription.cancel) }).first();
+  await first.locator("summary", { hasText: en.subscription.cancel }).click();
+  await first.getByLabel(en.subscription.cancelReason).fill("Away that day");
+  await first.getByRole("button", { name: en.subscription.cancel }).click();
+  await expect(page.getByText(en.subscription.cancelledDelivery)).toBeVisible();
+  // Bills are listed newest first; the cancelled day is in the first week.
+  await page.locator("a[href^='/app/bills/']").last().click();
+  await page.waitForURL(/\/app\/bills\//);
+  await expect(page.getByRole("heading", { name: en.bill.difference.title })).toBeVisible();
+  await page.getByRole("button", { name: /^Credit ₹/ }).click();
+  await page.waitForURL(/done=credited/);
+  await narrow(page);
+
+  // Paused for a few days.
+  await page.goto(subscription);
+  await page.getByLabel(en.subscription.pauseFrom, { exact: true }).fill(day(10));
+  await page.getByLabel(en.subscription.pauseUntil, { exact: true }).fill(day(12));
+  await page.getByRole("button", { name: en.subscription.pauseButton, exact: true }).click();
+  await expect(page.getByText(en.subscription.pausedDone)).toBeVisible();
+});
+
+test("the cook plan for a day, a batch that takes stock out, packing, labels and who got the batch", async ({ page }) => {
+  await signIn(page, "staff");
+  await expect(page.getByRole("heading", { name: en.todayKitchen.title })).toBeVisible();
+  await page.goto(`/app/kitchen?date=${day(3)}`);
+  // One delivery of 0.5 kg, any boarders on the kitchen's food, and 10% more.
+  await expect(page.getByText(/^Chicken and rice: [\d.]+ kg$/)).toBeVisible();
+  await expect(page.getByText(/^0\.5 kg for deliveries/)).toBeVisible();
+  await expect(page.getByText("Ali Meats")).toHaveCount(0);
+  await page.locator("input[name=packs]").fill("3");
+  await page.getByRole("button", { name: en.kitchen.recordBatch }).click();
+  await expect(page.getByText(/^Batch \d{6}-1 recorded\./)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m30-cook-plan");
+  const row = page.getByRole("listitem").filter({ hasText: "Biscuit for Priya Demo" });
+  await row.getByRole("button", { name: en.kitchen.pack }).click();
+  await expect(page.getByText(/^Packed from batch \d{6}-1\./)).toBeVisible();
+
+  await page.goto(`/app/kitchen/labels?date=${day(3)}`);
+  await expect(page.getByText("For Biscuit")).toHaveCount(2);
+  await shot(page, "m30-labels");
+
+  await page.goto(`/app/kitchen?date=${day(3)}`);
+  await page.getByRole("link", { name: /^\d{6}-1: Chicken and rice/ }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Biscuit" }).getByText(/^Delivery on /)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m30-batch");
+  // Staff see no cost.
+  await expect(page.getByText(/^Cost ₹/)).toHaveCount(0);
+});
+
+test("a rider joins and sees only their own run, and marks a stop delivered", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/people");
+  const linkForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Make a link" }) });
+  await linkForm.getByRole("textbox", { name: "Their name" }).fill("Raju");
+  await linkForm.locator("select[name=role]").selectOption("rider");
+  await linkForm.getByRole("button", { name: "Make a link" }).click();
+  await expect(page.getByText("Link made.")).toBeVisible();
+  const href = (await page.getByRole("link", { name: "Send on WhatsApp" }).first().getAttribute("href"))!;
+  const joinPath = /\/join\/[0-9a-f]{64}/.exec(decodeURIComponent(href))![0];
+  const raju = await privateWindow(browser);
+  await raju.page.goto(joinPath);
+  await raju.page.getByRole("link", { name: "Create an account" }).click();
+  await raju.page.getByLabel("Email").fill(`raju-${Date.now()}@example.test`);
+  await raju.page.getByLabel("Password").fill(PASSWORD);
+  await raju.page.getByRole("button", { name: "Create account" }).click();
+  await raju.page.getByRole("button", { name: /Join Wagbook Demo Kennel/ }).click();
+  await raju.page.waitForURL(/\/rider$/);
+  await expect(raju.page.getByText(en.rider.none)).toBeVisible();
+  // The kennel's own screens send a rider back to their run.
+  await raju.page.goto("/app/bookings");
+  await raju.page.waitForURL(/\/rider$/);
+
+  // A trial for Biscuit today, cooked, packed and put on Raju's run.
+  await openPet(page, "Biscuit");
+  const petUrl = page.url();
+  const petId = petUrl.split("/").pop()!;
+  await page.goto(`/app/food/new?pet=${petId}&kind=order`);
+  await page.getByLabel(en.food.orderKind).selectOption("trial");
+  await page.locator("select[name=productId]").selectOption({ label: "Food trial (A trial, once per pet, ₹499)" });
+  await page.getByLabel(en.food.orderDate).fill(day(0));
+  await page.getByRole("button", { name: en.food.orderButton }).click();
+  await expect(page.getByText(`Order added for ${day(0)}.`)).toBeVisible();
+  await page.goto(`/app/kitchen?date=${day(0)}`);
+  await page.locator("input[name=packs]").fill("4");
+  await page.getByRole("button", { name: en.kitchen.recordBatch }).click();
+  await expect(page.getByText(/^Batch \d{6}-\d recorded\./)).toBeVisible();
+  await page.getByRole("listitem").filter({ hasText: "Biscuit for Priya Demo" }).getByRole("button", { name: en.kitchen.pack }).click();
+  await expect(page.getByText(/^Packed from batch/)).toBeVisible();
+  await page.goto(`/app/food/runs?date=${day(0)}`);
+  await page.locator("select[name=riderId]").selectOption({ label: "Raju" });
+  await page.getByRole("button", { name: en.runs.startRun }).click();
+  await expect(page.getByText(en.runs.runStarted)).toBeVisible();
+  await page.getByRole("listitem").filter({ hasText: "Biscuit" }).getByRole("button", { name: en.runs.addTo }).click();
+  await expect(page.getByText(en.runs.added)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.runs.route })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m31-runs");
+
+  await raju.page.reload();
+  await expect(raju.page.getByText("1. Priya Demo")).toBeVisible();
+  await expect(raju.page.getByText("12, 4th Cross, HAL 2nd Stage, Indiranagar, 560038")).toBeVisible();
+  // No prices, no medical notes.
+  await expect(raju.page.getByText(/₹/)).toHaveCount(0);
+  await expect(raju.page.getByRole("link", { name: en.rider.tellOnTheWay })).toHaveAttribute("href", /wa\.me/);
+  expect(await raju.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(raju.page, "m31-rider");
+  await raju.page.getByRole("button", { name: en.rider.onTheWay }).click();
+  await expect(raju.page.getByText("Saved: On the way.")).toBeVisible();
+  await raju.page.getByRole("button", { name: en.rider.delivered, exact: true }).click();
+  await expect(raju.page.getByText("Saved: Delivered.")).toBeVisible();
+  await raju.context.close();
+
+  await page.goto(`/app/food/runs?date=${day(0)}`);
+  await expect(page.getByRole("listitem").filter({ hasText: "Biscuit" }).getByText(en.deliveryStatus.delivered, { exact: true })).toBeVisible();
+});
+
+test("an order from the kennel's food page becomes a subscription; a known parent asks for a pause from their link", async ({ page, browser }) => {
+  const parent = await privateWindow(browser);
+  await parent.page.goto("/f/demo");
+  await expect(parent.page.getByRole("heading", { name: "Fresh food from Wagbook Demo Kennel" })).toBeVisible();
+  await parent.page.getByLabel(en.foodOrder.dogName).fill("Mango");
+  await parent.page.getByLabel(en.foodOrder.weight).fill("12");
+  // A 12 kg dog is medium: 2.5% a day.
+  await expect(parent.page.getByText("About 300 g a day for a medium dog.")).toBeVisible();
+  await parent.page.getByLabel(en.foodOrder.line).fill("7 Lake View Road");
+  await parent.page.getByLabel(en.foodOrder.pin).fill("560038");
+  await expect(parent.page.getByText("We deliver to Indiranagar.")).toBeVisible();
+  // Tuesday 900 g and Friday 1.2 kg, each made whole packs of 250 g (1 kg and 1.25 kg), at ₹400 a kilo, and ₹50 each time.
+  await expect(parent.page.getByText("To pay now, the first week: ₹1,000")).toBeVisible();
+  await parent.page.getByLabel(en.foodOrder.name).fill("Anita Example");
+  await parent.page.getByLabel(en.foodOrder.phone).fill("98450 22222");
+  await parent.page.getByLabel(/I agree to Wagbook Demo Kennel keeping/).check();
+  expect(await parent.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(parent.page, "m32-order-form");
+  await parent.page.getByRole("button", { name: en.foodOrder.send }).click();
+  await expect(parent.page.getByText("Pay ₹1,000 by UPI")).toBeVisible();
+  await shot(parent.page, "m32-order-pay");
+  await parent.page.getByRole("button", { name: en.foodOrder.paid }).click();
+  await expect(parent.page.getByText(en.foodOrder.paidThanks)).toBeVisible();
+
+  // A PIN code not served waits for its area, with nothing to pay.
+  await parent.page.goto("/f/demo");
+  await parent.page.getByLabel(en.foodOrder.dogName).fill("Kiwi");
+  await parent.page.getByLabel(en.foodOrder.weight).fill("8");
+  await parent.page.getByLabel(en.foodOrder.line).fill("1 Far Away Street");
+  await parent.page.getByLabel(en.foodOrder.pin).fill("560100");
+  await expect(parent.page.getByText(en.foodOrder.notServed)).toBeVisible();
+  await parent.page.getByLabel(en.foodOrder.name).fill("Sunil Example");
+  await parent.page.getByLabel(en.foodOrder.phone).fill("98450 33333");
+  await parent.page.getByLabel(/I agree to Wagbook Demo Kennel keeping/).check();
+  await parent.page.getByRole("button", { name: en.foodOrder.send }).click();
+  await expect(parent.page.getByText(en.foodOrder.waitingArea)).toBeVisible();
+  await parent.context.close();
+
+  await signIn(page, "staff");
+  await page.goto("/app/food/orders");
+  await expect(page.getByText("560100: 1")).toBeVisible();
+  const order = page.getByRole("listitem").filter({ hasText: "Anita Example" });
+  await expect(order.getByText(en.foodOrders.statuses.paid)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m32-orders");
+  await order.getByRole("button", { name: en.foodOrders.confirm }).click();
+  await expect(page.getByText(en.foodOrders.confirmed)).toBeVisible();
+  await page.goto("/app/food");
+  await expect(page.getByRole("link", { name: /Mango \(Anita Example\): 300 g a day, Tue, Fri/ })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m29-food");
+
+  // Priya asks for a pause from her own link.
+  await openPet(page, "Biscuit");
+  await page.getByRole("link", { name: "Priya Demo" }).click();
+  const linkHref = (await page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: en.parent.requestLink.title }) })
+    .getByRole("link", { name: en.parent.requestLink.send })
+    .getAttribute("href"))!;
+  const tokenPath = /\/b\/[0-9a-f]{64}/.exec(decodeURIComponent(linkHref))![0];
+  const priya = await privateWindow(browser);
+  await priya.page.goto(tokenPath);
+  await expect(priya.page.getByRole("heading", { name: en.foodLink.title })).toBeVisible();
+  await priya.page.getByLabel(en.foodLink.from).fill(day(15));
+  await priya.page.getByLabel(en.foodLink.until).fill(day(16));
+  await priya.page.getByRole("button", { name: en.foodLink.send }).click();
+  await expect(priya.page.getByText(en.foodLink.sent)).toBeVisible();
+  await priya.context.close();
+  await page.goto("/app/food/orders");
+  const pause = page.getByRole("listitem").filter({ hasText: en.foodOrders.kinds.pause });
+  await pause.getByRole("button", { name: en.foodOrders.confirm }).click();
+  await expect(page.getByText(en.foodOrders.confirmed)).toBeVisible();
+});
+
+test("the food report counts the month, and downloads as CSV; staff are refused", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/reports");
+  await expect(page.getByRole("heading", { name: en.foodReports.title, exact: true })).toBeVisible();
+  await expect(page.getByText(en.foodReports.active)).toBeVisible();
+  await expect(page.getByText(/Raju: 1 delivered/)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m33-food-report");
+  const href = (await page.getByRole("link", { name: en.foodReports.download }).getAttribute("href"))!;
+  const csv = await page.request.get(href);
+  expect(csv.status()).toBe(200);
+  expect(await csv.text()).toContain(en.foodReports.active);
+
+  await signIn(page, "staff");
+  const refused = await page.request.get(href);
+  expect(refused.status()).toBe(403);
+});

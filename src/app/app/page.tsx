@@ -8,7 +8,7 @@ import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
   addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
-  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink,
+  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
@@ -257,6 +257,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
+      {org.offers_kitchen ? (
+        <Suspense fallback={null}>
+          <KitchenToday t={t} today={today} />
+        </Suspense>
+      ) : null}
+
       {reminders.length > 0 ? (
         <Section title={m.today.toSend} count={reminders.length}>
           <p className="mb-3 text-sm text-slate">{m.today.toSendAbout}</p>
@@ -366,6 +372,102 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Suspense>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The kitchen and food on Today (M29, M30), while the kennel has a kitchen:
+ * what to cook tomorrow, today's packing, orders waiting, portions to look at
+ * a week after a pet starts, and parents to ask about a subscription a few
+ * days after their dog's trial.
+ */
+async function KitchenToday({ t, today }: { t: I18n; today: string }) {
+  const { org } = await requireOrg();
+  const { m, locale } = t;
+  const w = m.todayKitchen;
+  const supabase = await createClient();
+  const [packing, orders, food, trials, asked, subs] = await Promise.all([
+    supabase.from("deliveries").select("status").eq("org_id", org.id).eq("delivery_date", today).neq("status", "cancelled"),
+    supabase.from("food_orders").select("id", { count: "exact", head: true }).eq("org_id", org.id).in("status", ["paid", "requested"]),
+    supabase.from("pet_food").select("pet_id, started_on, reviewed_on, pets(name)").eq("org_id", org.id).not("started_on", "is", null),
+    supabase
+      .from("deliveries")
+      .select("id, delivery_date, status, client_id, pets(name), clients(full_name, phone)")
+      .eq("org_id", org.id)
+      .eq("kind", "trial")
+      .eq("status", "delivered")
+      .gte("delivery_date", addDays(today, -14)),
+    supabase.from("reminders_sent").select("subject_id").eq("org_id", org.id).eq("kind", "trial"),
+    supabase.from("subscriptions").select("client_id").eq("org_id", org.id),
+  ]);
+  if (packing.error || food.error || trials.error) return null;
+  const packed = packing.data.filter((d) => d.status !== "planned").length;
+  const review = food.data.filter((f) => portionReviewDue(f, today));
+  const askedAbout = new Set((asked.data ?? []).map((r) => r.subject_id));
+  const follow = trialsToFollowUp(
+    trials.data.filter((d) => !askedAbout.has(d.id)),
+    new Set((subs.data ?? []).map((s) => s.client_id)),
+    new Set(),
+    today,
+  );
+  const p = parentI18n(org.parent_language, org.locale);
+
+  return (
+    <Section title={w.title}>
+      <div className="space-y-3">
+        <p className="flex flex-wrap gap-2">
+          <Link href={`/app/kitchen?date=${addDays(today, 1)}`} className={buttonStyles.secondary}>
+            {w.cook}
+          </Link>
+          {packing.data.length > 0 ? (
+            <Link href={`/app/kitchen?date=${today}`} className={buttonStyles.quiet}>
+              {fill(w.packing, { packed, total: packing.data.length })}
+            </Link>
+          ) : null}
+          {(orders.count ?? 0) > 0 ? (
+            <Link href="/app/food/orders" className={buttonStyles.quiet}>
+              {fill(w.orders, { count: orders.count ?? 0 })}
+            </Link>
+          ) : null}
+        </p>
+        {review.length > 0 ? (
+          <div>
+            <p className="mb-1 font-bold">{w.review}</p>
+            <Ledger>
+              {review.map((f) => (
+                <li key={f.pet_id}>
+                  <Link href={`/app/dogs/${f.pet_id}`} className="flex min-h-12 items-center px-4 py-3 hover:bg-ground">
+                    {fill(w.reviewLine, { pet: f.pets?.name ?? "", date: formatDate(f.started_on!, locale) })}
+                  </Link>
+                </li>
+              ))}
+            </Ledger>
+          </div>
+        ) : null}
+        {follow.length > 0 ? (
+          <div>
+            <p className="mb-1 font-bold">{w.trials}</p>
+            <Ledger>
+              {follow.map((d) => (
+                <LedgerRow key={d.id}>
+                  <span className="min-w-0 flex-1">{fill(w.trialLine, { pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "", date: formatDate(d.delivery_date, locale) })}</span>
+                  <ReminderLink
+                    href={whatsappLink(
+                      fill(p.m.todayKitchen.trialMessage, { name: (d.clients?.full_name ?? "").split(" ")[0], pet: d.pets?.name ?? "", kennel: org.name }),
+                      d.clients?.phone,
+                    )}
+                    kind="trial"
+                    subjectId={d.id}
+                    label={w.ask}
+                    title={w.ask}
+                  />
+                </LedgerRow>
+              ))}
+            </Ledger>
+          </div>
+        ) : null}
+      </div>
+    </Section>
   );
 }
 

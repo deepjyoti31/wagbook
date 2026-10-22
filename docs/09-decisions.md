@@ -890,3 +890,31 @@ schema these milestones need has settled.
 **Look again** if a kennel using Wagbook would rather connect a separate food or delivery tool, or if the food side
 grows beyond one kitchen.
 
+
+---
+
+## D45. Riders are a fourth role that reaches no table
+
+**Status:** Decided, 22 October 2026, building M31. The owner's answer of 21 October 2026: a rider sees their own run and
+nothing else.
+
+**Situation.** Food goes out on delivery runs. Riders are often hired by the day or come from an agency; they need the
+names, addresses, phones and packs of their stops, and nothing about prices, pets' health or other parents. Every other
+role (owner, manager, staff) reads the whole kennel through row level security that asks `my_org_ids()`.
+
+**Decision.** A fourth role, `rider`, in `member_role`. `my_org_ids()` leaves riders out, so every policy in the access
+model gives a rider nothing, and no table is opened to them. A rider reaches their work only through two functions:
+`my_runs(date)` (their own runs for a day, each stop with name, phone, pet, packs, address and notes) and
+`rider_mark_stop()` (on the way, delivered, nobody home or refused, on their own run, today), both `security definer`
+and checking the caller is the run's rider. One storage policy lets a rider add a photo at the door of a stop of their
+own run for today (`rider_upload_allowed`). The app sends a rider to `/rider` and away from the kennel's screens. A
+member of another role with the skill rider can also ride, seeing what their role already sees.
+
+**Why.** The database is the boundary (`05`): leaving riders out of `my_org_ids()` means a forgotten policy can never leak
+to them, rather than relying on every policy remembering to exclude them. Functions that return only what a run needs
+are the narrowest possible door.
+
+**Cost.** A rider cannot see a stop that is not on their run, even to help a colleague; the kennel moves the stop. A
+rider's language comes from their membership, as anyone's does.
+
+**Look again** if riders need to see yesterday's runs, or if pick-ups of boarders (M39) need more than an address.

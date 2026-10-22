@@ -23,3 +23,4 @@ export * from "./whatsapp";
 export * from "./reminders";
 export * from "./gstr1";
 export * from "./groundwork";
+export * from "./food";

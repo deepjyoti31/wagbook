@@ -98,6 +98,39 @@ alter table public.pets add constraint pets_photo_in_org check (public.paths_in_
 alter table public.vaccinations add constraint vaccinations_certificate_in_org check (public.paths_in_org(array[certificate_path], org_id));
 alter table public.care_tasks add constraint care_tasks_photo_in_org check (public.paths_in_org(array[photo_path], org_id));
 alter table public.expenses add constraint expenses_receipt_in_org check (public.paths_in_org(array[receipt_path], org_id));
+alter table public.stock_costs add constraint stock_costs_bill_in_org check (public.paths_in_org(array[bill_path], org_id));
+alter table public.deliveries add constraint deliveries_proof_in_org check (public.paths_in_org(array[proof_path], org_id));
+alter table public.delivery_problems add constraint delivery_problems_photo_in_org check (public.paths_in_org(array[photo_path], org_id));
+
+-- A rider (D45) reaches no folder through the policies above, which ask for
+-- my_org_ids(). They may add one thing: a photo taken at the door of a stop
+-- on their own run for today, under {org_id}/deliveries/{delivery_id}/.
+create function public.rider_upload_allowed(p_object_name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.deliveries d
+    join public.delivery_runs r on r.org_id = d.org_id and r.id = d.run_id
+    where split_part(p_object_name, '/', 2) = 'deliveries'
+      and d.org_id = public.storage_org_id(p_object_name)
+      and d.id::text = split_part(p_object_name, '/', 3)
+      and r.rider_id = (select auth.uid())
+      and r.run_date = public.org_today(r.org_id)
+      and r.org_id in (select public.my_rider_org_ids())
+  );
+$$;
+comment on function public.rider_upload_allowed(text) is
+  'True when a stored file''s path is a photo of a stop on the signed-in rider''s own run for today. SECURITY DEFINER because riders read no table (D45).';
+revoke all on function public.rider_upload_allowed(text) from public, anon;
+grant execute on function public.rider_upload_allowed(text) to authenticated;
+
+create policy pet_media_insert_rider on storage.objects for insert to authenticated
+  with check (bucket_id = 'pet-media' and public.rider_upload_allowed(name));
 alter table public.stay_updates add constraint stay_updates_media_in_org check (public.paths_in_org(media_paths, org_id));
 alter table public.stay_updates add constraint stay_updates_at_most_six_photos check (cardinality(media_paths) <= 6);
 

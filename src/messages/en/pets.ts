@@ -266,7 +266,7 @@ export const petsArea = {
     rolesAbout:
       "Staff run the day: bookings, check-in, care and payments. Managers also change kennels, prices and settings. Owners can do everything, including managing other owners.",
     // A role in the middle of a line, after a name.
-    roleInLine: { owner: "owner", manager: "manager", staff: "staff" },
+    roleInLine: { owner: "owner", manager: "manager", staff: "staff", rider: "rider" },
     byEmail: {
       title: "Invite someone who already has an account",
       intro: "Enter the email they use for Wagbook. They see the invitation the next time they sign in.",
@@ -304,6 +304,7 @@ export const petsArea = {
       owner: "Join {kennel} as an owner, under the name {name}?",
       manager: "Join {kennel} as a manager, under the name {name}?",
       staff: "Join {kennel} as staff, under the name {name}?",
+      rider: "Join {kennel} as a rider, under the name {name}?",
     },
     signedInAs: "Signed in as {email}.",
     // Stands for the email when there is none: "Signed in as you."

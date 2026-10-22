@@ -41,7 +41,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -80,6 +80,12 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   ]);
   if (lines.error || payments.error || balance.error || family.error || credits.error || seriesDays.error) throw new Error("Could not load the bill.");
   const stays = inv.bookings ? [inv.bookings] : inv.group_id ? family.data : seriesDays.data.slice(0, 1);
+  // A food bill (M29): the subscription or the order it is for.
+  const food = inv.subscription_id
+    ? (await supabase.from("subscriptions").select("id, pets(name)").eq("org_id", org.id).eq("id", inv.subscription_id).maybeSingle()).data
+    : inv.delivery_id
+      ? (await supabase.from("deliveries").select("id, pets(name)").eq("org_id", org.id).eq("id", inv.delivery_id).maybeSingle()).data
+      : null;
 
   const money = (minor: number) => formatMoney(minor, { currency: inv.currency, locale, trimZeros: true });
   const due = balance.data?.due_minor ?? 0;
@@ -133,6 +139,16 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         ) : null}
         <p className="text-slate">
           {inv.issued_on ? `${fill(m.bill.issuedOn, { date: formatDate(inv.issued_on, locale) })} ` : ""}
+          {food && inv.subscription_id && inv.period_start && inv.period_end ? (
+            <Link href={`/app/food/subscriptions/${inv.subscription_id}`} className="underline underline-offset-4">
+              {fill(m.billFood.period, { pet: food.pets?.name ?? "", from: formatDate(inv.period_start, locale), to: formatDate(inv.period_end, locale) })}
+            </Link>
+          ) : null}
+          {food && inv.delivery_id ? (
+            <Link href="/app/food" className="underline underline-offset-4">
+              {fill(m.billFood.order, { pet: food.pets?.name ?? "" })}
+            </Link>
+          ) : null}
           {inv.series_month && stays[0] ? (
             <Link href={`/app/bookings/${stays[0].id}`} className="underline underline-offset-4">
               {fill(m.bill.seriesMonth, { pet: stays[0].pets?.name ?? m.bill.theBooking, month: monthName(inv.series_month, locale) })}

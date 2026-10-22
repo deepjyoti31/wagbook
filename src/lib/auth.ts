@@ -103,6 +103,8 @@ export const requireOrg = cache(async (): Promise<OrgContext> => {
   const user = await requireUser();
   const memberships = await getMemberships();
   if (memberships.length === 0) {
+    // Riders cannot read the kennel itself, so their memberships come back empty here (D45).
+    if (await isRider()) redirect("/rider");
     // Two-step sign-in turned on from another phone since this session began:
     // the database hides every kennel until the code is given.
     const { data: fullySignedIn } = await (await createClient()).rpc("session_meets_mfa");
@@ -136,4 +138,23 @@ export async function rememberOrg(orgId: string): Promise<void> {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });
+}
+
+/** The signed-in person's rider memberships (D45): their own rows, which is all a rider can read. */
+const riderMemberships = cache(async () => {
+  const { data } = await (await createClient()).from("memberships").select("org_id, language").eq("role", "rider").eq("is_active", true);
+  return data ?? [];
+});
+
+/** Whether the signed-in person rides for some kennel (D45): asked of the database, as riders cannot read the kennel. */
+export async function isRider(): Promise<boolean> {
+  return (await riderMemberships()).length > 0;
+}
+
+/** A signed-in rider (D45), with the language they read Wagbook in. Anyone else goes to the app. */
+export async function requireRider(): Promise<{ user: SessionUser; language: Language }> {
+  const user = await requireUser();
+  const rows = await riderMemberships();
+  if (rows.length === 0) redirect("/app");
+  return { user, language: isLanguage(rows[0].language) ? rows[0].language : "en" };
 }

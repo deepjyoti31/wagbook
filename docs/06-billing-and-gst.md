@@ -319,6 +319,18 @@ Write the answers in your own records, not in this repository.
 15. When a parent keeps the value of a cancelled stay as credit for 12 months (M38), is that an advance I hold, and is
     there tax when it is kept, when it is spent, or when it runs out unspent?
 
+## Food bills (M29)
+
+A food subscription is billed ahead, a week from Monday or a calendar month at a time, as a repeating series is
+(D41): one line for each price, its kilos added up and its delivery days listed ("Fresh food for Biscuit: 3.5 kg, 7
+deliveries"), less the kennel's monthly discount when it is paid a month ahead, then one line for each delivery charge.
+The prices, tax rate and HSN code are copied onto each delivery when it is made, so a bill follows the rate card of
+the day the delivery was planned. A delivery charge takes the food's rate and code until the accountant says otherwise
+(question 13). A one-off order (a trial, food by the kilo, a cake) has its own bill. Staff issue a food bill only as
+its deliveries come to (`food_bill_lines`, `WB050`); one live bill per period, and no day on two (`WB155`). A delivery
+cancelled after its bill is issued is credited with a credit note for the difference (D34, D40), offered on the bill's
+page as for a stay that changed.
+
 ## GSTR-1 files
 
 Reports offers a GST-registered kennel the month's GSTR-1 as the GST offline tool's CSV files (D38,

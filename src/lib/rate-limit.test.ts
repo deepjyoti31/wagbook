@@ -32,6 +32,7 @@ describe("rateRuleFor", () => {
     expect(rateRuleFor("/login")?.name).toBe("sign-in");
     expect(rateRuleFor("/login/code")?.name).toBe("sign-in");
     expect(rateRuleFor("/i/happy-tails")?.name).toBe("intake");
+    expect(rateRuleFor("/f/happy-tails")?.name).toBe("food");
     expect(rateRuleFor("/join/abc")?.name).toBe("join");
     expect(rateRuleFor("/b/abc")?.name).toBe("requests");
     expect(rateRuleFor("/app")).toBeNull();
@@ -44,6 +45,8 @@ describe("bodyLimitFor", () => {
   it("allows files only where files are sent", () => {
     expect(bodyLimitFor("/app/bookings/1/update")).toBe(12 * 1024 * 1024);
     expect(bodyLimitFor("/i/happy-tails")).toBe(12 * 1024 * 1024);
+    expect(bodyLimitFor("/rider")).toBe(12 * 1024 * 1024);
+    expect(bodyLimitFor("/f/happy-tails")).toBe(1024 * 1024);
     expect(bodyLimitFor("/login")).toBe(1024 * 1024);
     expect(bodyLimitFor("/join/abc")).toBe(1024 * 1024);
     expect(bodyLimitFor("/application")).toBe(1024 * 1024);

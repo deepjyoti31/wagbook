@@ -6,7 +6,8 @@ import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { CARE_KINDS, clockText } from "@/lib/care";
-import { formatDate, todayIn } from "@/lib/core";
+import { dailyGrams, formatDate, todayIn } from "@/lib/core";
+import { portionSettings } from "@/lib/kitchen";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import type { Enums } from "@/lib/supabase/database.types";
@@ -28,7 +29,7 @@ export default function CarePage({ searchParams }: PageProps<"/app/care">) {
 }
 
 const TASK =
-  "id, kind, label, details, due_time, status, note, done_at, bookings(id, kennels(name, sort_order), pets(name, flags, photo_path))" as const;
+  "id, kind, label, details, due_time, status, note, done_at, bookings(id, pet_id, kennels(name, sort_order), pets(name, flags, photo_path, weight_g))" as const;
 
 async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams">) {
   const params = await searchParams;
@@ -63,6 +64,30 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
   const shown = pendingOnly ? tasks.filter((t) => t.status === "pending") : tasks;
   const photos = await signedUrls(supabase, shown.map((t) => t.bookings?.pets?.photo_path), { small: true });
   const pending = tasks.filter((t) => t.status === "pending").length;
+
+  // What each pet eats, on its meals, while the kennel has a kitchen (M28): the care round follows it.
+  const mealPets = [...new Set(shown.filter((t) => t.kind === "meal" && t.bookings?.pet_id).map((t) => t.bookings!.pet_id))];
+  const foodOf = new Map<string, string>();
+  if (org.offers_kitchen && mealPets.length > 0) {
+    const food = await supabase.from("pet_food").select("pet_id, plan, goal, grams_by_hand, boarder_food, kibble_brand, kibble_g_per_day").eq("org_id", org.id).in("pet_id", mealPets);
+    const rows = new Map((food.data ?? []).map((f) => [f.pet_id, f]));
+    for (const t of shown) {
+      const id = t.bookings?.pet_id;
+      if (!id || foodOf.has(id)) continue;
+      const f = rows.get(id) ?? null;
+      const grams = dailyGrams({ weight_g: t.bookings?.pets?.weight_g ?? null }, f, portionSettings(org));
+      foodOf.set(
+        id,
+        f?.boarder_food === "kibble"
+          ? fill(m.careFood.kibble, { brand: f.kibble_brand ?? "", grams: f.kibble_g_per_day ?? "" })
+          : f?.boarder_food === "own"
+            ? m.careFood.own
+            : grams
+              ? fill(m.careFood.kitchen, { grams })
+              : m.careFood.kitchenNoWeight,
+      );
+    }
+  }
 
   const groups = new Map<string, typeof shown>();
   for (const t of shown) {
@@ -132,7 +157,13 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
           <Section key={time} title={time} count={list.filter((t) => t.status === "pending").length}>
             <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
               {list.map((t) => (
-                <TaskRow key={t.id} m={m} task={t} photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null} />
+                <TaskRow
+                  key={t.id}
+                  m={m}
+                  task={t}
+                  photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null}
+                  food={t.kind === "meal" && t.bookings?.pet_id ? foodOf.get(t.bookings.pet_id) : undefined}
+                />
               ))}
             </ul>
           </Section>
@@ -152,7 +183,7 @@ type Task = {
   bookings: { id: string; kennels: { name: string } | null; pets: { name: string; flags: string[]; photo_path: string | null } | null } | null;
 };
 
-function TaskRow({ m, task: t, photo }: { m: Messages; task: Task; photo?: string | null }) {
+function TaskRow({ m, task: t, photo, food }: { m: Messages; task: Task; photo?: string | null; food?: string }) {
   const medicine = t.kind === "medication";
   const pet = t.bookings?.pets;
   return (
@@ -173,6 +204,7 @@ function TaskRow({ m, task: t, photo }: { m: Messages; task: Task; photo?: strin
               </Badge>
             ))}
           </p>
+          {food ? <p className="mt-1 font-semibold">{food}</p> : null}
           {t.details ? <p className="mt-1">{t.details}</p> : null}
           {t.note ? <p className="mt-1 text-slate">{fill(m.care.note, { note: t.note })}</p> : null}
         </div>
