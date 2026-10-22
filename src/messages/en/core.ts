@@ -368,7 +368,7 @@ export const core = {
     seeRequests: "See them",
     toSend: "To send",
     toSendAbout: "Messages due today. Send opens WhatsApp with the message typed; it then leaves this list.",
-    reminderKinds: { vaccination: "Vaccination card", arrival: "Arriving tomorrow", pickup: "Going home tomorrow", unpaid: "Bill unpaid", groom: "Due for a groom" },
+    reminderKinds: { vaccination: "Vaccination card", arrival: "Arriving tomorrow", pickup: "Going home tomorrow", unpaid: "Bill unpaid", groom: "Due for a groom", health: "Health papers", credit: "Credit ending", review: "Ask for a review" },
     send: "Send",
     // For a screen reader: who the message goes to.
     sendTo: "Send to {name} on WhatsApp",
@@ -440,6 +440,9 @@ export const core = {
       pickUpBy: "Pick-up by {time}.",
       unpaid: "Hi {parent}, a gentle reminder from {kennel}: bill {number} has {amount} still to pay. {url}",
       groom: "Hi {parent}, {pet} is due for a groom at {kennel} around {date}. Shall we book a time?",
+      health: "Hi {parent}, {pet} comes to {kennel} on {date}. By then {pet} needs: {lacks}. Please get it done and send us a photo of the papers before the stay.",
+      credit: "Hi {parent}, you have {amount} of credit with {kennel} that ends on {date}. Book a stay or a visit before then to use it.",
+      review: "Hi {parent}, thank you for trusting {kennel} with {pet}. If you have a minute, a review helps other parents find us: {url}",
     },
   },
   copy: {

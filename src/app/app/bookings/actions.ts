@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { diffDays, formatDate, isISODate, parseMoney, payFromPacks, seriesDates, todayIn } from "@/lib/core";
+import { diffDays, formatDate, isISODate, parseMoney, payFromPacks, seriesDates, todayIn, zonedInstant } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { searchPets, type PetChoice } from "@/lib/pet-search";
@@ -372,12 +372,19 @@ export async function setWaitlist(_state: FormState, form: FormData): Promise<Fo
 }
 
 export async function cancelBooking(_state: FormState, form: FormData): Promise<FormState> {
-  await requireOrg();
+  const { org } = await requireOrg();
   const { m } = await getAppI18n();
   const reason = text(form, "reason");
   if (!reason) return { error: m.booking.errors.cancelReason };
   if (reason.length > 500) return { error: m.booking.errors.cancelReasonLong };
-  return moveStatus(form, ["requested", "confirmed"], "cancelled", { cancel_reason: reason });
+  // When the parent asked decides each night's notice (M38): now, or earlier, never later.
+  const asked = text(form, "askedAt");
+  const askedAt = asked && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(asked) ? zonedInstant(asked.slice(0, 10), asked.slice(11, 16), org.time_zone) : new Date();
+  return moveStatus(form, ["requested", "confirmed"], "cancelled", {
+    cancel_reason: reason,
+    cancel_asked_at: new Date(Math.min(askedAt.getTime(), Date.now())).toISOString(),
+    cancelled_by_kennel: form.get("byKennel") === "on",
+  });
 }
 
 export async function markNoShow(_state: FormState, form: FormData): Promise<FormState> {

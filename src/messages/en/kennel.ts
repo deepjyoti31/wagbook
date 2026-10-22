@@ -13,6 +13,8 @@ export const kennelArea = {
       play: { title: "Play yards", about: "Yards, play hours, and how many yards you need." },
       extras: { title: "Extras", about: "Grooming, pick-up and anything else you charge for." },
       peak: { title: "Peak periods", about: "Festivals and long weekends, with your no-refund rule." },
+      cancellation: { title: "Cancellation rules", about: "What an advance becomes when a stay is cancelled, weekends, and how long credit lasts." },
+      health: { title: "Health papers", about: "The vaccines and treatments a pet needs to come in, and whether the door refuses or warns." },
       areas: { title: "Areas you serve", about: "PIN codes you deliver to, and what a delivery costs." },
       appointments: { title: "Appointments", about: "Grooming, swims, training and parties by the hour, a column per place." },
       appointmentSetup: { title: "Appointment setup", about: "Places and their hours, services and prices, and packages." },

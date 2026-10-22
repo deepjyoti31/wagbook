@@ -39,3 +39,17 @@ export async function markStop(_state: FormState, form: FormData): Promise<FormS
   // The stop's buttons change once it is marked, so the sentence is shown by the page instead.
   redirect(`/rider?done=${status.data}`);
 }
+
+/** A rider marks a pick-up or drop of their own run for today: on the way, done or nobody home (rider_mark_trip, M39). */
+export async function markTrip(_state: FormState, form: FormData): Promise<FormState> {
+  const { language } = await requireRider();
+  const t = i18nFor(language);
+  const trip = z.uuid().safeParse(form.get("tripId"));
+  const status = z.enum(["out", "done", "not_home"]).safeParse(form.get("status"));
+  if (!trip.success || !status.success) return { error: t.m.errors.notFound };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("rider_mark_trip", { p_trip: trip.data, p_status: status.data });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/rider");
+  redirect(`/rider?done=trip_${status.data}`);
+}

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
+import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, Empty, Loading, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, formatPhone, intakeInviteMessage, isISODate, whatsappLink } from "@/lib/core";
@@ -42,6 +43,10 @@ async function Intake() {
   if (error) throw new Error("Could not load forms.");
 
   const intakeUrl = `${origin}/i/${org.slug}`;
+  const bookUrl = `${origin}/book/${org.slug}`;
+  // Names of the services asked for on the booking form (M41).
+  const asked = [...new Set(data.flatMap((s) => (s.payload as { request?: { service_id?: unknown } }).request?.service_id ?? []).filter((x): x is string => typeof x === "string"))];
+  const services = asked.length > 0 ? ((await supabase.from("appointment_services").select("id, name").eq("org_id", org.id).in("id", asked.filter((x) => /^[0-9a-f-]{36}$/.test(x)))).data ?? []) : [];
 
   // Certificates parents sent with their forms: {org}/intake/{form}/pet-N, and
   // pet-N-2 for a pet's second vaccine. Only those that exist come back with a link.
@@ -85,6 +90,19 @@ async function Intake() {
             </a>
           </div>
           {org.intake_enabled ? null : <p className="mt-3 font-semibold text-alert">{k.switchedOff}</p>}
+        </div>
+      </Section>
+
+      <Section title={m.bookingForm.linkTitle}>
+        <div className="rounded-xl border border-rule bg-paper p-4">
+          <p className="mb-3 text-slate">{m.bookingForm.linkAbout}</p>
+          <p className="mb-3 break-all font-semibold">{bookUrl}</p>
+          <div className="flex flex-wrap gap-2">
+            <CopyButton text={bookUrl} words={m.copy} />
+            <a href={bookUrl} target="_blank" rel="noreferrer" className={buttonStyles.secondary}>
+              {k.openForm}
+            </a>
+          </div>
         </div>
       </Section>
 
@@ -150,6 +168,16 @@ async function Intake() {
                         ) : (
                           <p className="text-slate">{k.noVaccines}</p>
                         )}
+                        {p.dewormed_on || p.tick_treated_on ? (
+                          <p className="text-slate">
+                            {[
+                              p.dewormed_on ? `${m.health.dewormedOn}: ${p.dewormed_on}` : null,
+                              p.tick_treated_on ? `${m.health.tickTreatedOn}: ${p.tick_treated_on}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        ) : null}
                         {certificatePaths(s.id, i).map((path) =>
                           certificates.get(path) ? (
                             <a key={path} href={certificates.get(path)} target="_blank" rel="noreferrer" className="mr-4 inline-flex min-h-12 items-center underline underline-offset-4">
@@ -161,6 +189,20 @@ async function Intake() {
                     ))}
                   </ul>
                   {stay?.notes ? <p className="mt-3">{fill(k.note, { note: stay.notes })}</p> : null}
+                  {parsed.success && parsed.data.request ? (
+                    <div className="mt-3 space-y-1 rounded-lg bg-ground p-3">
+                      <p className="font-semibold">
+                        {parsed.data.request.service_id
+                          ? fill(m.bookingForm.review.appointment, {
+                              service: services.find((x) => x.id === parsed.data.request?.service_id)?.name ?? "",
+                              time: parsed.data.request.time ?? "",
+                            })
+                          : m.bookingForm.review.stay}
+                      </p>
+                      {parsed.data.request.pickup === "true" ? <p>{m.bookingForm.review.pickup}</p> : null}
+                      <p>{parsed.data.request.vaccinations_ok === "true" ? m.bookingForm.review.vaccinationsOk : m.bookingForm.review.vaccinationsNotSaid}</p>
+                    </div>
+                  ) : null}
                   {parsed.success ? null : <p className="mt-3 font-semibold text-alert">{k.unreadable}</p>}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {parsed.success ? (

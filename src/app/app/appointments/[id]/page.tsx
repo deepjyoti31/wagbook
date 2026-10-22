@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { HealthAtTheDoor } from "@/components/stay-health";
 import { workingPeople } from "@/lib/appointments";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, formatMoney, formatPhone, localClock, localDate, whatsappLink } from "@/lib/core";
@@ -133,6 +134,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
       </div>
 
       {doneKey ? <Notice tone="ok">{w.done_[doneKey]}</Notice> : null}
+      {open && !a.booking_id && a.appointment_services?.checks_vaccinations ? <HealthAtTheDoor t={t} petId={a.pet_id} on={day} appointmentId={a.id} /> : null}
 
       {open ? (
         <Section title={w.next}>

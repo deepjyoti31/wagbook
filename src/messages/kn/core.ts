@@ -375,7 +375,7 @@ export const core: typeof English = {
     seeRequests: "ನೋಡಿ",
     toSend: "ಕಳುಹಿಸಬೇಕಾದವು",
     toSendAbout: "ಇಂದು ಕಳುಹಿಸಬೇಕಾದ ಸಂದೇಶಗಳು. ಕಳುಹಿಸಿ ಒತ್ತಿದರೆ WhatsApp ನಲ್ಲಿ ಸಂದೇಶ ಬರೆದಿರುತ್ತದೆ; ನಂತರ ಇದು ಈ ಪಟ್ಟಿಯಿಂದ ಹೋಗುತ್ತದೆ.",
-    reminderKinds: { vaccination: "ಲಸಿಕೆ ಕಾರ್ಡ್", arrival: "ನಾಳೆ ಬರುತ್ತಿದೆ", pickup: "ನಾಳೆ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆ", unpaid: "ಬಿಲ್ ಬಾಕಿ", groom: "ಗ್ರೂಮಿಂಗ್ ಸಮಯ" },
+    reminderKinds: { vaccination: "ಲಸಿಕೆ ಕಾರ್ಡ್", arrival: "ನಾಳೆ ಬರುತ್ತಿದೆ", pickup: "ನಾಳೆ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆ", unpaid: "ಬಿಲ್ ಬಾಕಿ", groom: "ಗ್ರೂಮಿಂಗ್ ಸಮಯ", health: "ಆರೋಗ್ಯ ದಾಖಲೆಗಳು", credit: "ಕ್ರೆಡಿಟ್ ಮುಗಿಯುತ್ತಿದೆ", review: "ರಿವ್ಯೂ ಕೇಳಿ" },
     send: "ಕಳುಹಿಸಿ",
     // For a screen reader: who the message goes to.
     sendTo: "{name} ಗೆ WhatsApp ನಲ್ಲಿ ಕಳುಹಿಸಿ",
@@ -438,6 +438,9 @@ export const core: typeof English = {
       pickUpBy: "{time} ಒಳಗೆ ಕರೆದುಕೊಂಡು ಹೋಗಿ.",
       unpaid: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಿಂದ ಒಂದು ನೆನಪು: ಬಿಲ್ {number} ನಲ್ಲಿ {amount} ಪಾವತಿ ಬಾಕಿ ಇದೆ. {url}",
       groom: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ {pet} ಗೆ {date} ಸುಮಾರಿಗೆ ಗ್ರೂಮಿಂಗ್ ಸಮಯ. ಸಮಯ ಬುಕ್ ಮಾಡೋಣವೇ?",
+      health: "ನಮಸ್ಕಾರ {parent}, {pet} {date} ರಂದು {kennel} ಗೆ ಬರುತ್ತಿದೆ. ಅಷ್ಟರೊಳಗೆ {pet} ಗೆ ಬೇಕಾದುದು: {lacks}. ದಯವಿಟ್ಟು ಮಾಡಿಸಿ, ವಾಸ್ತವ್ಯದ ಮೊದಲು ದಾಖಲೆಗಳ ಫೋಟೋ ಕಳುಹಿಸಿ.",
+      credit: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ ನಿಮ್ಮ {amount} ಕ್ರೆಡಿಟ್ {date} ರಂದು ಮುಗಿಯುತ್ತದೆ. ಅದಕ್ಕೂ ಮೊದಲು ವಾಸ್ತವ್ಯ ಅಥವಾ ಭೇಟಿ ಬುಕ್ ಮಾಡಿ ಬಳಸಿಕೊಳ್ಳಿ.",
+      review: "ನಮಸ್ಕಾರ {parent}, {pet} ಅನ್ನು {kennel} ಗೆ ನಂಬಿ ಒಪ್ಪಿಸಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದ. ಒಂದು ನಿಮಿಷ ಇದ್ದರೆ, ನಿಮ್ಮ ರಿವ್ಯೂ ಬೇರೆ ಪೋಷಕರಿಗೆ ನಮ್ಮನ್ನು ಹುಡುಕಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ: {url}",
     },
   },
   copy: {

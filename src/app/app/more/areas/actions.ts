@@ -11,7 +11,7 @@ import { getAppI18n } from "@/lib/i18n-server";
 import type { Messages } from "@/messages";
 import { createClient } from "@/lib/supabase/server";
 
-type Area = { postal_code: string; name: string; delivery_charge_minor: number | null };
+type Area = { postal_code: string; name: string; delivery_charge_minor: number | null; trip_charge_minor: number | null };
 
 /** Read the area form: a PIN code (six digits in India), a name and an optional charge. */
 function readArea(form: FormData, m: Messages, country: string): { error: string } | { area: Area } {
@@ -24,7 +24,11 @@ function readArea(form: FormData, m: Messages, country: string): { error: string
   const charge = typed === null ? null : parseMoney(typed);
   if (charge !== null && charge < 0) return { error: e.charge };
   if (typed !== null && charge === null) return { error: e.charge };
-  return { area: { postal_code: postal, name: name.data, delivery_charge_minor: charge } };
+  // A pick-up or drop of a boarder (M39); empty means the delivery charge.
+  const tripTyped = text(form, "tripCharge");
+  const trip = tripTyped === null ? null : parseMoney(tripTyped);
+  if (tripTyped !== null && (trip === null || trip < 0)) return { error: e.charge };
+  return { area: { postal_code: postal, name: name.data, delivery_charge_minor: charge, trip_charge_minor: trip } };
 }
 
 /** Add a PIN code the kennel delivers to. Owners and managers (the policy decides). */

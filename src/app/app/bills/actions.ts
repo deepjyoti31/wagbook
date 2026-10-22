@@ -315,7 +315,8 @@ export async function recordPayment(_state: FormState, form: FormData): Promise<
 
   const Payment = z.object({
     amount: z.number().int().positive(w.errors.amount),
-    method: z.enum(PAYMENT_METHODS, w.errors.method),
+    // Credit (M38) pays a bill; the database spends the oldest first and never more than is left (WB211).
+    method: z.enum([...PAYMENT_METHODS, "credit"], w.errors.method),
     receivedOn: z.string().refine(isISODate, w.errors.date),
     reference: z.string().max(100, w.errors.reference).nullable(),
     note: z.string().max(500, w.errors.note).nullable(),
@@ -329,6 +330,7 @@ export async function recordPayment(_state: FormState, form: FormData): Promise<
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const p = parsed.data;
+  if (p.method === "credit" && (refund || !invoiceId)) return { error: t.m.credit.errors.billsOnly };
 
   const supabase = await createClient();
   // The parent, and the booking, come from the bill or the booking itself, read through our own session.

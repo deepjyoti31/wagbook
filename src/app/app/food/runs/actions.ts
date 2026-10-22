@@ -29,51 +29,71 @@ export async function startRun(_state: FormState, form: FormData): Promise<FormS
   return { ok: t.m.runs.runStarted };
 }
 
-/** Put a delivery on a run, at the end, take it off, or move it up or down (WB171: a run of its own day and time). Any member. */
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** A run's stops in order, deliveries and the pick-ups and drops of boarders (M39) together, as my_runs() orders them. */
+async function runStops(supabase: Supabase, orgId: string, runId: string) {
+  const [deliveries, trips] = await Promise.all([
+    supabase.from("deliveries").select("id, run_position, created_at").eq("org_id", orgId).eq("run_id", runId).neq("status", "cancelled"),
+    supabase.from("trips").select("id, run_position, created_at").eq("org_id", orgId).eq("run_id", runId).neq("status", "cancelled"),
+  ]);
+  if (deliveries.error || trips.error) return null;
+  return [...deliveries.data.map((d) => ({ ...d, trip: false })), ...trips.data.map((x) => ({ ...x, trip: true }))].sort(
+    (a, b) => (a.run_position ?? Infinity) - (b.run_position ?? Infinity) || a.created_at.localeCompare(b.created_at),
+  );
+}
+
+/** Put a stop on a run, at the end, take it off, or move it up or down (WB171: a run of its own day and time). Any member. A stop is a delivery or a trip. */
 export async function arrangeStop(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
   const t = await getAppI18n();
   const e = t.m.runs.errors;
   const delivery = Id.safeParse(form.get("deliveryId"));
-  if (!delivery.success) return { error: e.notFound };
+  const tripId = Id.safeParse(form.get("tripId"));
+  const isTrip = tripId.success;
+  const stopId = isTrip ? tripId.data : delivery.success ? delivery.data : null;
+  if (!stopId) return { error: e.notFound };
   const supabase = await createClient();
   const intent = form.get("intent");
+  const place = (run_id: string | null, run_position: number | null) =>
+    isTrip
+      ? supabase.from("trips").update({ run_id, run_position }).eq("org_id", org.id).eq("id", stopId).select("day:trip_date")
+      : supabase.from("deliveries").update({ run_id, run_position }).eq("org_id", org.id).eq("id", stopId).select("day:delivery_date");
 
   if (intent === "add") {
     const run = Id.safeParse(form.get("runId"));
     if (!run.success) return { error: e.run };
-    const last = await supabase.from("deliveries").select("run_position").eq("org_id", org.id).eq("run_id", run.data).order("run_position", { ascending: false, nullsFirst: false }).limit(1);
-    const { data, error } = await supabase
-      .from("deliveries")
-      .update({ run_id: run.data, run_position: (last.data?.[0]?.run_position ?? 0) + 1 })
-      .eq("org_id", org.id)
-      .eq("id", delivery.data)
-      .select("delivery_date");
+    const stops = await runStops(supabase, org.id, run.data);
+    const last = Math.max(0, ...(stops ?? []).map((x) => x.run_position ?? 0));
+    const { data, error } = await place(run.data, last + 1);
     if (error) return { error: friendlyError(error, t) };
     if (data.length === 0) return { error: e.notFound };
     revalidatePath("/app/food", "layout");
     // The stop's form moves to the run once it is on it, so the sentence is shown by the page instead.
-    redirect(`/app/food/runs?date=${data[0].delivery_date}&done=added`);
+    redirect(`/app/food/runs?date=${data[0].day}&done=added`);
   }
   if (intent === "off") {
-    const { error } = await supabase.from("deliveries").update({ run_id: null, run_position: null }).eq("org_id", org.id).eq("id", delivery.data);
+    const { error } = await place(null, null);
     if (error) return { error: friendlyError(error, t) };
     revalidatePath("/app/food", "layout");
     return { ok: t.m.common.saved };
   }
 
   // Up or down: swap places with the stop before or after it.
-  const me = await supabase.from("deliveries").select("id, run_id, run_position").eq("org_id", org.id).eq("id", delivery.data).maybeSingle();
+  const me = isTrip
+    ? await supabase.from("trips").select("run_id").eq("org_id", org.id).eq("id", stopId).maybeSingle()
+    : await supabase.from("deliveries").select("run_id").eq("org_id", org.id).eq("id", stopId).maybeSingle();
   if (!me.data?.run_id) return { error: e.notFound };
-  const stops = await supabase.from("deliveries").select("id, run_position").eq("org_id", org.id).eq("run_id", me.data.run_id).neq("status", "cancelled").order("run_position", { nullsFirst: false }).order("created_at");
-  if (stops.error) return { error: friendlyError(stops.error, t) };
-  const order = stops.data.map((s) => s.id);
-  const at = order.indexOf(me.data.id);
+  const stops = await runStops(supabase, org.id, me.data.run_id);
+  if (!stops) return { error: t.m.errors.missing };
+  const at = stops.findIndex((x) => x.id === stopId && x.trip === isTrip);
   const to = intent === "up" ? at - 1 : at + 1;
-  if (at < 0 || to < 0 || to >= order.length) return { ok: t.m.common.saved };
-  [order[at], order[to]] = [order[to], order[at]];
-  for (const [i, id] of order.entries()) {
-    const { error } = await supabase.from("deliveries").update({ run_position: i + 1 }).eq("org_id", org.id).eq("id", id);
+  if (at < 0 || to < 0 || to >= stops.length) return { ok: t.m.common.saved };
+  [stops[at], stops[to]] = [stops[to], stops[at]];
+  for (const [i, x] of stops.entries()) {
+    const { error } = x.trip
+      ? await supabase.from("trips").update({ run_position: i + 1 }).eq("org_id", org.id).eq("id", x.id)
+      : await supabase.from("deliveries").update({ run_position: i + 1 }).eq("org_id", org.id).eq("id", x.id);
     if (error) return { error: friendlyError(error, t) };
   }
   revalidatePath("/app/food", "layout");

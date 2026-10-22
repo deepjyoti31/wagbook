@@ -43,7 +43,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const res = await supabase
     .from("pets")
     .select(
-      "id, name, species, breed, sex, is_neutered, date_of_birth, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
+      "id, name, species, breed, sex, is_neutered, date_of_birth, dewormed_on, tick_treated_on, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -260,6 +260,12 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
             </Field>
             <Field label={f.dateOfBirth}>
               <Input name="dateOfBirth" type="date" defaultValue={pet.date_of_birth ?? ""} />
+            </Field>
+            <Field label={m.health.dewormedOn}>
+              <Input name="dewormedOn" type="date" defaultValue={pet.dewormed_on ?? ""} />
+            </Field>
+            <Field label={m.health.tickTreatedOn}>
+              <Input name="tickTreatedOn" type="date" defaultValue={pet.tick_treated_on ?? ""} />
             </Field>
             <Field label={f.colour}>
               <Input name="color" maxLength={80} defaultValue={pet.color ?? ""} />

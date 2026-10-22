@@ -8,16 +8,18 @@ import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
   addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
-  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp, localClock, localDate, type GroomCard,
+  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, CREDIT_REMINDER_DAYS, REVIEW_REMINDER_DAYS, zonedInstant, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp, localClock, localDate, type GroomCard,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { appointmentsOn, workingPeople } from "@/lib/appointments";
+import { lacksInWords, petsLacking } from "@/lib/health";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
 import { ReminderLink } from "@/components/reminder-link";
 import { siteOrigin } from "@/lib/site";
 import { bookingCards, familyHolds, type BookingCard } from "@/lib/queries";
+import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { checkIn, checkOut } from "./actions";
 import { confirmRequest, extendToToday } from "./bookings/actions";
@@ -277,7 +279,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
             {reminders.slice(0, 20).map((r) => (
               <LedgerRow key={`${r.kind}-${r.subjectId}`}>
                 <span className="min-w-0 flex-1">
-                  <span className="font-bold">{r.about}</span> <Badge tone={r.kind === "unpaid" || r.kind === "vaccination" ? "attention" : "neutral"}>{m.today.reminderKinds[r.kind]}</Badge>
+                  <span className="font-bold">{r.about}</span> <Badge tone={r.kind === "unpaid" || r.kind === "vaccination" || r.kind === "health" ? "attention" : "neutral"}>{m.today.reminderKinds[r.kind]}</Badge>
                   <span className="block text-sm text-slate">{r.parentName}</span>
                 </span>
                 <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} />
@@ -614,20 +616,68 @@ function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I1
 
 /**
  * The reminders due today (src/lib/core/reminders.ts), in the language the
- * kennel uses for parents: vaccination cards, see you tomorrow, going home
- * tomorrow, unpaid bills, and pets due a groom again (M35).
+ * kennel uses for parents: vaccination cards, health papers (M40), see you
+ * tomorrow, going home tomorrow, unpaid bills, pets due a groom again (M35),
+ * credit ending (M38) and asking for a review (M42).
  */
 async function todaysReminders(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  org: { id: string; name: string; parent_language: string; locale: string; currency: string; check_in_time: string; check_out_time: string; time_zone: string; offers_appointments: boolean },
+  org: Pick<
+    Tables<"organizations">,
+    | "id" | "name" | "parent_language" | "locale" | "currency" | "check_in_time" | "check_out_time" | "time_zone" | "offers_appointments"
+    | "health_check" | "deworm_days" | "tick_days" | "neuter_months" | "review_url"
+  >,
   today: string,
   origin: string,
   upcoming: BookingCard[],
   inHouse: BookingCard[],
   oldBills: { id: string; number: string | null; issued_on: string | null; public_token: string; clients: { full_name: string; phone: string } | null }[],
 ) {
-  const grooms = org.offers_appointments ? await groomCards(supabase, org) : [];
-  const ids = [...upcoming.map((b) => b.id), ...inHouse.map((b) => b.id), ...oldBills.map((b) => b.id), ...grooms.flatMap((g) => (g.last ? [g.last.id] : []))];
+  const weekAgo = addDays(today, -REVIEW_REMINDER_DAYS);
+  const [grooms, lacking, credits, endedStays, endedVisits] = await Promise.all([
+    org.offers_appointments ? groomCards(supabase, org) : Promise.resolve([]),
+    petsLacking(supabase, org, upcoming.flatMap((b) => (b.pets ? [{ petId: b.pets.id, on: b.start_date }] : []))),
+    supabase
+      .from("credit_balances")
+      .select("credit_id, client_id, left_minor, expires_on")
+      .eq("org_id", org.id)
+      .gt("left_minor", 0)
+      .gte("expires_on", today)
+      .lte("expires_on", addDays(today, CREDIT_REMINDER_DAYS))
+      .limit(100),
+    // Reviews: stays that ended in the last week (not each day of a daycare series), and visits for an appointment alone.
+    org.review_url
+      ? bookingCards(supabase, org.id).eq("status", "checked_out").is("series_id", null).gte("end_date", weekAgo).lte("end_date", today).limit(100)
+      : Promise.resolve({ data: [] as BookingCard[] }),
+    org.review_url && org.offers_appointments
+      ? supabase
+          .from("appointments")
+          .select("id, starts_at, pets!appointments_org_id_client_id_pet_id_fkey(name), clients(full_name, phone)")
+          .eq("org_id", org.id)
+          .eq("status", "done")
+          .is("booking_id", null)
+          .gte("starts_at", zonedInstant(weekAgo, "00:00", org.time_zone).toISOString())
+          .limit(100)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const ended = [
+    ...(endedStays.data ?? []).map((b) => ({ id: b.id, petName: b.pets?.name ?? "", parentName: b.clients?.full_name ?? "", phone: b.clients?.phone ?? "", endedOn: b.end_date })),
+    ...(endedVisits.data ?? []).map((a) => ({ id: a.id, petName: a.pets?.name ?? "", parentName: a.clients?.full_name ?? "", phone: a.clients?.phone ?? "", endedOn: localDate(a.starts_at, org.time_zone) })),
+  ]
+    .filter((e) => e.phone)
+    // One ask for each parent: the latest stay or visit.
+    .sort((a, b) => b.endedOn.localeCompare(a.endedOn))
+    .filter((e, i, all) => all.findIndex((x) => x.phone === e.phone) === i);
+  const creditClients = [...new Set((credits.data ?? []).flatMap((c) => (c.client_id ? [c.client_id] : [])))];
+  const creditParents = creditClients.length > 0 ? ((await supabase.from("clients").select("id, full_name, phone").eq("org_id", org.id).in("id", creditClients)).data ?? []) : [];
+  const ids = [
+    ...upcoming.map((b) => b.id),
+    ...inHouse.map((b) => b.id),
+    ...oldBills.map((b) => b.id),
+    ...grooms.flatMap((g) => (g.last ? [g.last.id] : [])),
+    ...(credits.data ?? []).flatMap((c) => (c.credit_id ? [c.credit_id] : [])),
+    ...ended.map((e) => e.id),
+  ];
   const [vaccinations, balances, sent] = await Promise.all([
     upcoming.length > 0
       ? supabase.from("vaccinations").select("pet_id, vaccine, valid_until").eq("org_id", org.id).in("pet_id", upcoming.map((b) => b.pets?.id ?? ""))
@@ -655,7 +705,13 @@ async function todaysReminders(
       dropOff: org.check_in_time,
       pickUp: org.check_out_time,
       currency: org.currency,
-      upcoming: upcoming.filter((b) => b.clients).map((b) => ({ ...stay(b), vaccinations: (vaccinations.data ?? []).filter((v) => v.pet_id === b.pets?.id) })),
+      upcoming: upcoming
+        .filter((b) => b.clients)
+        .map((b) => ({
+          ...stay(b),
+          vaccinations: (vaccinations.data ?? []).filter((v) => v.pet_id === b.pets?.id),
+          lacks: lacksInWords(lacking.get(`${b.pets?.id}:${b.start_date}`) ?? [], p.m.health.problems),
+        })),
       inHouse: inHouse.filter((b) => b.clients).map(stay),
       unpaid: oldBills
         .filter((b) => b.clients && b.number && b.issued_on && due.has(b.id))
@@ -669,6 +725,12 @@ async function todaysReminders(
           url: `${origin}/inv/${b.public_token}`,
         })),
       grooms,
+      credits: (credits.data ?? []).flatMap((c) => {
+        const parent = creditParents.find((x) => x.id === c.client_id);
+        return c.credit_id && parent && c.expires_on ? [{ id: c.credit_id, parentName: parent.full_name, phone: parent.phone, leftMinor: c.left_minor ?? 0, expiresOn: c.expires_on }] : [];
+      }),
+      reviewUrl: org.review_url,
+      ended,
       sent: (sent.data ?? []).map((x) => ({ kind: x.kind, subjectId: x.subject_id, sentOn: x.sent_on })),
     },
     p.locale,

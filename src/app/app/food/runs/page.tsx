@@ -28,7 +28,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
   const r = m.runs;
   const day = typeof asked === "string" && isISODate(asked) ? asked : todayIn(org.time_zone);
   const supabase = await createClient();
-  const [runs, deliveries, members] = await Promise.all([
+  const [runs, deliveries, members, trips] = await Promise.all([
     supabase.from("delivery_runs").select("id, slot, rider_id").eq("org_id", org.id).eq("run_date", day).order("slot"),
     supabase
       .from("deliveries")
@@ -40,11 +40,27 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
       .order("run_position", { nullsFirst: false })
       .order("created_at"),
     supabase.from("memberships").select("user_id, display_name, role, skills").eq("org_id", org.id).eq("is_active", true).order("display_name"),
+    // Pick-ups and drops of boarders (M39) go on the same runs.
+    supabase
+      .from("trips")
+      .select("id, kind, slot, status, at_time, run_id, run_position, created_at, pets(name, clients(full_name)), client_addresses(line, area, postal_code, map_url)")
+      .eq("org_id", org.id)
+      .eq("trip_date", day)
+      .neq("status", "cancelled")
+      .not("address_id", "is", null),
   ]);
-  if (runs.error || deliveries.error || members.error) throw new Error("Could not load runs.");
+  if (runs.error || deliveries.error || members.error || trips.error) throw new Error("Could not load runs.");
   const riders = members.data.filter((x) => x.role === "rider" || x.skills.includes("rider"));
   const nameOf = new Map(members.data.map((x) => [x.user_id, x.display_name]));
-  const unassigned = deliveries.data.filter((d) => !d.run_id);
+  // Deliveries and trips as one list of stops, in run order.
+  const all = [
+    ...deliveries.data.map((d) => ({ ...d, trip: null as null | { kind: "pickup" | "drop"; time: string } })),
+    ...trips.data.map((x) => ({ ...x, clients: x.pets?.clients ?? null, packs: 0, trip: { kind: x.kind, time: x.at_time.slice(0, 5) } })),
+  ].sort((a, b) => (a.run_position ?? Infinity) - (b.run_position ?? Infinity) || a.created_at.localeCompare(b.created_at));
+  const unassigned = all.filter((d) => !d.run_id);
+  const statusOf = (d: (typeof all)[number]) =>
+    d.trip ? m.trips.statuses[d.status as keyof typeof m.trips.statuses] : m.deliveryStatus[d.status as keyof typeof m.deliveryStatus];
+  const stopId = (d: (typeof all)[number]) => (d.trip ? <input type="hidden" name="tripId" value={d.id} /> : <input type="hidden" name="deliveryId" value={d.id} />);
 
   return (
     <>
@@ -68,7 +84,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
       </form>
 
       {runs.data.map((run) => {
-        const stops = deliveries.data.filter((d) => d.run_id === run.id);
+        const stops = all.filter((d) => d.run_id === run.id);
         return (
           <Section key={run.id} title={fill(r.run, { rider: nameOf.get(run.rider_id) ?? "", slot: m.slots[run.slot] })} count={stops.length}>
             {stops.length === 0 ? (
@@ -79,17 +95,21 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
                   {stops.map((d, i) => (
                     <LedgerRow key={d.id}>
                       <div className="min-w-48 flex-1">
-                        <p className="font-semibold">{plural(language, d.packs, r.stop, { n: i + 1, count: d.packs, pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "" })}</p>
+                        <p className="font-semibold">
+                          {d.trip
+                            ? fill(m.trips.runStop[d.trip.kind], { n: i + 1, time: d.trip.time, pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "" })
+                            : plural(language, d.packs, r.stop, { n: i + 1, count: d.packs, pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "" })}
+                        </p>
                         <p className="text-sm text-slate">{[d.client_addresses?.line, d.client_addresses?.area, d.client_addresses?.postal_code].filter(Boolean).join(", ")}</p>
                       </div>
-                      <Badge tone={d.status === "delivered" ? "good" : "neutral"}>{m.deliveryStatus[d.status]}</Badge>
+                      <Badge tone={d.status === "delivered" || d.status === "done" ? "good" : "neutral"}>{statusOf(d)}</Badge>
                       {d.client_addresses ? (
                         <a href={placeLink(d.client_addresses)} target="_blank" rel="noreferrer" className={buttonStyles.quiet}>
                           {r.openMap}
                         </a>
                       ) : null}
                       <ActionForm action={arrangeStop} className="flex flex-wrap gap-1">
-                        <input type="hidden" name="deliveryId" value={d.id} />
+                        {stopId(d)}
                         <SubmitButton variant="quiet" name="intent" value="up" pendingLabel="…">
                           {r.up}
                         </SubmitButton>
@@ -128,13 +148,14 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
                 <LedgerRow key={d.id}>
                   <div className="min-w-48 flex-1">
                     <p className="font-semibold">
+                      {d.trip ? `${m.trips.kinds[d.trip.kind]}, ${d.trip.time}: ` : ""}
                       {d.pets?.name} ({d.clients?.full_name}), {m.slots[d.slot]}
                     </p>
                     <p className="text-sm text-slate">{[d.client_addresses?.line, d.client_addresses?.area, d.client_addresses?.postal_code].filter(Boolean).join(", ")}</p>
                   </div>
                   {fits.length > 0 ? (
                     <ActionForm action={arrangeStop} className="flex flex-wrap items-end gap-2">
-                      <input type="hidden" name="deliveryId" value={d.id} />
+                      {stopId(d)}
                       <input type="hidden" name="intent" value="add" />
                       <Select name="runId" aria-label={r.addTo} className="w-auto" defaultValue={fits[0].id}>
                         {fits.map((x) => (

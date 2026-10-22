@@ -67,7 +67,7 @@ async function Intake({ params }: Pick<PageProps<"/i/[slug]">, "params">) {
           notice={kennel.notice}
           askAddress={kennel.delivers === true}
           words={w}
-          shared={{ species: m.labels.species, sex: m.labels.sex, yes: m.common.yes, no: m.common.no, photos: m.photos }}
+          shared={{ species: m.labels.species, sex: m.labels.sex, yes: m.common.yes, no: m.common.no, photos: m.photos, dewormedOn: m.health.dewormedOn, tickTreatedOn: m.health.tickTreatedOn }}
         />
       ) : (
         <p className="rounded-xl border border-rule bg-paper p-6 text-lg">{fill(w.closed, { kennel: kennel.name })}</p>

@@ -374,7 +374,7 @@ export const core: typeof English = {
     seeRequests: "देखें",
     toSend: "भेजने हैं",
     toSendAbout: "आज भेजने वाले संदेश। भेजें दबाने पर WhatsApp में संदेश लिखा हुआ खुलता है; फिर यह इस सूची से हट जाता है।",
-    reminderKinds: { vaccination: "टीकों का कार्ड", arrival: "कल आ रहा है", pickup: "कल घर जा रहा है", unpaid: "बिल बाकी", groom: "ग्रूमिंग का समय" },
+    reminderKinds: { vaccination: "टीकों का कार्ड", arrival: "कल आ रहा है", pickup: "कल घर जा रहा है", unpaid: "बिल बाकी", groom: "ग्रूमिंग का समय", health: "सेहत के कागज़", credit: "क्रेडिट खत्म हो रहा", review: "रिव्यू माँगें" },
     send: "भेजें",
     // For a screen reader: who the message goes to.
     sendTo: "{name} को WhatsApp पर भेजें",
@@ -437,6 +437,9 @@ export const core: typeof English = {
       pickUpBy: "{time} तक ले जाएं।",
       unpaid: "नमस्ते {parent}, {kennel} से एक याद: बिल {number} पर {amount} चुकाना बाकी है। {url}",
       groom: "नमस्ते {parent}, {kennel} में {pet} की ग्रूमिंग {date} के आसपास होनी है। क्या समय बुक करें?",
+      health: "नमस्ते {parent}, {pet} {date} को {kennel} आ रहा है। तब तक {pet} के लिए ज़रूरी है: {lacks}। कृपया यह करवा लें और रुकने से पहले कागज़ों की फ़ोटो भेज दें।",
+      credit: "नमस्ते {parent}, {kennel} में आपका {amount} का क्रेडिट {date} को खत्म हो जाएगा। उससे पहले कोई स्टे या विज़िट बुक करके इसे इस्तेमाल करें।",
+      review: "नमस्ते {parent}, {pet} को {kennel} पर भरोसा करके सौंपने के लिए धन्यवाद। अगर एक मिनट हो, तो आपका रिव्यू दूसरे पेरेंट्स को हमें ढूँढने में मदद करता है: {url}",
     },
   },
   copy: {

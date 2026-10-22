@@ -28,6 +28,9 @@ import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
 import { monthOf } from "@/lib/stay-bill";
 import { StayAppointments } from "@/components/stay-appointments";
+import { StayCancellation } from "@/components/stay-cancellation";
+import { HealthAtTheDoor } from "@/components/stay-health";
+import { StayTrips } from "@/components/stay-trips";
 import { createClient } from "@/lib/supabase/server";
 import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, setWaitlist, switchToBoarding, updateBooking } from "../actions";
 
@@ -297,6 +300,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       {b.status === "requested" || b.status === "confirmed" ? (
         <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
       ) : null}
+      {(b.status === "requested" || b.status === "confirmed") && pet ? (
+        <HealthAtTheDoor t={t} petId={pet.id} on={b.start_date > today ? b.start_date : today} bookingId={b.id} />
+      ) : null}
 
       {open ? (
         <Section title={w.next}>
@@ -438,6 +444,19 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         />
       ) : null}
 
+      {org.offers_food_delivery && parent && b.status !== "no_show" ? (
+        <StayTrips t={t} booking={{ ...b, client_id: parent.id, clients: parent }} open={b.status === "requested" || b.status === "confirmed" || b.status === "checked_in"} />
+      ) : null}
+
+      {b.status === "cancelled" && !bill.data ? (
+        <StayCancellation
+          t={t}
+          bookingId={b.id}
+          choice={query.choice === "credit" ? "credit" : query.choice === "refund" ? "refund" : null}
+          settled={query.money === "settled"}
+        />
+      ) : null}
+
       {b.status !== "requested" && (b.status !== "cancelled" || bill.data || advances.data.length > 0) ? (
         <Section title={w.bill.title}>
           {bill.data ? (
@@ -509,7 +528,11 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <p className="font-semibold">{fill(w.refund.paid, { amount: money(advanceMinor) })}</p>
                 {noRefundText ? <p className="text-slate">{noRefundText}</p> : null}
                 {canManage ? (
-                  <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+                  // The rules above say what the advance becomes; a different refund agreed with the parent is recorded here.
+                  <details>
+                    <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.cancelRules.otherRefund}</summary>
+                    <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+                  </details>
                 ) : (
                   <p className="text-slate">{w.refund.managersOnly}</p>
                 )}
@@ -773,6 +796,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             <Field label={w.cancel.why}>
               <Input name="reason" required maxLength={500} />
             </Field>
+            <Field label={m.cancelRules.askedAt} hint={m.cancelRules.askedAtHint}>
+              <Input name="askedAt" type="datetime-local" max={`${today}T23:59`} />
+            </Field>
+            <label className="flex min-h-12 items-start gap-3">
+              <input type="checkbox" name="byKennel" className="mt-1 size-5 shrink-0" />
+              <span>{m.cancelRules.byKennel}</span>
+            </label>
             <SubmitButton variant="secondary" pendingLabel={w.cancel.cancelling}>
               {w.cancel.button}
             </SubmitButton>

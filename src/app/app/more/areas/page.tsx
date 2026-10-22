@@ -25,7 +25,7 @@ async function Areas() {
   const { m } = t;
   const a = m.areas;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("service_areas").select("id, postal_code, name, delivery_charge_minor").eq("org_id", org.id).order("name").order("postal_code");
+  const { data, error } = await supabase.from("service_areas").select("id, postal_code, name, delivery_charge_minor, trip_charge_minor").eq("org_id", org.id).order("name").order("postal_code");
   if (error) throw new Error("Could not load areas.");
   const charge = (minor: number | null) =>
     minor === null || minor === 0 ? a.free : fill(a.perDelivery, { amount: formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true }) });
@@ -49,6 +49,9 @@ async function Areas() {
             <Field label={a.charge} hint={a.chargeHint}>
               <Input name="charge" inputMode="decimal" />
             </Field>
+            <Field label={m.trips.areaCharge} hint={m.trips.areaChargeHint}>
+              <Input name="tripCharge" inputMode="decimal" />
+            </Field>
             <SubmitButton pendingLabel={m.common.adding}>{a.addButton}</SubmitButton>
           </ActionForm>
         </Section>
@@ -66,6 +69,9 @@ async function Areas() {
                     {x.name} <span className="font-normal tabular-nums text-slate">{x.postal_code}</span>
                   </p>
                   <p className="text-slate">{charge(x.delivery_charge_minor)}</p>
+                  {x.trip_charge_minor !== null ? (
+                    <p className="text-slate">{fill(m.trips.areaChargeLine, { amount: formatMoney(x.trip_charge_minor, { currency: org.currency, locale: t.locale, trimZeros: true }) })}</p>
+                  ) : null}
                 </div>
                 {canManage ? (
                   <details className="w-full">
@@ -84,6 +90,9 @@ async function Areas() {
                       </Field>
                       <Field label={a.charge} hint={a.chargeHint}>
                         <Input name="charge" inputMode="decimal" defaultValue={plain(x.delivery_charge_minor)} />
+                      </Field>
+                      <Field label={m.trips.areaCharge} hint={m.trips.areaChargeHint}>
+                        <Input name="tripCharge" inputMode="decimal" defaultValue={plain(x.trip_charge_minor)} />
                       </Field>
                       <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
                     </ActionForm>

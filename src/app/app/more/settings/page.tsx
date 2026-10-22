@@ -275,6 +275,9 @@ async function Settings() {
           <Field label={s.intake.notice} hint={s.intake.noticeHint}>
             <Textarea name="intake_notice" defaultValue={org.intake_notice ?? ""} maxLength={1500} />
           </Field>
+          <Field label={m.reviews.link} hint={m.reviews.linkHint}>
+            <Input name="review_url" type="url" defaultValue={org.review_url ?? ""} maxLength={500} autoCapitalize="none" spellCheck={false} />
+          </Field>
         </Group>
 
         {canManage ? <SubmitButton pendingLabel={m.common.saving}>{s.save}</SubmitButton> : null}

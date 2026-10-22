@@ -46,6 +46,7 @@ export async function addPeakPeriod(_state: FormState, form: FormData): Promise<
     start_date: p.startDate,
     end_date: p.endDate,
     no_refund: checked(form, "noRefund"),
+    is_holiday: checked(form, "isHoliday"),
     play_session_minutes: p.playMinutes,
   });
   if (error) return { error: friendlyError(error, t) };

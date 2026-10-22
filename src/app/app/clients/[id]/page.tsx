@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { HidePanel } from "@/components/hide-panel";
+import { ParentCredit } from "@/components/parent-credit";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
@@ -167,6 +168,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
       {org.offers_food_delivery ? <Addresses t={t} org={org} clientId={c.id} canManage={canManage} canDelete={canDelete} /> : null}
 
       <Packs t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
+      <ParentCredit t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
 
       {c.request_token && !hidden ? <RequestLink t={t} org={org} client={{ id: c.id, name: c.full_name, phone: c.phone, token: c.request_token }} /> : null}
 

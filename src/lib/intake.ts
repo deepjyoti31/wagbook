@@ -36,6 +36,9 @@ export const IntakePet = z.object({
   behaviour_notes: optional(long),
   vet_name: optional(short),
   vet_phone: optional(short),
+  /** When the pet was last dewormed and treated for ticks (M40). */
+  dewormed_on: optional(short),
+  tick_treated_on: optional(short),
   vaccinations: z.array(IntakeVaccination).max(10).catch([]),
 });
 
@@ -59,6 +62,21 @@ export const IntakePayload = z.object({
     end_date: optional(short),
     notes: optional(long),
   }),
+  /**
+   * From the booking form for new parents (M41): accepting the form also makes
+   * the request (accept_intake). A stay uses `stay`; an appointment names its
+   * service and a time on `stay.start_date`.
+   */
+  request: z
+    .object({
+      make: z.literal("true"),
+      service_id: optional(z.uuid()),
+      time: optional(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)),
+      pickup: z.enum(["true", "false"]).catch("false"),
+      vaccinations_ok: z.enum(["true", "false"]).catch("false"),
+    })
+    .optional()
+    .catch(undefined),
   consent: z.literal(true),
 });
 
