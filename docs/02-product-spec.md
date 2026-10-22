@@ -916,19 +916,22 @@ those on days it no longer has.
 
 ## J. Boarding as the public rules promise (Phase 3, M38 to M42, D47)
 
-### J1. Cancellation rules and credit. Planned (M38).
+### J1. Cancellation rules and credit. Built (M38).
 
-**More, Cancellation and credit** (owners and managers change it): which weekdays count as the weekend (Saturday and
-Sunday by default), how many months credit lasts (12), and a rule for each of boarding, day boarding and
-appointments: the notice needed (24 hours), and what happens to a weekday and to a weekend or holiday night with that
-notice and without it: **refund**, **credit**, or **keep**. Holidays are peak periods marked "a holiday" (C7).
+**More, Cancellation rules** (owners and managers change it): which weekdays count as the weekend (Saturday and
+Sunday by default), how many months credit lasts (12), and a rule for each of boarding and day boarding: the notice
+needed (24 hours), and what happens to a weekday and to a weekend or holiday night with that notice and without it:
+**refund**, **credit**, or **keep**. Holidays are peak periods ticked "a holiday" (C7). The database also takes a rule
+for appointments, but no screen sets it yet: appointments take no advance (they are paid on their own bill), so there
+is nothing for it to decide (see Open questions in `HANDOFF.md`).
 
 **Cancelling a stay** records when the parent asked (now, or earlier when they rang yesterday) and whether the kennel
 cancelled. Wagbook then works out each night (each day for day boarding) on its own: its notice is the time from the
 ask to that day's check-in time; its rule is the weekday or the weekend one (`cancellationOutcome()`, unit tested). When
 the kennel cancels, the parent chooses: everything refunded, or everything as credit. The money paid in advance goes to
 the refund first, then to credit; the rest is kept. An owner or manager confirms both in one step on the stay's page:
-the refund, and the credit, which is a refund paid "as credit" (`payments.method = 'credit'`).
+the refund, and the credit, which is a refund paid "as credit" (`payments.method = 'credit'`). A different refund agreed
+with the parent can still be recorded by hand under it.
 
 **Credit** is a ledger (`credits`, `credit_uses`): each amount kept as credit, or given as goodwill by an owner or
 manager with a reason, ends on a set date. It is spent on any bill as a payment "from credit", the soonest to end first,
@@ -936,7 +939,7 @@ never more than what is left and never after it ends (`WB211`), and a payment fr
 The parent page shows what is left and when it ends; a bill's payment form offers it. Today lists a reminder to send a
 month before credit runs out (D39). Reports leave payments from and into credit out of money in and out: no money moved.
 
-### J2. Pick-up and drop from home. Planned (M39).
+### J2. Pick-up and drop from home. Built (M39).
 
 While the kennel delivers (B10), a stay has **Pick-up** and **Drop**: an address of the parent (B11) and a time. The
 price is the area's trip charge (B12, the delivery charge when none is set), copied when added; an owner or manager may
@@ -945,29 +948,30 @@ for Biscuit (3 Nov, 09:00)"). Pick-up is on the stay's first day and drop on its
 cancels its trips and changing its dates moves them. **Tell the parent** opens WhatsApp with the time. Trips join the
 day's runs (H6) by their slot, and a rider sees and marks them like deliveries (`my_runs()`, `rider_mark_trip()`).
 
-### J3. Health papers at the door. Planned (M40).
+### J3. Health papers at the door. Built (M40).
 
-**More, Health rules** (owners and managers): the vaccines the kennel requires and how many months each lasts when the
+**More, Health papers** (owners and managers): the vaccines the kennel requires and how many months each lasts when the
 card gives no date, deworming and tick treatment within so many days, spayed or neutered above an age in months, and
 whether failing them **warns** or **refuses** (off by default). Pets have the days they were last dewormed and treated
-for ticks, on the pet page and the intake form. `pet_health_problems()` says what a pet lacks on a day. Check-in and
-marking an appointment done show the problems, and while the kennel refuses, the database refuses them (`WB210`)
+for ticks, on the pet page and the intake form. `pet_health_problems()` says what a pet lacks on a day. A stay's page (before check-in) and a visitor's appointment page show the problems, and while the kennel refuses, the database refuses them (`WB210`)
 unless an owner or manager let the pet in with a note (`health_overrides`, in History of changes). Today lists stays
 starting within a week whose pet will lack something, to send the parent (D39).
 
-### J4. A booking form for new parents. Planned (M41).
+### J4. A booking form for new parents. Built (M41).
 
 `/book/{slug}`: what (boarding, day boarding, or an appointment service the kennel offers), when (dates, or a day and a
-time), pick-up from home (while the kennel delivers), the dog's name, breed and weight, a tick that vaccinations are up
-to date, the parent's name and phone, and consent. It shows an estimate from the kennel's prices and says nothing is
+time), pick-up from home with its address (while the kennel delivers), one pet's name, animal, breed, sex, neutering and
+date of birth, a tick that vaccinations are up to date, the parent's name and phone, a note, and consent. It shows an estimate from the kennel's prices and says nothing is
 charged. It lands in Forms from parents (B4) through the intake form's own function: accepting it makes the parent and
-pet and the request (a stay or an appointment), so staff confirm in one place. No new public function (D47).
+pet and the request (a stay or an appointment) and opens it, so staff confirm in one place. A request the kennel cannot
+take as asked (no usual price, a time outside the place's hours) is left for staff to book by hand. Its link is on
+Forms from parents. No new public function, and the intake form's rate limit (D47).
 
-### J5. Reviews from parents. Planned (M42).
+### J5. Reviews from parents. Built (M42).
 
 Settings, **Review link** (an https address, such as the kennel's Google review page). With it, Today lists parents to
-ask for a review: a stay checked out or an appointment done in the last week, once each (D39), with the WhatsApp
-message carrying the link. A review page of Wagbook's own is not built.
+ask for a review: a stay checked out or a visitor's appointment done in the last week, once each and only the latest for
+each parent (not each day of a daycare series), with the WhatsApp message carrying the link (D39). A review page of Wagbook's own is not built.
 
 ---
 

@@ -216,6 +216,23 @@ that name it. A pet's **grooming card** is `pet_grooming`, its coat `pets.coat`.
 `package_parts`) goes on a stay through `apply_package()`: `bookings.package_id` and `package_price_minor`, with its
 extras (`booking_items.in_package`) and appointments (`appointments.in_package`) at no charge.
 
+## Cancellations, credit, trips and health
+
+Phase 3 (M38 to M42, D47). In `20261008000560_credit.sql`: a kennel's **cancellation rules** (`cancellation_rules`,
+one row for each of boarding, day boarding and appointments; no row means the defaults), its weekend days and credit
+months (`organizations.weekend_days`, `credit_months`), and holidays as peak periods (`peak_periods.is_holiday`). A
+cancelled stay records when the parent asked and whether the kennel cancelled (`bookings.cancel_asked_at`,
+`cancelled_by_kennel`). **Credit** is a ledger: each lot (`credits`, from a cancellation or goodwill, with its end
+date) and each spending (`credit_uses`), written only by the trigger on payments (`payments_credit`): a refund paid as
+credit (`method = 'credit'`, direction out) makes a lot, a payment from credit (direction in) spends the soonest to
+end. `credit_balances` says what is left and whether it can be spent today. In `20261008000460_trips_and_health.sql`:
+**trips** (`trips`), a pick-up on a stay's first day or a drop on its last, with an address, a time and its slot, a
+price copied from the area (`service_areas.trip_charge_minor`, else its delivery charge), a status, and a place on a
+run (`run_id`, `run_position`). **Health at the door**: the kennel's rules (`organizations.health_check`,
+`deworm_days`, `tick_days`, `neuter_months`, and `required_vaccines`), the pet's dates (`pets.dewormed_on`,
+`tick_treated_on`), what a pet lacks on a day (`pet_health_problems()`), and an owner's or manager's reason for letting
+a pet in anyway (`health_overrides`). The review link is `organizations.review_url`.
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

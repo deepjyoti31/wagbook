@@ -2039,3 +2039,173 @@ test("appointments: a stay with a package is billed as one line, its swim and gr
   await expect(page.getByText(/^Holiday package: Toby, 4 nights/)).toBeVisible();
   await expect(page.getByText(/^Swim for Toby/)).toHaveCount(0);
 });
+
+// ---------------------------------------------------------------------------
+// Phase 3: boarding as the public rules promise (M38 to M42). New pets again.
+// ---------------------------------------------------------------------------
+
+test("cancellation: the kennel cancels a paid stay, the parent keeps it as credit, and a manager adds goodwill", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.cancellation.title) }).click();
+  await page.locator("input[name='boarding.hours']").fill("48");
+  await page.getByRole("button", { name: en.cancelSetup.save }).click();
+  await expect(page.getByText(en.cancelSetup.saved)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m38-rules");
+
+  await addPet(page, "9800000416", "Asha Sample", "Mitra");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Mitra (Asha Sample)" });
+  await page.getByLabel("Check-in date").fill(day(10));
+  await page.getByLabel("Check-out date").fill(day(13));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  await page.getByLabel("Amount").fill("3000");
+  await page.getByRole("button", { name: "Record advance" }).click();
+  await expect(page.getByText("Advance recorded.")).toBeVisible();
+
+  await page.getByLabel("Why is it cancelled?").fill("The kennel is closed for repairs");
+  await page.getByLabel(en.cancelRules.byKennel).check();
+  await page.getByRole("button", { name: "Cancel booking" }).click();
+  await expect(page.getByText("Booking cancelled. The space is free again.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.cancelRules.title })).toBeVisible();
+  await expect(page.getByText(en.cancelRules.byKennelAbout)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m38-cancelled");
+  await page.locator("select[name=choice]").selectOption({ label: en.cancelRules.chooseCredit });
+  await page.getByRole("button", { name: en.cancelRules.confirmChoice }).click();
+  await expect(page.getByText(en.cancelRules.settled)).toBeVisible();
+
+  await openPet(page, "Mitra");
+  await page.getByRole("link", { name: "Asha Sample" }).click();
+  await expect(page.getByText("₹3,000 of credit to spend")).toBeVisible();
+  await page.locator("form").filter({ has: page.getByRole("button", { name: en.credit.give }) }).locator("input[name=amount]").fill("500");
+  await page.locator("input[name=reason]").fill("Sorry for the trouble");
+  await page.getByRole("button", { name: en.credit.give }).click();
+  await expect(page.getByText(en.credit.given)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("₹3,500 of credit to spend")).toBeVisible();
+  await expect(page.getByText(en.credit.kinds.goodwill)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m38-credit");
+});
+
+test("health papers: a pet with no rabies card is refused at check-in until a manager lets it in", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/health");
+  await page.locator("select[name=mode]").selectOption("refuse");
+  await page.getByRole("button", { name: en.healthSetup.save, exact: true }).click();
+  await expect(page.getByText(en.healthSetup.saved, { exact: true })).toBeVisible();
+  await page.locator("input[name=vaccine]").fill("Rabies");
+  await page.getByRole("button", { name: en.healthSetup.add }).click();
+  await expect(page.getByText("Rabies is now required.")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m40-setup");
+
+  await addPet(page, "9800000417", "Dev Sample", "Kiwi");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Kiwi (Dev Sample)" });
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(1));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  await expect(page.getByText(/this pet lacks what the kennel requires: Rabies vaccination/)).toBeVisible();
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("This pet lacks what the kennel requires at the door: Rabies. An owner or manager can let it in with a note.")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m40-refused");
+
+  await page.getByLabel(en.health.why).fill("Card seen on the parent's phone");
+  await page.getByRole("button", { name: en.health.letInButton }).click();
+  await expect(page.getByText("Let in anyway: Card seen on the parent's phone")).toBeVisible();
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+
+  // Back to not checking, for the steps after.
+  await page.goto("/app/more/health");
+  await page.locator("select[name=mode]").selectOption("off");
+  await page.getByRole("button", { name: en.healthSetup.save, exact: true }).click();
+  await expect(page.getByText(en.healthSetup.saved, { exact: true })).toBeVisible();
+});
+
+test("pick-up from home: a trip on a stay, priced by the area, goes on the day's run", async ({ page }) => {
+  await signIn(page, "manager");
+  await addPet(page, "9800000418", "Meera Sample", "Zuzu");
+  await openPet(page, "Zuzu");
+  await page.getByRole("link", { name: "Meera Sample" }).click();
+  await page.getByText(en.addresses.add, { exact: true }).click();
+  const addressForm = page.locator("form").filter({ has: page.getByRole("button", { name: en.addresses.addButton }) });
+  await addressForm.getByLabel(en.addresses.line).fill("7, 2nd Main, Domlur");
+  await addressForm.getByLabel(en.addresses.area).fill("Indiranagar");
+  await addressForm.getByLabel(en.addresses.pin).fill("560038");
+  await addressForm.getByRole("button", { name: en.addresses.addButton }).click();
+  await expect(page.getByText(en.addresses.added)).toBeVisible();
+
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Zuzu (Meera Sample)" });
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(2));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  const stay = new URL(page.url()).pathname;
+  await page.getByRole("button", { name: en.trips.addButton }).click();
+  await expect(page.getByText("Pick-up added. It goes on that day's runs.")).toBeVisible();
+  await expect(page.getByRole("link", { name: en.trips.tell })).toHaveAttribute("href", /wa\.me/);
+  await narrow(page);
+  await shot(page, "m39-trip");
+
+  await page.goto(`/app/food/runs?date=${day(0)}`);
+  await page.getByRole("listitem").filter({ hasText: "Zuzu" }).getByRole("button", { name: en.runs.addTo }).click();
+  await expect(page.getByText(en.runs.added)).toBeVisible();
+  await expect(page.getByText("Pick-up at 09:00: Zuzu (Meera Sample)")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m39-runs");
+
+  // The trip is a line of the stay's bill.
+  await page.goto(stay);
+  await page.getByRole("button", { name: "Make bill" }).click();
+  await expect(page.getByText(/^Pick-up for Zuzu \(/)).toBeVisible();
+});
+
+test("a new parent books on the booking form, sees an estimate, and staff accept it as a request", async ({ page, browser }) => {
+  const parent = await privateWindow(browser);
+  await parent.page.goto("/book/demo");
+  const p = parent.page;
+  await p.getByLabel("Drop-off date").fill(day(30));
+  await p.getByLabel("Pick-up date").fill(day(33));
+  await expect(p.getByText(/^About ₹[\d,]+ for the nights you chose$/)).toBeVisible();
+  await p.getByLabel("Name", { exact: true }).fill("Pepper");
+  await p.getByLabel(en.bookingForm.vaccinationsOk).check();
+  await p.getByLabel("Your name").fill("Kavya Invented");
+  await p.getByLabel("Mobile number").fill("9800000198");
+  await p.locator("input[name=consent]").check();
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  await shot(p, "m41-form");
+  await p.getByRole("button", { name: en.bookingForm.send }).click();
+  await expect(p.getByText("Thank you. Wagbook Demo Kennel has your request.")).toBeVisible();
+  await parent.context.close();
+
+  await signIn(page, "staff");
+  await page.goto("/app/more/intake");
+  const form = page.getByRole("listitem").filter({ hasText: "Kavya Invented" });
+  await expect(form.getByText(en.bookingForm.review.stay)).toBeVisible();
+  await expect(form.getByText(en.bookingForm.review.vaccinationsOk)).toBeVisible();
+  await form.getByRole("button", { name: "Accept and book" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Pepper" })).toBeVisible();
+  await expect(page.getByText("This is a request. It holds no space until you confirm it.")).toBeVisible();
+});
+
+test("reviews: with a review link set, Today lists a parent whose pet went home this week", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/settings");
+  await page.getByLabel(en.reviews.link).fill("https://g.page/r/demo-review");
+  await page.getByRole("button", { name: en.settings.save }).click();
+  await expect(page.getByText(en.settings.saved)).toBeVisible();
+  await page.goto("/app");
+  await expect(page.getByText(en.today.reminderKinds.review).first()).toBeVisible();
+  const send = page.getByRole("listitem").filter({ hasText: en.today.reminderKinds.review }).first().getByRole("link", { name: en.today.send });
+  await expect(send).toHaveAttribute("href", /g\.page%2Fr%2Fdemo-review/);
+  await narrow(page);
+  await shot(page, "m42-today");
+});

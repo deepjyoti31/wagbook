@@ -1,5 +1,5 @@
 import { BILLABLE_IN_FAMILY, bookingLines, creditContext, differenceCredit, familyLines, moneyLines, seriesLines, staysChanged, type CreditableBill } from "./billing";
-import { appointmentLines, computeInvoice, toStayCharges, unpricedAppointments, type BillableAddOn, type BillableAppointment, type InvoiceTotals, type LineInput } from "./core";
+import { appointmentLines, computeInvoice, toStayCharges, tripLines, unpricedAppointments, type BillableAddOn, type BillableAppointment, type InvoiceTotals, type LineInput } from "./core";
 import { foodLines } from "./food-bill";
 import type { createClient } from "./supabase/server";
 
@@ -103,22 +103,27 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
   if (stays.data.length === 0) return { stays: stays.data, lines: [] as LineInput[] };
 
   const ids = stays.data.map((b) => b.id);
-  const [items, charges, appts] = await Promise.all([
+  const [items, charges, appts, trips] = await Promise.all([
     // A package's own extras are in its price, not lines of their own (M37).
     supabase.from("booking_items").select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).eq("in_package", false).order("created_at"),
     // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
     supabase.rpc("stay_charges", { p_org: orgId, p_bookings: ids }),
     billableAppointments(supabase, orgId, { bookings: ids }),
+    // Pick-ups and drops (M39), after the appointments.
+    supabase.from("trips").select("booking_id, kind, status, trip_date, at_time, price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).neq("status", "cancelled"),
   ]);
-  if (items.error || charges.error) return { error: items.error ?? charges.error };
+  if (items.error || charges.error || trips.error) return { error: items.error ?? charges.error ?? trips.error };
   if ("error" in appts) return { error: appts.error };
   if (unpricedAppointments(appts.appointments).length) return { error: UNPRICED };
   const billable = stays.data.map((b) => ({ ...b, package_name: b.packages?.name ?? null, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
   const itemsOf = (id: string) => items.data.filter((i) => i.booking_id === id);
-  // Each stay's appointments, after its stay and extras (M34).
+  // Each stay's appointments (M34) and trips (M39), after its stay and extras.
   const appointmentsOf = (id: string, petName: string) => {
     const mine = appts.appointments.filter((a) => a.booking_id === id);
-    return appointmentLines(petName, mine, appts.addOns.filter((x) => mine.some((a) => a.id === x.appointment_id)), timeZone);
+    return [
+      ...appointmentLines(petName, mine, appts.addOns.filter((x) => mine.some((a) => a.id === x.appointment_id)), timeZone),
+      ...tripLines(petName, trips.data.filter((t) => t.booking_id === id)),
+    ];
   };
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.
   const name = (b: (typeof billable)[number]) => b.pets?.name ?? "Pet";

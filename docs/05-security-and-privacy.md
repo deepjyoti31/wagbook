@@ -80,7 +80,13 @@ In summary (deleting anything is for owners, D29):
 | Grooming cards (M35) | Read, edit | Same | Also delete |
 | Training courses (M36) | Read; book sessions from one | Sell, correct | Also delete |
 | Putting a package on a stay (M37) | One with a set price (`apply_package`) | Also one priced on request (`WB206`) | Same |
-| A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()`, a photo at the door of their own stop | | |
+| Cancellation rules, weekend days, credit months (M38) | Read | Change | Same |
+| Settling a cancelled stay: its refund and credit (M38) | No: a refund is for owners and managers | Yes, worked out again from the database, never more than the advance (`WB122`) | Same |
+| Credit (M38) | Read; spend it on a bill as a payment, never more than is left (`WB211`) | Also give goodwill credit, with a reason | Also delete goodwill credit not yet spent; credit from a cancellation is made only by a refund kept as credit (`WB213`) |
+| Pick-ups and drops (M39) | Read, add, cancel with a reason; the database prices them; only to an area served (`WB215`) | Also another price, and outside the areas | Also delete |
+| Health rules at the door (M40) | Read | Change | Also delete a required vaccine |
+| Letting a pet in without its papers (M40) | No | Yes, with a reason (`health_overrides`, in History of changes) | Same |
+| A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()` and their own pick-ups and drops through `rider_mark_trip()` (M39), a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
@@ -95,7 +101,7 @@ is changed on purpose.
 
 | Function | Returns | Guard |
 | --- | --- | --- |
-| `get_public_intake_form(slug)` | Kennel name, city, WhatsApp number, usual times, consent wording, and whether the form is switched on | None: returned for any link name that exists. Nothing here is private. |
+| `get_public_intake_form(slug)` | Kennel name, city, WhatsApp number, usual times, consent wording, whether the form is switched on, and for the booking form (M41) its currency, its usual boarding and day boarding prices and the appointment services it offers with their prices | None: returned for any link name that exists. Nothing here is private: a kennel publishes its prices. |
 | `submit_intake(slug, payload)` | The folder for this form's certificates and its upload secret | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
@@ -132,9 +138,16 @@ booking link (M17) also shows their subscriptions' next delivery dates and asks 
 food, which arrive as requests. The app limits posts to `/f/` per address like the intake form. Erasing a parent deletes
 their food orders, matched by parent or by phone.
 
+**The booking form for new parents (milestone M41, D47).** `/book/{slug}` adds no public function. It sends the intake
+form's own payload through `submit_intake()`, with a `request` in it, so the same switch, size cap, consent, shape
+checks and flood limits apply, and the app limits posts per address as on `/i/`. Nothing is booked from the public
+internet: the form waits in Forms from parents, and only a member accepting it (`accept_intake()`) makes the parent,
+the pet and a booking or appointment with status `requested`, which holds nothing. The estimate on the page is worked
+out in the browser from the published prices and never sent back.
+
 **Riders (milestone M31, D45).** A rider is a member whose role leaves them out of `my_org_ids()`, so no policy in the
-access model gives them anything. `my_runs()` and `rider_mark_stop()` (both `security definer`, checking the caller is
-the run's rider, today) are their only way in, and `rider_upload_allowed()` lets them add a photo at the door of their
+access model gives them anything. `my_runs()`, `rider_mark_stop()` and `rider_mark_trip()` (all `security definer`, checking
+the caller is the run's rider, today) are their only way in, and `rider_upload_allowed()` lets them add a photo at the door of their
 own stop for today. `tests/db/riders.test.ts` signs in as a rider and reads every table in the schema: only their own
 membership row comes back.
 

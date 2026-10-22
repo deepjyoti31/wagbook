@@ -1,4 +1,4 @@
-import { diffDays, isISODate, type ISODate } from "./dates";
+import { diffDays, isISODate } from "./dates";
 import type { Minor } from "./money";
 
 /**

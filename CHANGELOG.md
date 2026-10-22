@@ -58,6 +58,18 @@ The first release will be 0.1.0. Everything below is in it.
 - Swims recorded with the life jacket and who supervised; training courses sold up front with notes and homework sent
   to the parent; birthday parties with one guest dog and a cake from the kitchen (24 hours' notice).
 - Packages: a stay with a swim, a groom and extra play included, billed as one line, its appointments booked for you.
+- Cancellation rules (More): weekend days, holidays from peak periods, the notice needed, and what each night becomes:
+  refunded, kept as credit, or kept. Cancelling a stay works out each night and an owner or manager confirms the
+  refund and the credit in one step; when the kennel cancels, the parent chooses. Credit on the parent page, spent on
+  any bill, never more than is left or after it ends, with a reminder a month before it does. Goodwill credit too.
+- Pick-up from home and drop back home on a stay, priced by the area, on the day's runs for the rider, a line on the
+  bill, and a WhatsApp message telling the parent the time.
+- Health papers at the door (More): required vaccines, deworming, tick treatment and neutering, warning or refusing at
+  check-in and a visitor's appointment; an owner or manager can let a pet in with a reason. Pets and the intake form
+  have deworming and tick dates. Today reminds parents a week before.
+- A booking form for new parents at `/book/{your link}`, with an estimate; it lands in Forms from parents, and
+  accepting it adds the request.
+- A review link in Settings: Today lists parents to ask for a review after a stay or a visit.
 - Settings says what else the kennel offers: appointments, a kitchen, food delivery. All off to start, so a kennel
   that only boards sees nothing new. With delivery on: parents' delivery addresses, matched by PIN code to the areas
   you serve and their charge. Skills on People (cook, groomer, trainer, swim supervisor, rider). Each pet's weight

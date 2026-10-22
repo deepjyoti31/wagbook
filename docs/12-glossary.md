@@ -60,6 +60,21 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Package | `packages`, `package_parts` | A stay with appointments and extras included, one line on the bill. |
 | Did not come | `status = 'no_show'` | Booked, and the pet did not come. Still billed. |
 
+## Rules the kennel promises (Phase 3)
+
+| On screen | In code | Meaning |
+| --- | --- | --- |
+| Cancellation rules | `cancellation_rules`, `cancellationOutcome()` | What each cancelled night becomes, by weekday or weekend and by notice. |
+| Enough notice | `notice_hours` | The parent asked at least this many hours before that night's check-in time. |
+| Holiday | `peak_periods.is_holiday` | A peak period whose days count as weekend days for cancellations. |
+| Credit | `credits`, `credit_uses`, `credit_balances` | Money a parent keeps with the kennel, from a cancellation or as goodwill, until a date. |
+| Goodwill | `credits.kind = 'goodwill'` | Credit an owner or manager gives, with a reason. |
+| Pick-up, Drop | `trips` | Fetching a boarder from home on the first day, taking them home on the last. |
+| Health papers | `pet_health_problems()`, `required_vaccines` | What a pet needs to come in: vaccines, deworming, tick treatment, neutering. |
+| Let in anyway | `health_overrides` | An owner or manager lets a pet in without its papers, with a reason. |
+| Booking form | `/book/{slug}`, `payload.request` | The public page where a new parent asks for a stay or an appointment. |
+| Review link | `organizations.review_url` | Where parents leave a review; Today reminds you to ask. |
+
 ## Places
 
 | On screen | In code | Meaning |

@@ -477,7 +477,7 @@ How these milestones work:
 **The order, and why.** Phase 1, the kitchen and food, comes first. Recurring deliveries, rotating recipes and stock
 are where a notebook or spreadsheet breaks first, and nothing in Wagbook covers them yet. Phase 2, appointments, comes
 next (built 22 October 2026). Phase 3 brings boarding up to the public rules
-(credit on cancellation, pick-up from home, health papers, a public booking form). Phase 4 is the team. The launch work
+(credit on cancellation, pick-up from home, health papers, a public booking form; built 22 October 2026). Phase 4 is the team. The launch work
 in M1 can happen at any point; the migration freeze waits for it.
 
 ---
@@ -814,25 +814,26 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M38. Cancellation rules and credit
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (J1 in `02`, D47).
 
 **Build**
 
-1. Weekends and holidays: which weekdays count as weekend, and the kennel's list of holiday dates (built on peak
+1. [x] Weekends and holidays: which weekdays count as weekend, and the kennel's list of holiday dates (built on peak
    periods, C7).
-2. A cancellation rule for each kind of service: the notice needed, and what happens to each night or appointment with
-   enough notice and without it (refund, or keep as credit).
-3. Credit: a parent's balance from a cancellation or a goodwill gesture, ending on a set date (12 months by default),
+2. [x] A cancellation rule for each kind of service: the notice needed, and what happens to each night or appointment with
+   enough notice and without it (refund, or keep as credit). On screen for boarding and day boarding; appointments take
+   no advance yet, so their rule waits (`HANDOFF.md`, Open questions).
+3. [x] Credit: a parent's balance from a cancellation or a goodwill gesture, ending on a set date (12 months by default),
    spent on any bill as a payment, never more than what is left. On the parent page and on bills. A reminder goes on
    Today's list to send (D39) a month before credit runs out (the owner's answer, 21 October 2026).
-4. On Cancel, Wagbook works out the refund and the credit night by night, shows both, and a manager confirms. The time
+4. [x] On Cancel, Wagbook works out the refund and the credit night by night, shows both, and a manager confirms. The time
    the parent asked is recorded for the notice rule.
-5. When the kennel cancels, the parent chooses a refund or credit.
+5. [x] When the kennel cancels, the parent chooses a refund or credit.
 
 **Rules**
 
 - Credit is money: a ledger in paise the database keeps from going below zero or being spent after it ends.
-- Whether kept credit needs a bill or carries tax is for the accountant (question 11 in `06`).
+- Whether kept credit needs a bill or carries tax is for the accountant (question 15 in `06`).
 
 **Done when**
 
@@ -843,26 +844,26 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M39. Pick-up and drop from home
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (J2 in `02`, D47).
 
 **Build**
 
-1. On a booking: pick-up, drop or both, an address (M25) and a time.
-2. The price is the area's charge by default, changed by a manager, and is a line on the bill.
-3. Trips join the day's run (M31), and the parent is told the time on WhatsApp.
+1. [x] On a booking: pick-up, drop or both, an address (M25) and a time.
+2. [x] The price is the area's charge by default, changed by a manager, and is a line on the bill.
+3. [x] Trips join the day's run (M31), and the parent is told the time on WhatsApp.
 
 ---
 
 ## M40. Health papers at the door
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (J3 in `02`, D47).
 
 **Build**
 
-1. The kennel's rules: the vaccines it requires and how long each lasts, deworming and tick treatment within a set
+1. [x] The kennel's rules: the vaccines it requires and how long each lasts, deworming and tick treatment within a set
    time, and spayed or neutered above a set age.
-2. Pets get deworming and tick treatment dates and whether they are neutered; the intake form asks for them.
-3. Check-in and appointments refuse or warn (a setting), with the reason. A manager may let a pet in anyway, recorded
+2. [x] Pets get deworming and tick treatment dates and whether they are neutered; the intake form asks for them.
+3. [x] Check-in and appointments refuse or warn (a setting), with the reason. A manager may let a pet in anyway, recorded
    with a note. Reminders go out before a stay when something will be out of date.
 
 **Rules**
@@ -873,13 +874,13 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M41. A booking form for new parents
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (J4 in `02`, D47).
 
 **Build**
 
-1. A public page for any service the kennel offers: what, when, pick-up, the dog's details, a tick for vaccinations up
+1. [x] A public page for any service the kennel offers: what, when, pick-up, the dog's details, a tick for vaccinations up
    to date, and a phone number. It shows an estimate and says nothing is charged.
-2. It lands as a request with a new parent and pet waiting for review (B4), so staff confirm in one place.
+2. [x] It lands as a request with a new parent and pet waiting for review (B4), so staff confirm in one place.
 
 **Rules**
 
@@ -889,13 +890,13 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M42. Reviews from parents
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (J5 in `02`, D47).
 
 **Build**
 
-1. After a stay or service ends, Today lists parents to ask for a review (D39), with a WhatsApp message carrying the
+1. [x] After a stay or service ends, Today lists parents to ask for a review (D39), with a WhatsApp message carrying the
    kennel's review link (a setting).
-2. Later, if wanted: a review page of Wagbook's own, where a parent gives stars and words and agrees to them being
+2. [ ] Later, if wanted (not built): a review page of Wagbook's own, where a parent gives stars and words and agrees to them being
    shown, and owners choose which ones to publish.
 
 ---

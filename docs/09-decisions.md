@@ -953,3 +953,37 @@ opening.
 
 **Look again** if kennels want group sessions (a class of six puppies), appointments moved by dragging, or reminders to
 parents before an appointment.
+
+## D47. Cancellation is worked out in the app and kept in the database; health is checked at the door by the database
+
+**Status:** Decided, 22 October 2026, building Phase 3 (M38 to M42).
+
+**Situation.** The public rules a kennel promises parents say what happens to an advance when a stay is cancelled
+(refunded with enough notice, kept as credit on a weekend or a holiday), that pets need their papers in order to come
+in, that pets can be picked up from home, and that a new parent can ask to book without ringing. Each of these touches
+money, the door or the public internet.
+
+**Decision.** The night-by-night arithmetic of a cancellation is a pure function (`cancellationOutcome()`), shown on
+the stay's page and worked out again from the database when an owner or manager confirms it: the refund is an ordinary
+refund, and the credit a refund paid "as credit" (`payments.method = 'credit'`). Credit itself is a ledger in the
+database (`credits`, `credit_uses`, `credit_balances`), filled and spent only by triggers on payments, oldest first,
+never below zero, never after it ends (`WB211`), and a credit payment is never changed (`WB212`). What a pet lacks at
+the door is `pet_health_problems()`, matched by `healthProblems()` in the app for lists; while a kennel refuses, the
+check-in and a visitor's appointment are refused by triggers (`WB210`) unless a row in `health_overrides` says who let
+the pet in and why. A pick-up or drop is a row of its own (`trips`), priced by the database from the area as deliveries
+are, on the stay's bill and on the day's runs. The booking form for new parents sends the intake form's own payload
+with a `request` in it, through `submit_intake()`; accepting it (`accept_intake()`) also makes the request. Reviews are
+a link and a reminder, nothing more.
+
+**Why.** The rules a parent was promised are about money, so the money is kept where a slow phone or a second tab
+cannot get round it, while the rule itself stays easy to change and to test. Confirming in one step keeps a person in
+charge of a refund. A new public function would be one more thing the anonymous role can call (rule 6); reusing the
+intake form keeps it at twelve, with its rate limit, size limit and checks.
+
+**Cost.** Changing a cancellation rule does not change a cancellation already confirmed. Credit kept is treated as a
+refund for the books until an accountant says otherwise (question 15 in `06`). The booking form takes one pet; a family
+uses the intake form. Appointments take no advance, so no screen sets a cancellation rule for them yet. Wagbook has no
+review page of its own.
+
+**Look again** if kennels want partial refunds per night, credit moved between parents, a review page of their own, or
+appointment advances.

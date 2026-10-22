@@ -367,6 +367,28 @@ Biscuit, 7 nights (3 Nov 2026 to 10 Nov 2026)"), at the package's own tax rate a
 are in that price and are not lines of their own, though add-ons on its appointments are. Grooming, swimming and
 training are services; their SAC codes and rates are for the accountant, as for boarding (question 1).
 
+## Cancellations and credit (M38)
+
+When a stay is cancelled, its advance is shared out night by night by the kennel's rule (`cancellationOutcome()`): a
+night's outcome is refund, credit or keep, by whether it is a weekday or a weekend or holiday night and whether the
+parent asked with enough notice. The money paid goes to the refunds first, then to credit; the rest is kept. When the
+kennel cancels, the parent chooses all as refund or all as credit. An owner or manager confirms it on the stay's page:
+the refund is an ordinary refund payment, and the credit a refund paid "as credit" (`payments.method = 'credit'`,
+direction out), which makes a credit lot ending after the kennel's months (12 by default). Kept money stays as an
+advance on a cancelled stay with no bill (D40, question 11).
+
+Credit is spent on an issued bill as a payment "from credit" (direction in, method credit): the database takes it from
+the parent's lots that end soonest, never more than is left and never after a lot ends (`WB211`). A credit payment is
+never changed (`WB212`). Goodwill credit is added by an owner or manager with a reason. Reports leave credit payments
+out of money in and out, because no money moved: the refund kept as credit was not paid out, and the bill paid from
+credit brought nothing in. Whether credit is an advance for tax, and when, is question 15.
+
+## Pick-up and drop (M39)
+
+A pick-up from home or a drop back home is a line of its stay's bill: "Pick-up for Biscuit (3 Nov, 09:00)". The price
+is the area's trip charge, or its delivery charge when none is set, copied when the trip is added; an owner or manager
+may give another. A cancelled trip is not billed. It takes the stay's tax rate and code.
+
 ## Not built
 
 - Debit notes.

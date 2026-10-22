@@ -38,7 +38,7 @@ export async function HealthAtTheDoor({ t, petId, on, bookingId, appointmentId }
   return (
     <div className="mb-4 space-y-3">
       <Notice tone={org.health_check === "refuse" && !letIn ? "error" : "info"}>
-        {fill(org.health_check === "refuse" ? w.refused : w.warned, { date: formatDate(on, locale), lacks: lacks.join(", ") })}
+        {fill(org.health_check === "refuse" && !letIn ? w.refused : w.warned, { date: formatDate(on, locale), lacks: lacks.join(", ") })}
       </Notice>
       {letIn ? (
         <p className="font-semibold">{fill(w.letInBecause, { reason: letIn.reason })}</p>

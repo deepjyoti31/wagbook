@@ -118,7 +118,7 @@ export const rulesArea = {
     riderDone: { pickup: "Picked up", drop: "Brought home" },
     runStop: { pickup: "{n}. Pick-up at {time}: {pet} ({parent})", drop: "{n}. Drop at {time}: {pet} ({parent})" },
     areaCharge: "Pick-up or drop charge",
-    areaChargeHint: "For each trip. Leave it empty to use the delivery charge.",
+    areaChargeHint: "For each trip. Leave it empty to charge what a delivery costs.",
     areaChargeLine: "Pick-up or drop: {amount}",
     errors: {
       address: "Choose an address.",

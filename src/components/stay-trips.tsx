@@ -36,6 +36,8 @@ export async function StayTrips({
     supabase.from("client_addresses").select("id, kind, line, area, postal_code").eq("org_id", org.id).eq("client_id", b.client_id).order("created_at"),
   ]);
   if (trips.error || addresses.error) return null;
+  // A stay that is over or cancelled says nothing about trips it never had.
+  if (!open && trips.data.length === 0) return null;
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
   // Told to the parent in the kennel's language for parents.
   const p = parentI18n(org.parent_language, org.locale);

@@ -28,3 +28,4 @@ export * from "./appointments";
 export * from "./cancellation";
 export * from "./health";
 export * from "./estimate";
+export * from "./trips";
