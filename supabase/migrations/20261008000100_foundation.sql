@@ -203,6 +203,7 @@ create table public.organizations (
   deworm_days smallint check (deworm_days is null or deworm_days between 1 and 730),
   tick_days smallint check (tick_days is null or tick_days between 1 and 730),
   neuter_months smallint check (neuter_months is null or neuter_months between 1 and 120),
+  keeps_rota boolean not null default false,
   review_url text check (review_url is null or (review_url ~ '^https://[^[:space:]]+$' and char_length(review_url) <= 500)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -277,6 +278,8 @@ comment on column public.organizations.deworm_days is 'A pet must have been dewo
 comment on column public.organizations.tick_days is 'A pet must have had tick treatment within this many days (M40). Empty: not required.';
 comment on column public.organizations.neuter_months is 'Above this age in months a pet must be spayed or neutered (M40). Empty: not required.';
 comment on column public.organizations.review_url is 'The kennel''s review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders.';
+comment on column public.organizations.keeps_rota is
+  'Whether the kennel keeps its rota, leave and attendance in Wagbook (M43): shifts, clocking in and out, Today''s "on now". Off: none of it is shown.';
 comment on column public.organizations.food_orders_enabled is 'Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 
@@ -314,6 +317,7 @@ create table public.memberships (
   phone text check (phone is null or phone ~ '^\+[1-9][0-9]{7,14}$'),
   language text not null default 'en' check (language in ('en', 'hi', 'kn')),
   skills public.staff_skill[] not null default '{}',
+  lives_on_site boolean not null default false,
   is_active boolean not null default false,
   accepted_at timestamptz,
   invited_by uuid references auth.users (id) on delete set null,
@@ -334,6 +338,8 @@ comment on column public.memberships.accepted_at is
 comment on column public.memberships.invited_by is 'Who sent the invitation.';
 comment on column public.memberships.skills is
   'What this person can be given to do in this kennel (staff_skill), set by owners and managers. Decides who is offered a job, not what they may see.';
+comment on column public.memberships.lives_on_site is
+  'Whether this person lives at the kennel (a caretaker on site day and night, M43), set by owners and managers. Shown with who is on now.';
 comment on column public.memberships.language is 'The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once.';
 
 create index memberships_user_id_idx on public.memberships (user_id);

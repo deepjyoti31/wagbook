@@ -32,6 +32,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB190 to WB199 | Appointments |
 | WB200 to WB209 | Appointments: bills, courses and packages |
 | WB210 to WB219 | Health at the door, credit, pick-up and drop |
+| WB220 to WB229 | The team: rota, leave and attendance |
+| WB230 to WB239 | Kennels in and out of service |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -174,3 +176,14 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB213` | credit from a cancellation comes from a refund kept as credit | `20261008000560_credit.sql` |
 | `WB215` | choose an address of this parent<br>that address is not in the areas you serve. An owner or manager sets the price. | `20261008000460_trips_and_health.sql` |
 | `WB216` | a cancelled trip stays cancelled. Add a new one. | `20261008000460_trips_and_health.sql` |
+| `WB220` | that shift is off the list | `20261008000470_team.sql` |
+| `WB221` | only owners, managers and staff working here now are on the rota and clock in | `20261008000470_team.sql` |
+| `WB222` | % is on leave that day | `20261008000470_team.sql` |
+| `WB223` | only an owner or manager grants or refuses leave | `20261008000470_team.sql` |
+| `WB224` | someone else answers your own leave | `20261008000470_team.sql` |
+| `WB225` | leave is asked for, or put in as granted<br>this leave has been answered. Ask again for new days.<br>granted leave keeps its days. Withdraw it and ask again.<br>this leave has been answered. Withdraw it and ask again. | `20261008000470_team.sql` |
+| `WB226` | only an owner or manager writes a clock time by hand | `20261008000470_team.sql` |
+| `WB227` | say why when writing a clock time by hand | `20261008000470_team.sql` |
+| `WB228` | a clock time cannot be later than now | `20261008000470_team.sql` |
+| `WB230` | a kennel goes in or out of service today or on a day before | `20261008000300_kennels_and_bookings.sql` |
+| `WB231` | that is before the kennel's last change, on % | `20261008000300_kennels_and_bookings.sql` |

@@ -70,6 +70,12 @@ The first release will be 0.1.0. Everything below is in it.
 - A booking form for new parents at `/book/{your link}`, with an estimate; it lands in Forms from parents, and
   accepting it adds the request.
 - A review link in Settings: Today lists parents to ask for a review after a stay or a visit.
+- The team (switch on "A rota for the team" in Settings): shifts and a week's rota, who lives on site, clocking in and
+  out from the phone with Today showing who is on now, leave asked for and answered, and a month's attendance for pay
+  with a CSV download. Clock times are stamped by the database; an owner or manager puts one right with a note.
+- Send on a reminder now asks "Did the message go?" and takes it off the list only when it did.
+- Kennels go in and out of service from a day, and reports count the kennels that were there on each past day.
+- Downloading a parent's details now gives a ZIP with their pets' photos and certificates as well.
 - Settings says what else the kennel offers: appointments, a kitchen, food delivery. All off to start, so a kennel
   that only boards sees nothing new. With delivery on: parents' delivery addresses, matched by PIN code to the areas
   you serve and their charge. Skills on People (cook, groomer, trainer, swim supervisor, rider). Each pet's weight

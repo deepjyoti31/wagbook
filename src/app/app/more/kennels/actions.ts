@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
+import { isISODate, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill, plural } from "@/lib/i18n";
@@ -48,20 +49,39 @@ export async function addKennels(_state: FormState, form: FormData): Promise<For
   return { ok: added === 0 ? t.m.kennels.alreadyExist : plural(t.language, added, t.m.kennels.added) };
 }
 
+/** A day typed on a form, today or before, or null when it is not one. */
+function dayUpToToday(form: FormData, name: string, timeZone: string): string | null {
+  const day = text(form, name) ?? todayIn(timeZone);
+  return isISODate(day) && day <= todayIn(timeZone) ? day : null;
+}
+
+/**
+ * Take a kennel out of service, or put it back, from a day: today, or the day
+ * it happened, so past reports count the kennels there that day (M44). The
+ * database refuses a day after today or before the kennel's last change.
+ */
 export async function setKennelActive(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
   const t = await getAppI18n();
+  const k = t.m.kennels;
   const id = z.uuid().safeParse(form.get("kennelId"));
-  if (!id.success) return { error: t.m.kennels.errors.notFound };
+  if (!id.success) return { error: k.errors.notFound };
   const active = form.get("active") === "true";
+  const from = dayUpToToday(form, "from", org.time_zone);
+  if (!from) return { error: k.errors.date };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("kennels").update({ is_active: active }).eq("org_id", org.id).eq("id", id.data).select("id");
+  const { data, error } = await supabase
+    .from("kennels")
+    .update({ is_active: active, service_from: from })
+    .eq("org_id", org.id)
+    .eq("id", id.data)
+    .select("name");
   if (error) return { error: friendlyError(error, t) };
-  if (data.length === 0) return { error: t.m.kennels.errors.onlyManagers };
+  if (data.length === 0) return { error: k.errors.onlyManagers };
 
   revalidatePath("/app", "layout");
-  return {};
+  return { ok: fill(active ? k.putBackDone : k.takenOut, { kennel: data[0].name }) };
 }
 
 const One = z.object({
@@ -95,11 +115,14 @@ export async function changeKennel(_state: FormState, form: FormData): Promise<F
   if (!id.success) return { error: e.notFound };
   const parsed = One.safeParse({ name: text(form, "name") ?? "", position: text(form, "position") ?? "" });
   if (!parsed.success) return { error: parsed.error.issues[0].path[0] === "name" ? e.name : e.position };
+  // The day its present state began, put right (M44). Unchanged unless typed.
+  const since = form.has("since") ? dayUpToToday(form, "since", org.time_zone) : undefined;
+  if (since === null) return { error: e.date };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("kennels")
-    .update({ name: parsed.data.name, sort_order: parsed.data.position })
+    .update({ name: parsed.data.name, sort_order: parsed.data.position, ...(since ? { service_from: since } : {}) })
     .eq("org_id", org.id)
     .eq("id", id.data)
     .select("id");

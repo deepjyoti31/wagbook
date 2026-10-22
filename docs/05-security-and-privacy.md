@@ -86,8 +86,17 @@ In summary (deleting anything is for owners, D29):
 | Pick-ups and drops (M39) | Read, add, cancel with a reason; the database prices them; only to an area served (`WB215`) | Also another price, and outside the areas | Also delete |
 | Health rules at the door (M40) | Read | Change | Also delete a required vaccine |
 | Letting a pet in without its papers (M40) | No | Yes, with a reason (`health_overrides`, in History of changes) | Same |
+| Shifts and the rota (M43) | Read | Plan: add shifts, put people on and take them off (D48) | Also delete a shift |
+| Leave (M43) | Ask for and withdraw their own; read their own | Read everyone's; grant or refuse, never their own (`WB223`, `WB224`); put leave in for someone | Also answer their own; delete |
+| Attendance (M43) | Clock themselves in and out (the database stamps the time); read their own; see who is on now, names only (`who_is_on`) | Read everyone's; write or correct a time by hand with a note (`WB226`, `WB227`), in History of changes | Also delete |
+| When kennels went in or out of service (M44) | Read | Read; written only by the database from the kennel's own change | Same |
 | A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()` and their own pick-ups and drops through `rider_mark_trip()` (M39), a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
+
+`who_is_on()` (M43) is `security definer`: a person reads only their own attendance, but anyone working at the kennel
+may know who else is clocked in. It checks the caller works at the kennel asked about and returns names only, no
+times. `kennels_keep_service()` is a `security definer` trigger: `kennel_service` has no grant to write, so it only
+ever says what `kennels.is_active` said, and when. Neither is granted to the anonymous role.
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
 out: a booking's check-in and check-out stamps, its creator and its link token; an invoice's status, number, dates,

@@ -7,6 +7,7 @@ export const beyondArea = {
     kitchen: "A kitchen that cooks fresh food",
     delivery: "Food delivered to parents' homes",
     deliveryHint: "Needs the kitchen. Turns on parents' addresses and the areas you deliver to.",
+    rota: "A rota for the team, with leave and clocking in and out",
   },
   areas: {
     title: "Areas you serve",

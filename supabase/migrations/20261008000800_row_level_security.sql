@@ -97,6 +97,11 @@ alter table public.health_overrides enable row level security;
 alter table public.cancellation_rules enable row level security;
 alter table public.credits enable row level security;
 alter table public.credit_uses enable row level security;
+alter table public.kennel_service enable row level security;
+alter table public.shifts enable row level security;
+alter table public.rota enable row level security;
+alter table public.leave_requests enable row level security;
+alter table public.attendance enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -120,10 +125,10 @@ create policy organizations_delete on public.organizations for delete to authent
 -- owners can change or remove an owner. People are added by invitation
 -- (invite_member_by_email) and become active only by accepting
 -- (respond_to_invitation), so there is no insert policy, and only the role,
--- name, phone, skills and active flag can be written directly.
+-- name, phone, skills, living on site and active flag can be written directly.
 -- ---------------------------------------------------------------------------
 grant select, delete on public.memberships to authenticated;
-grant update (role, display_name, phone, is_active, skills) on public.memberships to authenticated;
+grant update (role, display_name, phone, is_active, skills, lives_on_site) on public.memberships to authenticated;
 
 create policy memberships_select on public.memberships for select to authenticated
   using (org_id in (select public.my_org_ids()) or (user_id = (select auth.uid()) and (select public.session_meets_mfa())));
@@ -224,7 +229,7 @@ begin
   foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
                           'suppliers', 'stock_items', 'recipes', 'food_products',
                           'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts',
-                          'required_vaccines'] loop
+                          'required_vaccines', 'shifts', 'rota'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -316,6 +321,55 @@ create policy health_overrides_select on public.health_overrides for select to a
 create policy health_overrides_insert on public.health_overrides for insert to authenticated
   with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 create policy health_overrides_delete on public.health_overrides for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- When kennels went in and out of service (M44): any member reads it; only
+-- the kennels_keep_service trigger writes it, so there is no other grant.
+grant select on public.kennel_service to authenticated;
+create policy kennel_service_select on public.kennel_service for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+
+-- The team (M43). The rota is planned by owners and managers and read by
+-- everyone (it is in the setup list above; taking a person off a shift is
+-- part of planning, so managers delete rota rows too, D48). Leave and
+-- attendance are a person's own: they see and write their own, owners and
+-- managers see and write everyone's (the triggers decide who answers leave
+-- and who writes a time by hand), owners delete.
+create policy rota_delete_by_managers on public.rota for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+
+grant select, delete on public.leave_requests to authenticated;
+grant insert (org_id, user_id, starts_on, ends_on, reason, status, answer) on public.leave_requests to authenticated;
+grant update (starts_on, ends_on, reason, status, answer) on public.leave_requests to authenticated;
+create policy leave_requests_select on public.leave_requests for select to authenticated
+  using ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+         or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy leave_requests_insert on public.leave_requests for insert to authenticated
+  with check ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+              or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy leave_requests_update on public.leave_requests for update to authenticated
+  using ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+         or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+              or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy leave_requests_delete on public.leave_requests for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+grant select, delete on public.attendance to authenticated;
+grant insert (org_id, user_id, clocked_in_at, clocked_out_at, note) on public.attendance to authenticated;
+grant update (clocked_in_at, clocked_out_at, note) on public.attendance to authenticated;
+create policy attendance_select on public.attendance for select to authenticated
+  using ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+         or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy attendance_insert on public.attendance for insert to authenticated
+  with check ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+              or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy attendance_update on public.attendance for update to authenticated
+  using ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+         or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check ((user_id = (select auth.uid()) and org_id in (select public.my_org_ids()))
+              or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy attendance_delete on public.attendance for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- Weighings: any member weighs a pet and reads the weights; owners and
@@ -611,6 +665,9 @@ grant execute on function public.apply_package(uuid, uuid, bigint) to authentica
 -- Phase 3 (M38 to M42).
 grant execute on function public.pet_health_problems(uuid, uuid, date) to authenticated;
 grant execute on function public.rider_mark_trip(uuid, public.trip_status) to authenticated;
+-- Phase 4 (M43, M44).
+grant execute on function public.who_is_on(uuid) to authenticated;
+grant execute on function public.kennels_in_service(uuid, date) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.

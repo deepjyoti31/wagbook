@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
+import { formatDate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -20,10 +21,11 @@ export default function KennelsPage({ searchParams }: PageProps<"/app/more/kenne
 async function Kennels({ searchParams }: Pick<PageProps<"/app/more/kennels">, "searchParams">) {
   const welcome = (await searchParams).welcome === "1";
   const { org, canManage } = await requireOrg();
-  const { m } = await getAppI18n();
+  const { m, locale } = await getAppI18n();
   const k = m.kennels;
+  const today = todayIn(org.time_zone);
   const supabase = await createClient();
-  const { data, error } = await supabase.from("kennels").select("id, name, is_active, sort_order").eq("org_id", org.id).order("sort_order").order("name");
+  const { data, error } = await supabase.from("kennels").select("id, name, is_active, sort_order, service_from").eq("org_id", org.id).order("sort_order").order("name");
   if (error) throw new Error("Could not load kennels.");
   const active = data.filter((x) => x.is_active).length;
 
@@ -66,18 +68,30 @@ async function Kennels({ searchParams }: Pick<PageProps<"/app/more/kennels">, "s
             <Ledger>
               {data.map((x) => (
                 <LedgerRow key={x.id}>
-                  <div className="flex flex-1 items-center gap-3">
+                  <div className="flex flex-1 flex-wrap items-center gap-3">
                     <DoorTag name={x.name} empty={m.common.noKennel} />
-                    {x.is_active ? null : <Badge tone="alert">{k.outOfService}</Badge>}
+                    {x.is_active ? null : <Badge tone="alert">{fill(k.outSince, { date: formatDate(x.service_from as string, locale) })}</Badge>}
                   </div>
                   {canManage ? (
-                    <ActionForm action={setKennelActive} className="contents">
-                      <input type="hidden" name="kennelId" value={x.id} />
-                      <input type="hidden" name="active" value={x.is_active ? "false" : "true"} />
-                      <SubmitButton variant="quiet" pendingLabel={m.common.saving}>
+                    <details className="w-full">
+                      <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">
                         {x.is_active ? k.takeOut : k.putBack}
-                      </SubmitButton>
-                    </ActionForm>
+                        <span className="sr-only"> {x.name}</span>
+                      </summary>
+                      {/* A day before today when it happened earlier, so past reports count the kennels there that day (M44). */}
+                      <ActionForm action={setKennelActive} className="mt-2 flex flex-wrap items-end gap-3">
+                        <input type="hidden" name="kennelId" value={x.id} />
+                        <input type="hidden" name="active" value={x.is_active ? "false" : "true"} />
+                        <div className="min-w-44 flex-1">
+                          <Field label={k.from} hint={k.fromHint}>
+                            <Input name="from" type="date" required max={today} min={x.service_from ?? undefined} defaultValue={today} />
+                          </Field>
+                        </div>
+                        <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+                          {x.is_active ? k.takeOut : k.putBack}
+                        </SubmitButton>
+                      </ActionForm>
+                    </details>
                   ) : null}
                   {canManage ? (
                     <details className="w-full">
@@ -93,6 +107,9 @@ async function Kennels({ searchParams }: Pick<PageProps<"/app/more/kennels">, "s
                         </Field>
                         <Field label={k.position} hint={k.positionHint}>
                           <Input name="position" type="number" min={0} max={9999} required defaultValue={x.sort_order} />
+                        </Field>
+                        <Field label={x.is_active ? k.inSince : k.outSinceLabel} hint={k.sinceHint}>
+                          <Input name="since" type="date" required max={today} defaultValue={x.service_from ?? today} />
                         </Field>
                         <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
                       </ActionForm>

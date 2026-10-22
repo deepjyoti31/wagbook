@@ -15,6 +15,7 @@ import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { appointmentsOn, workingPeople } from "@/lib/appointments";
 import { lacksInWords, petsLacking } from "@/lib/health";
 import { signedUrls } from "@/lib/media";
+import { OnNow } from "@/components/on-now";
 import { PetAvatar } from "@/components/pet-avatar";
 import { ReminderLink } from "@/components/reminder-link";
 import { siteOrigin } from "@/lib/site";
@@ -161,6 +162,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         <Rich text={m.today.toArrive} parts={{ arrivals: <strong className="font-extrabold">{arrivals.length}</strong> }} />
       </p>
 
+      {org.keeps_rota ? (
+        <Suspense fallback={null}>
+          <OnNow />
+        </Suspense>
+      ) : null}
+
       {capacity === 0 ? (
         <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
           {m.today.noKennels}{" "}
@@ -282,7 +289,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                   <span className="font-bold">{r.about}</span> <Badge tone={r.kind === "unpaid" || r.kind === "vaccination" || r.kind === "health" ? "attention" : "neutral"}>{m.today.reminderKinds[r.kind]}</Badge>
                   <span className="block text-sm text-slate">{r.parentName}</span>
                 </span>
-                <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} />
+                <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} words={sentWords(t)} />
               </LedgerRow>
             ))}
           </Ledger>
@@ -513,6 +520,7 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
                     subjectId={d.id}
                     label={w.ask}
                     title={w.ask}
+                    words={sentWords(t)}
                   />
                 </LedgerRow>
               ))}
@@ -735,6 +743,11 @@ async function todaysReminders(
     },
     p.locale,
   );
+}
+
+/** The question Send asks once WhatsApp has opened (M44), and its two answers. */
+function sentWords({ m }: I18n) {
+  return { didItGo: m.today.didItGo, itWent: m.today.itWent, notYet: m.today.notYet };
 }
 
 /** Pets with a groom interval on their grooming card, with their last groom done (M35). */

@@ -75,6 +75,19 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Booking form | `/book/{slug}`, `payload.request` | The public page where a new parent asks for a stay or an appointment. |
 | Review link | `organizations.review_url` | Where parents leave a review; Today reminds you to ask. |
 
+## The team (Phase 4)
+
+| On screen | In code | Meaning |
+| --- | --- | --- |
+| Rota | `rota`, `/app/more/rota` | Who works which shift on which day. |
+| Shift | `shifts` | A stretch of the day the kennel works, such as Morning 07:00 to 15:00. A night shift ends the next morning. |
+| Lives on site | `memberships.lives_on_site` | A caretaker who lives at the kennel, there day and night. |
+| Leave | `leave_requests` | Days off: asked, granted, refused or withdrawn. |
+| Clock in, Clock out | `attendance` | Saying you have started or finished work; the database stamps the time. |
+| On now | `who_is_on()` | Who is clocked in now, on Today. |
+| Attendance | `attendanceSheet()`, `/app/more/attendance` | A month's days and hours worked, leave and shifts, for pay. |
+| In service since | `kennels.service_from`, `kennel_service` | The day a kennel went into or out of service, so past reports count the kennels there that day. |
+
 ## Places
 
 | On screen | In code | Meaning |

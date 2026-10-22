@@ -140,4 +140,13 @@ export const historyFields = {
   offers_kitchen: "रसोई है",
   offers_food_delivery: "खाना पहुँचाता है",
   skills: "हुनर",
+  keeps_rota: "रोस्टर रखता है",
+  lives_on_site: "यहीं रहते हैं",
+  starts_on: "पहला दिन",
+  ends_on: "आख़िरी दिन",
+  reason: "वजह",
+  answer: "जवाब",
+  clocked_in_at: "आने का समय",
+  clocked_out_at: "जाने का समय",
+  work_date: "दिन",
 };

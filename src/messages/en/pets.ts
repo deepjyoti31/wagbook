@@ -225,7 +225,8 @@ export const petsArea = {
     privacy: {
       title: "What we hold about them",
       intro: "A parent may ask for a copy of everything the kennel holds about them, or ask for it to be erased.",
-      download: "Download their details",
+      download: "Download their details and files",
+      downloadAbout: "A ZIP file: everything held about them in parent.json, and their pets' photos and certificates in the files folder.",
       eraseTitle: "Erase their details",
       eraseIntro:
         "Their name, phone numbers, address and notes are emptied, and the updates sent to them, their forms and the vaccination certificates (a card shows the owner) are deleted for good. Their pets' records stay: details, photos, vaccinations, routines and incidents, hidden from lists. Bills already issued stay, with the name printed on them, because tax law says so.",

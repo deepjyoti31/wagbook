@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { en } from "../src/messages/en";
 import { hi } from "../src/messages/hi";
 import { kn } from "../src/messages/kn";
+import { readZipStore } from "../src/lib/core/zip";
 
 /**
  * The whole day at a kennel, in a real browser at phone width, against a
@@ -949,11 +950,17 @@ test("a parent sends a certificate with the form, then asks for their details an
   await page.goto(`/app/dogs?q=${phone}`);
   await page.getByRole("link", { name: /Rhea Invented/ }).first().click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: en.parent.privacy.download }).click()]);
-  const exported = JSON.parse((await (await download.createReadStream()).toArray()).join(""));
+  expect(download.suggestedFilename()).toMatch(/^parent-[0-9a-f]{8}-\d{4}-\d{2}-\d{2}\.zip$/);
+  // A ZIP (M44): the details as parent.json, and the files themselves.
+  const zip = readZipStore(new Uint8Array(Buffer.concat(await (await download.createReadStream()).toArray())));
+  const exported = JSON.parse(new TextDecoder().decode(zip.find((f) => f.name === "parent.json")!.bytes));
   expect(exported.parent.full_name).toBe("Rhea Invented");
   expect(exported.pets[0].name).toBe("Mochi");
   expect(exported.forms).toHaveLength(1);
-  expect(exported.files.some((f: string) => f.endsWith("/pet-1"))).toBe(true);
+  const cardPath = exported.files.find((f: string) => f.endsWith("/pet-1"));
+  expect(cardPath).toBeTruthy();
+  expect(exported.files_not_included).toEqual([]);
+  expect(Buffer.from(zip.find((f) => f.name === `files/${cardPath}`)!.bytes).toString()).toContain("Wagbook test card");
 
   // And then to be erased.
   await page.getByRole("button", { name: en.parent.privacy.eraseButton }).click();
@@ -1113,9 +1120,16 @@ test("Today lists the reminders to send, and one sent leaves the list", async ({
   const link = arrival.getByRole("link", { name: /Neha Placeholder/ });
   expect(decodeURIComponent((await link.getAttribute("href"))!)).toContain("see you and Tofu tomorrow");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
-  // Send opens WhatsApp in a new tab and marks it sent.
+  // Send opens WhatsApp in a new tab, then asks whether the message went (M44): "Not yet" keeps it on the list.
   const [whatsapp] = await Promise.all([context.waitForEvent("page"), link.click()]);
   await whatsapp.close();
+  await expect(arrival.getByText(en.today.didItGo)).toBeVisible();
+  await arrival.getByRole("button", { name: en.today.notYet }).click();
+  await expect(arrival).toBeVisible();
+  const [again] = await Promise.all([context.waitForEvent("page"), link.click()]);
+  await again.close();
+  await narrow(page);
+  await arrival.getByRole("button", { name: en.today.itWent }).click();
   await expect(arrival).toHaveCount(0);
 });
 
@@ -2208,4 +2222,134 @@ test("reviews: with a review link set, Today lists a parent whose pet went home 
   await expect(send).toHaveAttribute("href", /g\.page%2Fr%2Fdemo-review/);
   await narrow(page);
   await shot(page, "m42-today");
+});
+
+test("the team: shifts and the rota, clocking in from Today, leave asked for and granted, and the month's attendance", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await expect(page.getByRole("link", { name: new RegExp(en.more.links.rota.title) })).toHaveCount(0);
+  await page.goto("/app/more/settings");
+  await page.getByLabel(en.offers.rota).check();
+  await page.getByRole("button", { name: en.settings.save }).click();
+  await expect(page.getByText(en.settings.saved)).toBeVisible();
+
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.rota.title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.rota.title })).toBeVisible();
+  await page.getByRole("button", { name: en.rota.shifts.addUsual }).click();
+  await expect(page.getByText(en.rota.shifts.addedUsual)).toBeVisible();
+  await page.reload();
+  const put = page.locator("form").filter({ has: page.getByRole("button", { name: en.rota.put.button }) });
+  await put.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await put.locator("select[name=shiftId]").selectOption({ label: "Morning, 07:00 to 15:00" });
+  await put.locator("input[name=from]").fill(day(0));
+  await put.locator("input[name=to]").fill(day(2));
+  await put.getByRole("button", { name: en.rota.put.button }).click();
+  await expect(page.getByText("Put on 3 shifts.")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Ravi" }).check();
+  await page.getByRole("button", { name: en.rota.onSite.save, exact: true }).click();
+  await expect(page.getByText(en.rota.onSite.saved)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Lives on site: Ravi")).toBeVisible();
+  // Today's card (the week may end before the third day).
+  await expect(page.locator("ol > li").filter({ hasText: "Meena" }).first()).toContainText("Morning");
+  await narrow(page);
+  await shot(page, "m43-rota");
+
+  // Meena clocks in from Today, on her own phone.
+  const meena = await browser.newContext({ viewport: { width: 360, height: 780 } });
+  const staff = await meena.newPage();
+  await signIn(staff, "staff");
+  const onNow = staff.locator("section").filter({ has: staff.getByRole("heading", { name: new RegExp(`^${en.onNow.title}`) }) });
+  await expect(onNow.getByText(en.onNow.notOn)).toBeVisible();
+  await onNow.getByRole("button", { name: en.onNow.clockIn }).click();
+  await expect(staff.getByText(/^Clocked in at \d\d:\d\d\.$/)).toBeVisible();
+  await staff.reload();
+  await expect(onNow.getByText(/^You are on since \d\d:\d\d\.$/)).toBeVisible();
+  await expect(onNow.getByText("Lives on site:")).toBeVisible();
+  await narrow(staff);
+  await shot(staff, "m43-today-on-now");
+
+  // She asks for two days off.
+  await staff.goto("/app/more/leave");
+  await staff.getByLabel(en.leave.ask.from).fill(day(10));
+  await staff.getByLabel(en.leave.ask.to).fill(day(11));
+  await staff.getByLabel(en.leave.ask.reason).fill("Sister's wedding");
+  await staff.getByRole("button", { name: en.leave.ask.button }).click();
+  await expect(staff.getByText(en.leave.ask.done)).toBeVisible();
+  await expect(staff.getByRole("listitem").filter({ hasText: "Sister's wedding" })).toContainText(en.leave.status.asked);
+  await narrow(staff);
+
+  // The manager sees her clocked in, and grants the leave.
+  await page.goto("/app");
+  await expect(page.locator("section").filter({ hasText: en.onNow.title }).getByText("Meena")).toBeVisible();
+  await page.goto("/app/more/leave");
+  const waiting = page.getByRole("listitem").filter({ hasText: "Sister's wedding" });
+  await waiting.getByRole("button", { name: en.leave.grant }).click();
+  await expect(page.getByText(en.leave.granted)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m43-leave");
+  // The rota then refuses her on those days.
+  await page.goto("/app/more/rota");
+  await put.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await put.locator("select[name=shiftId]").selectOption({ label: "Evening, 15:00 to 23:00" });
+  await put.locator("input[name=from]").fill(day(10));
+  await put.locator("input[name=to]").fill(day(10));
+  await put.getByRole("button", { name: en.rota.put.button }).click();
+  await expect(page.getByText("Meena is on leave that day")).toBeVisible();
+
+  // She clocks out.
+  await staff.goto("/app");
+  await onNow.getByRole("button", { name: en.onNow.clockOut }).click();
+  await expect(staff.getByText(/^Clocked out at \d\d:\d\d\.$/)).toBeVisible();
+
+  // The manager writes yesterday in by hand, and sees the month.
+  const month = day(-1).slice(0, 7);
+  await page.goto(`/app/more/attendance?month=${month}`);
+  const byHand = page.locator("form").filter({ has: page.getByRole("button", { name: en.attendance.byHand.button }) }).last();
+  await byHand.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await byHand.locator("input[name=day]").fill(day(-1));
+  await byHand.locator("input[name=in]").fill("07:00");
+  await byHand.locator("input[name=out]").fill("15:30");
+  await byHand.locator("input[name=note]").fill("Forgot her phone");
+  await byHand.getByRole("button", { name: en.attendance.byHand.button }).click();
+  await expect(page.getByText(en.attendance.byHand.saved)).toBeVisible();
+  await page.reload();
+  const row = page.getByRole("listitem").filter({ has: page.getByText("Meena", { exact: true }) }).first();
+  await expect(row).toContainText(/Hours: 8:3\d/);
+  await row.getByText(en.attendance.dayByDay).click();
+  await expect(row.getByText("07:00 to 15:30 · By hand: Forgot her phone")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m43-attendance");
+  const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: en.attendance.download }).click()]);
+  const text = Buffer.concat(await (await csv.createReadStream()).toArray()).toString();
+  expect(text).toContain("Date,Name,Clocked in,Clocked out,Hours,On leave,Shifts on the rota,Note");
+  expect(text).toContain(`${day(-1)},Meena,07:00,15:30,8.50,no,0,Forgot her phone`);
+
+  // Meena sees her own attendance only, and writes no times by hand.
+  await staff.goto(`/app/more/attendance?month=${month}`);
+  await expect(staff.getByText("Meena", { exact: true }).first()).toBeVisible();
+  await expect(staff.getByText("Ravi", { exact: true })).toHaveCount(0);
+  await expect(staff.getByRole("button", { name: en.attendance.byHand.button })).toHaveCount(0);
+  await narrow(staff);
+  await meena.close();
+});
+
+test("a kennel goes out of service from an earlier day, and back in", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/kennels");
+  const k12 = page.getByRole("listitem").filter({ hasText: "K12" });
+  await k12.locator("summary").filter({ hasText: en.kennels.takeOut }).click();
+  await k12.locator("input[name=from]").fill(day(-3));
+  await k12.getByRole("button", { name: en.kennels.takeOut }).click();
+  await expect(page.getByText("K12 is out of service.")).toBeVisible();
+  await page.reload();
+  await expect(k12.getByText(/^Out of service since /)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m44-kennels");
+  // Not after today.
+  await k12.locator("summary").filter({ hasText: en.kennels.putBack }).click();
+  await k12.locator("input[name=from]").fill(day(0));
+  await k12.getByRole("button", { name: en.kennels.putBack }).click();
+  await expect(page.getByText("K12 is back in service.")).toBeVisible();
 });

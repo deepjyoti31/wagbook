@@ -296,6 +296,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
             <a href={`/app/clients/${c.id}/export`} download className={buttonStyles.secondary}>
               {p.privacy.download}
             </a>
+            <p className="text-sm text-slate">{p.privacy.downloadAbout}</p>
             {canDelete ? (
             <ActionForm action={eraseClient} className="space-y-3 rounded-lg bg-alert-soft p-3">
               <input type="hidden" name="clientId" value={c.id} />

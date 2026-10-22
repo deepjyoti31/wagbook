@@ -126,6 +126,10 @@ async function Settings() {
               <span className="block text-sm text-slate">{m.offers.deliveryHint}</span>
             </span>
           </label>
+          <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="keeps_rota" defaultChecked={org.keeps_rota} className="mt-1 size-5" />
+            <span>{m.offers.rota}</span>
+          </label>
         </Group>
 
         <Group title={s.prices.title} about={s.prices.about}>

@@ -81,9 +81,9 @@ begin
   perform public.respond_to_invitation(v_org, true);
   perform set_config('request.jwt.claim.sub', v_owner::text, true);
 
-  -- Twelve kennels.
+  -- Twelve kennels, in service for the past year (M44: reports count the kennels there on each day).
   for i in 1..12 loop
-    insert into public.kennels (org_id, name, sort_order) values (v_org, 'K' || lpad(i::text, 2, '0'), i);
+    insert into public.kennels (org_id, name, sort_order, service_from) values (v_org, 'K' || lpad(i::text, 2, '0'), i, v_today - 365);
   end loop;
   select array_agg(k.id order by k.sort_order) into v_kennel from public.kennels k where k.org_id = v_org;
 

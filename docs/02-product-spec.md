@@ -72,6 +72,9 @@ One person can belong to several kennels, with a different role in each.
 /app/more/appointments  Places, services, prices by size and coat, packages  signed in (appointments on)
 /app/more/cancellation  Weekend days, credit months, cancellation rules  signed in
 /app/more/health      Health rules at the door                       signed in
+/app/more/rota        The week's rota, shifts, who lives on site     signed in (rota on)
+/app/more/leave       Ask for leave; owners and managers answer      signed in (rota on)
+/app/more/attendance  Clocking in and out, the month's sheet, CSV    signed in (rota on)
 /book/{slug}          A kennel's booking form for new parents        public
 /rider                A rider's own run for today                    riders (D45)
 /f/{slug}             A kennel's food order page                     public
@@ -108,8 +111,10 @@ land on Kennels with a welcome note asking them to add kennels. A person can own
 Add one kennel with any name ("Garden suite"), at the end of the list, or a numbered row in one go: prefix `K`, how
 many, first number, gives `K01` to `K60`. Repeating a row never duplicates. Each kennel's Change renames it and sets
 its position in the list, which is also the order the care round walks. Two kennels cannot share a name. A kennel can
-be taken out of service and put back. The number of kennels in service is the kennel's capacity. Owners and managers
-(M12).
+be taken out of service and put back, from today or the day it happened (M44); the kennel's Change also puts right the
+day its present state began, for a kennel that was there before Wagbook knew. The number of kennels in service is the
+kennel's capacity. Each change is kept (`kennel_service`), so a past day is measured against the kennels there that day
+(`WB230`: never after today; `WB231`: never before the last change). Owners and managers (M12).
 
 ### A4. Invite the team. Built.
 
@@ -241,10 +246,12 @@ that was hidden on its own before. Merging and erasing hide rows the same way.
 
 On the parent page, for owners and managers (`WB070` for anyone else); erasing is for owners only (`WB074`):
 
-- **Download their details** gives one JSON file (`export_client`): the parent and their consent, their addresses, each
-  pet with its vaccinations, weights, own routine and incidents, every stay with its extras, updates, care tasks and play, bills with their
-  lines, payments, the intake forms they sent, and the storage paths of their photos and certificates (the file names
-  them; it does not contain them).
+- **Download their details and files** gives one ZIP file (M44): `parent.json` (`export_client`) with the parent and
+  their consent, their addresses, each pet with its vaccinations, weights, own routine and incidents, every stay with
+  its extras, updates, care tasks and play, bills with their lines, payments, the intake forms they sent, and the
+  storage paths of their files; and the files themselves (pet photos, certificates, photos from stays and deliveries)
+  under `files/` at those paths. The small copy of each photo is left out; a file that could not be read is listed in
+  `files_not_included`.
 - **Erase their details**, after ticking "I understand that this cannot be undone" (`erase_client`): empties every
   personal detail on the parent (the parent is then shown as "Erased" where a past stay or bill names them) and the
   notes on their stays; deletes their addresses, the updates sent to them (with their photos), their intake forms (with their files),
@@ -483,8 +490,9 @@ Pet flags (for example "bite history" or "escape risk") show in red on every row
 On Today, "To send": a vaccination card to ask for (a confirmed stay within a week with no record, or one that lapses
 before the pet goes home), see you tomorrow (with the usual drop-off time), going home tomorrow (with the pick-up
 time), and bills issued three or more days ago with money owed (with the bill's link). Each says the pet or bill, the
-parent, and Send, which opens WhatsApp with the message typed in the kennel's language for parents and takes it off the
-list (an unpaid bill comes back three days later). Today also says how many requests from parents are waiting.
+parent, and Send, which opens WhatsApp with the message typed in the kennel's language for parents and then asks "Did the
+message go?": **Yes, it went** takes it off the list (an unpaid bill comes back three days later), **Not yet** leaves it
+(M44). Today also says how many requests from parents are waiting.
 
 ### D2. Daily care tasks. Built.
 
@@ -618,7 +626,7 @@ changes keeps it). Receipt files are for owners and managers only, like the expe
 
 - How full: nights sold, day boarding days, kennels used as a share of kennels available, the busiest day, and a bar
   for each day (with the same numbers in a table). Counts confirmed, current and finished stays; kennels are the ones
-  in service today.
+  in service on each day (M44, `kennels_in_service()`).
 - Money in the month: billed (issued bills by bill date, less credit notes by their own date, cancelled bills left
   out, with the tax in them), credit notes, received,
   refunded, spent, and received less spent; what is owed on bills today; the last twelve months side by side.
@@ -972,6 +980,48 @@ Forms from parents. No new public function, and the intake form's rate limit (D4
 Settings, **Review link** (an https address, such as the kennel's Google review page). With it, Today lists parents to
 ask for a review: a stay checked out or a visitor's appointment done in the last week, once each and only the latest for
 each parent (not each day of a daycare series), with the WhatsApp message carrying the link (D39). A review page of Wagbook's own is not built.
+
+## K. The team (Phase 4, M43, D48)
+
+Switched on in Settings, What this kennel offers: "A rota for the team, with leave and clocking in and out"
+(`organizations.keeps_rota`). Off, none of it is shown.
+
+### K1. Shifts and the rota. Built (M43).
+
+**More, Rota**: the week, Monday to Sunday, a card for each day with each shift and who works it; the week before and
+after. Owners and managers set up **shifts** (a name and hours; "Add morning, evening and night" gives 07:00 to 15:00,
+15:00 to 23:00 and 23:00 to 07:00, a shift ending before it starts ending the next morning), change their hours (the
+rota from today on follows), and take one off the list. They **put someone on the rota** for one shift on one day or
+on each day up to 31 days, and take a person off a shift. The database keeps a person on one shift at a time
+(`rota_one_shift_at_a_time`), and refuses a shift off the list (`WB220`), a rider or someone not working here now
+(`WB221`), and a day of granted leave (`WB222`). **Living on site** marks the caretakers who live at the kennel
+(`memberships.lives_on_site`). Staff read the rota.
+
+### K2. Clocking in and out. Built (M43).
+
+Today, **On now**: the reader's own **Clock in** or **Clock out** (with "You are on since 07:02"), who is clocked in
+(names only, for everyone: `who_is_on()`), who is on the rota now but not clocked in, and who lives on site. The
+database stamps both times; a person cannot write their own (`WB226`). An owner or manager writes a time by hand for
+someone who forgot, or puts one right, always with a note (`WB227`), never later than now (`WB228`), and History of
+changes keeps who did it. A person is in one stretch at a time (`attendance_one_at_a_time`). A person sees their own
+attendance; owners and managers everyone's. A person with attendance on record is suspended, not removed
+(`attendance_keeps_member`).
+
+### K3. Leave. Built (M43).
+
+**More, Leave**: anyone asks for days off (first and last day, a reason if they want), and sees and withdraws their
+own. Owners and managers see what is waiting and grant or refuse it with an answer, see granted leave to come, and
+may put leave in for someone, already granted. Nobody answers their own leave unless an owner (`WB223`, `WB224`);
+refused and withdrawn leave is final, and granted leave keeps its days (`WB225`); requests do not overlap. Granting
+takes the person off the rota on those days.
+
+### K4. The month's attendance for pay. Built (M43).
+
+**More, Attendance**: a month at a time, each person's days worked, hours (from stretches clocked out), days on leave,
+shifts on the rota, and stretches not clocked out, then day by day with the times and any note. A stretch counts on the
+day it began, so a night shift counts on its evening (`attendanceSheet()`). **Download the month (CSV)**: a line for
+each person and day, with first in, last out, hours as a decimal, leave, shifts and notes. Staff see and download their
+own.
 
 ---
 

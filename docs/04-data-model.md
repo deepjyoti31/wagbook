@@ -91,7 +91,9 @@ Both are soft deleted (`deleted_at`), because old bookings and invoices must sti
 ## Kennels and bookings
 
 **kennels** are the physical units. `is_active = false` means out of service. The count of active kennels is the
-capacity.
+capacity. Each change in or out of service is dated (`service_from`, today unless an earlier day is given) and kept in
+**kennel_service**, one row a change, written only by a trigger (M44). `kennels_in_service(org, day)` counts the
+kennels there on a day, which the occupancy report and the calendar use for past days.
 
 **services** is the rate card: one default row per stay kind (`boarding`, `daycare`), plus any number of add-ons.
 
@@ -232,6 +234,20 @@ run (`run_id`, `run_position`). **Health at the door**: the kennel's rules (`org
 `deworm_days`, `tick_days`, `neuter_months`, and `required_vaccines`), the pet's dates (`pets.dewormed_on`,
 `tick_treated_on`), what a pet lacks on a day (`pet_health_problems()`), and an owner's or manager's reason for letting
 a pet in anyway (`health_overrides`). The review link is `organizations.review_url`.
+
+## The team
+
+Phase 4 (M43, D48), in `20261008000470_team.sql`. **shifts** are the kennel's shifts with their hours (a shift that
+ends at or before its start ends the next day). **rota** puts one person on one shift on one day; it copies the
+shift's hours as kennel clock times (`starts_at`, `ends_at`), and an exclusion constraint keeps a person on one shift
+at a time, as bookings keep a kennel to one stay. **leave_requests** are days off, asked for and then granted,
+refused or withdrawn; granted leave takes the person off the rota on those days and the rota then refuses them.
+**attendance** is one stretch of work, clocked in and out, the times stamped by the database unless an owner or
+manager writes them by hand with a note; a stretch counts on the kennel date it began (`work_date`), and another
+exclusion constraint keeps a person to one stretch at a time. Who lives on site is `memberships.lives_on_site`; the
+whole area shows while `organizations.keeps_rota` is on. Leave and attendance are each person's own: they read and
+write their own rows, owners and managers everyone's, and `who_is_on()` tells everyone the names of who is clocked in
+now. Attendance is kept for pay: a person with some cannot be removed (`attendance_keeps_member`), only suspended.
 
 ## Intake
 

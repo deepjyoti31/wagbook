@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 15. Tables: 63. Views: 6. Functions: 140.
+Migrations applied: 16. Tables: 68. Views: 6. Functions: 149.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [required_vaccines](#required_vaccines), [service_areas](#service_areas), [services](#services), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations)
+- Tables: [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [required_vaccines](#required_vaccines), [rota](#rota), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations)
 - Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stock_levels](#stock_levels)
 - [Functions](#functions)
 
@@ -42,6 +42,7 @@ Migrations applied: 15. Tables: 63. Views: 6. Functions: 140.
 | `incident_severity` | `low`, `medium`, `high` | low: worth noting. medium: the parent should be told today. high: the parent and a vet should be told now. |
 | `intake_status` | `new`, `accepted`, `rejected`, `spam` | new: waiting for staff. accepted: turned into a client and pets. rejected: declined by staff. spam: junk, kept only to spot patterns. |
 | `invoice_status` | `draft`, `issued`, `void` | draft: being prepared, editable, has no number. issued: numbered and frozen. void: cancelled after issue; the number stays used. |
+| `leave_status` | `asked`, `granted`, `refused`, `withdrawn` | asked: waiting for an owner or manager. granted: the person is off those days. refused: not given. withdrawn: taken back by the person or a manager. Refused and withdrawn are final. |
 | `member_role` | `owner`, `manager`, `staff`, `rider` | owner: everything, including people and deleting the organisation. manager: everything except owners. staff: daily operations. rider: only their own delivery run for the day, through rider functions (D45); no table is open to them. |
 | `package_day` | `first`, `middle`, `last` | Which day of a stay a package's appointment goes on: first (the day it starts), middle (halfway), last (the day it ends, finished by pick-up). |
 | `pay_period` | `week`, `month` | How a subscription is paid: a week ahead, or a month ahead (with the kennel's monthly discount). |
@@ -353,6 +354,56 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 - `appointments_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `appointments_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `appointments_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### attendance
+
+One stretch of work (M43): clocked in, then out. A person clocks themselves in and out and the database stamps the time; only an owner or manager writes a time by hand, with a note (WB226, WB227). Never two at once for a person (attendance_one_at_a_time), so one open at most. A person sees their own; owners and managers everyone's.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `work_date` | `date` |  |  | The kennel date the stretch began, which is the day it counts on (a night shift counts on the evening it began). Set by the database. |
+| `clocked_in_at` | `timestamp with time zone` | yes | `now()` |  |
+| `clocked_out_at` | `timestamp with time zone` |  |  | Empty while the person is still on. |
+| `note` | `text` |  |  | Why a time was written by hand: needed whenever an owner or manager puts in or changes a time. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `attendance_pkey`: `PRIMARY KEY (id)`
+- Unique `attendance_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `attendance_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `attendance_keeps_member`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id)`
+- Foreign key `attendance_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Exclusion `attendance_one_at_a_time`: `EXCLUDE USING gist (org_id WITH =, user_id WITH =, tstzrange(clocked_in_at, clocked_out_at) WITH &&)`
+- Check `attendance_dated`: `CHECK ((work_date IS NOT NULL))`
+- Check `attendance_note_check`: `CHECK (((note IS NULL) OR ((char_length(btrim(note)) >= 1) AND (char_length(btrim(note)) <= 300))))`
+- Check `attendance_out_after_in`: `CHECK (((clocked_out_at IS NULL) OR (clocked_out_at > clocked_in_at)))`
+
+**Indexes**
+
+- `CREATE INDEX attendance_open_idx ON public.attendance USING btree (org_id) WHERE (clocked_out_at IS NULL)`
+- `CREATE INDEX attendance_org_date_idx ON public.attendance USING btree (org_id, work_date)`
+
+**Triggers**
+
+- `attendance_audit` (after insert or delete or update) runs `audit_row()`
+- `attendance_check` (before insert or update) runs `attendance_check()`
+- `attendance_forbid_org_change` (before update) runs `forbid_org_change()`
+- `attendance_set_updated_at` (before update) runs `set_updated_at()`
+- `attendance_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `attendance_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `attendance_insert` (insert): new values must satisfy `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
+- `attendance_select` (select): rows where `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
+- `attendance_update` (update): rows where `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`; new values must satisfy `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
 
 ### audit_log
 
@@ -1924,6 +1975,35 @@ END)`
 - `invoices_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
+### kennel_service
+
+When each kennel went into or out of service (M44), one row a change, written only by the kennels_service trigger from kennels.is_active and kennels.service_from. A kennel counts on a day by its latest row on or before that day; before its first row it was not there. Nobody writes it directly.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` | yes |  |  |
+| `kennel_id` | `uuid` | yes |  |  |
+| `from_date` | `date` | yes |  | The first day of this state, kennel time. |
+| `in_service` | `boolean` | yes |  | True: in service, so in the capacity from this day. False: out of service. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `kennel_service_pkey`: `PRIMARY KEY (org_id, kennel_id, from_date)`
+- Foreign key `kennel_service_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `kennel_service_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `kennel_service_org_id_kennel_id_fkey`: `FOREIGN KEY (org_id, kennel_id) REFERENCES kennels(org_id, id) ON DELETE CASCADE`
+
+**Triggers**
+
+- `kennel_service_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `kennel_service_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### kennels
 
 A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets of one parent sharing it. The number of active kennels is the organisation's capacity.
@@ -1936,6 +2016,7 @@ A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets o
 | `zone` | `text` |  |  | Optional grouping such as a block or wing, for sorting the board. |
 | `notes` | `text` |  |  |  |
 | `is_active` | `boolean` | yes | `true` | False takes the kennel out of service (repairs, deep cleaning) and out of the capacity count. |
+| `service_from` | `date` |  |  | The day the kennel went into its present state (in or out of service, M44): today unless an earlier day is given, never after today and never before the change before it (WB230, WB231). Each change is kept in kennel_service. |
 | `sort_order` | `integer` | yes | `0` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -1947,10 +2028,13 @@ A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets o
 - Unique `kennels_org_id_name_key`: `UNIQUE (org_id, name)`
 - Foreign key `kennels_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `kennels_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 40)))`
+- Check `kennels_service_from_set`: `CHECK ((service_from IS NOT NULL))`
 
 **Triggers**
 
+- `kennels_check_service` (before insert or update of is_active, service_from) runs `kennels_check_service()`
 - `kennels_forbid_org_change` (before update) runs `forbid_org_change()`
+- `kennels_keep_service` (after insert or update of is_active, service_from) runs `kennels_keep_service()`
 - `kennels_set_updated_at` (before update) runs `set_updated_at()`
 
 **Access**
@@ -1960,6 +2044,60 @@ A place pets stay: a kennel, room, run or suite. It holds one pet, or two pets o
 - `kennels_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `kennels_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `kennels_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### leave_requests
+
+Days off (M43): asked for by the person (or put in by an owner or manager), then granted or refused by an owner or manager, never the person themselves unless an owner. Granting takes the person off the rota on those days. A person sees their own; owners and managers everyone's.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `starts_on` | `date` | yes |  | The first day off, kennel date. |
+| `ends_on` | `date` | yes |  | The last day off, kennel date. At most 92 days in one request. |
+| `reason` | `text` |  |  |  |
+| `status` | `leave_status` | yes | `'asked'::leave_status` |  |
+| `answer` | `text` |  |  | What the owner or manager said with the answer, if anything. |
+| `decided_by` | `uuid` |  |  | Who granted, refused or withdrew it. Set by the database. |
+| `decided_at` | `timestamp with time zone` |  |  | When it was granted, refused or withdrawn. Set by the database. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `leave_requests_pkey`: `PRIMARY KEY (id)`
+- Unique `leave_requests_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `leave_requests_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `leave_requests_decided_by_fkey`: `FOREIGN KEY (decided_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `leave_requests_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `leave_requests_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Exclusion `leave_requests_one_at_a_time`: `EXCLUDE USING gist (org_id WITH =, user_id WITH =, daterange(starts_on, ends_on, '[]'::text) WITH &&) WHERE ((status = ANY (ARRAY['asked'::leave_status, 'granted'::leave_status])))`
+- Check `leave_requests_answer_check`: `CHECK (((answer IS NULL) OR (char_length(answer) <= 300)))`
+- Check `leave_requests_in_order`: `CHECK (((ends_on >= starts_on) AND ((ends_on - starts_on) < 92)))`
+- Check `leave_requests_reason_check`: `CHECK (((reason IS NULL) OR (char_length(reason) <= 300)))`
+
+**Indexes**
+
+- `CREATE INDEX leave_requests_org_dates_idx ON public.leave_requests USING btree (org_id, starts_on)`
+
+**Triggers**
+
+- `leave_clears_rota` (after insert or update of status) runs `leave_clears_rota()`
+- `leave_requests_audit` (after insert or delete or update) runs `audit_row()`
+- `leave_requests_check` (before insert or update) runs `leave_requests_check()`
+- `leave_requests_forbid_org_change` (before update) runs `forbid_org_change()`
+- `leave_requests_set_updated_at` (before update) runs `set_updated_at()`
+- `leave_requests_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `leave_requests_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `leave_requests_insert` (insert): new values must satisfy `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
+- `leave_requests_select` (select): rows where `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
+- `leave_requests_update` (update): rows where `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`; new values must satisfy `(((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids))) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
 
 ### memberships
 
@@ -1974,6 +2112,7 @@ Links a signed-in user to an organisation with a role. Row level security on eve
 | `phone` | `text` |  |  |  |
 | `language` | `text` | yes | `'en'::text` | The language this person reads Wagbook in: en, hi or kn. Set by the person with set_my_language(), for all their kennels at once. |
 | `skills` | `staff_skill[]` | yes | `'{}'::staff_skill[]` | What this person can be given to do in this kennel (staff_skill), set by owners and managers. Decides who is offered a job, not what they may see. |
+| `lives_on_site` | `boolean` | yes | `false` | Whether this person lives at the kennel (a caretaker on site day and night, M43), set by owners and managers. Shown with who is on now. |
 | `is_active` | `boolean` | yes | `false` | Whether this person can use the organisation right now. False while an invitation is pending, and set false again to cut off access at once without losing the history of who did what. |
 | `accepted_at` | `timestamp with time zone` |  |  | When the person accepted the invitation. Empty means the invitation is still pending. Only respond_to_invitation() and create_organization() set it. |
 | `invited_by` | `uuid` |  |  | Who sent the invitation. |
@@ -2080,6 +2219,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `deworm_days` | `smallint` |  |  | A pet must have been dewormed within this many days (M40). Empty: not required. |
 | `tick_days` | `smallint` |  |  | A pet must have had tick treatment within this many days (M40). Empty: not required. |
 | `neuter_months` | `smallint` |  |  | Above this age in months a pet must be spayed or neutered (M40). Empty: not required. |
+| `keeps_rota` | `boolean` | yes | `false` | Whether the kennel keeps its rota, leave and attendance in Wagbook (M43): shifts, clocking in and out, Today's "on now". Off: none of it is shown. |
 | `review_url` | `text` |  |  | The kennel's review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -2892,6 +3032,52 @@ A vaccine the kennel requires at the door (M40), matched to a pet's vaccinations
 - `required_vaccines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `required_vaccines_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### rota
+
+Who works which shift on which day (M43). A person is never on two shifts that overlap (rota_one_shift_at_a_time), nor on a day of their granted leave (WB222). Owners and managers plan it; everyone reads it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `shift_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `work_date` | `date` | yes |  | The day the shift starts, kennel date. A night shift ends the next morning. |
+| `starts_at` | `timestamp without time zone` |  |  | When it starts, kennel clock, copied from the shift. Moves with the shift's hours from today on. |
+| `ends_at` | `timestamp without time zone` |  |  | When it ends, kennel clock, the next day for a night shift. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `rota_pkey`: `PRIMARY KEY (id)`
+- Unique `rota_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `rota_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `rota_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `rota_org_id_shift_id_fkey`: `FOREIGN KEY (org_id, shift_id) REFERENCES shifts(org_id, id) ON DELETE CASCADE`
+- Foreign key `rota_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Exclusion `rota_one_shift_at_a_time`: `EXCLUDE USING gist (org_id WITH =, user_id WITH =, tsrange(starts_at, ends_at) WITH &&)`
+- Check `rota_timed`: `CHECK (((starts_at IS NOT NULL) AND (ends_at IS NOT NULL) AND (ends_at > starts_at)))`
+
+**Indexes**
+
+- `CREATE INDEX rota_org_date_idx ON public.rota USING btree (org_id, work_date)`
+
+**Triggers**
+
+- `rota_check` (before insert or update) runs `rota_check()`
+- `rota_forbid_org_change` (before update) runs `forbid_org_change()`
+- `rota_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `rota_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `rota_delete_by_managers` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `rota_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
 ### service_areas
 
 A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.
@@ -2982,6 +3168,46 @@ The rate card. A boarding or daycare row sets the price of a stay; addon rows ar
 - `services_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `services_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `services_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### shifts
+
+A shift the kennel works (M43), such as Morning 07:00 to 15:00 or Night 23:00 to 07:00, in the language it was typed in. Taken off the list rather than deleted once used.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `name` | `text` | yes |  |  |
+| `starts_at` | `time without time zone` | yes |  | When it starts, kennel time. |
+| `ends_at` | `time without time zone` | yes |  | When it ends, kennel time. At or before the start means the next day (a night shift). |
+| `is_active` | `boolean` | yes | `true` | False takes it off the list: no new rota rows, the old ones stay. |
+| `sort_order` | `smallint` | yes | `0` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `shifts_pkey`: `PRIMARY KEY (id)`
+- Unique `shifts_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `shifts_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `shifts_have_hours`: `CHECK ((ends_at <> starts_at))`
+- Check `shifts_name_check`: `CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)))`
+
+**Indexes**
+
+- `CREATE UNIQUE INDEX shifts_one_name ON public.shifts USING btree (org_id, lower(btrim(name)))`
+
+**Triggers**
+
+- `shifts_follow_rota` (after update of starts_at, ends_at) runs `shifts_follow_rota()`
+- `shifts_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `shifts_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `shifts_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `shifts_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `shifts_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### stay_updates
 
@@ -3586,6 +3812,18 @@ appointments_check_health() returns trigger
 - Volatility: volatile
 
 Trigger: while the kennel refuses at the door, a visitor's appointment that checks vaccinations is not marked done for a pet that lacks what the kennel requires, unless an owner or manager let it in (WB210). A boarder was checked at its check-in.
+
+### attendance_check
+
+```
+attendance_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a person clocking themselves in or out gets the database's time; anything else (a time for someone else, a time changed) is for an owner or manager (WB226) with a note (WB227), never later than now (WB228). Only people working here now, not riders, clock in (WB221). Sets the day it counts on.
 
 ### audit_row
 
@@ -4367,6 +4605,66 @@ issue_invoice(p_invoice uuid) returns invoices
 
 Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, or its food deliveries) says. Takes in advances paid for those stays.
 
+### kennels_check_service
+
+```
+kennels_check_service() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: dates a kennel's change in or out of service (kennels.service_from) today unless an earlier day is given, never after today (WB230) and never before the change before it (WB231).
+
+### kennels_in_service
+
+```
+kennels_in_service(p_org uuid, p_day date) returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The kennels in service on a day (M44), each by its latest change on or before it (kennel_service). A kennel not there yet does not count. Today and after, the same as counting kennels.is_active.
+
+### kennels_keep_service
+
+```
+kennels_keep_service() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger: keeps kennel_service in step with kennels.is_active and kennels.service_from, one row a change. SECURITY DEFINER because nobody may write kennel_service directly.
+
+### leave_clears_rota
+
+```
+leave_clears_rota() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: leave being granted takes the person off the rota on its days.
+
+### leave_requests_check
+
+```
+leave_requests_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: only an owner or manager grants or refuses leave (WB223), and not their own unless an owner (WB224); only leave still asked for changes its days; refused and withdrawn leave is final (WB225). Stamps who answered and when.
+
 ### make_recovery_codes
 
 ```
@@ -4473,7 +4771,7 @@ occupancy_by_day(p_org uuid, p_from date, p_to date) returns TABLE(day date, occ
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.
+For each day in a range (at most 400 days): kennels in use, kennels in service that day (kennels_in_service), and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.
 
 ### org_today
 
@@ -4785,7 +5083,7 @@ report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boa
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service today, and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
+For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service that day (kennels_in_service), and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
 
 ### report_tax
 
@@ -4846,6 +5144,18 @@ rider_upload_allowed(p_object_name text) returns boolean
 - Volatility: stable
 
 True when a stored file's path is a photo of a stop on the signed-in rider's own run for today. SECURITY DEFINER because riders read no table (D45).
+
+### rota_check
+
+```
+rota_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a rota row takes its shift's hours on its day (the next morning for a night shift); never a shift off the list (WB220), a person not working here or a rider (WB221), or a day of their granted leave (WB222).
 
 ### rotation_recipe
 
@@ -4930,6 +5240,18 @@ set_updated_at() returns trigger
 - Volatility: volatile
 
 Trigger: stamps updated_at on every update.
+
+### shifts_follow_rota
+
+```
+shifts_follow_rota() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: when a shift's hours change, its rota rows from today on take the new hours (refused if that puts a person on two shifts at once).
 
 ### stamp_actor
 
@@ -5182,3 +5504,15 @@ waiting_list(p_org uuid) returns TABLE(booking_id uuid, waitlisted_at timestamp 
 - Volatility: stable
 
 The kennel's waiting list, first in line first: each request waiting for a kennel, when it joined, and whether it would fit now (a kennel free on every day, and no other stay for the pet). Stays already over are left out. Must agree with bookings_check_capacity().
+
+### who_is_on
+
+```
+who_is_on(p_org uuid) returns TABLE(user_id uuid, display_name text)
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: stable
+
+The names of the people clocked in now at a kennel the caller works at (M43): names only, no times. SECURITY DEFINER because a person reads only their own attendance.
