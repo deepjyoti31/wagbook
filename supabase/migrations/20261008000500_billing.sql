@@ -12,10 +12,10 @@
 -- =============================================================================
 
 create type public.invoice_status as enum ('draft', 'issued', 'void');
-create type public.payment_method as enum ('upi', 'cash', 'card', 'bank_transfer', 'other');
+create type public.payment_method as enum ('upi', 'cash', 'card', 'bank_transfer', 'other', 'credit');
 comment on type public.invoice_status is
   'draft: being prepared, editable, has no number. issued: numbered and frozen. void: cancelled after issue; the number stays used.';
-comment on type public.payment_method is 'How money moved. Wagbook records this; it does not process payments.';
+comment on type public.payment_method is 'How money moved. Wagbook records this; it does not process payments. credit: from the parent''s credit (in), or kept as credit instead of refunded (out); no money moved (M38).';
 
 create table public.invoices (
   id uuid primary key default gen_random_uuid(),
@@ -561,10 +561,16 @@ as $$
   from public.appointment_items ai
   join public.appointments a on a.org_id = ai.org_id and a.id = ai.appointment_id
   where ai.org_id = p_org and a.status in ('confirmed', 'done', 'no_show')
-    and (a.id = p_appointment or a.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month)));
+    and (a.id = p_appointment or a.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month)))
+  union all
+  -- Pick-ups and drops (M39) that are not cancelled.
+  select 1::numeric(10, 2), t.price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else t.tax_rate_bp end
+  from public.trips t
+  where t.org_id = p_org and t.status <> 'cancelled'
+    and t.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month));
 $$;
 comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode, uuid, date, uuid) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons; or a visitor''s appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.';
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, and each pick-up and drop not cancelled; or a visitor''s appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.';
 
 -- One line of a bill or credit note, checked against the same rules as
 -- src/lib/core/tax.ts. The app does the sums; the database refuses a document
@@ -1542,10 +1548,12 @@ begin
   update public.invoices i set client_id = v_keep.id where i.org_id = v_keep.org_id and i.client_id = v_merge.id;
   -- Day boarding packs go with the parent, and so do the days paid from them.
   update public.passes ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
+  -- Credit, and the payments into and from it, go together (M38).
+  update public.credits cr set client_id = v_keep.id where cr.org_id = v_keep.org_id and cr.client_id = v_merge.id;
+  update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   perform set_config('wagbook.merging', 'off', true);
   -- Play sessions copy their parent from the booking whenever they are written.
   update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;
-  update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
   update public.intake_submissions s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
   update public.client_addresses a set client_id = v_keep.id where a.org_id = v_keep.org_id and a.client_id = v_merge.id;
   update public.food_orders f set client_id = v_keep.id where f.org_id = v_keep.org_id and f.client_id = v_merge.id;
@@ -1572,4 +1580,4 @@ begin
 end;
 $$;
 comment on function public.merge_clients(uuid, uuid) is
-  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';
+  'Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, credit, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.';

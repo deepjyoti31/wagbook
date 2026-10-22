@@ -6,13 +6,13 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 13. Tables: 57. Views: 5. Functions: 130.
+Migrations applied: 15. Tables: 63. Views: 6. Functions: 140.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [service_areas](#service_areas), [services](#services), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [vaccinations](#vaccinations)
-- Views: [course_balances](#course_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stock_levels](#stock_levels)
+- Tables: [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennels](#kennels), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [required_vaccines](#required_vaccines), [service_areas](#service_areas), [services](#services), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations)
+- Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stock_levels](#stock_levels)
 - [Functions](#functions)
 
 ## Enumerated types
@@ -26,7 +26,10 @@ Migrations applied: 13. Tables: 57. Views: 5. Functions: 130.
 | `boarder_food` | `kitchen`, `kibble`, `own` | What a pet eats while boarding: kitchen (fresh food from the kennel's kitchen, the default), kibble (a dry food the parent names, which the kennel feeds), own (food the parent sends). |
 | `booking_kind` | `boarding`, `daycare` | boarding: overnight, charged per night. daycare: day boarding with no night, charged per day. |
 | `booking_status` | `requested`, `confirmed`, `checked_in`, `checked_out`, `cancelled`, `no_show` | requested: asked for, not yet accepted, holds no space. confirmed: space is held. checked_in: the pet is in house. checked_out: gone home. cancelled and no_show: space released. |
+| `cancel_applies_to` | `boarding`, `daycare`, `appointment` | What a cancellation rule is for: boarding nights, day boarding days, or appointments. |
+| `cancel_outcome` | `refund`, `credit`, `keep` | What happens to a cancelled night or day: refund (the money goes back), credit (kept as the parent's credit), keep (the kennel keeps it). |
 | `care_kind` | `meal`, `medication`, `walk`, `play`, `cleaning`, `other` | What sort of care a routine or task is. Used to group and count tasks. |
+| `credit_kind` | `cancellation`, `goodwill` | cancellation: kept instead of a refund when a stay or service was cancelled. goodwill: given by an owner or manager, with a reason. |
 | `customer_source` | `boarding`, `referral`, `website`, `other` | Where a food customer came from: a boarding parent, a referral, the website order page, or elsewhere. |
 | `delivery_kind` | `subscription`, `trial`, `order`, `item`, `replacement` | subscription: made from a subscription. trial: a trial, once per pet. order: food by the kilo, once. item: a made-to-order item. replacement: a delivery made again at no charge after a problem. |
 | `delivery_slot` | `morning`, `afternoon`, `evening` | When a delivery arrives: morning (from 8), afternoon (from 1) or evening (from 6), kennel time. Changes close food_cutoff_hours before the slot starts. |
@@ -42,7 +45,7 @@ Migrations applied: 13. Tables: 57. Views: 5. Functions: 130.
 | `member_role` | `owner`, `manager`, `staff`, `rider` | owner: everything, including people and deleting the organisation. manager: everything except owners. staff: daily operations. rider: only their own delivery run for the day, through rider functions (D45); no table is open to them. |
 | `package_day` | `first`, `middle`, `last` | Which day of a stay a package's appointment goes on: first (the day it starts), middle (halfway), last (the day it ends, finished by pick-up). |
 | `pay_period` | `week`, `month` | How a subscription is paid: a week ahead, or a month ahead (with the kennel's monthly discount). |
-| `payment_method` | `upi`, `cash`, `card`, `bank_transfer`, `other` | How money moved. Wagbook records this; it does not process payments. |
+| `payment_method` | `upi`, `cash`, `card`, `bank_transfer`, `other`, `credit` | How money moved. Wagbook records this; it does not process payments. credit: from the parent's credit (in), or kept as credit instead of refunded (out); no money moved (M38). |
 | `pet_coat` | `short`, `double`, `long`, `curly`, `wire` | A pet's coat, for grooming prices (M35): short, double (a thick undercoat), long, curly, wire. |
 | `pet_sex` | `male`, `female`, `unknown` | unknown is the honest default when nobody has said. |
 | `problem_kind` | `damaged`, `late`, `wrong` | What a parent said was wrong with a delivery: damaged, late or wrong. |
@@ -55,6 +58,8 @@ Migrations applied: 13. Tables: 57. Views: 5. Functions: 130.
 | `stock_unit` | `g`, `ml`, `piece` | How an item is counted: grams, millilitres or pieces. Quantities are whole numbers of this unit. |
 | `task_status` | `pending`, `done`, `skipped` | pending: still to do. done: completed (who and when are stamped). skipped: deliberately not done, with a note saying why. |
 | `tax_mode` | `none`, `simple`, `gst_india` | none: no tax charged. simple: one tax at one rate (VAT, sales tax). gst_india: CGST+SGST within a state, IGST across states. |
+| `trip_kind` | `pickup`, `drop` | pickup: the kennel fetches the pet from home on the first day of its stay. drop: it takes the pet home on the last day. |
+| `trip_status` | `planned`, `out`, `done`, `not_home`, `cancelled` | planned: to go. out: the rider is on the way. done: picked up or dropped. not_home: nobody there. cancelled: not going, with a reason. |
 | `waste_reason` | `spoiled`, `past_date`, `dropped`, `other` | Why stock was thrown away: spoiled, past its use-by date, dropped, or another reason in the note. |
 
 ## Tables
@@ -334,6 +339,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 
 - `appointments_audit` (after insert or delete or update) runs `audit_row()`
 - `appointments_check` (before insert or update) runs `appointments_check()`
+- `appointments_check_health` (before insert or update of status) runs `appointments_check_health()`
 - `appointments_forbid_org_change` (before update) runs `forbid_org_change()`
 - `appointments_set_updated_at` (before update) runs `set_updated_at()`
 - `appointments_stamp_actor` (before insert or update) runs `stamp_actor()`
@@ -520,6 +526,8 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 | `checked_out_by` | `uuid` |  |  |  |
 | `cancelled_at` | `timestamp with time zone` |  |  |  |
 | `cancel_reason` | `text` |  |  |  |
+| `cancel_asked_at` | `timestamp with time zone` |  |  | When the parent asked to cancel, which decides each night's notice (M38). Empty: when it was cancelled. |
+| `cancelled_by_kennel` | `boolean` | yes | `false` | True when the kennel cancelled the stay, so the parent chooses a refund or credit (M38). |
 | `belongings` | `text` |  |  | What came with the pet (bed, leash, food, medicines) so it all goes home again. |
 | `gate_notes` | `text` |  |  | Anything the parent said at drop-off: a change of food, a recent illness, who will collect. |
 | `vaccinations_checked_at` | `timestamp with time zone` |  |  | When a staff member confirmed at check-in that they had seen the pet's vaccination certificates. Stamped by the database. |
@@ -588,10 +596,12 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
+- `bookings_check_health` (before update of status) runs `bookings_check_health()`
 - `bookings_check_package` (before insert or update of package_id, package_price_minor) runs `bookings_check_package()`
 - `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
 - `bookings_follow_appointments` (after update of status, start_date, end_date) runs `bookings_follow_appointments()`
+- `bookings_follow_trips` (after update of status, start_date, end_date) runs `bookings_follow_trips()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
 - `bookings_guard_price` (before insert or update) runs `bookings_guard_price()`
 - `bookings_keep_billed_month` (before update of start_date) runs `bookings_keep_billed_month()`
@@ -606,6 +616,40 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `bookings_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### cancellation_rules
+
+The kennel's cancellation rule for boarding, day boarding or appointments (M38). No row: the defaults (24 hours; a weekday refunded with notice, credit otherwise; a weekend or holiday night as credit). cancellationOutcome() applies it night by night.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` | yes |  |  |
+| `applies_to` | `cancel_applies_to` | yes |  |  |
+| `notice_hours` | `smallint` | yes | `24` | How many hours before a night's check-in time (or an appointment's start) the parent must ask, for it to count as on time. |
+| `weekday_on_time` | `cancel_outcome` | yes | `'refund'::cancel_outcome` | A weekday night or day cancelled with the notice. |
+| `weekday_late` | `cancel_outcome` | yes | `'credit'::cancel_outcome` | A weekday night or day cancelled without the notice. |
+| `weekend_on_time` | `cancel_outcome` | yes | `'credit'::cancel_outcome` | A weekend or holiday night or day cancelled with the notice. |
+| `weekend_late` | `cancel_outcome` | yes | `'credit'::cancel_outcome` | A weekend or holiday night or day cancelled without the notice. |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `cancellation_rules_pkey`: `PRIMARY KEY (org_id, applies_to)`
+- Foreign key `cancellation_rules_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `cancellation_rules_notice_hours_check`: `CHECK (((notice_hours >= 0) AND (notice_hours <= 720)))`
+
+**Triggers**
+
+- `cancellation_rules_forbid_org_change` (before update) runs `forbid_org_change()`
+- `cancellation_rules_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `cancellation_rules_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `cancellation_rules_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `cancellation_rules_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `cancellation_rules_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### care_items
 
@@ -994,6 +1038,91 @@ A credit note: takes back all or part of an issued bill, counted in the month it
 
 - Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
 - `credit_notes_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### credit_uses
+
+What a payment from credit took from each credit, the soonest to end first. Written only by payments_credit(), never changed; removing the payment gives the credit back.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `credit_id` | `uuid` | yes |  |  |
+| `payment_id` | `uuid` | yes |  |  |
+| `amount_minor` | `bigint` | yes |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `credit_uses_pkey`: `PRIMARY KEY (id)`
+- Foreign key `credit_uses_org_id_credit_id_fkey`: `FOREIGN KEY (org_id, credit_id) REFERENCES credits(org_id, id) ON DELETE RESTRICT`
+- Foreign key `credit_uses_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `credit_uses_payment_fkey`: `FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE`
+- Check `credit_uses_amount_minor_check`: `CHECK ((amount_minor > 0))`
+
+**Indexes**
+
+- `CREATE INDEX credit_uses_org_credit_idx ON public.credit_uses USING btree (org_id, credit_id)`
+- `CREATE INDEX credit_uses_payment_idx ON public.credit_uses USING btree (payment_id)`
+
+**Triggers**
+
+- `credit_uses_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credit_uses_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### credits
+
+Credit a parent holds with the kennel (M38): an amount, kept from a cancellation (a refund paid "as credit") or given as goodwill, that ends on a day. Spent through payments from credit (credit_uses). Never changed; credit_balances says what is left.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  |  |
+| `kind` | `credit_kind` | yes |  |  |
+| `amount_minor` | `bigint` | yes |  |  |
+| `expires_on` | `date` | yes |  | The last day it can be spent: organizations.credit_months after it was given. |
+| `reason` | `text` | yes |  |  |
+| `payment_id` | `uuid` |  |  | For credit kept from a cancellation: the refund paid "as credit" that made it. |
+| `booking_id` | `uuid` |  |  | The stay it was kept from, if any. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `credits_pkey`: `PRIMARY KEY (id)`
+- Unique `credits_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `credits_payment_id_key`: `UNIQUE (payment_id)`
+- Foreign key `credits_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `credits_org_id_booking_id_fkey`: `FOREIGN KEY (org_id, booking_id) REFERENCES bookings(org_id, id) ON DELETE SET NULL (booking_id)`
+- Foreign key `credits_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
+- Foreign key `credits_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `credits_payment_fkey`: `FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE`
+- Check `credits_amount_minor_check`: `CHECK ((amount_minor > 0))`
+- Check `credits_cancellation_from_a_payment`: `CHECK (((kind = 'cancellation'::credit_kind) = (payment_id IS NOT NULL)))`
+- Check `credits_reason_check`: `CHECK (((char_length(btrim(reason)) >= 1) AND (char_length(btrim(reason)) <= 300)))`
+
+**Indexes**
+
+- `CREATE INDEX credits_org_client_idx ON public.credits USING btree (org_id, client_id, expires_on)`
+
+**Triggers**
+
+- `credits_audit` (after insert or delete or update) runs `audit_row()`
+- `credits_check` (before insert) runs `credits_check()`
+- `credits_forbid_org_change` (before update) runs `forbid_org_change()`
+- `credits_stamp_actor` (before insert) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `credits_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `credits_insert` (insert): new values must satisfy `((kind = 'goodwill'::credit_kind) AND (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role)))`
+- `credits_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### day_packs
 
@@ -1404,6 +1533,47 @@ Food in the rate card: a trial, subscription food and one-off food by the kilo, 
 - `food_products_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `food_products_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### health_overrides
+
+An owner or manager letting a pet in although it lacks what the kennel requires (M40), with the reason. A row, so History of changes shows who let a pet in and why.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `booking_id` | `uuid` |  |  |  |
+| `appointment_id` | `uuid` |  |  |  |
+| `reason` | `text` | yes |  |  |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `health_overrides_pkey`: `PRIMARY KEY (id)`
+- Foreign key `health_overrides_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `health_overrides_org_id_appointment_id_fkey`: `FOREIGN KEY (org_id, appointment_id) REFERENCES appointments(org_id, id) ON DELETE CASCADE`
+- Foreign key `health_overrides_org_id_booking_id_fkey`: `FOREIGN KEY (org_id, booking_id) REFERENCES bookings(org_id, id) ON DELETE CASCADE`
+- Foreign key `health_overrides_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `health_overrides_one_subject`: `CHECK ((num_nonnulls(booking_id, appointment_id) = 1))`
+- Check `health_overrides_reason_check`: `CHECK (((char_length(btrim(reason)) >= 3) AND (char_length(btrim(reason)) <= 300)))`
+
+**Indexes**
+
+- `CREATE INDEX health_overrides_org_booking_idx ON public.health_overrides USING btree (org_id, booking_id)`
+
+**Triggers**
+
+- `health_overrides_audit` (after insert or delete or update) runs `audit_row()`
+- `health_overrides_forbid_org_change` (before update) runs `forbid_org_change()`
+- `health_overrides_stamp_actor` (before insert) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `health_overrides_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `health_overrides_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `health_overrides_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### incidents
 
 Anything out of the ordinary: illness, injury, a fight, an escape. A written, timed record of what happened and what was done protects the pet, the parent and the kennel.
@@ -1473,7 +1643,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 | `parent_phone` | `text` | yes |  |  |
 | `requested_start` | `date` |  |  |  |
 | `requested_end` | `date` |  |  |  |
-| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, consent}. |
+| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), consent}. |
 | `consent_at` | `timestamp with time zone` | yes |  |  |
 | `consent_text` | `text` | yes |  | The exact consent wording the parent agreed to, kept as evidence. |
 | `client_id` | `uuid` |  |  | The client created or matched when the submission was accepted. |
@@ -1904,6 +2074,13 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `problem_window_hours` | `smallint` | yes | `24` | How many hours after a delivery a parent may report it damaged, late or wrong. |
 | `food_orders_enabled` | `boolean` | yes | `true` | Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on. |
 | `item_lead_hours` | `smallint` | yes | `24` | How many hours ahead a made-to-order item (a birthday cake) must be ordered: the database refuses one for sooner (WB156). |
+| `weekend_days` | `smallint[]` | yes | `'{6,7}'::smallint[]` | The weekdays that count as the weekend for cancellation rules (M38), 1 Monday to 7 Sunday. |
+| `credit_months` | `smallint` | yes | `12` | How many months credit lasts from the day it is given (M38). |
+| `health_check` | `text` | yes | `'off'::text` | What happens at the door when a pet lacks what the kennel requires (M40): off, warn (the screens say so), or refuse (check-in is refused unless a manager lets the pet in, WB210). |
+| `deworm_days` | `smallint` |  |  | A pet must have been dewormed within this many days (M40). Empty: not required. |
+| `tick_days` | `smallint` |  |  | A pet must have had tick treatment within this many days (M40). Empty: not required. |
+| `neuter_months` | `smallint` |  |  | Above this age in months a pet must be spayed or neutered (M40). Empty: not required. |
+| `review_url` | `text` |  |  | The kennel's review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -1913,20 +2090,24 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Unique `organizations_slug_key`: `UNIQUE (slug)`
 - Check `organizations_cook_margin_bp_check`: `CHECK (((cook_margin_bp >= 0) AND (cook_margin_bp <= 5000)))`
 - Check `organizations_country_code_check`: `CHECK ((country_code ~ '^[A-Z]{2}$'::text))`
+- Check `organizations_credit_months_check`: `CHECK (((credit_months >= 1) AND (credit_months <= 60)))`
 - Check `organizations_currency_check`: `CHECK ((currency ~ '^[A-Z]{3}$'::text))`
 - Check `organizations_default_tax_rate_bp_check`: `CHECK (((default_tax_rate_bp >= 0) AND (default_tax_rate_bp <= 10000)))`
 - Check `organizations_delivery_needs_kitchen`: `CHECK (((NOT offers_food_delivery) OR offers_kitchen))`
+- Check `organizations_deworm_days_check`: `CHECK (((deworm_days IS NULL) OR ((deworm_days >= 1) AND (deworm_days <= 730))))`
 - Check `organizations_fiscal_year_start_month_check`: `CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12)))`
 - Check `organizations_food_cutoff_hours_check`: `CHECK (((food_cutoff_hours >= 0) AND (food_cutoff_hours <= 168)))`
 - Check `organizations_food_pack_g_check`: `CHECK ((((food_pack_g >= 50) AND (food_pack_g <= 5000)) AND ((food_pack_g % 10) = 0)))`
 - Check `organizations_goal_change_bp_check`: `CHECK (((goal_change_bp >= 0) AND (goal_change_bp <= 3000)))`
 - Check `organizations_gst_needs_registration`: `CHECK (((tax_mode <> 'gst_india'::tax_mode) OR ((tax_id IS NOT NULL) AND (gst_state_code IS NOT NULL))))`
 - Check `organizations_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
+- Check `organizations_health_check_check`: `CHECK ((health_check = ANY (ARRAY['off'::text, 'warn'::text, 'refuse'::text])))`
 - Check `organizations_invoice_prefix_check`: `CHECK (((invoice_prefix ~ '^[A-Z0-9]{1,4}$'::text) AND (invoice_prefix <> 'CN'::text)))`
 - Check `organizations_item_lead_hours_check`: `CHECK (((item_lead_hours >= 0) AND (item_lead_hours <= 336)))`
 - Check `organizations_medium_dog_max_g_check`: `CHECK (((medium_dog_max_g >= 1000) AND (medium_dog_max_g <= 150000)))`
 - Check `organizations_monthly_food_discount_bp_check`: `CHECK (((monthly_food_discount_bp >= 0) AND (monthly_food_discount_bp <= 5000)))`
 - Check `organizations_name_check`: `CHECK (((char_length(name) >= 2) AND (char_length(name) <= 80)))`
+- Check `organizations_neuter_months_check`: `CHECK (((neuter_months IS NULL) OR ((neuter_months >= 1) AND (neuter_months <= 120))))`
 - Check `organizations_parent_language_check`: `CHECK ((parent_language = ANY (ARRAY['en'::text, 'hi'::text, 'kn'::text])))`
 - Check `organizations_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 - Check `organizations_play_break_inside_day`: `CHECK ((((play_break_start IS NULL) AND (play_break_end IS NULL)) OR ((play_break_start IS NOT NULL) AND (play_break_end IS NOT NULL) AND (play_break_start > play_day_start) AND (play_break_end < play_day_end) AND (play_break_end > play_break_start))))`
@@ -1938,11 +2119,14 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_portion_medium_bp_check`: `CHECK (((portion_medium_bp >= 50) AND (portion_medium_bp <= 1000)))`
 - Check `organizations_portion_small_bp_check`: `CHECK (((portion_small_bp >= 50) AND (portion_small_bp <= 1000)))`
 - Check `organizations_problem_window_hours_check`: `CHECK (((problem_window_hours >= 1) AND (problem_window_hours <= 168)))`
+- Check `organizations_review_url_check`: `CHECK (((review_url IS NULL) OR ((review_url ~ '^https://[^[:space:]]+$'::text) AND (char_length(review_url) <= 500))))`
 - Check `organizations_size_bands_in_order`: `CHECK ((medium_dog_max_g > small_dog_max_g))`
 - Check `organizations_slug_check`: `CHECK ((slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'::text))`
 - Check `organizations_small_dog_max_g_check`: `CHECK (((small_dog_max_g >= 1000) AND (small_dog_max_g <= 100000)))`
+- Check `organizations_tick_days_check`: `CHECK (((tick_days IS NULL) OR ((tick_days >= 1) AND (tick_days <= 730))))`
 - Check `organizations_topper_share_bp_check`: `CHECK (((topper_share_bp >= 500) AND (topper_share_bp <= 9000)))`
 - Check `organizations_upi_vpa_check`: `CHECK (((upi_vpa IS NULL) OR (upi_vpa ~ '^[a-zA-Z0-9._-]{2,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$'::text)))`
+- Check `organizations_weekend_days_check`: `CHECK ((weekend_days <@ ARRAY[(1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint, (7)::smallint]))`
 - Check `organizations_whatsapp_phone_check`: `CHECK (((whatsapp_phone IS NULL) OR (whatsapp_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 
 **Triggers**
@@ -2132,7 +2316,9 @@ Money received from a parent, or refunded to one. Wagbook records payments; it d
 
 - `payments_audit` (after insert or delete or update) runs `audit_row()`
 - `payments_check_refund` (before insert or update of direction, amount_minor, invoice_id, booking_id) runs `payments_check_refund()`
+- `payments_credit` (after insert) runs `payments_credit()`
 - `payments_forbid_org_change` (before update) runs `forbid_org_change()`
+- `payments_guard_credit` (before update) runs `payments_guard_credit()`
 - `payments_set_updated_at` (before update) runs `set_updated_at()`
 - `payments_stamp_actor` (before insert or update) runs `stamp_actor()`
 
@@ -2156,6 +2342,7 @@ Busy stretches such as Diwali week or a long weekend. Used to warn about cancell
 | `start_date` | `date` | yes |  |  |
 | `end_date` | `date` | yes |  | Last day of the period, inclusive. |
 | `no_refund` | `boolean` | yes | `false` | True when bookings touching this period are not refunded on cancellation. |
+| `is_holiday` | `boolean` | yes | `false` | Its days are holidays for cancellation rules (M38): their nights follow the weekend rule. |
 | `play_session_minutes` | `smallint` |  |  | Play session length during this period. Empty means the organisation's normal length. |
 | `notes` | `text` |  |  |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -2345,6 +2532,8 @@ An animal in the kennel's care. Belongs to one client.
 | `target_weight_g` | `integer` |  |  | The weight the pet should get to, in grams, when it has one. Food portions (M28) use it. |
 | `color` | `text` |  |  |  |
 | `coat` | `pet_coat` |  |  | Its coat, for grooming: grooming services priced by coat use it (appointment_price()). |
+| `dewormed_on` | `date` |  |  | When the pet was last dewormed (M40). |
+| `tick_treated_on` | `date` |  |  | When the pet last had tick and flea treatment (M40). |
 | `microchip` | `text` |  |  |  |
 | `photo_path` | `text` |  |  | Path of the profile photo inside the pet-media storage bucket. |
 | `food_notes` | `text` |  |  | What the pet eats, how much and when, in the parent's words. |
@@ -2638,7 +2827,7 @@ A reminder a person sent a parent from Today, on WhatsApp from their own phone: 
 | --- | --- | --- | --- | --- |
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
-| `kind` | `text` | yes |  | vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed. trial: asking a parent whose dog had the food trial about a subscription (M29). groom: a pet due for a groom again (M35). |
+| `kind` | `text` | yes |  | vaccination: card needed before a stay. arrival: see you tomorrow. pickup: going home tomorrow. unpaid: a bill still owed. trial: asking a parent whose dog had the food trial about a subscription (M29). groom: a pet due for a groom again (M35). credit: credit running out within a month (M38). health: a stay coming whose pet lacks what the kennel requires (M40). review: asking for a review after a stay or appointment (M42). |
 | `subject_id` | `uuid` | yes |  | The booking (vaccination, arrival, pickup), the bill (unpaid), the trial delivery (trial) or the last groom (groom, an appointment) it was about. |
 | `sent_on` | `date` | yes |  | The kennel's date it was sent. An unpaid bill comes back three days later. |
 | `sent_by` | `uuid` |  | `auth.uid()` |  |
@@ -2649,7 +2838,7 @@ A reminder a person sent a parent from Today, on WhatsApp from their own phone: 
 - Primary key `reminders_sent_pkey`: `PRIMARY KEY (id)`
 - Foreign key `reminders_sent_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `reminders_sent_sent_by_fkey`: `FOREIGN KEY (sent_by) REFERENCES auth.users(id) ON DELETE SET NULL`
-- Check `reminders_sent_kind_check`: `CHECK ((kind = ANY (ARRAY['vaccination'::text, 'arrival'::text, 'pickup'::text, 'unpaid'::text, 'trial'::text, 'groom'::text])))`
+- Check `reminders_sent_kind_check`: `CHECK ((kind = ANY (ARRAY['vaccination'::text, 'arrival'::text, 'pickup'::text, 'unpaid'::text, 'trial'::text, 'groom'::text, 'credit'::text, 'health'::text, 'review'::text])))`
 
 **Indexes**
 
@@ -2667,6 +2856,42 @@ A reminder a person sent a parent from Today, on WhatsApp from their own phone: 
 - `reminders_sent_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `reminders_sent_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
+### required_vaccines
+
+A vaccine the kennel requires at the door (M40), matched to a pet's vaccinations by name without regard to case, spaces or underscores, and how many months it lasts from the day given when the card gives no end date.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `vaccine` | `text` | yes |  |  |
+| `months_valid` | `smallint` | yes | `12` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `required_vaccines_pkey`: `PRIMARY KEY (id)`
+- Unique `required_vaccines_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `required_vaccines_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `required_vaccines_months_valid_check`: `CHECK (((months_valid >= 1) AND (months_valid <= 60)))`
+- Check `required_vaccines_vaccine_check`: `CHECK (((char_length(btrim(vaccine)) >= 1) AND (char_length(btrim(vaccine)) <= 60)))`
+
+**Indexes**
+
+- `CREATE UNIQUE INDEX required_vaccines_one_each ON public.required_vaccines USING btree (org_id, lower(btrim(vaccine)))`
+
+**Triggers**
+
+- `required_vaccines_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `required_vaccines_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `required_vaccines_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `required_vaccines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `required_vaccines_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
 ### service_areas
 
 A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.
@@ -2677,7 +2902,8 @@ A PIN code the kennel delivers to and picks up from, with its name and charge. A
 | `org_id` | `uuid` | yes |  |  |
 | `postal_code` | `text` | yes |  |  |
 | `name` | `text` | yes |  | What the kennel calls the area, e.g. Indiranagar. |
-| `delivery_charge_minor` | `bigint` |  |  | What a delivery or trip there costs the parent, in minor units. Empty: free. |
+| `delivery_charge_minor` | `bigint` |  |  | What a food delivery there costs the parent, in minor units. Empty: free. |
+| `trip_charge_minor` | `bigint` |  |  | What a pick-up or drop of a boarder there costs (M39). Empty: the delivery charge. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -2689,6 +2915,7 @@ A PIN code the kennel delivers to and picks up from, with its name and charge. A
 - Check `service_areas_delivery_charge_minor_check`: `CHECK (((delivery_charge_minor IS NULL) OR (delivery_charge_minor >= 0)))`
 - Check `service_areas_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
 - Check `service_areas_postal_code_check`: `CHECK (((postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$'::text) AND (postal_code ~ '[0-9]'::text)))`
+- Check `service_areas_trip_charge_minor_check`: `CHECK (((trip_charge_minor IS NULL) OR (trip_charge_minor >= 0)))`
 
 **Triggers**
 
@@ -3038,6 +3265,75 @@ Who the kennel buys from: a butcher, a vegetable seller, a packaging shop.
 - `suppliers_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `suppliers_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### trips
+
+A stay's pick-up from home on its first day, or drop back home on its last (M39): an address of the parent and a time, priced by the area when added, a line on the stay's bill, and a stop on a rider's run.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `booking_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  |  |
+| `pet_id` | `uuid` | yes |  |  |
+| `kind` | `trip_kind` | yes |  |  |
+| `trip_date` | `date` | yes |  | The day it goes: the stay's first day for a pick-up, its last for a drop. Kept in step with the stay. |
+| `at_time` | `time without time zone` | yes |  | When the parent was told it would be, kennel time. |
+| `slot` | `delivery_slot` | yes | `'morning'::delivery_slot` | The run slot it goes in, from its time: morning before 13:00, afternoon before 18:00, evening after. |
+| `address_id` | `uuid` |  |  | Where the pet is picked up from or dropped at: an address of the stay's parent. Empty only once the parent's details were erased. |
+| `price_minor` | `bigint` |  |  | What it costs, copied when added from the area of its address (service_areas.trip_charge_minor, else its delivery charge). Only owners and managers give another (WB022), and must outside the areas served (WB215). |
+| `tax_rate_bp` | `integer` | yes | `0` |  |
+| `sac_code` | `text` |  |  |  |
+| `status` | `trip_status` | yes | `'planned'::trip_status` |  |
+| `cancel_reason` | `text` |  |  |  |
+| `run_id` | `uuid` |  |  | The rider's run it goes out on (M31). |
+| `run_position` | `smallint` |  |  | Its place in the run. |
+| `done_at` | `timestamp with time zone` |  |  | When the rider marked it done or nobody home. |
+| `note` | `text` |  |  |  |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `trips_pkey`: `PRIMARY KEY (id)`
+- Unique `trips_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `trips_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `trips_org_id_address_id_fkey`: `FOREIGN KEY (org_id, address_id) REFERENCES client_addresses(org_id, id) ON DELETE SET NULL (address_id)`
+- Foreign key `trips_org_id_booking_id_pet_id_fkey`: `FOREIGN KEY (org_id, booking_id, pet_id) REFERENCES bookings(org_id, id, pet_id) ON UPDATE CASCADE ON DELETE CASCADE`
+- Foreign key `trips_org_id_client_id_pet_id_fkey`: `FOREIGN KEY (org_id, client_id, pet_id) REFERENCES pets(org_id, client_id, id) ON UPDATE CASCADE ON DELETE RESTRICT`
+- Foreign key `trips_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `trips_run_fkey`: `FOREIGN KEY (org_id, run_id) REFERENCES delivery_runs(org_id, id) ON DELETE SET NULL (run_id)`
+- Check `trips_cancel_has_reason`: `CHECK (((status = 'cancelled'::trip_status) = (cancel_reason IS NOT NULL)))`
+- Check `trips_cancel_reason_check`: `CHECK (((cancel_reason IS NULL) OR (char_length(cancel_reason) <= 300)))`
+- Check `trips_note_check`: `CHECK (((note IS NULL) OR (char_length(note) <= 300)))`
+- Check `trips_price_minor_check`: `CHECK (((price_minor IS NULL) OR (price_minor >= 0)))`
+- Check `trips_priced`: `CHECK ((price_minor IS NOT NULL))`
+- Check `trips_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `trips_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
+
+**Indexes**
+
+- `CREATE UNIQUE INDEX trips_one_of_each_per_stay ON public.trips USING btree (org_id, booking_id, kind) WHERE (status <> 'cancelled'::trip_status)`
+- `CREATE INDEX trips_org_date_idx ON public.trips USING btree (org_id, trip_date, slot)`
+
+**Triggers**
+
+- `trips_audit` (after insert or delete or update) runs `audit_row()`
+- `trips_check` (before insert or update) runs `trips_check()`
+- `trips_check_run` (after insert or update of run_id, trip_date, slot) runs `trips_check_run()`
+- `trips_forbid_org_change` (before update) runs `forbid_org_change()`
+- `trips_set_updated_at` (before update) runs `set_updated_at()`
+- `trips_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `trips_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `trips_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `trips_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `trips_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### vaccinations
 
 One vaccine record for a pet. Which vaccines a kennel insists on is the kennel's policy; Wagbook only stores and reminds.
@@ -3103,6 +3399,25 @@ Each training course with the sessions used (confirmed, done or not come) and th
 | `invoice_id` | `uuid` |  |  |  |
 | `sessions_used` | `integer` |  |  |  |
 | `sessions_left` | `integer` |  |  |  |
+
+**Access**: signed-in users may select. Runs with the caller's row level security.
+
+### credit_balances
+
+Each credit with what is left of it and whether it can still be spent (not past its end).
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `credit_id` | `uuid` |  |  |  |
+| `org_id` | `uuid` |  |  |  |
+| `client_id` | `uuid` |  |  |  |
+| `kind` | `credit_kind` |  |  |  |
+| `amount_minor` | `bigint` |  |  |  |
+| `expires_on` | `date` |  |  |  |
+| `reason` | `text` |  |  |  |
+| `created_at` | `timestamp with time zone` |  |  |  |
+| `left_minor` | `bigint` |  |  |  |
+| `spendable` | `boolean` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -3198,7 +3513,7 @@ accept_intake(p_submission uuid) returns uuid
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. Returns the client id. Creating the booking is a separate step.
+Staff action: turns a new intake submission into a client and pets. A parent already known by phone number is reused and left unchanged; only pets with new names are added, each with the vaccinations the parent listed and the certificate they sent for it, if any, and the weight they gave as its first weighing. A new parent who gave an address with a PIN code gets it as their home address. A form from the booking form for new parents (M41, payload.request.make) also makes its request: a stay at the usual price for each pet, or an appointment for the first, left for staff to book by hand when the kennel cannot take it as asked. Returns the client id.
 
 ### accept_invitation_link
 
@@ -3259,6 +3574,18 @@ appointments_check() returns trigger
 - Volatility: volatile
 
 Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party's people (WB197). Done needs the certificates seen (WB194), a swim's supervisor and life jacket (WB195) and a guest's certificates (WB196). A cancelled one stays cancelled (WB198).
+
+### appointments_check_health
+
+```
+appointments_check_health() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: while the kennel refuses at the door, a visitor's appointment that checks vaccinations is not marked done for a pet that lacks what the kennel requires, unless an owner or manager let it in (WB210). A boarder was checked at its check-in.
 
 ### audit_row
 
@@ -3356,6 +3683,18 @@ bookings_check_group() returns trigger
 
 Trigger: every booking sharing a group_id has the same client (WB024), and a booking's group_id never changes (WB026).
 
+### bookings_check_health
+
+```
+bookings_check_health() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: while the kennel refuses at the door (organizations.health_check), check-in is refused for a pet that lacks a required vaccine, deworming, tick treatment or neutering (pet_health_problems), unless an owner or manager let it in (health_overrides). WB210.
+
 ### bookings_check_package
 
 ```
@@ -3403,6 +3742,18 @@ bookings_follow_appointments() returns trigger
 - Volatility: volatile
 
 Trigger: a stay cancelled or not come cancels its appointments still to come; a stay whose dates change cancels those on days it no longer has.
+
+### bookings_follow_trips
+
+```
+bookings_follow_trips() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a stay cancelled or not come cancels its trips still to go; a stay whose dates change moves its planned trips to its new first and last days.
 
 ### bookings_guard_price
 
@@ -3547,6 +3898,18 @@ create_organization(p_name text, p_slug text, p_display_name text) returns uuid
 - Volatility: volatile
 
 Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being.
+
+### credits_check
+
+```
+credits_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a cancellation credit is only ever made from a refund paid as credit (WB213); credit added by hand is goodwill.
 
 ### default_intake_notice
 
@@ -3810,7 +4173,7 @@ get_public_intake_form(p_slug text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. What the intake form page needs to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, and whether it delivers (so the form asks for an address with a PIN code).
+PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate.
 
 ### get_public_invoice
 
@@ -3918,7 +4281,7 @@ invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons; or a visitor's appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, and each pick-up and drop not cancelled; or a visitor's appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.
 
 ### invoice_lines_guard
 
@@ -4026,7 +4389,7 @@ merge_clients(p_keep uuid, p_merge uuid) returns uuid
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
+Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, credit, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
 
 ### my_invitations
 
@@ -4086,7 +4449,7 @@ my_runs(p_date date) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-The signed-in rider's runs for a day (today in their kennel when empty): each stop's name, phone, pet's name, packs, address and notes, in order. Nothing else: no prices, no medical notes, no other runs. SECURITY DEFINER because riders read no table (D45).
+The signed-in rider's runs for a day (today in their kennel when empty): each stop's name, phone, pet's name, packs, address and notes, in order, deliveries and the pick-ups and drops of boarders (M39) together. Nothing else: no prices, no medical notes, no other runs. SECURITY DEFINER because riders read no table (D45).
 
 ### new_token
 
@@ -4160,6 +4523,30 @@ payments_check_refund() returns trigger
 
 Trigger: a refund names a bill or a stay (WB120) and gives back no more than was paid over what the bill now comes to after credit notes (WB121), or than the advance paid for a stay with no bill (WB122).
 
+### payments_credit
+
+```
+payments_credit() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger: a refund paid as credit (method credit, out) becomes a credit ending after the kennel's credit_months; a payment from credit (method credit, in) takes from the parent's credits still spendable, the soonest to end first, and is refused when there is not enough (WB211).
+
+### payments_guard_credit
+
+```
+payments_guard_credit() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a payment from or into credit keeps its method, amount, direction and parent (WB212), so the ledger always matches it.
+
 ### pet_food_guard_grams
 
 ```
@@ -4171,6 +4558,18 @@ pet_food_guard_grams() returns trigger
 - Volatility: volatile
 
 Trigger: only owners and managers set or change a portion by hand (WB146).
+
+### pet_health_problems
+
+```
+pet_health_problems(p_org uuid, p_pet uuid, p_on date) returns TABLE(problem text, detail text)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+What a pet lacks on a day by the kennel's rules (M40): vaccine (a required vaccine with no record, or lapsed: its end date, else the day given plus its months), deworming and ticks (not done within the kennel's days), neutering (not neutered above the age; a pet of unknown age is not held to it). Empty when it lacks nothing. Must match healthProblems() in src/lib/core/health.ts.
 
 ### pet_weights_refresh_pet
 
@@ -4374,7 +4773,7 @@ report_money(p_org uuid, p_from date, p_to date) returns TABLE(month date, bille
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
+For each month in the period: what was billed (issued bills by bill date; cancelled bills left out), what credit notes took back (by credit note date), the tax in the month net of credit notes, payments received and refunded (by the date the money moved; not from or into credit, which moves none), and expenses (by the date spent). Only days inside the period count, so a period that starts mid-month gives a part month. Owners and managers only.
 
 ### report_occupancy
 
@@ -4423,6 +4822,18 @@ rider_mark_stop(p_delivery uuid, p_status delivery_status, p_proof_path text) re
 - Volatility: volatile
 
 A rider marks a stop of their own run for today: on the way (out), delivered (with a photo), nobody home or refused (WB172, WB173). SECURITY DEFINER because riders read no table; it checks the caller is the run's rider.
+
+### rider_mark_trip
+
+```
+rider_mark_trip(p_trip uuid, p_status trip_status) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+A rider marks a pick-up or drop of their own run for today: on the way, done or nobody home (WB172, WB173). SECURITY DEFINER because riders read no table; it checks the caller is the run's rider.
 
 ### rider_upload_allowed
 
@@ -4699,6 +5110,30 @@ subscriptions_replan() returns trigger
 - Volatility: volatile
 
 Trigger: when a subscription's grams, days, slot, address, food, plan, pause or end change, its deliveries still before their cut-off are made again: cancelled (when a bill has them, so the bill can be credited) or removed, and made anew up to as far ahead as before.
+
+### trips_check
+
+```
+trips_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a trip goes on its stay's first day (pick-up) or last (drop) in the slot of its time, to an address of the stay's parent (WB215), priced at the area's trip charge with the stay's tax; staff cannot price one outside the areas served (WB215) or change a price (WB022). A cancelled trip stays cancelled (WB216).
+
+### trips_check_run
+
+```
+trips_check_run() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pick-up or drop is put on a run of its own day and slot (WB171).
 
 ### use_recovery_code
 

@@ -109,6 +109,8 @@ create table public.pets (
   target_weight_g integer check (target_weight_g is null or target_weight_g between 1 and 199999),
   color text,
   coat public.pet_coat,
+  dewormed_on date,
+  tick_treated_on date,
   microchip text,
   photo_path text,
   food_notes text,
@@ -132,6 +134,8 @@ comment on column public.pets.photo_path is 'Path of the profile photo inside th
 comment on column public.pets.weight_g is
   'The latest weight in grams, from pet_weights. Kept by the database (pets_latest_weight): whatever is written here is replaced.';
 comment on column public.pets.target_weight_g is 'The weight the pet should get to, in grams, when it has one. Food portions (M28) use it.';
+comment on column public.pets.dewormed_on is 'When the pet was last dewormed (M40).';
+comment on column public.pets.tick_treated_on is 'When the pet last had tick and flea treatment (M40).';
 comment on column public.pets.coat is 'Its coat, for grooming: grooming services priced by coat use it (appointment_price()).';
 comment on column public.pets.food_notes is 'What the pet eats, how much and when, in the parent''s words.';
 comment on column public.pets.flags is
@@ -283,6 +287,7 @@ create table public.service_areas (
   postal_code text not null check (postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$' and postal_code ~ '[0-9]'),
   name text not null check (char_length(name) between 1 and 80),
   delivery_charge_minor bigint check (delivery_charge_minor is null or delivery_charge_minor >= 0),
+  trip_charge_minor bigint check (trip_charge_minor is null or trip_charge_minor >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, postal_code)
@@ -291,7 +296,8 @@ create table public.service_areas (
 comment on table public.service_areas is
   'A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.';
 comment on column public.service_areas.name is 'What the kennel calls the area, e.g. Indiranagar.';
-comment on column public.service_areas.delivery_charge_minor is 'What a delivery or trip there costs the parent, in minor units. Empty: free.';
+comment on column public.service_areas.delivery_charge_minor is 'What a food delivery there costs the parent, in minor units. Empty: free.';
+comment on column public.service_areas.trip_charge_minor is 'What a pick-up or drop of a boarder there costs (M39). Empty: the delivery charge.';
 
 create trigger service_areas_set_updated_at
   before update on public.service_areas

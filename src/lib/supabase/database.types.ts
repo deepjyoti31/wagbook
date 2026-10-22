@@ -637,6 +637,8 @@ export type Database = {
           checked_out_by: string | null;
           cancelled_at: string | null;
           cancel_reason: string | null;
+          cancel_asked_at: string | null;
+          cancelled_by_kennel: boolean;
           belongings: string | null;
           gate_notes: string | null;
           vaccinations_checked_at: string | null;
@@ -679,6 +681,8 @@ export type Database = {
           checked_out_by?: string | null;
           cancelled_at?: string | null;
           cancel_reason?: string | null;
+          cancel_asked_at?: string | null;
+          cancelled_by_kennel?: boolean;
           belongings?: string | null;
           gate_notes?: string | null;
           vaccinations_checked_at?: string | null;
@@ -721,6 +725,8 @@ export type Database = {
           checked_out_by?: string | null;
           cancelled_at?: string | null;
           cancel_reason?: string | null;
+          cancel_asked_at?: string | null;
+          cancelled_by_kennel?: boolean;
           belongings?: string | null;
           gate_notes?: string | null;
           vaccinations_checked_at?: string | null;
@@ -780,6 +786,47 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "passes";
             referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      cancellation_rules: {
+        Row: {
+          org_id: string;
+          applies_to: Database["public"]["Enums"]["cancel_applies_to"];
+          notice_hours: number;
+          weekday_on_time: Database["public"]["Enums"]["cancel_outcome"];
+          weekday_late: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_on_time: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_late: Database["public"]["Enums"]["cancel_outcome"];
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          applies_to: Database["public"]["Enums"]["cancel_applies_to"];
+          notice_hours?: number;
+          weekday_on_time?: Database["public"]["Enums"]["cancel_outcome"];
+          weekday_late?: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_on_time?: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_late?: Database["public"]["Enums"]["cancel_outcome"];
+          updated_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          applies_to?: Database["public"]["Enums"]["cancel_applies_to"];
+          notice_hours?: number;
+          weekday_on_time?: Database["public"]["Enums"]["cancel_outcome"];
+          weekday_late?: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_on_time?: Database["public"]["Enums"]["cancel_outcome"];
+          weekend_late?: Database["public"]["Enums"]["cancel_outcome"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_rules_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -1305,6 +1352,126 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "invoices";
             referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      credit_uses: {
+        Row: {
+          id: string;
+          org_id: string;
+          credit_id: string;
+          payment_id: string;
+          amount_minor: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          credit_id: string;
+          payment_id: string;
+          amount_minor: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          credit_id?: string;
+          payment_id?: string;
+          amount_minor?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credit_uses_org_id_credit_id_fkey";
+            columns: ["org_id", "credit_id"];
+            isOneToOne: false;
+            referencedRelation: "credits";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "credit_uses_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "credit_uses_payment_fkey";
+            columns: ["payment_id"];
+            isOneToOne: false;
+            referencedRelation: "payments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      credits: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          kind: Database["public"]["Enums"]["credit_kind"];
+          amount_minor: number;
+          expires_on: string;
+          reason: string;
+          payment_id: string | null;
+          booking_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          kind: Database["public"]["Enums"]["credit_kind"];
+          amount_minor: number;
+          expires_on: string;
+          reason: string;
+          payment_id?: string | null;
+          booking_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          kind?: Database["public"]["Enums"]["credit_kind"];
+          amount_minor?: number;
+          expires_on?: string;
+          reason?: string;
+          payment_id?: string | null;
+          booking_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "credits_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "credits_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "credits_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "credits_payment_fkey";
+            columns: ["payment_id"];
+            isOneToOne: true;
+            referencedRelation: "payments";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -1904,6 +2071,58 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "food_products_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      health_overrides: {
+        Row: {
+          id: string;
+          org_id: string;
+          booking_id: string | null;
+          appointment_id: string | null;
+          reason: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          booking_id?: string | null;
+          appointment_id?: string | null;
+          reason: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          booking_id?: string | null;
+          appointment_id?: string | null;
+          reason?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "health_overrides_org_id_appointment_id_fkey";
+            columns: ["org_id", "appointment_id"];
+            isOneToOne: false;
+            referencedRelation: "appointments";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "health_overrides_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "health_overrides_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -2548,6 +2767,13 @@ export type Database = {
           problem_window_hours: number;
           food_orders_enabled: boolean;
           item_lead_hours: number;
+          weekend_days: number[];
+          credit_months: number;
+          health_check: string;
+          deworm_days: number | null;
+          tick_days: number | null;
+          neuter_months: number | null;
+          review_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -2610,6 +2836,13 @@ export type Database = {
           problem_window_hours?: number;
           food_orders_enabled?: boolean;
           item_lead_hours?: number;
+          weekend_days?: number[];
+          credit_months?: number;
+          health_check?: string;
+          deworm_days?: number | null;
+          tick_days?: number | null;
+          neuter_months?: number | null;
+          review_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2672,6 +2905,13 @@ export type Database = {
           problem_window_hours?: number;
           food_orders_enabled?: boolean;
           item_lead_hours?: number;
+          weekend_days?: number[];
+          credit_months?: number;
+          health_check?: string;
+          deworm_days?: number | null;
+          tick_days?: number | null;
+          neuter_months?: number | null;
+          review_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2958,6 +3198,7 @@ export type Database = {
           start_date: string;
           end_date: string;
           no_refund: boolean;
+          is_holiday: boolean;
           play_session_minutes: number | null;
           notes: string | null;
           created_at: string;
@@ -2970,6 +3211,7 @@ export type Database = {
           start_date: string;
           end_date: string;
           no_refund?: boolean;
+          is_holiday?: boolean;
           play_session_minutes?: number | null;
           notes?: string | null;
           created_at?: string;
@@ -2982,6 +3224,7 @@ export type Database = {
           start_date?: string;
           end_date?: string;
           no_refund?: boolean;
+          is_holiday?: boolean;
           play_session_minutes?: number | null;
           notes?: string | null;
           created_at?: string;
@@ -3189,6 +3432,8 @@ export type Database = {
           target_weight_g: number | null;
           color: string | null;
           coat: Database["public"]["Enums"]["pet_coat"] | null;
+          dewormed_on: string | null;
+          tick_treated_on: string | null;
           microchip: string | null;
           photo_path: string | null;
           food_notes: string | null;
@@ -3216,6 +3461,8 @@ export type Database = {
           target_weight_g?: number | null;
           color?: string | null;
           coat?: Database["public"]["Enums"]["pet_coat"] | null;
+          dewormed_on?: string | null;
+          tick_treated_on?: string | null;
           microchip?: string | null;
           photo_path?: string | null;
           food_notes?: string | null;
@@ -3243,6 +3490,8 @@ export type Database = {
           target_weight_g?: number | null;
           color?: string | null;
           coat?: Database["public"]["Enums"]["pet_coat"] | null;
+          dewormed_on?: string | null;
+          tick_treated_on?: string | null;
           microchip?: string | null;
           photo_path?: string | null;
           food_notes?: string | null;
@@ -3606,6 +3855,38 @@ export type Database = {
           },
         ];
       };
+      required_vaccines: {
+        Row: {
+          id: string;
+          org_id: string;
+          vaccine: string;
+          months_valid: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          vaccine: string;
+          months_valid?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          vaccine?: string;
+          months_valid?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "required_vaccines_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       service_areas: {
         Row: {
           id: string;
@@ -3613,6 +3894,7 @@ export type Database = {
           postal_code: string;
           name: string;
           delivery_charge_minor: number | null;
+          trip_charge_minor: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -3622,6 +3904,7 @@ export type Database = {
           postal_code: string;
           name: string;
           delivery_charge_minor?: number | null;
+          trip_charge_minor?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3631,6 +3914,7 @@ export type Database = {
           postal_code?: string;
           name?: string;
           delivery_charge_minor?: number | null;
+          trip_charge_minor?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -4098,6 +4382,117 @@ export type Database = {
           },
         ];
       };
+      trips: {
+        Row: {
+          id: string;
+          org_id: string;
+          booking_id: string;
+          client_id: string;
+          pet_id: string;
+          kind: Database["public"]["Enums"]["trip_kind"];
+          trip_date: string;
+          at_time: string;
+          slot: Database["public"]["Enums"]["delivery_slot"];
+          address_id: string | null;
+          price_minor: number | null;
+          tax_rate_bp: number;
+          sac_code: string | null;
+          status: Database["public"]["Enums"]["trip_status"];
+          cancel_reason: string | null;
+          run_id: string | null;
+          run_position: number | null;
+          done_at: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          booking_id: string;
+          client_id: string;
+          pet_id: string;
+          kind: Database["public"]["Enums"]["trip_kind"];
+          trip_date: string;
+          at_time: string;
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          price_minor?: number | null;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          status?: Database["public"]["Enums"]["trip_status"];
+          cancel_reason?: string | null;
+          run_id?: string | null;
+          run_position?: number | null;
+          done_at?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          booking_id?: string;
+          client_id?: string;
+          pet_id?: string;
+          kind?: Database["public"]["Enums"]["trip_kind"];
+          trip_date?: string;
+          at_time?: string;
+          slot?: Database["public"]["Enums"]["delivery_slot"];
+          address_id?: string | null;
+          price_minor?: number | null;
+          tax_rate_bp?: number;
+          sac_code?: string | null;
+          status?: Database["public"]["Enums"]["trip_status"];
+          cancel_reason?: string | null;
+          run_id?: string | null;
+          run_position?: number | null;
+          done_at?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trips_org_id_address_id_fkey";
+            columns: ["org_id", "address_id"];
+            isOneToOne: false;
+            referencedRelation: "client_addresses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "trips_org_id_booking_id_pet_id_fkey";
+            columns: ["org_id", "booking_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id", "pet_id"];
+          },
+          {
+            foreignKeyName: "trips_org_id_client_id_pet_id_fkey";
+            columns: ["org_id", "client_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "client_id", "id"];
+          },
+          {
+            foreignKeyName: "trips_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trips_run_fkey";
+            columns: ["org_id", "run_id"];
+            isOneToOne: false;
+            referencedRelation: "delivery_runs";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       vaccinations: {
         Row: {
           id: string;
@@ -4172,6 +4567,21 @@ export type Database = {
           invoice_id: string | null;
           sessions_used: number | null;
           sessions_left: number | null;
+        };
+        Relationships: [];
+      };
+      credit_balances: {
+        Row: {
+          credit_id: string | null;
+          org_id: string | null;
+          client_id: string | null;
+          kind: Database["public"]["Enums"]["credit_kind"] | null;
+          amount_minor: number | null;
+          expires_on: string | null;
+          reason: string | null;
+          created_at: string | null;
+          left_minor: number | null;
+          spendable: boolean | null;
         };
         Relationships: [];
       };
@@ -4427,6 +4837,10 @@ export type Database = {
         Args: { p_paths: string[]; p_org: string };
         Returns: boolean;
       };
+      pet_health_problems: {
+        Args: { p_org: string; p_pet: string; p_on: string };
+        Returns: { problem: string; detail: string }[];
+      };
       plan_subscription: {
         Args: { p_subscription: string; p_until: string };
         Returns: number;
@@ -4485,6 +4899,10 @@ export type Database = {
       };
       rider_mark_stop: {
         Args: { p_delivery: string; p_status: Database["public"]["Enums"]["delivery_status"]; p_proof_path?: string };
+        Returns: undefined;
+      };
+      rider_mark_trip: {
+        Args: { p_trip: string; p_status: Database["public"]["Enums"]["trip_status"] };
         Returns: undefined;
       };
       rider_upload_allowed: {
@@ -4568,7 +4986,10 @@ export type Database = {
       boarder_food: "kitchen" | "kibble" | "own";
       booking_kind: "boarding" | "daycare";
       booking_status: "requested" | "confirmed" | "checked_in" | "checked_out" | "cancelled" | "no_show";
+      cancel_applies_to: "boarding" | "daycare" | "appointment";
+      cancel_outcome: "refund" | "credit" | "keep";
       care_kind: "meal" | "medication" | "walk" | "play" | "cleaning" | "other";
+      credit_kind: "cancellation" | "goodwill";
       customer_source: "boarding" | "referral" | "website" | "other";
       delivery_kind: "subscription" | "trial" | "order" | "item" | "replacement";
       delivery_slot: "morning" | "afternoon" | "evening";
@@ -4584,7 +5005,7 @@ export type Database = {
       member_role: "owner" | "manager" | "staff" | "rider";
       package_day: "first" | "middle" | "last";
       pay_period: "week" | "month";
-      payment_method: "upi" | "cash" | "card" | "bank_transfer" | "other";
+      payment_method: "upi" | "cash" | "card" | "bank_transfer" | "other" | "credit";
       pet_coat: "short" | "double" | "long" | "curly" | "wire";
       pet_sex: "male" | "female" | "unknown";
       problem_kind: "damaged" | "late" | "wrong";
@@ -4597,6 +5018,8 @@ export type Database = {
       stock_unit: "g" | "ml" | "piece";
       task_status: "pending" | "done" | "skipped";
       tax_mode: "none" | "simple" | "gst_india";
+      trip_kind: "pickup" | "drop";
+      trip_status: "planned" | "out" | "done" | "not_home" | "cancelled";
       waste_reason: "spoiled" | "past_date" | "dropped" | "other";
     };
     CompositeTypes: { [_ in never]: never };

@@ -91,6 +91,12 @@ alter table public.packages enable row level security;
 alter table public.package_parts enable row level security;
 alter table public.appointments enable row level security;
 alter table public.appointment_items enable row level security;
+alter table public.trips enable row level security;
+alter table public.required_vaccines enable row level security;
+alter table public.health_overrides enable row level security;
+alter table public.cancellation_rules enable row level security;
+alter table public.credits enable row level security;
+alter table public.credit_uses enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -162,7 +168,7 @@ begin
     'clients', 'pets', 'vaccinations', 'bookings', 'booking_items',
     'care_tasks', 'play_sessions', 'stay_updates', 'incidents',
     'pet_food', 'subscriptions', 'deliveries', 'delivery_runs', 'delivery_problems',
-    'appointments', 'appointment_items', 'pet_grooming'
+    'appointments', 'appointment_items', 'pet_grooming', 'trips'
   ] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
@@ -198,11 +204,11 @@ grant update (org_id, created_by, full_name, phone, alt_phone, email, address, c
 revoke insert, update on public.bookings from authenticated;
 grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id,
-              waitlisted_at)
+              waitlisted_at, cancel_asked_at, cancelled_by_kennel)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
-              vaccinations_checked_at, notes, group_id, waitlisted_at, package_id, package_price_minor)
+              vaccinations_checked_at, notes, group_id, waitlisted_at, package_id, package_price_minor, cancel_asked_at, cancelled_by_kennel)
   on public.bookings to authenticated;
 -- A package is put on a stay only through apply_package() (bookings_check_package).
 -- Who may change a price is decided by a trigger, not here: owners, managers
@@ -217,7 +223,8 @@ declare
 begin
   foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
                           'suppliers', 'stock_items', 'recipes', 'food_products',
-                          'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts'] loop
+                          'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts',
+                          'required_vaccines'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -271,6 +278,45 @@ create policy courses_update on public.courses for update to authenticated
 create policy courses_delete on public.courses for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 grant select on public.course_balances to authenticated;
+
+-- Cancellation rules (M38): any member reads them (the cancel screen works them
+-- out); owners and managers set them; owners delete.
+grant select, insert, update, delete on public.cancellation_rules to authenticated;
+create policy cancellation_rules_select on public.cancellation_rules for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy cancellation_rules_insert on public.cancellation_rules for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy cancellation_rules_update on public.cancellation_rules for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy cancellation_rules_delete on public.cancellation_rules for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- Credit (M38): any member reads a parent's credit (to spend it on a bill).
+-- Owners and managers give goodwill credit; credit kept from a cancellation and
+-- every use are written only by payments_credit(). Nobody changes either; an
+-- owner deletes goodwill credit not yet used.
+grant select, insert, delete on public.credits to authenticated;
+create policy credits_select on public.credits for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy credits_insert on public.credits for insert to authenticated
+  with check (kind = 'goodwill' and org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy credits_delete on public.credits for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select on public.credit_uses to authenticated;
+create policy credit_uses_select on public.credit_uses for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+grant select on public.credit_balances to authenticated;
+
+-- Letting a pet in at the door despite the health rules (M40): owners and
+-- managers, with a reason; any member reads; nobody changes one; owners delete.
+grant select, insert, delete on public.health_overrides to authenticated;
+create policy health_overrides_select on public.health_overrides for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy health_overrides_insert on public.health_overrides for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy health_overrides_delete on public.health_overrides for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- Weighings: any member weighs a pet and reads the weights; owners and
 -- managers correct one; owners delete (D29).
@@ -562,6 +608,9 @@ grant execute on function public.fiscal_year_label(date, integer) to authenticat
 grant execute on function public.appointment_price(uuid, uuid, uuid) to authenticated;
 grant execute on function public.first_free_start(uuid, uuid, uuid, date, integer, integer, time, boolean) to authenticated;
 grant execute on function public.apply_package(uuid, uuid, bigint) to authenticated;
+-- Phase 3 (M38 to M42).
+grant execute on function public.pet_health_problems(uuid, uuid, date) to authenticated;
+grant execute on function public.rider_mark_trip(uuid, public.trip_status) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.

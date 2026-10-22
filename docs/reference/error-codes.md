@@ -31,6 +31,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB180 to WB189 | Food orders from the website and parents' links |
 | WB190 to WB199 | Appointments |
 | WB200 to WB209 | Appointments: bills, courses and packages |
+| WB210 to WB219 | Health at the door, credit, pick-up and drop |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -53,7 +54,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB019` | this has a stay in the kennel now or still to come. Check it out or cancel it first.<br>this pet's parent is hidden. Show the parent again first. | `20261008000300_kennels_and_bookings.sql` |
 | `WB020` | no space on % (% booked, % kennels) | `20261008000300_kennels_and_bookings.sql` |
 | `WB021` | that kennel is out of service | `20261008000300_kennels_and_bookings.sql` |
-| `WB022` | only an owner or manager can change the price or the kind of stay<br>only an owner or manager can change a price | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql`<br>`20261008000550_kitchen.sql` |
+| `WB022` | only an owner or manager can change the price or the kind of stay<br>only an owner or manager can change a price | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql`<br>`20261008000460_trips_and_health.sql`<br>`20261008000550_kitchen.sql` |
 | `WB023` | only an owner or manager can book at a price that is not on your price list | `20261008000300_kennels_and_bookings.sql` |
 | `WB024` | bookings made together must all be for one parent | `20261008000300_kennels_and_bookings.sql` |
 | `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql` |
@@ -167,3 +168,9 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB205` | a package goes only on a stay still to come or in the kennel, booked on its own price and not billed yet | `20261008000450_appointments.sql` |
 | `WB206` | only an owner or manager sets the price of a package priced on request | `20261008000450_appointments.sql` |
 | `WB207` | the stay's package does not include that, or it is booked already | `20261008000450_appointments.sql` |
+| `WB210` | this pet lacks what the kennel requires at the door: %. An owner or manager can let it in with a note. | `20261008000460_trips_and_health.sql` |
+| `WB211` | there is only % of credit left to spend | `20261008000560_credit.sql` |
+| `WB212` | a payment from or into credit is not changed. Remove it and record it again. | `20261008000560_credit.sql` |
+| `WB213` | credit from a cancellation comes from a refund kept as credit | `20261008000560_credit.sql` |
+| `WB215` | choose an address of this parent<br>that address is not in the areas you serve. An owner or manager sets the price. | `20261008000460_trips_and_health.sql` |
+| `WB216` | a cancelled trip stays cancelled. Add a new one. | `20261008000460_trips_and_health.sql` |

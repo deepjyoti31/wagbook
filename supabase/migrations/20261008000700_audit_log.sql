@@ -96,6 +96,12 @@ create trigger appointment_services_audit after insert or update or delete on pu
   for each row execute function public.audit_row();
 create trigger courses_audit after insert or update or delete on public.courses
   for each row execute function public.audit_row();
+create trigger trips_audit after insert or update or delete on public.trips
+  for each row execute function public.audit_row();
+create trigger health_overrides_audit after insert or update or delete on public.health_overrides
+  for each row execute function public.audit_row();
+create trigger credits_audit after insert or update or delete on public.credits
+  for each row execute function public.audit_row();
 create trigger incidents_audit after insert or update or delete on public.incidents
   for each row execute function public.audit_row();
 create trigger organizations_audit after insert or update or delete on public.organizations

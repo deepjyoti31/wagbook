@@ -140,6 +140,11 @@ export const core = {
       invoices_one_live_per_appointment: "This appointment already has a bill.",
       package_parts_one_kind: "Choose an appointment and its day, or an extra.",
       bookings_package_is_the_price: "A stay with a package is priced as the package.",
+      trips_one_of_each_per_stay: "This stay already has that trip.",
+      trips_cancel_has_reason: "Say why the trip is cancelled.",
+      required_vaccines_one_each: "That vaccine is already required.",
+      health_overrides_reason_check: "Say why the pet may come in.",
+      credits_amount_minor_check: "Enter the credit as an amount above nothing.",
     },
     // In English the database's own sentence is shown. Other languages show
     // these, one per code (docs/reference/error-codes.md).
@@ -277,6 +282,12 @@ export const core = {
       WB205: "A package goes only on a stay still to come or in the kennel, booked at its own price and not billed yet.",
       WB206: "Only an owner or manager sets the price of a package priced on request.",
       WB207: "The stay's package does not include that, or it is booked already.",
+      WB210: "This pet lacks what the kennel requires at the door. An owner or manager can let it in with a note.",
+      WB211: "There is not that much credit left to spend.",
+      WB212: "A payment from or into credit is not changed. Remove it and record it again.",
+      WB213: "Credit from a cancellation comes from a refund kept as credit.",
+      WB215: "That address is not in the areas you serve, or not the parent's. An owner or manager sets the price.",
+      WB216: "A cancelled trip stays cancelled. Add a new one.",
     },
   },
   labels: {
@@ -320,7 +331,7 @@ export const core = {
     },
     vaccinationStatus: { valid: "Valid", expires_soon: "Expires soon", expired: "Expired", no_date: "No expiry date" },
     invoiceStatus: { draft: "Draft", issued: "Issued", void: "Cancelled" },
-    paymentMethod: { upi: "UPI", cash: "Cash", card: "Card", bank_transfer: "Bank transfer", other: "Other" },
+    paymentMethod: { upi: "UPI", cash: "Cash", card: "Card", bank_transfer: "Bank transfer", other: "Other", credit: "Credit" },
     intakeStatus: { new: "New", accepted: "Accepted", rejected: "Declined", spam: "Spam" },
     tax: "Tax",
     gst: "GST",

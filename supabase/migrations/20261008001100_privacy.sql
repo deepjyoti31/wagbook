@@ -179,6 +179,14 @@ begin
         order by a.starts_at)
       from public.appointments a where a.org_id = v_client.org_id and a.client_id = v_client.id
     ), '[]'::jsonb),
+    'trips', coalesce((
+      select jsonb_agg(to_jsonb(t) - 'org_id' order by t.trip_date)
+      from public.trips t where t.org_id = v_client.org_id and t.client_id = v_client.id
+    ), '[]'::jsonb),
+    'credit', coalesce((
+      select jsonb_agg(to_jsonb(cb) - 'org_id' order by cb.expires_on)
+      from public.credit_balances cb where cb.org_id = v_client.org_id and cb.client_id = v_client.id
+    ), '[]'::jsonb),
     'courses', coalesce((
       select jsonb_agg(to_jsonb(cb) - 'org_id' order by cb.name)
       from public.course_balances cb where cb.org_id = v_client.org_id and cb.client_id = v_client.id
@@ -329,6 +337,8 @@ begin
       cancel_reason = case when a.status = 'cancelled' then 'Erased' end
   where a.org_id = v_client.org_id and a.client_id = v_client.id;
   update public.courses c set notes = null where c.org_id = v_client.org_id and c.client_id = v_client.id;
+  update public.trips t set note = null, cancel_reason = case when t.status = 'cancelled' then 'Erased' end
+  where t.org_id = v_client.org_id and t.client_id = v_client.id;
 
   -- The pets stay as they are, with their health, routines, incidents, care
   -- and play (the owner's decision, D30): they are the kennel's record of the

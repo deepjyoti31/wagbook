@@ -197,6 +197,13 @@ create table public.organizations (
   problem_window_hours smallint not null default 24 check (problem_window_hours between 1 and 168),
   food_orders_enabled boolean not null default true,
   item_lead_hours smallint not null default 24 check (item_lead_hours between 0 and 336),
+  weekend_days smallint[] not null default '{6,7}' check (weekend_days <@ array[1, 2, 3, 4, 5, 6, 7]::smallint[]),
+  credit_months smallint not null default 12 check (credit_months between 1 and 60),
+  health_check text not null default 'off' check (health_check in ('off', 'warn', 'refuse')),
+  deworm_days smallint check (deworm_days is null or deworm_days between 1 and 730),
+  tick_days smallint check (tick_days is null or tick_days between 1 and 730),
+  neuter_months smallint check (neuter_months is null or neuter_months between 1 and 120),
+  review_url text check (review_url is null or (review_url ~ '^https://[^[:space:]]+$' and char_length(review_url) <= 500)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Food is delivered from the kennel's own kitchen (D44).
@@ -262,6 +269,14 @@ comment on column public.organizations.monthly_food_discount_bp is 'Discount on 
 comment on column public.organizations.cook_margin_bp is 'Extra food the cook plan adds on top of what is needed, in basis points: 1000 is 10%.';
 comment on column public.organizations.problem_window_hours is 'How many hours after a delivery a parent may report it damaged, late or wrong.';
 comment on column public.organizations.item_lead_hours is 'How many hours ahead a made-to-order item (a birthday cake) must be ordered: the database refuses one for sooner (WB156).';
+comment on column public.organizations.weekend_days is 'The weekdays that count as the weekend for cancellation rules (M38), 1 Monday to 7 Sunday.';
+comment on column public.organizations.credit_months is 'How many months credit lasts from the day it is given (M38).';
+comment on column public.organizations.health_check is
+  'What happens at the door when a pet lacks what the kennel requires (M40): off, warn (the screens say so), or refuse (check-in is refused unless a manager lets the pet in, WB210).';
+comment on column public.organizations.deworm_days is 'A pet must have been dewormed within this many days (M40). Empty: not required.';
+comment on column public.organizations.tick_days is 'A pet must have had tick treatment within this many days (M40). Empty: not required.';
+comment on column public.organizations.neuter_months is 'Above this age in months a pet must be spayed or neutered (M40). Empty: not required.';
+comment on column public.organizations.review_url is 'The kennel''s review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders.';
 comment on column public.organizations.food_orders_enabled is 'Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on.';
 comment on column public.organizations.parent_language is 'Language of the pages and messages parents see: the intake form, stay page and WhatsApp messages. en, hi or kn. Bills are in English (clients.bill_translation adds a language on request).';
 

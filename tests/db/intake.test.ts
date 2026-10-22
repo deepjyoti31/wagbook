@@ -38,7 +38,7 @@ describe("the public intake form", () => {
     await as(db, anon, async () => {
       const res = await db.query<{ v: Record<string, unknown> }>("select public.get_public_intake_form($1) as v", [slug.toUpperCase()]);
       expect(Object.keys(res.rows[0].v).sort()).toEqual(
-        ["check_in_time", "check_out_time", "city", "delivers", "intake_enabled", "language", "name", "notice", "whatsapp_phone"],
+        ["check_in_time", "check_out_time", "city", "currency", "delivers", "intake_enabled", "language", "locale", "name", "notice", "prices", "services", "whatsapp_phone"],
       );
       expect(String(res.rows[0].v.notice)).toContain("Test Kennel");
       expect((await db.query<{ v: unknown }>("select public.get_public_intake_form('no-such-kennel') as v")).rows[0].v).toBeNull();

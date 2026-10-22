@@ -612,8 +612,7 @@ create trigger pet_food_guard_grams
 -- Subscriptions, deliveries and one-off orders (M29)
 -- ---------------------------------------------------------------------------
 
-create type public.delivery_slot as enum ('morning', 'afternoon', 'evening');
-comment on type public.delivery_slot is 'When a delivery arrives: morning (from 8), afternoon (from 1) or evening (from 6), kennel time. Changes close food_cutoff_hours before the slot starts.';
+-- delivery_slot is made in 00046 (trips use it too).
 
 create type public.pay_period as enum ('week', 'month');
 comment on type public.pay_period is 'How a subscription is paid: a week ahead, or a month ahead (with the kennel''s monthly discount).';
@@ -1419,8 +1418,11 @@ as $$
     'run_date', r.run_date,
     'slot', r.slot,
     'stops', coalesce((
-      select jsonb_agg(jsonb_build_object(
+      select jsonb_agg(s.stop order by s.position nulls last, s.created_at)
+      from (
+      select d.run_position as position, d.created_at, jsonb_build_object(
         'delivery_id', d.id,
+        'kind', 'delivery',
         'position', d.run_position,
         'name', c.full_name,
         'phone', c.phone,
@@ -1434,12 +1436,36 @@ as $$
         'door_note', a.door_note,
         'note', d.note,
         'status', d.status
-      ) order by d.run_position nulls last, d.created_at)
+      ) as stop
       from public.deliveries d
       join public.clients c on c.org_id = d.org_id and c.id = d.client_id
       join public.pets p on p.org_id = d.org_id and p.id = d.pet_id
       left join public.client_addresses a on a.org_id = d.org_id and a.id = d.address_id
       where d.org_id = r.org_id and d.run_id = r.id and d.status <> 'cancelled'
+      union all
+      -- Pick-ups and drops of boarders (M39).
+      select t.run_position, t.created_at, jsonb_build_object(
+        'trip_id', t.id,
+        'kind', t.kind,
+        'position', t.run_position,
+        'time', to_char(t.at_time, 'HH24:MI'),
+        'name', c.full_name,
+        'phone', c.phone,
+        'pet', p.name,
+        'line', a.line,
+        'area', a.area,
+        'postal_code', a.postal_code,
+        'map_url', a.map_url,
+        'door_note', a.door_note,
+        'note', t.note,
+        'status', t.status
+      )
+      from public.trips t
+      join public.clients c on c.org_id = t.org_id and c.id = t.client_id
+      join public.pets p on p.org_id = t.org_id and p.id = t.pet_id
+      join public.client_addresses a on a.org_id = t.org_id and a.id = t.address_id
+      where t.org_id = r.org_id and t.run_id = r.id and t.status <> 'cancelled'
+      ) s
     ), '[]'::jsonb)
   ) order by r.slot), '[]'::jsonb)
   from public.delivery_runs r
@@ -1449,7 +1475,7 @@ as $$
                      where m.user_id = (select auth.uid()) and m.is_active and public.session_meets_mfa());
 $$;
 comment on function public.my_runs(date) is
-  'The signed-in rider''s runs for a day (today in their kennel when empty): each stop''s name, phone, pet''s name, packs, address and notes, in order. Nothing else: no prices, no medical notes, no other runs. SECURITY DEFINER because riders read no table (D45).';
+  'The signed-in rider''s runs for a day (today in their kennel when empty): each stop''s name, phone, pet''s name, packs, address and notes, in order, deliveries and the pick-ups and drops of boarders (M39) together. Nothing else: no prices, no medical notes, no other runs. SECURITY DEFINER because riders read no table (D45).';
 
 -- What happened at the door, from the rider's phone: only on their own run,
 -- only on the run's day.
@@ -1486,6 +1512,62 @@ end;
 $$;
 comment on function public.rider_mark_stop(uuid, public.delivery_status, text) is
   'A rider marks a stop of their own run for today: on the way (out), delivered (with a photo), nobody home or refused (WB172, WB173). SECURITY DEFINER because riders read no table; it checks the caller is the run''s rider.';
+
+-- A trip goes on a run of its own day and slot (M39).
+alter table public.trips
+  add constraint trips_run_fkey foreign key (org_id, run_id) references public.delivery_runs (org_id, id) on delete set null (run_id);
+
+create function public.trips_check_run()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.run_id is not null and not exists (
+    select 1 from public.delivery_runs r
+    where r.org_id = new.org_id and r.id = new.run_id and r.run_date = new.trip_date and r.slot = new.slot
+  ) then
+    raise exception 'WB171: a delivery goes on a run of its own day and slot' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.trips_check_run() is 'Trigger: a pick-up or drop is put on a run of its own day and slot (WB171).';
+
+create trigger trips_check_run
+  after insert or update of run_id, trip_date, slot on public.trips
+  for each row execute function public.trips_check_run();
+
+-- A rider marks a pick-up or drop of their own run for today, as a delivery.
+create function public.rider_mark_trip(p_trip uuid, p_status public.trip_status)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_trip public.trips;
+  v_run public.delivery_runs;
+begin
+  -- SECURITY DEFINER: riders read no table (D45); this checks the caller is the run's rider.
+  select * into v_trip from public.trips t where t.id = p_trip for update;
+  select * into v_run from public.delivery_runs r where r.org_id = v_trip.org_id and r.id = v_trip.run_id;
+  if v_run.id is null or v_run.rider_id <> (select auth.uid())
+     or v_run.org_id not in (select m.org_id from public.memberships m
+                             where m.user_id = (select auth.uid()) and m.is_active and public.session_meets_mfa()) then
+    raise exception 'WB003: that stop was not found' using errcode = 'P0002';
+  end if;
+  if v_run.run_date <> public.org_today(v_run.org_id) then
+    raise exception 'WB172: this run is not today''s' using errcode = '23514';
+  end if;
+  if p_status not in ('out', 'done', 'not_home') or v_trip.status = 'cancelled' then
+    raise exception 'WB173: a rider marks a stop on the way, delivered, nobody home or refused' using errcode = '23514';
+  end if;
+  update public.trips t set status = p_status where t.id = v_trip.id;
+end;
+$$;
+comment on function public.rider_mark_trip(uuid, public.trip_status) is
+  'A rider marks a pick-up or drop of their own run for today: on the way, done or nobody home (WB172, WB173). SECURITY DEFINER because riders read no table; it checks the caller is the run''s rider.';
 
 create type public.problem_kind as enum ('damaged', 'late', 'wrong');
 comment on type public.problem_kind is 'What a parent said was wrong with a delivery: damaged, late or wrong.';

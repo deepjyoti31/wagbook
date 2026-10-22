@@ -73,6 +73,7 @@ export function errorCodes(): string {
     "| WB180 to WB189 | Food orders from the website and parents' links |",
     "| WB190 to WB199 | Appointments |",
     "| WB200 to WB209 | Appointments: bills, courses and packages |",
+    "| WB210 to WB219 | Health at the door, credit, pick-up and drop |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

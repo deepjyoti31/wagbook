@@ -76,6 +76,7 @@ create table public.peak_periods (
   start_date date not null,
   end_date date not null,
   no_refund boolean not null default false,
+  is_holiday boolean not null default false,
   play_session_minutes smallint check (play_session_minutes is null or play_session_minutes between 5 and 240),
   notes text,
   created_at timestamptz not null default now(),
@@ -87,6 +88,7 @@ comment on table public.peak_periods is
   'Busy stretches such as Diwali week or a long weekend. Used to warn about cancellation terms and to shorten play sessions when the house is full.';
 comment on column public.peak_periods.end_date is 'Last day of the period, inclusive.';
 comment on column public.peak_periods.no_refund is 'True when bookings touching this period are not refunded on cancellation.';
+comment on column public.peak_periods.is_holiday is 'Its days are holidays for cancellation rules (M38): their nights follow the weekend rule.';
 comment on column public.peak_periods.play_session_minutes is 'Play session length during this period. Empty means the organisation''s normal length.';
 
 create index peak_periods_org_dates_idx on public.peak_periods (org_id, start_date, end_date);
@@ -151,6 +153,8 @@ create table public.bookings (
   checked_out_by uuid references auth.users (id) on delete set null,
   cancelled_at timestamptz,
   cancel_reason text,
+  cancel_asked_at timestamptz,
+  cancelled_by_kennel boolean not null default false,
   belongings text,
   gate_notes text,
   vaccinations_checked_at timestamptz,
@@ -241,6 +245,8 @@ comment on column public.bookings.day_rate_minor is 'With boarding_from: the pri
 comment on column public.bookings.discount_minor is 'Discount on the stay itself, before tax. On a bill it goes on the stay''s largest line (stay_charges()).';
 comment on column public.bookings.tax_rate_bp is 'Tax rate for the stay, copied when booked.';
 comment on column public.bookings.expected_arrival is 'When the parent said they would drop off. For planning the day; not enforced.';
+comment on column public.bookings.cancel_asked_at is 'When the parent asked to cancel, which decides each night''s notice (M38). Empty: when it was cancelled.';
+comment on column public.bookings.cancelled_by_kennel is 'True when the kennel cancelled the stay, so the parent chooses a refund or credit (M38).';
 comment on column public.bookings.belongings is 'What came with the pet (bed, leash, food, medicines) so it all goes home again.';
 comment on column public.bookings.gate_notes is 'Anything the parent said at drop-off: a change of food, a recent illness, who will collect.';
 comment on column public.bookings.vaccinations_checked_at is
