@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { diffDays, formatDate, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
@@ -14,10 +14,10 @@ import { answerLeave, askLeave, withdrawLeave } from "./actions";
 export const generateMetadata = () => appTitle((m) => m.leave.title);
 
 /** Leave (M43): ask for days off; owners and managers answer. */
-export default function LeavePage() {
+export default function LeavePage({ searchParams }: PageProps<"/app/more/leave">) {
   return (
     <Suspense fallback={<Loading />}>
-      <Leave />
+      <Leave searchParams={searchParams} />
     </Suspense>
   );
 }
@@ -26,7 +26,8 @@ type LeaveRow = Pick<Tables<"leave_requests">, "id" | "user_id" | "starts_on" | 
 
 const TONE = { asked: "attention", granted: "good", refused: "alert", withdrawn: "neutral" } as const;
 
-async function Leave() {
+async function Leave({ searchParams }: Pick<PageProps<"/app/more/leave">, "searchParams">) {
+  const done = (await searchParams).done;
   const { org, user, canManage } = await requireOrg();
   const t = await getAppI18n();
   const { m } = t;
@@ -67,6 +68,7 @@ async function Leave() {
     <>
       {title}
       <p className="mb-5 text-slate">{w.about}</p>
+      {done === "granted" || done === "refused" || done === "withdrawn" ? <Notice tone="ok">{w[done]}</Notice> : null}
 
       {canManage ? (
         <Section title={w.waiting} count={waiting.data.length}>

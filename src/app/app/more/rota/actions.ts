@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { clockTime, diffDays, eachDate, addDays, isISODate } from "@/lib/core";
@@ -89,7 +90,8 @@ export async function addUsualShifts(): Promise<FormState> {
   ]);
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app/more/rota");
-  return { ok: t.m.rota.shifts.addedUsual };
+  // The button goes once there are shifts, and its sentence with it: say it on the page.
+  redirect("/app/more/rota?done=shifts");
 }
 
 /** Change a shift's hours. The rota from today on follows (the database moves it, and refuses a clash). */

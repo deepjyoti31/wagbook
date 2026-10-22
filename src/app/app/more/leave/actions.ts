@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { diffDays, isISODate } from "@/lib/core";
@@ -59,7 +60,8 @@ export async function answerLeave(_state: FormState, form: FormData): Promise<Fo
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: w.errors.notFound };
   revalidatePath("/app", "layout");
-  return { ok: status === "granted" ? w.granted : w.refused };
+  // The request leaves the waiting list, and its form with it: say it on the page.
+  redirect(`/app/more/leave?done=${status}`);
 }
 
 /** Take back leave asked for or granted: the person's own, or anyone's for an owner or manager. */
@@ -80,5 +82,5 @@ export async function withdrawLeave(_state: FormState, form: FormData): Promise<
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: w.errors.notFound };
   revalidatePath("/app", "layout");
-  return { ok: w.withdrawn };
+  redirect("/app/more/leave?done=withdrawn");
 }

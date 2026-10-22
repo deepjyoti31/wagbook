@@ -2240,13 +2240,13 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
   await expect(page.getByText(en.rota.shifts.addedUsual)).toBeVisible();
   await page.reload();
   const put = page.locator("form").filter({ has: page.getByRole("button", { name: en.rota.put.button }) });
-  await put.getByLabel(en.rota.put.person).selectOption({ label: "Meena" });
-  await put.getByLabel(en.rota.put.shift).selectOption({ label: "Morning, 07:00 to 15:00" });
-  await put.getByLabel(en.rota.put.from).fill(day(0));
-  await put.getByLabel(en.rota.put.to).fill(day(2));
+  await put.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await put.locator("select[name=shiftId]").selectOption({ label: "Morning, 07:00 to 15:00" });
+  await put.locator("input[name=from]").fill(day(0));
+  await put.locator("input[name=to]").fill(day(2));
   await put.getByRole("button", { name: en.rota.put.button }).click();
   await expect(page.getByText("Put on 3 shifts.")).toBeVisible();
-  await page.getByLabel("Ravi").check();
+  await page.getByRole("checkbox", { name: "Ravi" }).check();
   await page.getByRole("button", { name: en.rota.onSite.save, exact: true }).click();
   await expect(page.getByText(en.rota.onSite.saved)).toBeVisible();
   await page.reload();
@@ -2291,10 +2291,10 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
   await shot(page, "m43-leave");
   // The rota then refuses her on those days.
   await page.goto("/app/more/rota");
-  await put.getByLabel(en.rota.put.person).selectOption({ label: "Meena" });
-  await put.getByLabel(en.rota.put.shift).selectOption({ label: "Evening, 15:00 to 23:00" });
-  await put.getByLabel(en.rota.put.from).fill(day(10));
-  await put.getByLabel(en.rota.put.to).fill(day(10));
+  await put.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await put.locator("select[name=shiftId]").selectOption({ label: "Evening, 15:00 to 23:00" });
+  await put.locator("input[name=from]").fill(day(10));
+  await put.locator("input[name=to]").fill(day(10));
   await put.getByRole("button", { name: en.rota.put.button }).click();
   await expect(page.getByText("Meena is on leave that day")).toBeVisible();
 
@@ -2307,11 +2307,11 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
   const month = day(-1).slice(0, 7);
   await page.goto(`/app/more/attendance?month=${month}`);
   const byHand = page.locator("form").filter({ has: page.getByRole("button", { name: en.attendance.byHand.button }) }).last();
-  await byHand.getByLabel(en.attendance.byHand.person).selectOption({ label: "Meena" });
-  await byHand.getByLabel(en.attendance.byHand.day).fill(day(-1));
-  await byHand.getByLabel(en.attendance.byHand.in).fill("07:00");
-  await byHand.getByLabel(en.attendance.byHand.out).fill("15:30");
-  await byHand.getByLabel(en.attendance.byHand.note).fill("Forgot her phone");
+  await byHand.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await byHand.locator("input[name=day]").fill(day(-1));
+  await byHand.locator("input[name=in]").fill("07:00");
+  await byHand.locator("input[name=out]").fill("15:30");
+  await byHand.locator("input[name=note]").fill("Forgot her phone");
   await byHand.getByRole("button", { name: en.attendance.byHand.button }).click();
   await expect(page.getByText(en.attendance.byHand.saved)).toBeVisible();
   await page.reload();
@@ -2328,7 +2328,7 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
 
   // Meena sees her own attendance only, and writes no times by hand.
   await staff.goto(`/app/more/attendance?month=${month}`);
-  await expect(staff.getByText("Meena", { exact: true })).toBeVisible();
+  await expect(staff.getByText("Meena", { exact: true }).first()).toBeVisible();
   await expect(staff.getByText("Ravi", { exact: true })).toHaveCount(0);
   await expect(staff.getByRole("button", { name: en.attendance.byHand.button })).toHaveCount(0);
   await narrow(staff);
@@ -2340,7 +2340,7 @@ test("a kennel goes out of service from an earlier day, and back in", async ({ p
   await page.goto("/app/more/kennels");
   const k12 = page.getByRole("listitem").filter({ hasText: "K12" });
   await k12.locator("summary").filter({ hasText: en.kennels.takeOut }).click();
-  await k12.getByLabel(en.kennels.from).fill(day(-3));
+  await k12.locator("input[name=from]").fill(day(-3));
   await k12.getByRole("button", { name: en.kennels.takeOut }).click();
   await expect(page.getByText("K12 is out of service.")).toBeVisible();
   await page.reload();
@@ -2349,7 +2349,7 @@ test("a kennel goes out of service from an earlier day, and back in", async ({ p
   await shot(page, "m44-kennels");
   // Not after today.
   await k12.locator("summary").filter({ hasText: en.kennels.putBack }).click();
-  await k12.getByLabel(en.kennels.from).fill(day(0));
+  await k12.locator("input[name=from]").fill(day(0));
   await k12.getByRole("button", { name: en.kennels.putBack }).click();
   await expect(page.getByText("K12 is back in service.")).toBeVisible();
 });

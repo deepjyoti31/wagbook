@@ -81,6 +81,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
           {w.next}
         </Link>
       </nav>
+      {query.done === "shifts" ? <Notice tone="ok">{w.shifts.addedUsual}</Notice> : null}
       {onSite.length > 0 ? <p className="mb-4 text-slate">{fill(w.livesOnSite, { names: onSite.map((p) => p.display_name).join(", ") })}</p> : null}
       {canManage ? null : <Notice tone="info">{w.viewOnly}</Notice>}
 
