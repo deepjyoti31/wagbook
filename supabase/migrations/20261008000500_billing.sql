@@ -1487,7 +1487,8 @@ select
   coalesce(c.credited_minor, 0)::bigint as credited_minor,
   (case when i.status = 'issued' then i.total_minor - coalesce(c.credited_minor, 0) - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor,
   i.series_id,
-  i.series_month
+  i.series_month,
+  i.appointment_id
 from public.invoices i
 left join lateral (
   select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end) as paid_minor

@@ -201,6 +201,21 @@ A food bill is an invoice with `subscription_id` and a period, or `delivery_id`,
 in the public pages file) come from the website or a parent's link and become rows above only through
 `confirm_food_order`.
 
+## Appointments
+
+Phase 2 (M34 to M37, D46), in `20261008000450_appointments.sql`. **Places** (`appointment_places`) take one appointment at
+a time between their daily hours. **Services** (`appointment_services`) have a length, a place, minutes to clean up, a
+skill, and a price: fixed, by size or by coat (`appointment_service_prices`, a breed before a coat), or on quote;
+`appointment_price()` works out a pet's price, and an add-on (`is_addon`) is priced on top of another appointment
+(`appointment_items`). An **appointment** is one pet, service, place and person between two `timestamptz`; three
+exclusion constraints keep a place (to `held_until`, the end of its clean-up), a pet and a person to one at a time while
+confirmed or done, and a trigger (`appointments_check`) copies the price and checks hours, the stay, courses, packages
+and what done needs. A boarder's appointment names its stay (`booking_id`) and is billed on it; a visitor's has its own
+bill (`invoices.appointment_id`). A **course** (`courses`, with `course_balances`) is sold up front and pays for sessions
+that name it. A pet's **grooming card** is `pet_grooming`, its coat `pets.coat`. A **package** (`packages`,
+`package_parts`) goes on a stay through `apply_package()`: `bookings.package_id` and `package_price_minor`, with its
+extras (`booking_items.in_package`) and appointments (`appointments.in_package`) at no charge.
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

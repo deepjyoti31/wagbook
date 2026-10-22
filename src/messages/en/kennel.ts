@@ -14,6 +14,8 @@ export const kennelArea = {
       extras: { title: "Extras", about: "Grooming, pick-up and anything else you charge for." },
       peak: { title: "Peak periods", about: "Festivals and long weekends, with your no-refund rule." },
       areas: { title: "Areas you serve", about: "PIN codes you deliver to, and what a delivery costs." },
+      appointments: { title: "Appointments", about: "Grooming, swims, training and parties by the hour, a column per place." },
+      appointmentSetup: { title: "Appointment setup", about: "Places and their hours, services and prices, and packages." },
       kitchen: { title: "Kitchen", about: "What to cook, batches, packing, labels, stock and recipes." },
       food: { title: "Food for homes", about: "Subscriptions, orders, deliveries and runs." },
       settings: { title: "Settings", about: "Kennel details, prices, tax and UPI." },

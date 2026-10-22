@@ -4190,6 +4190,7 @@ export type Database = {
           due_minor: number | null;
           series_id: string | null;
           series_month: string | null;
+          appointment_id: string | null;
         };
         Relationships: [];
       };

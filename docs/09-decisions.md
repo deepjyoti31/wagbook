@@ -918,3 +918,38 @@ are the narrowest possible door.
 rider's language comes from their membership, as anyone's does.
 
 **Look again** if riders need to see yesterday's runs, or if pick-ups of boarders (M39) need more than an address.
+
+---
+
+## D46. Appointments are held by the database, by place, pet and person
+
+**Status:** Decided, 22 October 2026, building Phase 2 (M34 to M37).
+
+**Situation.** Grooming, swims, training and parties are booked by the hour, not by the night. A pool or a grooming
+table takes one dog at a time and needs cleaning afterwards; a groomer cannot be at two tables; a pet cannot be in the
+pool and on the table. Some are for pets staying in, some for visitors. Prices depend on the dog (its size or coat), or
+are quoted by the trainer.
+
+**Decision.** Appointments are rows with `timestamptz` start and end, in a **place** with its daily hours. Three
+exclusion constraints, like the kennel overlap for stays (D3), refuse a place, a pet or a person in two appointments at
+once; the place is held to the end of the service's clean-up (`held_until`, kept by a trigger). Requests hold nothing,
+as stay requests do. The database works out the price for the pet (`appointment_price()`: fixed, by size from the latest
+weight, by coat with a named breed first, or on quote) and copies it, with the tax rate and code, onto the appointment;
+only owners and managers give another (D15), and an appointment on quote can only be a request until it is priced. A
+boarder's appointment names its stay and is a line of the stay's bill; a visitor's has a bill of its own
+(`invoices.appointment_id`); `invoice_expected_lines()` knows both, so staff issue either only as the database prices
+it (`WB050`). A training course is sold up front as a day boarding pack is (D37). A **package** is put on a stay by
+`apply_package()`, which bills the stay as one line and books its parts at the first free times; the parts then cost
+nothing on their own. Cancelling or shortening a stay cancels its appointments that no longer fit.
+
+**Why.** The same reasons as for stays: rules about money and double booking belong in the database, where a second
+tab, a slow phone or a bug in a screen cannot get round them. Copying the price keeps old appointments as they were
+sold. Billing a boarder's groom on the stay's bill is what parents expect: one bill for the stay.
+
+**Cost.** An appointment cannot move to another time: it is cancelled and booked again (the free times make that quick).
+Add-ons on a visitor's course session have no bill to go on. Two pets of one family cannot share one appointment (two
+dogs in the pool together); each is booked on its own. The free times are offered every 30 minutes from the place's
+opening.
+
+**Look again** if kennels want group sessions (a class of six puppies), appointments moved by dragging, or reminders to
+parents before an appointment.

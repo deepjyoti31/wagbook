@@ -354,6 +354,19 @@ the days added up and listed, then each day's extras with its date. A day of a s
 A pack is sold on its own bill (one line: the pack, its days and dates, at its price, rate and code). Days paid from it
 are at ₹0 on their own bills, described "from a pack" (D37).
 
+## Appointments (M34 to M37)
+
+A boarder's appointment that is confirmed, done or a no-show is a line of its stay's bill, after the stay and its
+extras: "Full groom for Biscuit (14 Nov, 10:00)", then each add-on. A visitor's has a bill of its own
+(`invoices.appointment_id`). The price, tax rate and code are copied onto the appointment when it is booked, so a later
+change to the services never changes one already booked. Staff issue either bill only as `invoice_expected_lines()`
+says it comes to (`WB050`). An appointment on quote has no price until an owner or manager sets one, and no bill can be
+made while one is unpriced. A training course is sold on a bill of its own, one line, as a day boarding pack is; its
+sessions cost nothing on their own. A stay with a **package** is one line for the whole stay ("Holiday package:
+Biscuit, 7 nights (3 Nov 2026 to 10 Nov 2026)"), at the package's own tax rate and code; its extras and appointments
+are in that price and are not lines of their own, though add-ons on its appointments are. Grooming, swimming and
+training are services; their SAC codes and rates are for the accountant, as for boarding (question 1).
+
 ## Not built
 
 - Debit notes.

@@ -43,6 +43,23 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Problem | `delivery_problems` | A delivery a parent said was damaged, late or wrong. |
 | Food order | `food_orders` | An order from the food order page, or a parent's change from their own link. |
 
+## Appointments
+
+| On screen | In code | Meaning |
+| --- | --- | --- |
+| Appointment | `appointments` | One pet, one service, in one place, with one person, at a time. |
+| Place | `appointment_places` | What takes one appointment at a time: the pool, a grooming table, the party yard. |
+| Service | `appointment_services` | What is booked by the hour: a groom, a swim, a training session, a party. |
+| Add-on | `appointment_services.is_addon`, `appointment_items` | Priced on top of an appointment: nails, decorations. |
+| Clean-up | `cleanup_minutes`, `held_until` | Minutes the place stays taken after an appointment. |
+| Free times | `freeTimes()` | Starts every 30 minutes when the place, the pet and the person are all free. |
+| On quote | `pricing = 'quote'` | Priced by an owner or manager for each appointment. |
+| Coat | `pets.coat` | Short, double, long, curly or wire: grooming prices follow it. |
+| Grooming card | `pet_grooming` | The usual cut, products, skin, behaviour on the table, how often. |
+| Course | `courses`, `course_balances` | Training sessions sold up front. |
+| Package | `packages`, `package_parts` | A stay with appointments and extras included, one line on the bill. |
+| Did not come | `status = 'no_show'` | Booked, and the pet did not come. Still billed. |
+
 ## Places
 
 | On screen | In code | Meaning |

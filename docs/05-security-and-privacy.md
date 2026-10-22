@@ -75,6 +75,11 @@ In summary (deleting anything is for owners, D29):
 | Delivery runs and problems (M31) | Read, add, change | Same | Also delete |
 | Food orders from the website and parents' links (M32) | Read; confirm (`confirm_food_order`) or decline; what the parent sent is never edited | Same | Also delete |
 | Food reports (M33) | Nothing (`WB060`) | Read | Read |
+| Places, services, their prices, packages (M34, M37) | Read | Add, edit, take off the list | Also delete |
+| Appointments and add-ons (M34) | Read, book, confirm, mark done, cancel; the database prices them; not the price (`WB022`, `WB025`) | Also set or change a price, and price a quote | Also delete |
+| Grooming cards (M35) | Read, edit | Same | Also delete |
+| Training courses (M36) | Read; book sessions from one | Sell, correct | Also delete |
+| Putting a package on a stay (M37) | One with a set price (`apply_package`) | Also one priced on request (`WB206`) | Same |
 | A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()`, a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 

@@ -8,10 +8,11 @@ import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
   addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
-  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp,
+  UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp, localClock, localDate, type GroomCard,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
+import { appointmentsOn, workingPeople } from "@/lib/appointments";
 import { signedUrls } from "@/lib/media";
 import { PetAvatar } from "@/components/pet-avatar";
 import { ReminderLink } from "@/components/reminder-link";
@@ -257,6 +258,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
+      {org.offers_appointments ? (
+        <Suspense fallback={null}>
+          <AppointmentsToday t={t} today={today} />
+        </Suspense>
+      ) : null}
+
       {org.offers_kitchen ? (
         <Suspense fallback={null}>
           <KitchenToday t={t} today={today} />
@@ -372,6 +379,50 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Suspense>
       ) : null}
     </>
+  );
+}
+
+/** The day's appointments on Today (M34), while the kennel offers appointments. */
+async function AppointmentsToday({ t, today }: { t: I18n; today: string }) {
+  const { org } = await requireOrg();
+  const { m } = t;
+  const w = m.appointments;
+  const supabase = await createClient();
+  const [list, places, people] = await Promise.all([
+    appointmentsOn(supabase, org.id, org.time_zone, today),
+    supabase.from("appointment_places").select("id, name").eq("org_id", org.id),
+    workingPeople(supabase, org.id),
+  ]);
+  if (list.error) throw new Error("Could not load today's appointments.");
+  return (
+    <Section title={w.today} count={list.data.length}>
+      {list.data.length === 0 ? (
+        <Empty>{w.todayEmpty}</Empty>
+      ) : (
+        <Ledger>
+          {list.data.map((a) => {
+            const person = people.data?.find((p) => p.user_id === a.staff_id)?.display_name;
+            return (
+              <li key={a.id}>
+                <Link href={`/app/appointments/${a.id}`} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-ground">
+                  <span className="font-bold tabular-nums">{localClock(a.starts_at, org.time_zone)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-bold">{a.pets?.name}</span> {a.appointment_services?.name}
+                    <span className="block text-sm text-slate">
+                      {[places.data?.find((p) => p.id === a.place_id)?.name, person ? fill(w.with, { person }) : null].filter(Boolean).join(", ")}
+                    </span>
+                  </span>
+                  <Badge tone={a.status === "requested" ? "attention" : a.status === "done" ? "good" : "neutral"}>{m.appointmentStatus[a.status]}</Badge>
+                </Link>
+              </li>
+            );
+          })}
+        </Ledger>
+      )}
+      <Link href={`/app/appointments?date=${localDate(new Date(), org.time_zone)}`} className={`${buttonStyles.quiet} mt-2`}>
+        {w.seeDay}
+      </Link>
+    </Section>
   );
 }
 
@@ -564,18 +615,19 @@ function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I1
 /**
  * The reminders due today (src/lib/core/reminders.ts), in the language the
  * kennel uses for parents: vaccination cards, see you tomorrow, going home
- * tomorrow, and unpaid bills.
+ * tomorrow, unpaid bills, and pets due a groom again (M35).
  */
 async function todaysReminders(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  org: { id: string; name: string; parent_language: string; locale: string; currency: string; check_in_time: string; check_out_time: string },
+  org: { id: string; name: string; parent_language: string; locale: string; currency: string; check_in_time: string; check_out_time: string; time_zone: string; offers_appointments: boolean },
   today: string,
   origin: string,
   upcoming: BookingCard[],
   inHouse: BookingCard[],
   oldBills: { id: string; number: string | null; issued_on: string | null; public_token: string; clients: { full_name: string; phone: string } | null }[],
 ) {
-  const ids = [...upcoming.map((b) => b.id), ...inHouse.map((b) => b.id), ...oldBills.map((b) => b.id)];
+  const grooms = org.offers_appointments ? await groomCards(supabase, org) : [];
+  const ids = [...upcoming.map((b) => b.id), ...inHouse.map((b) => b.id), ...oldBills.map((b) => b.id), ...grooms.flatMap((g) => (g.last ? [g.last.id] : []))];
   const [vaccinations, balances, sent] = await Promise.all([
     upcoming.length > 0
       ? supabase.from("vaccinations").select("pet_id, vaccine, valid_until").eq("org_id", org.id).in("pet_id", upcoming.map((b) => b.pets?.id ?? ""))
@@ -616,8 +668,41 @@ async function todaysReminders(
           dueMinor: due.get(b.id) ?? 0,
           url: `${origin}/inv/${b.public_token}`,
         })),
+      grooms,
       sent: (sent.data ?? []).map((x) => ({ kind: x.kind, subjectId: x.subject_id, sentOn: x.sent_on })),
     },
     p.locale,
   );
+}
+
+/** Pets with a groom interval on their grooming card, with their last groom done (M35). */
+async function groomCards(supabase: Awaited<ReturnType<typeof createClient>>, org: { id: string; time_zone: string }): Promise<GroomCard[]> {
+  const cards = await supabase
+    .from("pet_grooming")
+    .select("pet_id, every_weeks, pets(name, deleted_at, clients(full_name, phone))")
+    .eq("org_id", org.id)
+    .not("every_weeks", "is", null)
+    .limit(500);
+  const live = (cards.data ?? []).filter((c) => c.pets && !c.pets.deleted_at && c.pets.clients);
+  if (live.length === 0) return [];
+  const done = await supabase
+    .from("appointments")
+    .select("id, pet_id, starts_at")
+    .eq("org_id", org.id)
+    .eq("kind", "groom")
+    .eq("status", "done")
+    .in("pet_id", live.map((c) => c.pet_id))
+    .order("starts_at", { ascending: false })
+    .limit(2000);
+  return live.map((c) => {
+    const last = (done.data ?? []).find((a) => a.pet_id === c.pet_id);
+    return {
+      petId: c.pet_id,
+      petName: c.pets!.name,
+      parentName: c.pets!.clients!.full_name,
+      phone: c.pets!.clients!.phone,
+      everyWeeks: c.every_weeks,
+      last: last ? { id: last.id, day: localDate(last.starts_at, org.time_zone) } : null,
+    };
+  });
 }

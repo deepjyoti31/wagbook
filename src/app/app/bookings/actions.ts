@@ -231,7 +231,8 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
     notes: text(form, "notes"),
     belongings: text(form, "belongings"),
   };
-  if (canManage) {
+  // A stay with a package is priced as the package (M37): its page sends no price.
+  if (canManage && form.has("rate")) {
     const rate = typedMoney(form, "rate");
     const discount = typedMoney(form, "discount");
     if (rate === undefined || rate === null) return { error: e.priceWhole };

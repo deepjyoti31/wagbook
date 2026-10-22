@@ -10,7 +10,7 @@ import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
-import { creditForChange, monthOf, stayBillLines, type BillScope } from "@/lib/stay-bill";
+import { creditForChange, monthOf, stayBillLines, UNPRICED, type BillScope } from "@/lib/stay-bill";
 import { createClient } from "@/lib/supabase/server";
 
 const Id = z.uuid();
@@ -38,7 +38,7 @@ export async function makeBill(_state: FormState, form: FormData): Promise<FormS
 
   // The stays this bill covers, and what they come to.
   const built = await stayBillLines(supabase, org.id, scope);
-  if ("error" in built) return { error: friendlyError(built.error, t) };
+  if ("error" in built) return { error: built.error === UNPRICED ? t.m.appointment.errors.unpriced : friendlyError(built.error, t) };
   if (built.lines.length === 0) return { error: t.m.bill.errors.nothingToBill };
 
   let existingQuery = supabase.from("invoices").select("id, status").eq("org_id", org.id).neq("status", "void");

@@ -3125,6 +3125,7 @@ Each invoice with what has been paid against it, what credit notes took off it, 
 | `due_minor` | `bigint` |  |  |  |
 | `series_id` | `uuid` |  |  |  |
 | `series_month` | `date` |  |  |  |
+| `appointment_id` | `uuid` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 

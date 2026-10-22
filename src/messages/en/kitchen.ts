@@ -272,6 +272,7 @@ export const kitchenArea = {
     monthly: "Discount for paying a month ahead (%)",
     margin: "Extra cooked on top of the plan (%)",
     window: "Problems can be reported for this many hours after a delivery",
+    lead: "Hours' notice for an item made to order",
     orders: "Take orders on the food order page",
     ordersHint: "Your page: {url}",
     saved: "Kitchen settings saved.",

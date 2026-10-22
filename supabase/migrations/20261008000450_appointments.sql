@@ -655,7 +655,7 @@ begin
   if v_service.id is null or not v_service.is_addon or not v_service.is_active then
     raise exception 'WB203: that is not an add-on. Choose one from the list.' using errcode = '23514';
   end if;
-  new.description := coalesce(new.description, v_service.name);
+  new.description := coalesce(nullif(btrim(new.description), ''), v_service.name);
   if not v_manager or new.unit_price_minor is null then
     new.unit_price_minor := public.appointment_price(new.org_id, new.service_id, v_pet);
   end if;

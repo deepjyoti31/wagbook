@@ -41,7 +41,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
   const res = await supabase
     .from("invoices")
     .select(
-      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
+      "id, status, number, issued_on, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, currency, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, public_token, void_reason, notes, subtotal_minor, discount_minor, taxable_minor, cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, clients(full_name, phone), bookings(id, pets(name))",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -147,6 +147,11 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
           {food && inv.delivery_id ? (
             <Link href="/app/food" className="underline underline-offset-4">
               {fill(m.billFood.order, { pet: food.pets?.name ?? "" })}
+            </Link>
+          ) : null}
+          {inv.appointment_id ? (
+            <Link href={`/app/appointments/${inv.appointment_id}`} className="underline underline-offset-4">
+              {m.appointment.title}
             </Link>
           ) : null}
           {inv.series_month && stays[0] ? (

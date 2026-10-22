@@ -12,6 +12,7 @@ import { petsArea } from "./kn/pets";
 import { kennelArea } from "./kn/kennel";
 import { beyondArea } from "./kn/beyond";
 import { kitchenArea } from "./kn/kitchen";
+import { appointmentsArea } from "./kn/appointments";
 
 export const kn: Messages = {
   ...core,
@@ -22,4 +23,5 @@ export const kn: Messages = {
   ...kennelArea,
   ...beyondArea,
   ...kitchenArea,
+  ...appointmentsArea,
 };

@@ -15,6 +15,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
+import { PetAppointments } from "@/components/pet-appointments";
 import { createClient } from "@/lib/supabase/server";
 import { addWeight, markPortionReviewed, removeWeight, savePetFood, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
 
@@ -188,6 +189,8 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           <AddVaccinationForm t={t} petId={pet.id} />
         </div>
       </Section>
+
+      {org.offers_appointments ? <PetAppointments t={t} petId={pet.id} /> : null}
 
       {org.offers_kitchen ? (
         <FoodSection t={t} orgId={org.id} pet={pet} canManage={canManage} today={today} offersDelivery={org.offers_food_delivery} settings={portionSettings(org)} />

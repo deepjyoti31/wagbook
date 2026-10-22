@@ -476,7 +476,7 @@ How these milestones work:
 
 **The order, and why.** Phase 1, the kitchen and food, comes first. Recurring deliveries, rotating recipes and stock
 are where a notebook or spreadsheet breaks first, and nothing in Wagbook covers them yet. Phase 2, appointments, comes
-next: until then, a groom or a swim can be sold as an extra on a stay. Phase 3 brings boarding up to the public rules
+next (built 22 October 2026). Phase 3 brings boarding up to the public rules
 (credit on cancellation, pick-up from home, health papers, a public booking form). Phase 4 is the team. The launch work
 in M1 can happen at any point; the migration freeze waits for it.
 
@@ -729,19 +729,19 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M34. Services by appointment
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (I1 to I4 in `02`, D46).
 
 **Build**
 
-1. Places that take one booking at a time: the pool, a grooming table, a training ground, the party yard. Each with
+1. [x] Places that take one booking at a time: the pool, a grooming table, a training ground, the party yard. Each with
    its hours.
-2. Appointment services: name, length, the place it uses, time to clean up after, price (fixed, by size, or on quote),
+2. [x] Appointment services: name, length, the place it uses, time to clean up after, price (fixed, by size, or on quote),
    tax rate and code, the skill it needs, and whether vaccinations are checked.
-3. Book an appointment for a pet staying in or visiting for the day: service, date and time, place and person. Free
+3. [x] Book an appointment for a pet staying in or visiting for the day: service, date and time, place and person. Free
    times are offered.
-4. States: requested, confirmed, done, no-show, cancelled with a reason.
-5. Today lists the day's appointments. A day view shows each place as a column, at 360 pixels wide.
-6. A boarder's appointment is a line on its stay's bill; a visitor's has a bill of its own.
+4. [x] States: requested, confirmed, done, no-show, cancelled with a reason.
+5. [x] Today lists the day's appointments. A day view shows each place as a column, at 360 pixels wide.
+6. [x] A boarder's appointment is a line on its stay's bill; a visitor's has a bill of its own.
 
 **Rules**
 
@@ -758,18 +758,18 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M35. Grooming and spa
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (I5 in `02`).
 
 **Build**
 
-1. The grooming menu: bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea bath, teeth; priced by
+1. [x] The grooming menu: bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea bath, teeth; priced by
    coat and breed (the owner's answer, 21 October 2026): a coat type on the pet (short, double, long, curly, wire) and
    a price for each coat type, with a price for a named breed overriding it; add-ons on top.
-2. A grooming card on the pet: coat, the usual cut, products to use or avoid, skin conditions, how the pet behaves on
+2. [x] A grooming card on the pet: coat, the usual cut, products to use or avoid, skin conditions, how the pet behaves on
    the table, the last groom.
-3. Before and after photos sent to the parent as an update (D4, F3).
-4. "Groom before going home" on a stay: booked on the last day, finished before pick-up.
-5. A reminder when a pet is due for a groom again (D39).
+3. [x] Before and after photos sent to the parent as an update (D4, F3).
+4. [x] "Groom before going home" on a stay: booked on the last day, finished before pick-up.
+5. [x] A reminder when a pet is due for a groom again (D39).
 
 **Done when**
 
@@ -779,17 +779,18 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M36. Swimming, training and parties
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (I6 in `02`).
 
 **Build**
 
-1. Swimming: one dog at a time (M34), with a tick for the life jacket and who supervised.
-2. Training: a course of sessions sold as a pack (as M18), priced on quote by the trainer, with notes and homework after
+1. [x] Swimming: one dog at a time (M34), with a tick for the life jacket and who supervised.
+2. [x] Training: a course of sessions sold as a pack (as M18), priced on quote by the trainer, with notes and homework after
    each session sent to the parent.
-3. Birthday parties: the party yard for a set time, the birthday pet and one guest dog it already knows (the guest's
+3. [x] Birthday parties: the party yard for a set time, the birthday pet and one guest dog it already knows (the guest's
    parent and vaccinations recorded), the number of people, decorations as extras, and a cake from the kitchen.
-4. Made-to-order items: a lead time the database checks (24 hours by default), the name to write on it, and delivery on
-   a run (M31) with the area's charge.
+4. [x] Made-to-order items: a lead time the database checks (24 hours by default), the name to write on it, and delivery on
+   a run (M31) with the area's charge. A party's cake is collected at the kennel; one delivered goes on a run as any
+   order does.
 
 **Rules**
 
@@ -799,13 +800,13 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M37. Packages
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (I7 in `02`).
 
 **Build**
 
-1. A package: a stay with appointments and extras included (more play, a swim, a groom before going home), at one
+1. [x] A package: a stay with appointments and extras included (more play, a swim, a groom before going home), at one
    price or a price on request set by a manager.
-2. Booking a package books its parts; cancelling the stay cancels them. The bill shows the package as one line.
+2. [x] Booking a package books its parts; cancelling the stay cancels them. The bill shows the package as one line.
 
 ---
 

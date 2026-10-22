@@ -258,7 +258,7 @@ Settings, **What this kennel offers**: three switches, all off for a new kennel.
 
 | Switch | Turns on |
 | --- | --- |
-| Appointments: grooming, swimming, training and parties | The skills groomer, trainer and swim supervisor (M34 onwards adds the rest) |
+| Appointments: grooming, swimming, training and parties | Appointments and Appointment setup under More, appointments on Today, on a stay and on the pet page (grooming card, courses), and the skills groomer, trainer and swim supervisor (I1 to I7) |
 | A kitchen that cooks fresh food | Kitchen under More (stock, recipes, the cook plan, batches, labels, kitchen settings), Food on the pet page, boarders' food on the care round, the kitchen on Today, food reports, and the skill cook (H1 to H5, H8) |
 | Food delivered to parents' homes | Parents' addresses, Areas you serve and Food for homes under More (subscriptions, orders, runs), the address and PIN code on the intake form, the food order page, food on parents' own links, the role and skill rider (H4, H6, H7) |
 
@@ -823,7 +823,7 @@ Owners and managers only, refused in the database (`WB060`, as D20).
 All of it shows only while the kennel offers appointments (B10). A kennel with it off sees none of it. Times are
 `timestamptz`; the day an appointment is on is the kennel's (its time zone). Money in paise, lengths in whole minutes.
 
-### I1. Places and services. Planned (M34).
+### I1. Places and services. Built (M34).
 
 **More, Appointment setup**, for owners and managers (staff read it). **Places**: things that take one booking at a time
 (the pool, a grooming table, a training ground, the party yard), each with its hours (09:00 to 18:00 by default) and in
@@ -834,7 +834,7 @@ people. A price is **fixed**, **by size** (small, medium, large from the pet's l
 bands), **by coat** (I5), or **on quote**. An **add-on** is a service priced on top of another (nails with a bath,
 decorations for a party): it takes no place and no time of its own.
 
-### I2. Booking an appointment. Planned (M34).
+### I2. Booking an appointment. Built (M34).
 
 **Appointments** (More, and Today): **Book an appointment** for a pet staying in or visiting for the day. Find the pet,
 choose the service, the day, the place (the service's own by default) and the person (people with the service's skill
@@ -852,14 +852,14 @@ checks vaccinations until someone has seen the certificates, on the appointment 
 tax rate and code; staff cannot change it (`WB022`, D15). A service on quote is booked by staff as a request, and an
 owner or manager sets the price before it is confirmed (`WB199`).
 
-### I3. The day. Planned (M34).
+### I3. The day. Built (M34).
 
 **Today** lists the day's appointments: time, pet, service, place, person and state. **Appointments** shows a day with
 each place as a column and the hours down the side, at 360 pixels wide (the columns scroll inside their box, never the
 page), with the day before and after, and a list of the day under it. An appointment's page has Confirm, Done, Did not
 come, Cancel with a reason, add-ons, the price (owners and managers change it), notes for whoever does it, and its bill.
 
-### I4. Bills for appointments. Planned (M34).
+### I4. Bills for appointments. Built (M34).
 
 A boarder's appointment is a line on its stay's bill ("Full groom for Biscuit (14 Nov, 10:00)"), with its add-ons,
 when it is confirmed, done or a no-show; not when requested or cancelled. A visitor's appointment has a bill of its own
@@ -867,7 +867,7 @@ when it is confirmed, done or a no-show; not when requested or cancelled. A visi
 (`WB050`, `invoice_expected_lines()`). An appointment cancelled after its bill went out is offered back as a credit note,
 as a stay is (D34, D40).
 
-### I5. Grooming. Planned (M35).
+### I5. Grooming. Built (M35).
 
 **The grooming menu**: grooming services (bath and dry, full groom, haircut, nails, ears, de-shedding, tick and flea
 bath, teeth) priced **by coat**: a price for each coat type (short, double, long, curly, wire), with a price for a named
@@ -881,7 +881,7 @@ weeks) is on Today's list to send (D39), once for each groom.
 (F3), so the parent sees them on the stay page. **Groom before going home** on a stay books the groom on its last day, at
 the latest free time that finishes by the pick-up time (the stay's expected departure, or the kennel's check-out time).
 
-### I6. Swimming, training and parties. Planned (M36).
+### I6. Swimming, training and parties. Built (M36).
 
 **Swimming**: one dog at a time (the place's rule, I2). Marking a swim done asks whether the dog wore a life jacket and
 who supervised; the database refuses a swim done without both (`WB195`).
@@ -899,7 +899,7 @@ as add-ons, and a cake from the kitchen. A party is marked done only once the gu
 **Made-to-order items** (H4): the name to write on it, and a lead time the database checks (24 hours by default, a kitchen
 setting, `WB156`); delivered on a run with the area's charge, or collected at the party.
 
-### I7. Packages. Planned (M37).
+### I7. Packages. Built (M37).
 
 **More, Appointment setup, Packages**: a stay with appointments and extras included (a swim on the middle day, a groom on
 the last day, three extra play sessions), for boarding or day boarding, at one price or a price on request.

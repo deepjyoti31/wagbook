@@ -34,8 +34,10 @@ export async function saveKitchenSettings(_state: FormState, form: FormData): Pr
   const pack = whole("pack");
   const cutoff = whole("cutoff");
   const window = whole("window");
+  const lead = form.has("lead") ? whole("lead") : null;
   const values = [small, medium, large, topper, goal, monthly, margin, smallMax, mediumMax, cutoff, window];
   if (values.some((v) => v === null)) return { error: e.number };
+  if (lead !== null && lead > 336) return { error: e.number };
   if (pack === null || pack < 50 || pack > 5000 || pack % 10 !== 0) return { error: e.pack };
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -53,6 +55,7 @@ export async function saveKitchenSettings(_state: FormState, form: FormData): Pr
       monthly_food_discount_bp: monthly!,
       cook_margin_bp: margin!,
       problem_window_hours: window!,
+      ...(lead === null ? {} : { item_lead_hours: lead }),
       food_orders_enabled: checked(form, "orders"),
     })
     .eq("id", org.id)

@@ -157,6 +157,9 @@ async function KitchenSettings() {
               <Field label={k.window}>
                 <Input name="window" inputMode="numeric" required defaultValue={org.problem_window_hours} />
               </Field>
+              <Field label={k.lead}>
+                <Input name="lead" inputMode="numeric" required defaultValue={org.item_lead_hours} />
+              </Field>
               <label className="flex min-h-12 items-start gap-3 sm:col-span-3">
                 <input type="checkbox" name="orders" defaultChecked={org.food_orders_enabled} className="mt-1 size-5" />
                 <span>

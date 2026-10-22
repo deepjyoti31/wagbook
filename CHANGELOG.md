@@ -48,6 +48,16 @@ The first release will be 0.1.0. Everything below is in it.
 - A regular's repeating day boarding is billed once a month, on one bill.
 - Owners can take a photo posted by mistake off an update.
 - Recovery codes for two-step sign-in, for when a phone is lost.
+- Appointments, switched on in Settings: places that take one booking at a time (the pool, a grooming table, the
+  party yard) with their hours; grooming, swims, training and parties priced by size, by coat and breed, or on quote,
+  with add-ons. Free times offered; the database never lets a place, a pet or a person be booked twice at once, with
+  time to clean up. A day's view with a column for each place. A boarder's groom goes on the stay's bill, a visitor's
+  has its own.
+- Grooming cards on the pet page, "Groom before going home" on a stay, before and after photos on the parent's stay
+  page, and a reminder when a groom is due again.
+- Swims recorded with the life jacket and who supervised; training courses sold up front with notes and homework sent
+  to the parent; birthday parties with one guest dog and a cake from the kitchen (24 hours' notice).
+- Packages: a stay with a swim, a groom and extra play included, billed as one line, its appointments booked for you.
 - Settings says what else the kennel offers: appointments, a kitchen, food delivery. All off to start, so a kennel
   that only boards sees nothing new. With delivery on: parents' delivery addresses, matched by PIN code to the areas
   you serve and their charge. Skills on People (cook, groomer, trainer, swim supervisor, rider). Each pet's weight
