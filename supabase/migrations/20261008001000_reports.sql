@@ -45,7 +45,8 @@ begin
     d.day::date,
     count(b.id) filter (where b.kind = 'boarding')::integer,
     count(b.id) filter (where b.kind = 'daycare')::integer,
-    (select count(*)::integer from public.kennels k where k.org_id = p_org and k.is_active),
+    -- The kennels there that day (M44), not today's.
+    public.kennels_in_service(p_org, d.day::date),
     -- Two pets sharing a kennel use one; a pet with no kennel recorded is counted as using one.
     count(distinct coalesce(b.kennel_id, b.id))::integer
   from generate_series(p_from::timestamp, p_to::timestamp, interval '1 day') as d (day)
@@ -58,7 +59,7 @@ begin
 end;
 $$;
 comment on function public.report_occupancy(uuid, date, date) is
-  'For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service today, and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.';
+  'For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service that day (kennels_in_service), and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.';
 
 -- ---------------------------------------------------------------------------
 

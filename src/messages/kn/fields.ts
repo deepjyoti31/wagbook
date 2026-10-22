@@ -140,4 +140,13 @@ export const historyFields = {
   offers_kitchen: "ಅಡುಗೆಮನೆ ಇದೆ",
   offers_food_delivery: "ಊಟ ತಲುಪಿಸುತ್ತದೆ",
   skills: "ಕೌಶಲ್ಯಗಳು",
+  keeps_rota: "ಪಾಳಿ ಪಟ್ಟಿ ಇಡುತ್ತದೆ",
+  lives_on_site: "ಇಲ್ಲೇ ವಾಸ",
+  starts_on: "ಮೊದಲ ದಿನ",
+  ends_on: "ಕೊನೆಯ ದಿನ",
+  reason: "ಕಾರಣ",
+  answer: "ಉತ್ತರ",
+  clocked_in_at: "ಬಂದ ಸಮಯ",
+  clocked_out_at: "ಹೋದ ಸಮಯ",
+  work_date: "ದಿನ",
 };

@@ -987,3 +987,44 @@ review page of its own.
 
 **Look again** if kennels want partial refunds per night, credit moved between parents, a review page of their own, or
 appointment advances.
+
+## D48. The team: a rota planned by managers, leave and attendance each person's own, times stamped by the database
+
+**Status:** Decided, 22 October 2026, building Phase 4 (M43 and M44).
+
+**Situation.** A kennel with caretakers on site day and night runs on shifts, and pays people by the days and hours
+they worked. The roadmap asks for shifts and who works them, clocking in and out from the phone, leave asked for and
+granted, and a month's sheet for pay, with each person seeing their own attendance and owners and managers everyone's.
+It also asks for three rough edges to be smoothed before production: Send on a reminder that marks it sent before
+anyone knows it went, occupancy measured against today's kennels for every past day, and an export that names files
+without holding them.
+
+**Decision.** Shifts, the rota, leave and attendance are tables of their own (`shifts`, `rota`, `leave_requests`,
+`attendance`), switched on per kennel (`organizations.keeps_rota`, as D44 switches each area). The rota is planned by
+owners and managers and read by everyone; taking a person off a shift is part of planning, so managers delete rota rows
+too, an exception to D29 (the row is a plan, not a record). Leave and attendance follow the roadmap's rule in row level
+security: a person reads and writes their own, owners and managers everyone's; who answers leave is a trigger (an owner
+or manager, never their own unless an owner). Clocking in and out takes the database's clock; a time by hand is for an
+owner or manager, with a note, and lands in History of changes. Two exclusion constraints keep a person on one shift
+and one stretch at a time. Today's "On now" uses `who_is_on()`, a `security definer` function that gives the names of
+people clocked in to anyone working at the kennel, and nothing more. A stretch counts on the day it began, so a night
+shift counts on its evening, and the month's sheet is worked out in the app (`attendanceSheet()`) from the rows the
+reader may see. Riders keep no rota: they reach no table (D45). For M44: Send asks "Did the message go?" and records it
+only on "Yes, it went"; each change of a kennel in or out of service is kept (`kennel_service`) and past days count
+the kennels there that day; the export is a ZIP of the JSON and the files, written by a small function of Wagbook's
+own (`zipStore()`, files stored as they are, since photos and PDFs are compressed already) rather than a new library.
+
+**Why.** A time someone types for themselves is a time someone can round up; a time the database stamps is not, and a
+manager's correction carries their name and reason. Pay depends on the sheet, so the rules that make it right (one
+stretch at a time, no hand-written times by staff, attendance kept when a person goes) live in the database with
+tests. Seeing who else is on is part of working a shift; seeing when a colleague clocked in is not, so the function
+gives names only.
+
+**Cost.** Hours are counted only from stretches clocked out; a forgotten clock-out shows on the sheet until a manager
+puts it right. A person with attendance cannot be removed, only suspended. The rota has no repeating pattern (put
+someone on for up to 31 days at a time) and no cover requests. Riders are not on the rota. A ZIP of a parent with
+hundreds of photos is built in memory on the server.
+
+**Look again** if kennels want repeating rotas, overtime rules, pay worked out in Wagbook, riders on the rota, or
+clocking in tied to being at the kennel (location or a code on the wall).
+

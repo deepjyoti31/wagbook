@@ -140,4 +140,13 @@ export const historyFields = {
   offers_kitchen: "Has a kitchen",
   offers_food_delivery: "Delivers food",
   skills: "Skills",
+  keeps_rota: "Keeps a rota",
+  lives_on_site: "Lives on site",
+  starts_on: "First day",
+  ends_on: "Last day",
+  reason: "Reason",
+  answer: "Answer",
+  clocked_in_at: "Clocked in",
+  clocked_out_at: "Clocked out",
+  work_date: "Day",
 };

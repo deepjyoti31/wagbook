@@ -74,6 +74,8 @@ export function errorCodes(): string {
     "| WB190 to WB199 | Appointments |",
     "| WB200 to WB209 | Appointments: bills, courses and packages |",
     "| WB210 to WB219 | Health at the door, credit, pick-up and drop |",
+    "| WB220 to WB229 | The team: rota, leave and attendance |",
+    "| WB230 to WB239 | Kennels in and out of service |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

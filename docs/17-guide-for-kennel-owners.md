@@ -94,7 +94,8 @@ If the phone loses its connection, ticks are kept on the phone and sent when it 
 **Play** (top right) plans solo play in your yards, one pet at a time, so dogs that should not meet never do.
 
 Today's **To send** list has the messages due: a vaccination card to ask for, see you tomorrow, going home tomorrow,
-and bills still unpaid. **Send** opens WhatsApp with the message written; send it, and it leaves the list.
+and bills still unpaid. **Send** opens WhatsApp with the message written. Send it there, come back, and answer **Did
+the message go?**: **Yes, it went** takes it off the list; **Not yet** keeps it for later.
 
 ## Pets and parents
 
@@ -159,6 +160,22 @@ downloaded for your accountant.
 
 **More, History of changes** shows who changed a booking, a price, a bill or a setting, and when.
 
+## The team: rota, leave and attendance
+
+Switch on **A rota for the team** in Settings, under What this kennel offers.
+
+- **More, Rota**: press **Add morning, evening and night** for the usual shifts (change their hours if yours differ),
+  then **Put someone on the rota** for a shift, one day or up to 31 days in a row. Tick who lives at the kennel under
+  **Living on site**. Everyone can read the rota; owners and managers change it.
+- **Today, On now**: each person taps **Clock in** when they start and **Clock out** when they finish. The time is
+  the server's, not the phone's. Everyone sees who is clocked in and who lives on site; owners and managers also see
+  the times.
+- **More, Leave**: staff ask for days off; owners and managers **Grant** or **Refuse**. Granted leave takes the person
+  off the rota on those days. Nobody answers their own leave except an owner.
+- **More, Attendance**: the month for pay, each person's days and hours, with a CSV download. Someone forgot to clock
+  in or out? An owner or manager writes the time by hand, with the reason; History of changes keeps it.
+- Someone with attendance on record is **suspended** on People, not removed, so their attendance stays for pay.
+
 ## Keeping it safe
 
 <img src="guide/12-two-step.jpg" alt="Two-step sign-in" width="270">
@@ -179,7 +196,8 @@ downloaded for your accountant.
 India's data protection law lets a parent ask what you hold about them, and ask you to delete it. On the parent's page
 (open a pet, then its parent), owners and managers find **What we hold about them** (only an owner can erase):
 
-- **Download their details** gives you one file with everything. Send it to the parent.
+- **Download their details and files** gives you one ZIP file: everything you hold about them, and their pets' photos
+  and vaccination cards. Send it to the parent.
 - **Erase their details** empties their name, phone numbers, address and notes, and deletes the updates you sent
   them, their forms and the vaccination cards (a card shows the owner's name). Their pets' records stay, hidden: the
   pet's details, photo, vaccinations, routines and incidents. Bills you already issued stay, because tax law requires

@@ -9,11 +9,14 @@ create table public.kennels (
   zone text,
   notes text,
   is_active boolean not null default true,
+  service_from date,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, id),
-  unique (org_id, name)
+  unique (org_id, name),
+  -- kennels_service fills it in; it is never empty once written.
+  constraint kennels_service_from_set check (service_from is not null)
 );
 
 comment on table public.kennels is
@@ -21,10 +24,128 @@ comment on table public.kennels is
 comment on column public.kennels.name is 'Short label painted on the door, e.g. K07 or "Suite 2".';
 comment on column public.kennels.zone is 'Optional grouping such as a block or wing, for sorting the board.';
 comment on column public.kennels.is_active is 'False takes the kennel out of service (repairs, deep cleaning) and out of the capacity count.';
+comment on column public.kennels.service_from is
+  'The day the kennel went into its present state (in or out of service, M44): today unless an earlier day is given, never after today and never before the change before it (WB230, WB231). Each change is kept in kennel_service.';
 
 create trigger kennels_set_updated_at
   before update on public.kennels
   for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Kennels in and out of service by date (M44): each change is kept, so a
+-- past day is measured against the kennels that were there on that day.
+-- ---------------------------------------------------------------------------
+
+create table public.kennel_service (
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  kennel_id uuid not null,
+  from_date date not null,
+  in_service boolean not null,
+  created_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  primary key (org_id, kennel_id, from_date),
+  foreign key (org_id, kennel_id) references public.kennels (org_id, id) on delete cascade
+);
+
+comment on table public.kennel_service is
+  'When each kennel went into or out of service (M44), one row a change, written only by the kennels_service trigger from kennels.is_active and kennels.service_from. A kennel counts on a day by its latest row on or before that day; before its first row it was not there. Nobody writes it directly.';
+comment on column public.kennel_service.from_date is 'The first day of this state, kennel time.';
+comment on column public.kennel_service.in_service is 'True: in service, so in the capacity from this day. False: out of service.';
+
+-- A kennel's state and the day it began are the database's to check: never
+-- after today, never before the change before it. Runs as the caller.
+create function public.kennels_check_service()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_today date := (select (now() at time zone o.time_zone)::date from public.organizations o where o.id = new.org_id);
+  v_before date;
+begin
+  if tg_op = 'INSERT' then
+    new.service_from := coalesce(new.service_from, v_today);
+  elsif new.is_active is distinct from old.is_active then
+    -- A new change: today, unless an earlier day was given with it.
+    if new.service_from is not distinct from old.service_from then
+      new.service_from := v_today;
+    end if;
+    v_before := old.service_from;
+  elsif new.service_from is distinct from old.service_from then
+    -- The day of the present state corrected: it stays after the change before it.
+    select max(s.from_date) into v_before
+    from public.kennel_service s
+    where s.org_id = new.org_id and s.kennel_id = new.id and s.from_date < old.service_from;
+  else
+    return new;
+  end if;
+  if new.service_from is null or new.service_from > v_today then
+    raise exception 'WB230: a kennel goes in or out of service today or on a day before' using errcode = '22023';
+  end if;
+  -- A new change may share the day of the last one (out and back the same
+  -- day); a corrected day must stay after the change before it.
+  if v_before is not null and (new.service_from < v_before or (new.is_active is not distinct from old.is_active and new.service_from = v_before)) then
+    raise exception 'WB231: that is before the kennel''s last change, on %', v_before using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.kennels_check_service() is
+  'Trigger: dates a kennel''s change in or out of service (kennels.service_from) today unless an earlier day is given, never after today (WB230) and never before the change before it (WB231).';
+
+create trigger kennels_check_service
+  before insert or update of is_active, service_from on public.kennels
+  for each row execute function public.kennels_check_service();
+
+create function public.kennels_keep_service()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- SECURITY DEFINER: kennel_service has no grant to write, so that it only
+  -- ever says what kennels.is_active said and when. The change itself was
+  -- allowed (or refused) by the kennels policies before this runs.
+  if tg_op = 'UPDATE' and new.is_active is not distinct from old.is_active then
+    -- The day of the present state corrected.
+    update public.kennel_service s set from_date = new.service_from
+    where s.org_id = new.org_id and s.kennel_id = new.id and s.from_date = old.service_from;
+    return null;
+  end if;
+  -- Gone out and back on one day: that day's row says how it ended.
+  insert into public.kennel_service (org_id, kennel_id, from_date, in_service)
+  values (new.org_id, new.id, new.service_from, new.is_active)
+  on conflict (org_id, kennel_id, from_date) do update set in_service = excluded.in_service, created_by = excluded.created_by, created_at = now();
+  return null;
+end;
+$$;
+comment on function public.kennels_keep_service() is
+  'Trigger: keeps kennel_service in step with kennels.is_active and kennels.service_from, one row a change. SECURITY DEFINER because nobody may write kennel_service directly.';
+
+create trigger kennels_keep_service
+  after insert or update of is_active, service_from on public.kennels
+  for each row execute function public.kennels_keep_service();
+
+-- How many kennels were in service on a day: each kennel by its latest change
+-- on or before the day. Runs as the caller.
+create function public.kennels_in_service(p_org uuid, p_day date)
+returns integer
+language sql
+stable
+set search_path = ''
+as $$
+  select count(*)::integer
+  from public.kennels k
+  where k.org_id = p_org
+    and (select s.in_service
+           from public.kennel_service s
+          where s.org_id = k.org_id and s.kennel_id = k.id and s.from_date <= p_day
+          order by s.from_date desc
+          limit 1);
+$$;
+comment on function public.kennels_in_service(uuid, date) is
+  'The kennels in service on a day (M44), each by its latest change on or before it (kennel_service). A kennel not there yet does not count. Today and after, the same as counting kennels.is_active.';
 
 -- ---------------------------------------------------------------------------
 
@@ -698,7 +819,7 @@ as $$
       where b.org_id = p_org
         and b.status in ('confirmed', 'checked_in')
         and public.stay_range(b.kind, b.start_date, b.end_date) @> d.day::date),
-    (select count(*)::integer from public.kennels k where k.org_id = p_org and k.is_active),
+    public.kennels_in_service(p_org, d.day::date),
     (select count(*)::integer
        from public.bookings b
       where b.org_id = p_org
@@ -708,7 +829,7 @@ as $$
   where p_to >= p_from and p_to - p_from <= 400;
 $$;
 comment on function public.occupancy_by_day(uuid, date, date) is
-  'For each day in a range (at most 400 days): kennels in use, total kennels, and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.';
+  'For each day in a range (at most 400 days): kennels in use, kennels in service that day (kennels_in_service), and pets in house (two sharing a kennel are two pets in one kennel). Powers the occupancy calendar.';
 
 -- The waiting list: requests that wait for a kennel to free up, in the order
 -- they joined. has_space says whether the stay would fit now: on every one of

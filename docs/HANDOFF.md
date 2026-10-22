@@ -2,11 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after Phase 3 (M38 to M42: boarding as the public rules promise).
+Last updated: 22 October 2026, after Phase 4 (M43 and M44: the team, and rough edges before production).
 
 ## In one paragraph
 
-Every boarding milestone is built, M2 to M24, and so are Phases 1, 2 and 3 of the roadmap's second part (D44). Phase 3
+Every milestone on the roadmap is built, M2 to M44, except the launch work in M1 that needs the owner. Phase 4 (M43
+and M44, `02` section K, D48): shifts and a week's rota planned by owners and managers, who lives on site, clocking in
+and out from Today with the time stamped by the database and "On now" for everyone, leave asked for and answered
+(never one's own, unless an owner) taking the person off the rota, and a month's attendance for pay with a CSV; a
+time by hand is an owner's or manager's, with a note. All of it is switched on in Settings (`keeps_rota`), so a
+kennel that leaves it off sees nothing new. M44: Send on a reminder asks "Did the message go?" and takes it off the
+list only on "Yes, it went"; kennels go in and out of service from a day, every change kept, and past days are
+measured against the kennels there that day; a parent's export is a ZIP of `parent.json` and their files. Phase 3
 (M38 to M42, `02` section J, D47): cancellation rules by weekday and weekend or holiday and by notice, worked out night
 by night and confirmed by an owner or manager as a refund and credit; credit as a ledger the database keeps (spent on
 any bill, never below nothing or after it ends) with goodwill credit and a reminder before it ends; pick-up from home
@@ -31,8 +38,8 @@ portions from each dog's weight; subscriptions that make their deliveries ahead 
 recipe, closing to changes at a cut-off; food bills checked by the database like stays and credited for cancelled
 deliveries; batches that take stock out and answer who received them; riders, a fourth role that reaches no table
 (D45); and twelve public functions now, four for food (`05`). The owner's earlier answers (boarders' food, riders,
-monthly payment, credit reminders) are built in. Next is Phase 4 (M43 onwards). What has still never
-happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
+monthly payment, credit reminders) are built in. Nothing is left on the roadmap but M1's launch work and the ideas
+not scheduled. What has still never happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
 
 Before Phase 1: M25 added what the kennel offers, parents' addresses matched to the areas served by PIN code, people's
 skills, and weights in grams. M20 to M24: going home early and refunds (D40), the waiting list (D42), requests on the
@@ -40,8 +47,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (372 database tests, 229 unit tests), and the whole day is walked in a real
-browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 65 tests).
+database rules are tested in-process (394 database tests, 241 unit tests), and the whole day is walked in a real
+browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 67 tests).
 
 ## What is verified, and how
 
@@ -150,6 +157,12 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | The booking form (M41): the public prices and services for the estimate, a stay request at the usual price for each pet with the pick-up noted, an appointment request at the time asked, the parent and pet made when the request cannot be taken | `tests/db/booking-form.test.ts`, `tests/db/intake.test.ts`, `security.test.ts` (still twelve public functions) | High |
 | Night-by-night cancellation across a weekend and a holiday with and without notice, the kennel cancelling, packages, packs and discounts; health problems; the booking form's estimate; trip lines; health, credit and review reminders | `src/lib/core/cancellation.test.ts`, `health.test.ts`, `estimate.test.ts`, `trips.test.ts`, `reminders.test.ts` | High |
 | Phase 3 in a browser at 360 pixels: cancellation rules saved; a paid stay cancelled by the kennel, the parent's choice of credit confirmed, the credit on the parent page and goodwill added; a pet with no rabies card refused at check-in with the sentence, let in with a reason, then checked in; a pick-up added to a stay at the area's price, on the day's run, and on the stay's bill; the booking form in a private window with its estimate, accepted by staff into a request; a review reminder on Today with the link | `npm run test:e2e` (5 new tests, 65 in all) against the local Supabase; screenshots taken 22 October 2026 | High for the local stack |
+| The rota (M43): a person on one shift at a time, a night shift ending the next morning, planned by owners and managers (staff refused), read by everyone; no shift off the list (`WB220`), rider or suspended person (`WB221`), or day of granted leave (`WB222`); a shift's new hours move its rota from today on | `tests/db/team.test.ts` | High |
+| Leave (M43): answered by owners and managers only (`WB223`), never their own unless an owner (`WB224`); refused and withdrawn final, granted days kept, no overlaps (`WB225`); granting takes the person off the rota; each person sees their own | `tests/db/team.test.ts`; the `WB224` check and the rota clearing each removed once to see the tests fail | High |
+| Attendance (M43): clocking in and out stamped by the database whatever is sent; one stretch at a time; times by hand only by owners and managers (`WB226`) with a note (`WB227`), never later than now (`WB228`), in History of changes; counted on the kennel day it began; each person sees their own; `who_is_on()` gives names to the kennel's own people only; riders and suspended people refused (`WB221`); a person with attendance cannot be removed, the kennel's deletion takes it all | `tests/db/team.test.ts`; the stamping and the kept-member rule each removed once to see the tests fail | High |
+| Kennels in and out of service by date (M44): counted from the day added, a change dated earlier, never after today (`WB230`) or before the last change (`WB231`), out and back on one day, the history written only by the database; the occupancy report and the calendar count the kennels there each day | `tests/db/kennel-service.test.ts`; the report's per-day count removed once to see the test fail | High |
+| The week's days, shift spans across midnight, who is on the rota now, hours, leave days in a month, the month's sheet (a night shift on its evening, open stretches flagged), times typed by hand; the ZIP writer (CRC-32, UTF-8 names, read back, damage noticed) | `src/lib/core/team.test.ts`, `src/lib/core/zip.test.ts`; a ZIP from `zipStore()` passes `unzip -t` | High |
+| Phase 4 in a browser at 360 pixels: the rota switched on, the usual shifts, Meena on three mornings and Ravi living on site; Meena clocking in on Today and seeing On now; her leave asked for and granted, the rota then refusing her; clocking out; a manager writing yesterday by hand, the month's sheet and its CSV; Meena seeing only her own; a kennel out of service from three days ago and back; Send asking whether the message went ("Not yet" keeps it); a parent's export as a ZIP holding the certificate | `npm run test:e2e` (2 new steps, 67 in all) against the local Supabase; screenshots taken 22 October 2026 | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -183,6 +196,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | The booking form asking for an appointment, in the browser | The walk sends a boarding request; appointment requests are tested in the database (`tests/db/booking-form.test.ts`) | Low |
 | Spending credit on a bill in the browser | The walk keeps an advance as credit and adds goodwill; spending it is tested in the database (`tests/db/credit.test.ts`) | Low |
 | Phase 3 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | Long Kannada words may wrap on the cancellation panel |
+| Phase 4 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The rota's day cards and the attendance summary may wrap in Kannada |
+| Clocking in on a real phone, at a real shift change | Walked in Chromium at 360 pixels only | Two people clocking in from one phone works (each signs in), but a shared phone left signed in clocks in whoever is signed in |
+| The attendance CSV opened in a spreadsheet for pay | Checked as text in the walk | Low: the same CSV writer as the reports |
+| A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
 
@@ -205,9 +222,11 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: start M43** (rota and attendance), then M44 (rough edges before production). Each milestone first writes
-its section in `02-product-spec.md`. The owner has said production is not soon, so the launch steps above
-can wait and migrations stay editable in place until then. Steps 1 to 8 need the owner; M43 onwards does not. The
+**Building: the roadmap is done** (M2 to M44). What is left needs the owner: steps 1 to 8 above, then the migration
+freeze. New building waits for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
+owner has said production is not soon, so migrations stay editable in place until then. Worth doing before
+production without the owner: have a person read the Phase 1 to 4 Hindi and Kannada, and walk the team screens on a
+real phone at a shift change. The
 accountant should also give the SAC codes and rates for grooming, swimming and training (question 1 in `06`). Before a kennel sells food, the accountant should answer questions
 13 and 14 in `06` (the food's HSN code and rate, the delivery charge, and any kitchen licence or label wording).
 
@@ -276,6 +295,13 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 22 October 2026 (Phase 4), also unchecked: the whole of `src/messages/hi/team.ts` and
+`src/messages/kn/team.ts` (rota, leave, attendance, On now), the eight new constraint sentences and eleven error
+sentences in `core.ts`, "Did the message go?" on Today, the kennels' "in service since" words, and the export's
+download line. "Rota" was drafted as रोस्टर and ಪಾಳಿ ಪಟ್ಟಿ, "shift" as शिफ़्ट and ಪಾಳಿ, "clock in" as हाज़िरी लगाएं and
+ಹಾಜರಿ ಹಾಕಿ, "clock out" as काम ख़त्म करें and ಕೆಲಸ ಮುಗಿಸಿ, "leave" as छुट्टी and ರಜೆ, "lives on site" as यहीं रहते हैं and
+ಇಲ್ಲೇ ವಾಸ. Staff read these every day: check the On now panel first.
 
 Drafted on 22 October 2026 (Phase 3), also unchecked: the whole of `src/messages/hi/rules.ts` and
 `src/messages/kn/rules.ts` (cancellation rules and the cancelled stay's panel, credit, pick-up and drop, health papers,
@@ -392,6 +418,25 @@ Chosen in M25 as the simplest thing:
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
 
+Chosen in Phase 4 (M43, M44) as the simplest thing:
+
+- The rota has no repeating pattern: a manager puts someone on a shift for up to 31 days in a row, and again next
+  month. Is a weekly pattern wanted?
+- A stretch of work counts on the day it began, so a night shift counts on its evening, and only once clocked out. A
+  forgotten clock-out stays open (and the person shows as on now) until a manager puts it right.
+- Riders keep no rota and do not clock in (they reach no table, D45). Should they?
+- Leave is days, not hours, and has no kinds (sick, paid, unpaid). The month's sheet counts granted days only.
+- Granting leave takes the person off the rota on those days without asking; the rota then shows the shift short.
+- A person with attendance on record cannot be removed, only suspended (`attendance_keeps_member`), so "leaving" a
+  kennel is not possible for them either; an owner suspends them.
+- Clocking in is from any phone the person is signed in on; nothing ties it to being at the kennel.
+- Who is on now is told to everyone working at the kennel, names only; the times are for owners and managers.
+- A kennel counts from the day it was added. One that was there before Wagbook knew needs its "In service since" put
+  right on Kennels, or past reports undercount it. The demo kennels are in service from a year back.
+- A change in or out of service dated the same day as the kennel's last change counts from today (the database
+  cannot tell "the same day" from "no day given").
+- The export leaves out the small copy of each photo (it is the same photo, smaller).
+
 Chosen in Phase 3 (M38 to M42) as the simplest thing:
 
 - Cancellation rules are on screen for boarding and day boarding only. Appointments take no advance (they are paid on
@@ -471,7 +516,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - The difference offered on a bill is worked out from the stays as they are now. A line a manager added to a bill by
   hand is never offered back on its own (`staysChanged()`), but when the stays changed as well, the amount offered
   includes it: check the amount on a bill edited by hand before crediting it.
-- Tapping Send on a reminder marks it sent even if WhatsApp's own Send is not pressed.
+- "Did the message go?" is asked only with JavaScript; without it, Send opens WhatsApp and the reminder stays.
 - A parent's booking link shows the dates of their stays to whoever holds it.
 
 - No debit notes, and no composition scheme mode (a bill of supply's own words are not printed).
@@ -483,8 +528,6 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
 - The calendar's top row counts kennels in use; when siblings share, the number of pets is shown under it.
 - No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
-- Reports measure how full the kennel was against the kennels in service **today** for every day; there is no history
-  of kennels going in or out of service.
 - A pet that overstays counts in the occupancy report only up to its check-out date unless someone pressed Extend.
 - Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
@@ -492,7 +535,8 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
   rows; other ids read "a record no longer here". An erasure shows as a change to "clients".
 - An erased parent appears as "Erased" (stored in English) where a past stay or bill names them. Their pets keep their
   names but are hidden for good, because their parent stays hidden.
-- The export names photos and certificates by their storage paths; it does not include the files.
+- Rota and attendance: no repeating rota, no cover requests or swaps, no overtime rules, no pay worked out, no
+  clocking in tied to the kennel's place. A shift taken off the list keeps its old rota rows; its name cannot change.
 - A certificate sent with the intake form is lost if the form arrives but the upload fails: the parent is told to send
   it on WhatsApp.
 - On the two-step page, after the first code is accepted, the page redraws in its "on" state, so the longer "have your
@@ -504,7 +548,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 562 tests, build
+npm run check        # dash check, lint, typecheck, 635 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -513,6 +557,11 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 22 October 2026. Phase 4, M43 and M44: shifts, the rota, living on site, clocking in and out with On now on Today,
+  leave, the month's attendance and its CSV (D48); Send asks whether the message went; kennels in and out of service
+  by date, with past occupancy counted against the kennels there that day; the export as a ZIP with the files.
+  e2e walk extended to 67 tests, run against the local Supabase (images pulled through `mirror.gcr.io` where the registry refused).
 
 - 22 October 2026. Phase 2, M34 to M37: places, services and prices, appointments held by the database by place, pet
   and person, the day's board, bills for boarders and visitors, grooming cards and reminders, swims, courses, parties,

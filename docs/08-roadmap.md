@@ -477,7 +477,8 @@ How these milestones work:
 **The order, and why.** Phase 1, the kitchen and food, comes first. Recurring deliveries, rotating recipes and stock
 are where a notebook or spreadsheet breaks first, and nothing in Wagbook covers them yet. Phase 2, appointments, comes
 next (built 22 October 2026). Phase 3 brings boarding up to the public rules
-(credit on cancellation, pick-up from home, health papers, a public booking form; built 22 October 2026). Phase 4 is the team. The launch work
+(credit on cancellation, pick-up from home, health papers, a public booking form; built 22 October 2026). Phase 4, the
+team and the rough edges before production, was built the same day. The launch work
 in M1 can happen at any point; the migration freeze waits for it.
 
 ---
@@ -905,13 +906,13 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M43. Rota and attendance
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (K1 to K4 in `02`, D48).
 
 **Build**
 
-1. Shifts (morning, evening, night) and who works each, including who lives on site.
-2. Clocking in and out from the phone; Today shows who is on now.
-3. Leave asked for and granted, and a month's attendance sheet for pay.
+1. [x] Shifts (morning, evening, night) and who works each, including who lives on site.
+2. [x] Clocking in and out from the phone; Today shows who is on now.
+3. [x] Leave asked for and granted, and a month's attendance sheet for pay.
 
 **Rules**
 
@@ -921,13 +922,13 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ## M44. Rough edges before production
 
-- [ ] Not started.
+- [x] Finished 22 October 2026 (A3, B8, D1b and E5 in `02`, D48).
 
 **Build**
 
-1. Send on a reminder asks whether the message went, instead of marking it sent on the tap.
-2. Kennels going in and out of service by date, so past occupancy is measured against the kennels there on that day.
-3. The export includes the files (photos and certificates) as well as their names.
+1. [x] Send on a reminder asks whether the message went, instead of marking it sent on the tap.
+2. [x] Kennels going in and out of service by date, so past occupancy is measured against the kennels there on that day.
+3. [x] The export includes the files (photos and certificates) as well as their names.
 
 ---
 

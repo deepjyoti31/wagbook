@@ -22,6 +22,9 @@ export const kennelArea = {
       food: { title: "Food for homes", about: "Subscriptions, orders, deliveries and runs." },
       settings: { title: "Settings", about: "Kennel details, prices, tax and UPI." },
       history: { title: "History of changes", about: "Who changed what, and when. Owners and managers." },
+      rota: { title: "Rota", about: "Shifts, who works when, and who lives on site." },
+      leave: { title: "Leave", about: "Ask for days off, and answer others' requests." },
+      attendance: { title: "Attendance", about: "Clocking in and out, and the month's sheet for pay." },
     },
     // {role} is one of roleInSentence, written as it sits in the middle of a sentence.
     signedInAs: "Signed in as {name} ({email}), {role} at {kennel}.",
@@ -207,6 +210,15 @@ export const kennelArea = {
     outOfService: "Out of service",
     takeOut: "Take out of service",
     putBack: "Put back in service",
+    // Going in or out of service on a day (M44), so past reports count the kennels there that day.
+    from: "From",
+    fromHint: "Today, or the day it happened.",
+    outSince: "Out of service since {date}",
+    inSince: "In service since",
+    outSinceLabel: "Out of service since",
+    sinceHint: "Put it right if the kennel was there before Wagbook knew. Reports count it from this day.",
+    takenOut: "{kennel} is out of service.",
+    putBackDone: "{kennel} is back in service.",
     errors: {
       atLeastOne: "Add at least one kennel.",
       atMost: "Add at most 200 kennels at a time.",
@@ -216,6 +228,7 @@ export const kennelArea = {
       onlyManagers: "Only an owner or manager can change kennels.",
       name: "A kennel's name is 1 to 40 characters.",
       position: "The position is a whole number from 0 to 9999.",
+      date: "Choose a day, today or before.",
     },
     alreadyExist: "Those kennels already exist.",
     added: { one: "Added {n} kennel.", other: "Added {n} kennels." },

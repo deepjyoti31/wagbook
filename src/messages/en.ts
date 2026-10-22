@@ -15,6 +15,7 @@ import { beyondArea } from "./en/beyond";
 import { kitchenArea } from "./en/kitchen";
 import { appointmentsArea } from "./en/appointments";
 import { rulesArea } from "./en/rules";
+import { teamArea } from "./en/team";
 
 export const en = {
   ...core,
@@ -27,6 +28,7 @@ export const en = {
   ...kitchenArea,
   ...appointmentsArea,
   ...rulesArea,
+  ...teamArea,
 };
 
 export type Messages = typeof en;

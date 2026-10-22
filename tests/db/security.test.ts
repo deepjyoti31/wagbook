@@ -98,6 +98,7 @@ describe("tenant isolation", () => {
     "appointment_places", "appointment_services", "appointment_service_prices", "appointments", "appointment_items", "pet_grooming",
     "courses", "packages", "package_parts",
     "trips", "required_vaccines", "health_overrides", "cancellation_rules", "credits", "credit_uses",
+    "kennel_service", "shifts", "rota", "leave_requests", "attendance",
   ];
 
   it("shows a member only their own organisation's rows, in every table", async () => {

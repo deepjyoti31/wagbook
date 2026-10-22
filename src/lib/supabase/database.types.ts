@@ -424,6 +424,60 @@ export type Database = {
           },
         ];
       };
+      attendance: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          work_date: string | null;
+          clocked_in_at: string;
+          clocked_out_at: string | null;
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          work_date?: string | null;
+          clocked_in_at?: string;
+          clocked_out_at?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          work_date?: string | null;
+          clocked_in_at?: string;
+          clocked_out_at?: string | null;
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attendance_keeps_member";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+          {
+            foreignKeyName: "attendance_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           id: number;
@@ -2610,6 +2664,48 @@ export type Database = {
           },
         ];
       };
+      kennel_service: {
+        Row: {
+          org_id: string;
+          kennel_id: string;
+          from_date: string;
+          in_service: boolean;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          org_id: string;
+          kennel_id: string;
+          from_date: string;
+          in_service: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          kennel_id?: string;
+          from_date?: string;
+          in_service?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kennel_service_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "kennel_service_org_id_kennel_id_fkey";
+            columns: ["org_id", "kennel_id"];
+            isOneToOne: false;
+            referencedRelation: "kennels";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       kennels: {
         Row: {
           id: string;
@@ -2618,6 +2714,7 @@ export type Database = {
           zone: string | null;
           notes: string | null;
           is_active: boolean;
+          service_from: string | null;
           sort_order: number;
           created_at: string;
           updated_at: string;
@@ -2629,6 +2726,7 @@ export type Database = {
           zone?: string | null;
           notes?: string | null;
           is_active?: boolean;
+          service_from?: string | null;
           sort_order?: number;
           created_at?: string;
           updated_at?: string;
@@ -2640,6 +2738,7 @@ export type Database = {
           zone?: string | null;
           notes?: string | null;
           is_active?: boolean;
+          service_from?: string | null;
           sort_order?: number;
           created_at?: string;
           updated_at?: string;
@@ -2654,6 +2753,69 @@ export type Database = {
           },
         ];
       };
+      leave_requests: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          starts_on: string;
+          ends_on: string;
+          reason: string | null;
+          status: Database["public"]["Enums"]["leave_status"];
+          answer: string | null;
+          decided_by: string | null;
+          decided_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          starts_on: string;
+          ends_on: string;
+          reason?: string | null;
+          status?: Database["public"]["Enums"]["leave_status"];
+          answer?: string | null;
+          decided_by?: string | null;
+          decided_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          starts_on?: string;
+          ends_on?: string;
+          reason?: string | null;
+          status?: Database["public"]["Enums"]["leave_status"];
+          answer?: string | null;
+          decided_by?: string | null;
+          decided_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leave_requests_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+        ];
+      };
       memberships: {
         Row: {
           org_id: string;
@@ -2663,6 +2825,7 @@ export type Database = {
           phone: string | null;
           language: string;
           skills: Database["public"]["Enums"]["staff_skill"][];
+          lives_on_site: boolean;
           is_active: boolean;
           accepted_at: string | null;
           invited_by: string | null;
@@ -2677,6 +2840,7 @@ export type Database = {
           phone?: string | null;
           language?: string;
           skills?: Database["public"]["Enums"]["staff_skill"][];
+          lives_on_site?: boolean;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -2691,6 +2855,7 @@ export type Database = {
           phone?: string | null;
           language?: string;
           skills?: Database["public"]["Enums"]["staff_skill"][];
+          lives_on_site?: boolean;
           is_active?: boolean;
           accepted_at?: string | null;
           invited_by?: string | null;
@@ -2773,6 +2938,7 @@ export type Database = {
           deworm_days: number | null;
           tick_days: number | null;
           neuter_months: number | null;
+          keeps_rota: boolean;
           review_url: string | null;
           created_at: string;
           updated_at: string;
@@ -2842,6 +3008,7 @@ export type Database = {
           deworm_days?: number | null;
           tick_days?: number | null;
           neuter_months?: number | null;
+          keeps_rota?: boolean;
           review_url?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -2911,6 +3078,7 @@ export type Database = {
           deworm_days?: number | null;
           tick_days?: number | null;
           neuter_months?: number | null;
+          keeps_rota?: boolean;
           review_url?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -3887,6 +4055,64 @@ export type Database = {
           },
         ];
       };
+      rota: {
+        Row: {
+          id: string;
+          org_id: string;
+          shift_id: string;
+          user_id: string;
+          work_date: string;
+          starts_at: string | null;
+          ends_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          shift_id: string;
+          user_id: string;
+          work_date: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          shift_id?: string;
+          user_id?: string;
+          work_date?: string;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rota_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rota_org_id_shift_id_fkey";
+            columns: ["org_id", "shift_id"];
+            isOneToOne: false;
+            referencedRelation: "shifts";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "rota_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+        ];
+      };
       service_areas: {
         Row: {
           id: string;
@@ -3980,6 +4206,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "services_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      shifts: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          starts_at: string;
+          ends_at: string;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          starts_at: string;
+          ends_at: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          starts_at?: string;
+          ends_at?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "shifts_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -4793,6 +5060,10 @@ export type Database = {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
       };
+      kennels_in_service: {
+        Args: { p_org: string; p_day: string };
+        Returns: number;
+      };
       make_recovery_codes: {
         Args: Record<PropertyKey, never>;
         Returns: string[];
@@ -4977,6 +5248,10 @@ export type Database = {
         Args: { p_org: string };
         Returns: { booking_id: string; waitlisted_at: string; has_space: boolean }[];
       };
+      who_is_on: {
+        Args: { p_org: string };
+        Returns: { user_id: string; display_name: string }[];
+      };
     };
     Enums: {
       address_kind: "home" | "work" | "other";
@@ -5002,6 +5277,7 @@ export type Database = {
       incident_severity: "low" | "medium" | "high";
       intake_status: "new" | "accepted" | "rejected" | "spam";
       invoice_status: "draft" | "issued" | "void";
+      leave_status: "asked" | "granted" | "refused" | "withdrawn";
       member_role: "owner" | "manager" | "staff" | "rider";
       package_day: "first" | "middle" | "last";
       pay_period: "week" | "month";

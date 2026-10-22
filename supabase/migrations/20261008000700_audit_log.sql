@@ -108,3 +108,8 @@ create trigger organizations_audit after insert or update or delete on public.or
   for each row execute function public.audit_row();
 create trigger memberships_audit after insert or update or delete on public.memberships
   for each row execute function public.audit_row();
+-- The team (M43): leave answered, and clock times written by hand.
+create trigger leave_requests_audit after insert or update or delete on public.leave_requests
+  for each row execute function public.audit_row();
+create trigger attendance_audit after insert or update or delete on public.attendance
+  for each row execute function public.audit_row();
