@@ -15,7 +15,7 @@ import {
   todayIn,
   whatsappLink,
 } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { percentText, planAhead, portionSettings, quantityText } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +35,7 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
   const asked = (await searchParams).date;
   const { org } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const k = m.kitchen;
   const today = todayIn(org.time_zone);
   const day = typeof asked === "string" && isISODate(asked) ? asked : addDays(today, 1);
@@ -66,6 +66,8 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
   if (deliveries.error || stays.error || recipes.error || batches.error || members.error || levels.error) throw new Error("Could not load the kitchen.");
 
   // Boarders in house that day: a boarding stay's nights, and day boarding on its day.
+  const batchNumber = new Map(batches.data.map((b) => [b.id, b.number]));
+  const packedFrom = (id: string | null) => (id ? batchNumber.get(id) : undefined);
   const boarders = stays.data.filter((b) => (b.kind === "daycare" ? true : b.end_date > day));
   const petIds = [...new Set(boarders.map((b) => b.pet_id))];
   const food = petIds.length > 0 ? await supabase.from("pet_food").select("pet_id, plan, goal, grams_by_hand, boarder_food").eq("org_id", org.id).in("pet_id", petIds) : { data: [], error: null };
@@ -262,7 +264,7 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
           <Ledger>
             {deliveries.data.map((d) => {
               const options = usable(d.recipe_id);
-              const what = d.kind === "item" ? fill(m.food.pieces, { n: d.quantity }) : fill(m.food.packsOf, { packs: d.packs, kg: formatKg(d.grams, locale) });
+              const what = d.kind === "item" ? fill(m.food.pieces, { n: d.quantity }) : plural(language, d.packs, m.food.packsOf, { kg: formatKg(d.grams, locale) });
               return (
                 <LedgerRow key={d.id}>
                   <div className="min-w-48 flex-1">
@@ -292,7 +294,10 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
                       <span className="text-sm text-slate">{k.noBatch}</span>
                     )
                   ) : (
-                    <Badge tone={d.status === "delivered" ? "good" : "neutral"}>{m.deliveryStatus[d.status]}</Badge>
+                    <div className="text-right">
+                      <Badge tone={d.status === "delivered" ? "good" : "neutral"}>{m.deliveryStatus[d.status]}</Badge>
+                      {packedFrom(d.batch_id) ? <p className="mt-1 text-sm text-slate">{fill(k.packed, { number: packedFrom(d.batch_id)! })}</p> : null}
+                    </div>
                   )}
                 </LedgerRow>
               );
@@ -310,7 +315,7 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
               <li key={b.id}>
                 <Link href={`/app/kitchen/batches/${b.id}`} className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-3 hover:bg-ground">
                   <span className="flex-1 font-semibold">
-                    {fill(k.batchLine, { number: b.number, recipe: b.recipes?.name ?? "", kg: formatKg(b.grams, locale), packs: b.packs })}
+                    {plural(language, b.packs, k.batchLine, { number: b.number, recipe: b.recipes?.name ?? "", kg: formatKg(b.grams, locale) })}
                   </span>
                   <Badge tone={b.use_by < today ? "alert" : "neutral"}>{fill(k.usedBy, { date: formatDate(b.use_by, locale) })}</Badge>
                 </Link>

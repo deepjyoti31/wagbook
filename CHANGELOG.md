@@ -52,6 +52,17 @@ The first release will be 0.1.0. Everything below is in it.
   that only boards sees nothing new. With delivery on: parents' delivery addresses, matched by PIN code to the areas
   you serve and their charge. Skills on People (cook, groomer, trainer, swim supervisor, rider). Each pet's weight
   over time, with a target and a body condition score.
+- The kitchen (switch it on in Settings): stock that is the sum of what came in and went out, with purchases written
+  down as expenses in the same step, waste and stock takes; suppliers; recipes in versions that never change, a
+  rotation, and a list of foods a dog must never eat that no recipe may use; food prices and portions worked out from
+  each dog's weight; what each boarder eats, on the care round; what to cook tomorrow, the shopping list on WhatsApp,
+  batches that take their ingredients out of stock, labels to print, packing from a batch in date, and who received
+  any batch.
+- Food for homes (switch on delivery): subscriptions delivered on set days in whole packs, paused, changed and ended
+  up to a cut-off; trials, orders and cakes; bills a week or a month ahead, credited for deliveries cancelled
+  afterwards; delivery runs with a rider role that sees only its own run; problems replaced or refunded; a public
+  food order page with the price worked out and UPI payment; parents pausing or skipping from their own link; and food
+  reports with CSV downloads.
 
 ### For whoever runs it
 

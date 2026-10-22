@@ -15,7 +15,8 @@ When you build something, change its mark here in the same change.
 | Owner | Yes | Everything, including deleting anything (D29), inviting and removing owners, and deleting the kennel. |
 | Manager | Yes | Everything except deleting, managing owners and deleting the kennel. Changes kennels, prices, settings; voids invoices; records refunds. |
 | Staff | Yes | Runs the day: bookings, check-in and out, pets, care tasks, updates, incidents, payments received, issuing invoices. |
-| Parent | Never | Opens links sent to them: the intake form, their pet's stay page, their bill. |
+| Rider (D45) | Yes | Only their own delivery run for the day, at `/rider`: name, address, phone, packs and the note for the door of each stop. No prices, no medical notes, no other parents, no table at all. |
+| Parent | Never | Opens links sent to them: the intake form, their pet's stay page, their bill, their own booking link. Orders food from the kennel's food page. |
 
 One person can belong to several kennels, with a different role in each.
 
@@ -54,6 +55,19 @@ One person can belong to several kennels, with a different role in each.
 /app/bills            Bills: owed, drafts, recent                    signed in
 /app/bills/{id}       One bill and its payments                      signed in
 /app/bookings/{id}/update  Write an update with photos               signed in
+/app/kitchen          Cook plan, shopping list, batches, packing     signed in (kitchen on)
+/app/kitchen/stock    Stock, purchases, waste, stock takes, suppliers signed in (kitchen on)
+/app/kitchen/recipes  Recipes, versions, rotation, cost per kilo     signed in (kitchen on)
+/app/kitchen/batches/{id}  One batch and who received it           signed in (kitchen on)
+/app/kitchen/labels   Pack labels to print for a day                 signed in (kitchen on)
+/app/kitchen/settings Portions, packs, cut-off, food prices          signed in (kitchen on)
+/app/food             Food for homes: orders, deliveries, subscriptions  signed in (delivery on)
+/app/food/new         Start a subscription, or a one-off order       signed in (delivery on)
+/app/food/subscriptions/{id}  One subscription, its deliveries and bills  signed in (delivery on)
+/app/food/runs        Delivery runs for a day                        signed in (delivery on)
+/app/food/orders      Orders from the website and parents' requests  signed in (delivery on)
+/rider                A rider's own run for today                    riders (D45)
+/f/{slug}             A kennel's food order page                     public
 /i/{slug}             A kennel's intake form                         public
 /s/{token}            One stay, for the parent                       public, secret link
 /inv/{token}          One bill, for the parent                       public, secret link
@@ -241,8 +255,8 @@ Settings, **What this kennel offers**: three switches, all off for a new kennel.
 | Switch | Turns on |
 | --- | --- |
 | Appointments: grooming, swimming, training and parties | The skills groomer, trainer and swim supervisor (M34 onwards adds the rest) |
-| A kitchen that cooks fresh food | The skill cook (M26 onwards adds the rest) |
-| Food delivered to parents' homes | Parents' addresses, Areas you serve under More, the address and PIN code on the intake form, and the skill rider |
+| A kitchen that cooks fresh food | Kitchen under More (stock, recipes, the cook plan, batches, labels, kitchen settings), Food on the pet page, boarders' food on the care round, the kitchen on Today, food reports, and the skill cook (H1 to H5, H8) |
+| Food delivered to parents' homes | Parents' addresses, Areas you serve and Food for homes under More (subscriptions, orders, runs), the address and PIN code on the intake form, the food order page, food on parents' own links, the role and skill rider (H4, H6, H7) |
 
 Delivery needs the kitchen: the database refuses delivery without it (`organizations_delivery_needs_kitchen`). With
 every switch off, Wagbook looks as it did before M25.
@@ -655,6 +669,153 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 
 ---
 
+## H. The kitchen and food (Phase 1, M26 to M33, D44)
+
+All of it shows only while the kennel offers a kitchen (B10); delivery, subscriptions, runs and the food order page
+also need food delivery on. A kennel with both off sees none of it. Grams, millilitres, pieces and paise throughout;
+never a decimal in the database.
+
+### H1. Stock. Built (M26).
+
+**Kitchen, Stock**: each item (name, counted in grams, millilitres or pieces, kind, usual supplier, a low level, and
+"a dog must never eat this") with what is in stock, a **Low** badge at or below its level, and **Use soon**: what is
+left of each purchase that passes its use-by date in the next two days, oldest first (stock is taken from the soonest
+to go off, `lotsLeft()`). **Suppliers** with phone and what they supply.
+
+Stock is never edited: it is the sum of its movements (`stock_moves`), and the database refuses a movement that takes an
+item below nothing (`WB130`). **Bought in** (owners and managers): quantity typed as 10 kg, 750 g, 2 l or 12, the cost,
+the day, a use-by date, the supplier's bill number and a photo of the bill, and "Also write it down as an expense"
+(ticked by default), which records the same money as an expense (E4) in the same step (`record_purchase`). Costs and
+bill photos are for owners and managers only (`stock_costs`, the photo under the expenses folder). **Thrown away**
+(anyone): quantity and a reason (spoiled, past its date, dropped, other). **Stock take** (anyone): the counted quantity;
+the database records the difference ("Rice counted: -100 g difference"). Used in cooking is written only by a batch
+(H5). Nobody changes or deletes a movement, not even an owner.
+
+### H2. Recipes. Built (M27).
+
+**Kitchen, Recipes**: each recipe with its place in the rotation, its current version and, for owners and managers,
+what a kilo costs from each ingredient's latest purchase price ("No cost yet" while an ingredient has no price). A
+recipe's page shows what goes into a kilo of cooked food, raw, what it is good for (parents read this), kcal and
+protein a kilo, who signed it off (a veterinary nutritionist) and when, and when it was last lab tested.
+
+**Make a new version** (owners and managers, `save_recipe_version`): changing a recipe always makes a new version; a
+version and its ingredients never change afterwards (`WB141`). Batches and deliveries keep the version they were made
+from. Items marked "never in a recipe" are not offered, and the database refuses them (`WB140`), and refuses marking
+an item so while a recipe in use has it. **Rotation and keeping**: the place in the rotation (one recipe per place),
+how many days it keeps after cooking (a batch's use-by date), and how to store it (printed on labels). A recipe that
+has been cooked is retired, never deleted (`WB144`).
+
+**The rotation.** Each delivery of a subscription takes the next recipe in order (the n-th delivery the n-th place,
+round again after the last), so four recipes and two deliveries a week repeat every two weeks. Boarders eat the
+rotation's recipes by day: its recipes share fourteen days in turn (`boarderRecipeIndex()`).
+
+### H3. Food prices and portions. Built (M28).
+
+**Kitchen settings**, for owners and managers: **Food prices**: a trial (a fixed price and weight, once per pet),
+subscription food per kilo, one-off food per kilo, and items made to order per piece (a birthday cake), each with its
+own tax rate and HSN code (D35; pet food is goods, question 13 in `06`). **Portions**: a day's food as a share of body
+weight by size (3%, 2.5% and 2% for small, medium and large dogs, small up to 10 kg and medium up to 25 kg by default),
+a topper as a share of the day's food (a third), and how much losing or gaining weight changes it (10%). **Packing and
+deliveries**: grams in a pack (250), the cut-off (24 hours before a delivery's slot), the discount for paying a month
+ahead, the margin the cook plan adds (10%), the window for reporting a problem (24 hours), and whether the food order
+page takes orders.
+
+**The worked example.** A 20 kg dog keeping its weight is medium: 20,000 g x 2.5% is **500 g a day** on a full meal,
+and a third of that, **167 g**, as a topper. To lose weight, 450 g; to gain, 550 g. Each step rounds to the nearest
+gram (`portionGrams()`, unit tested).
+
+**On the pet page, Food**: the portion and how it was worked out ("624 g a day: large dog, 2% of 31.2 kg"), or set by
+hand with a note (owners and managers only, `WB146`); the plan and goal; what it eats while boarding: fresh food from the
+kitchen (the default), a kibble the parent names with grams a day, or food the parent sends; foods to avoid; and its
+subscriptions. A pet on the kitchen's food is due a look at its portion a week after it starts: the pet page and Today
+say so until someone marks it looked at. The care round shows each boarder's food on its meal tasks.
+
+### H4. Subscriptions and orders. Built (M29).
+
+**Food for homes** (More): orders and requests waiting, the next week's deliveries, and every subscription.
+**Start a subscription** for a pet: the food, plan, grams a day (the worked-out portion by default), delivery days (Tuesday
+and Friday by default), a slot (morning from 8, afternoon from 1, evening from 6), the address (or collected at the
+kennel), the first day, paid a week or a month ahead, and where the customer came from.
+
+Deliveries are made ahead (`plan_subscription`, three weeks each time the food screens open): one on each delivery day,
+covering the days until the next, rounded up to whole packs (500 g a day, Tuesday to Friday, is 1.5 kg in six packs),
+with the rotation's next recipe. Grams, recipe, price, tax and the area's delivery charge are copied onto each delivery
+when it is made, so changing the rate card never changes one already planned. One delivery per subscription per day.
+
+**Change** grams, plan, days, slot, address or how it is paid; **pause** between two days or until resumed; **end** it
+from a day with a reason. Changes close at the cut-off: deliveries still open to change are made again (cancelled and
+kept when a bill has them, so the bill can be credited), and those past the cut-off go as they are. After the cut-off
+staff cannot change a delivery; a manager can cancel it with a reason (`WB151`). A delivery that has been to the door is
+never cancelled (`WB153`).
+
+**One-off orders**: a trial (once per pet), food by the kilo, or an item made to order, for a day and an address.
+
+**Bills**: "Make the bill for 3 Nov to 9 Nov" on the subscription (a week from Monday, or the calendar month), from its
+deliveries: one line for each price in kilos, less the monthly discount when paid a month ahead, then the delivery
+charges. Staff issue it only as the deliveries come to (`WB050`, checked against `food_bill_lines`); one live bill per
+period, and no day on two (`WB155`). A one-off order has its own bill. A delivery cancelled after its bill is issued is
+offered back on the bill's page as a credit note (D34, D40), and the bill's due feeds the unpaid reminders (D39).
+
+**Today** lists trials handed over three to fourteen days ago whose parents have no subscription, with "Ask on
+WhatsApp".
+
+### H5. The cook plan and batches. Built (M30).
+
+**Kitchen**, for a day (tomorrow by default): **What to cook**: for each recipe, the grams for that day's deliveries and
+for the boarders on the kitchen's food (each boarder's grams a day, eating the rotation's recipe of the day), plus the
+margin, rounded up to 100 g (`cookPlan()`). Boarders with no weight are named and left out. **Shopping list**: what those
+recipes need less what is in stock, by supplier, each with "Send to Ali Meats" on WhatsApp.
+
+**Record a batch**: recipe, cooked weight, packs, the day, the cook, and the day the boarders eat from it. It is
+numbered by its day (`270314-2`), takes its use-by date from the recipe, and takes each ingredient out of stock by its
+version and weight in the same step, refused as a whole when stock is short (`record_batch`). **Packing**: each delivery
+ticked packed with the batch it was packed from: only a batch of its own recipe, cooked by its day and within its use-by
+date (`WB160`, `WB161`). **Labels to print**: one label for each pack: pet, recipe, grams, batch, cooked on, use by, how to
+store it, on A4. **A batch's page** answers who received it: every delivery packed from it, and the boarders on the
+kitchen's food in house the day they ate from it (`batch_recipients`), with their parents' phones. Owners and managers
+see what it cost, from its own version and that day's prices.
+
+### H6. Delivery runs and riders. Built (M31, D45).
+
+**Delivery runs**, for a day: start a run for a rider (a member with the role Rider or the skill Rider) and a slot, add
+the day's deliveries to it, move stops up and down, open each stop's map, and open the whole route in Google Maps.
+
+**Riders** are a fourth role with the least access of any (D45). A rider signs in to `/rider` and sees only their own runs
+for today: each stop's name, address, phone, pet, packs and notes; Call, Map, "On the way" (a WhatsApp message from
+their phone), and Delivered (with a photo at the door), Nobody home or Refused. No table is open to a rider; everything
+comes through `my_runs()` and `rider_mark_stop()`, which check the run is theirs and today's. A rider opening the
+kennel's screens is sent back to their run.
+
+**Problems**: on the subscription, a delivery handed over can be reported damaged, late or wrong, with the parent's photo,
+within the kennel's window (`WB174`). It is replaced (a new delivery at no charge) or refunded (a credit note and a refund
+from the bill), or closed with nothing done.
+
+### H7. Ordering food from the kennel's website. Built (M32).
+
+`/f/{slug}`, a link the kennel puts on its own website: a trial or regular deliveries, the dog's name and weight (the
+portion is worked out as they type: "About 300 g a day for a medium dog"), days and slot, address and PIN code ("We
+deliver to Indiranagar", or "We do not deliver to that PIN code yet"), their name and phone, and consent. The page shows
+what the first week costs; the database works it out again (`submit_food_order`), and that is what is asked: the UPI QR
+code and link, then **I have paid**. A PIN code not served is kept as waiting for its area, with nothing to pay; staff see
+how many wait in each PIN code.
+
+**Orders from the website** (Food for homes): staff check the money has arrived and **Confirm**, which makes or finds the
+parent by phone, the dog by name (with its weight as the first weighing), the address, and the trial delivery or the
+subscription with its first two weeks of deliveries (`confirm_food_order`). Or **Decline**.
+
+**A known parent's own link** (F0) shows their dog's subscriptions with the next deliveries, and asks to pause deliveries,
+skip one, or have extra food on a day. Each arrives as a request; Confirm makes the change.
+
+### H8. Food reports. Built (M33).
+
+**Reports**, while the kennel has a kitchen, for the month: active subscriptions, started and ended; trials and how many
+then subscribed; deliveries, kilos delivered and a day, and food sold; kilos cooked, the cooking cost and the cost a
+kilo (from each batch's own version and that day's prices); what was thrown away and its cost; deliveries by rider by
+day; and where customers came from. Downloads as CSV: food month by month for the year, and deliveries by rider.
+Owners and managers only, refused in the database (`WB060`, as D20).
+
+---
+
 ## G. Across everything
 
 | Feature | State |
@@ -666,7 +827,7 @@ stay's shared photos (D18, and `05`, "Photos on the stay page").
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
 | Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase; `npm run setup:local` points the app at it (README, "Try it on your own computer"). No public demo (D28). |
 | Two-step sign-in | Built (M9): any person can turn it on under More, Two-step sign-in (an authenticator app). Owners without it see a reminder. Once on, a session with only the password reaches nothing in the database. Recovery codes (M24, D43): ten one-use codes, made on the same page and shown once; "Use a recovery code instead" on the code page lets that one session in without the phone. |
-| Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
+| Limits on how often strangers can post | Built (M9): sign in and two-step codes 20, intake form 10, joining 20, booking links 10, the food order page 10, per address per ten minutes; posts over 1 MB refused outside photo uploads (`src/lib/rate-limit.ts`) |
 | Scripts only from Wagbook itself | Built (M9): a Content-Security-Policy with a fresh nonce for every page (D23) |
 
 ## Words on screen

@@ -182,9 +182,24 @@ gives back only what was paid and is not owed (`payments_check_refund`, D40).
 
 ## Reports
 
-No tables. Four functions, `report_occupancy`, `report_money`, `report_tax` and `report_extras`, each taking a kennel
+No tables. Seven functions, `report_occupancy`, `report_money`, `report_tax`, `report_extras` and the food reports
+`report_food`, `report_food_riders` and `report_food_sources`, each taking a kennel
 and a period of up to 400 days, run as the caller and refuse anyone who is not an owner or manager (D20). What each
 counts is in its comment, and so in [reference/schema.md](reference/schema.md).
+
+## The kitchen and food
+
+Phase 1 (M26 to M33, D44), in `20261008000550_kitchen.sql`. **Stock** is `stock_items` and their `stock_moves`: never
+updated or deleted; what is in stock is their sum (`stock_levels`), and a trigger refuses a movement below nothing and
+turns a stock take into the difference. What a purchase cost sits apart in `stock_costs`, for owners and managers.
+**Recipes** have `recipe_versions` with their `recipe_ingredients`, written once (`save_recipe_version`). **Food** for sale
+is `food_products`; what a pet eats is `pet_food`. A **subscription** makes `deliveries` ahead (`plan_subscription`), each
+with grams, recipe, price, tax and charge copied on; a trigger prices every delivery and another closes it at its cut-off.
+A food bill is an invoice with `subscription_id` and a period, or `delivery_id`, checked by `food_bill_lines()`.
+**Batches** take stock out with `used` movements (`record_batch`); a delivery packs from one (`batch_id`). **Runs**
+(`delivery_runs`) hold deliveries in order; `delivery_problems` record what went wrong. **Food orders** (`food_orders`,
+in the public pages file) come from the website or a parent's link and become rows above only through
+`confirm_food_order`.
 
 ## Intake
 

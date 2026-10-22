@@ -7,7 +7,8 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly eight things, and can read no table.
+2. Someone who is not signed in can do exactly twelve things, and can read no table.
+9. A rider (D45) sees only their own delivery run for the day, and can read no table.
 3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
 5. An issued invoice cannot be changed by anyone, including owners.
@@ -62,6 +63,19 @@ In summary (deleting anything is for owners, D29):
 | A parent's details: download everything, erase on request | No (`WB070`) | Download (`export_client`) | Also erase (`erase_client`, `WB074`, D29) |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
 | Merge two parents | No | Yes (`merge_clients`) | Same |
+| Stock (M26): items, suppliers, what is in stock | Read; record waste and stock takes | Also add items and suppliers, record purchases | Also delete items and suppliers |
+| What stock cost, and supplier bills (`stock_costs`) | Nothing | Read, add (with a purchase); nobody changes one | Same |
+| Stock movements | Read; nobody changes or deletes one, not even an owner (a stock take corrects) | Same | Same |
+| Recipes and their versions (M27) | Read | Add, new versions (`save_recipe_version`), retire; a version never changes | Also delete a recipe never cooked |
+| Cost per kilo of a recipe or batch | Nothing (`WB145`) | Read | Read |
+| A pet's food (M28) | Read, edit, but not grams set by hand (`WB146`) | Also grams by hand | Also delete |
+| Food prices, kitchen settings | Read | Add, edit | Also delete |
+| Subscriptions and deliveries (M29) | Read, add, change before the cut-off; the database prices them | Also a delivery's price; cancel after the cut-off with a reason | Also delete a delivery not on a bill |
+| Batches (M30) | Read, record (with their stock) | Same | Also delete one that took nothing |
+| Delivery runs and problems (M31) | Read, add, change | Same | Also delete |
+| Food orders from the website and parents' links (M32) | Read; confirm (`confirm_food_order`) or decline; what the parent sent is never edited | Same | Also delete |
+| Food reports (M33) | Nothing (`WB060`) | Read | Read |
+| A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()`, a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
@@ -71,7 +85,7 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Eight functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+Twelve functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
 is changed on purpose.
 
 | Function | Returns | Guard |
@@ -82,6 +96,10 @@ is changed on purpose.
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
 | `get_public_booking_form(token)` | A known parent's own booking link: kennel name, WhatsApp number and usual times, the parent's first name, their pets' names, the kinds of stay they can ask for, and their stays already asked for or booked (dates and status) | 64 character secret per parent (`clients.request_token`); nothing for a hidden or erased parent; no prices, notes or other parents |
 | `submit_booking_request(token, payload)` | How many pets were asked for | Same secret; refused when the kennel turns requests off (`WB100`); only the parent's own listed pets (`WB102`); dates from today to a year ahead, 90 days at most (`WB103`); a usual price must exist (`WB104`); 12 requested pets a day at most (`WB105`); size cap. Makes bookings with status `requested`, which hold no kennel |
+| `get_public_food_form(slug)` | The kennel's food order page (M32): name, WhatsApp number, UPI details, consent wording, the trial and subscription food with their prices, the portion settings and pack size, and the PIN codes served with their charges | None beyond the link name, and only while the kennel delivers food and takes orders. Nothing here is private: a kennel publishes its prices and areas |
+| `submit_food_order(slug, payload)` | A token for the order, its status, and what to pay now, worked out by the database | Refused when the kennel takes no orders (`WB180`); size cap and shape checks (`WB181` to `WB185`), consent required, a valid phone and PIN code, a dog's weight; three orders a day per phone and thirty in ten minutes per kennel (`WB184`). Makes a `food_orders` row and nothing else: no parent, pet, subscription or charge |
+| `food_order_paid(token)` | The order's status | The order's 64 character token; only moves an unpaid order to "says paid", for staff to check |
+| `submit_food_request(token, payload)` | Nothing | A known parent's own link secret, as `submit_booking_request`; only their own subscriptions (`WB186`); dates from today to 120 days ahead (`WB187`); ten a day (`WB105`). Makes a request for staff, never a change by itself |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
 | `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
 
@@ -99,6 +117,21 @@ for a stay. Each pet asked for becomes a booking with status `requested` at the 
 no kennel, so a forwarded or leaked link cannot take space from anyone: at worst it adds requests that staff decline.
 Staff renew the link (`renew_request_link`, any member), and the old one stops working; the token is not writable
 through the API. Erasing the parent clears it. The app limits posts to the page per address, like the intake form.
+
+**Ordering food (milestone M32).** The food order page is public by design: a kennel puts its link on its own
+website. An order holds nothing and charges nothing; it is a row staff read and confirm once the money has arrived
+(`confirm_food_order`, any member, `security definer` because what the parent sent is never writable through the API).
+The amount shown for payment is worked out in the database from the kennel's own prices, never taken from the page. The
+token returned lets the parent say "I have paid" and nothing else; it cannot read the order back. A known parent's own
+booking link (M17) also shows their subscriptions' next delivery dates and asks for a pause, a skipped delivery or more
+food, which arrive as requests. The app limits posts to `/f/` per address like the intake form. Erasing a parent deletes
+their food orders, matched by parent or by phone.
+
+**Riders (milestone M31, D45).** A rider is a member whose role leaves them out of `my_org_ids()`, so no policy in the
+access model gives them anything. `my_runs()` and `rider_mark_stop()` (both `security definer`, checking the caller is
+the run's rider, today) are their only way in, and `rider_upload_allowed()` lets them add a photo at the door of their
+own stop for today. `tests/db/riders.test.ts` signs in as a rider and reads every table in the schema: only their own
+membership row comes back.
 
 **Photos on the stay page (milestone M5).** A parent has no account, Postgres cannot sign storage links, and the
 service role key is never used. So the stay page asks Storage for signed links as the anonymous role, sending the stay

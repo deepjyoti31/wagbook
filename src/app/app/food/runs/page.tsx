@@ -4,7 +4,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, isISODate, todayIn } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { placeLink, routeLink } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -21,10 +21,10 @@ export default function RunsPage({ searchParams }: PageProps<"/app/food/runs">) 
 }
 
 async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchParams">) {
-  const asked = (await searchParams).date;
+  const { date: asked, done } = await searchParams;
   const { org } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const r = m.runs;
   const day = typeof asked === "string" && isISODate(asked) ? asked : todayIn(org.time_zone);
   const supabase = await createClient();
@@ -53,6 +53,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
           {m.food.title}
         </Link>
       </PageTitle>
+      {done === "added" ? <Notice tone="ok">{r.added}</Notice> : null}
       <p className="mb-4 text-slate">{r.about}</p>
       {org.offers_food_delivery ? null : <Notice tone="info">{m.food.off}</Notice>}
       <form className="mb-6 flex flex-wrap items-end gap-2" action="/app/food/runs">
@@ -78,7 +79,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
                   {stops.map((d, i) => (
                     <LedgerRow key={d.id}>
                       <div className="min-w-48 flex-1">
-                        <p className="font-semibold">{fill(r.stop, { n: i + 1, pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "", packs: d.packs })}</p>
+                        <p className="font-semibold">{plural(language, d.packs, r.stop, { n: i + 1, count: d.packs, pet: d.pets?.name ?? "", parent: d.clients?.full_name ?? "" })}</p>
                         <p className="text-sm text-slate">{[d.client_addresses?.line, d.client_addresses?.area, d.client_addresses?.postal_code].filter(Boolean).join(", ")}</p>
                       </div>
                       <Badge tone={d.status === "delivered" ? "good" : "neutral"}>{m.deliveryStatus[d.status]}</Badge>

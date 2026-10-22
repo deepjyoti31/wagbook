@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { isISODate } from "@/lib/core";
@@ -42,14 +43,17 @@ export async function arrangeStop(_state: FormState, form: FormData): Promise<Fo
     const run = Id.safeParse(form.get("runId"));
     if (!run.success) return { error: e.run };
     const last = await supabase.from("deliveries").select("run_position").eq("org_id", org.id).eq("run_id", run.data).order("run_position", { ascending: false, nullsFirst: false }).limit(1);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("deliveries")
       .update({ run_id: run.data, run_position: (last.data?.[0]?.run_position ?? 0) + 1 })
       .eq("org_id", org.id)
-      .eq("id", delivery.data);
+      .eq("id", delivery.data)
+      .select("delivery_date");
     if (error) return { error: friendlyError(error, t) };
+    if (data.length === 0) return { error: e.notFound };
     revalidatePath("/app/food", "layout");
-    return { ok: t.m.runs.added };
+    // The stop's form moves to the run once it is on it, so the sentence is shown by the page instead.
+    redirect(`/app/food/runs?date=${data[0].delivery_date}&done=added`);
   }
   if (intent === "off") {
     const { error } = await supabase.from("deliveries").update({ run_id: null, run_position: null }).eq("org_id", org.id).eq("id", delivery.data);

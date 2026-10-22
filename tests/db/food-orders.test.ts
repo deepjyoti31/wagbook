@@ -150,3 +150,28 @@ describe("a known parent's own link", () => {
     expect(dates).toContain(days[1]);
   });
 });
+
+describe("erasing a parent who had food", () => {
+  it("is refused while food is still to come, then removes their food orders, addresses and the subscription's notes", async () => {
+    const e = await seedKitchen(db);
+    const [{ id: sub }] = await q<{ id: string }>(
+      db, e.owner,
+      "insert into public.subscriptions (org_id, client_id, pet_id, product_id, grams_per_day, weekdays, address_id, starts_on, notes) values ($1, $2, $3, $4, 400, '{2,5}', $5, $6, 'Gate code 1234') returning id",
+      [e.org, e.client, e.pets[0], e.subscriptionFood, e.address, await dayFromToday(db, e, 3)],
+    );
+    await q(db, e.owner, "select public.plan_subscription($1, $2)", [sub, await dayFromToday(db, e, 10)]);
+    const [{ phone }] = await q<{ phone: string }>(db, e.owner, "select phone from public.clients where id = $1", [e.client]);
+    const [{ slug: theirSlug }] = await q<{ slug: string }>(db, e.owner, "select slug from public.organizations where id = $1", [e.org]);
+    await as(db, anon, () => db.query("select public.submit_food_order($1, $2)", [theirSlug, order({ phone })]));
+
+    const refused = await errorOf(() => q(db, e.owner, "select public.erase_client($1)", [e.client]));
+    expect(refused.message).toContain("WB075");
+
+    await q(db, e.owner, "update public.subscriptions set cancelled_on = $2, cancel_reason = 'Moving away' where id = $1", [sub, await dayFromToday(db, e, 0)]);
+    await q(db, e.owner, "select public.erase_client($1)", [e.client]);
+    expect(await q(db, e.owner, "select id from public.food_orders where org_id = $1", [e.org])).toHaveLength(0);
+    const [s] = await q<{ notes: string | null; cancel_reason: string }>(db, e.owner, "select notes, cancel_reason from public.subscriptions where id = $1", [sub]);
+    expect(s).toEqual({ notes: null, cancel_reason: "Erased" });
+    expect(await q(db, e.owner, "select id from public.client_addresses where client_id = $1", [e.client])).toHaveLength(0);
+  });
+});

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Ledger, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatDate, formatKg, todayIn } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { planAhead, weekdayList } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -21,7 +21,7 @@ export default function FoodPage() {
 async function Food() {
   const { org } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const f = m.food;
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
@@ -107,7 +107,7 @@ async function Food() {
                       slot: m.slots[d.slot],
                       pet: d.pets?.name ?? "",
                       parent: d.clients?.full_name ?? "",
-                      what: d.kind === "item" ? fill(f.pieces, { n: d.quantity }) : fill(f.packsOf, { packs: d.packs, kg: formatKg(d.grams, locale) }),
+                      what: d.kind === "item" ? fill(f.pieces, { n: d.quantity }) : plural(language, d.packs, f.packsOf, { kg: formatKg(d.grams, locale) }),
                     })}
                   </span>
                   {d.kind !== "subscription" ? <Badge>{m.deliveryKinds[d.kind]}</Badge> : null}

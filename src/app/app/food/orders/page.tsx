@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, Empty, Ledger, LedgerRow, Loading, PageTitle, Section } from "@/components/ui";
+import { Badge, buttonStyles, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, formatKg, formatMoney, formatPhone } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -12,15 +12,16 @@ import { confirmOrder, declineOrder } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.foodOrders.title);
 
-export default function FoodOrdersPage() {
+export default function FoodOrdersPage({ searchParams }: PageProps<"/app/food/orders">) {
   return (
     <Suspense fallback={<Loading />}>
-      <FoodOrders />
+      <FoodOrders searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function FoodOrders() {
+async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, "searchParams">) {
+  const done = (await searchParams).done;
   const { org } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale } = t;
@@ -34,7 +35,7 @@ async function FoodOrders() {
     .limit(200);
   if (orders.error) throw new Error("Could not load orders.");
   const waiting = orders.data.filter((o) => ["unpaid", "paid", "requested"].includes(o.status));
-  const done = orders.data.filter((o) => ["confirmed", "declined"].includes(o.status)).slice(0, 30);
+  const finished = orders.data.filter((o) => ["confirmed", "declined"].includes(o.status)).slice(0, 30);
   const areaCounts = new Map<string, number>();
   for (const o of orders.data.filter((x) => x.status === "waiting_area")) areaCounts.set(o.postal_code ?? "", (areaCounts.get(o.postal_code ?? "") ?? 0) + 1);
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
@@ -67,6 +68,8 @@ async function FoodOrders() {
           {m.food.title}
         </Link>
       </PageTitle>
+      {done === "confirmed" ? <Notice tone="ok">{w.confirmed}</Notice> : null}
+      {done === "declined" ? <Notice tone="ok">{w.declined}</Notice> : null}
 
       <Section title={w.waiting} count={waiting.length}>
         {waiting.length === 0 ? (
@@ -125,12 +128,12 @@ async function FoodOrders() {
         )}
       </Section>
 
-      <Section title={w.done} count={done.length}>
-        {done.length === 0 ? (
+      <Section title={w.done} count={finished.length}>
+        {finished.length === 0 ? (
           <Empty>{w.none}</Empty>
         ) : (
           <Ledger>
-            {done.map((o) => (
+            {finished.map((o) => (
               <LedgerRow key={o.id}>
                 <span className="flex-1">
                   {w.kinds[o.kind]}: {o.parent_name ?? o.clients?.full_name}

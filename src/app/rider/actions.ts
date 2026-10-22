@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRider } from "@/lib/auth";
 import { friendlyError } from "@/lib/errors";
 import type { FormState } from "@/lib/forms";
-import { fill } from "@/lib/i18n";
 import { i18nFor } from "@/lib/i18n-server";
 import { readUpload, store } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
@@ -36,5 +36,6 @@ export async function markStop(_state: FormState, form: FormData): Promise<FormS
   const { error } = await supabase.rpc("rider_mark_stop", { p_delivery: delivery.data, p_status: status.data, p_proof_path: path });
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/rider");
-  return { ok: fill(t.m.rider.marked, { status: t.m.deliveryStatus[status.data] }) };
+  // The stop's buttons change once it is marked, so the sentence is shown by the page instead.
+  redirect(`/rider?done=${status.data}`);
 }

@@ -2,45 +2,31 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 21 October 2026, after milestone M25 (groundwork for more than boarding: what the kennel offers,
-parents' addresses, areas served, skills, weights).
+Last updated: 22 October 2026, after Phase 1 (M26 to M33: the kitchen and food).
 
 ## In one paragraph
 
-Every boarding milestone is built, M2 to M24. On 21 October 2026 the owner asked for Wagbook to run the rest of a
-kennel's business before going to production, so the roadmap now runs to M44 (D44): groundwork, stock, recipes, food
-portions, subscriptions, the cook plan, delivery runs and food ordering (Phase 1, M25 to M33); services by appointment,
-grooming, swimming, training, parties and packages (Phase 2, M34 to M37); cancellation credit, pick-up from home,
-health papers, a public booking form and reviews (Phase 3, M38 to M42); and the rota and rough edges (Phase 4, M43 and
-M44). M25 is built: three switches in Settings for what the kennel offers (all off by default, and with them off
-Wagbook looks as before), parents' delivery addresses matched to the areas served by PIN code, people's skills, and
-weights over time in grams with a target (`pets.weight_kg` became `weight_g`, kept by the database). The owner's
-answers to the five planning questions are in the roadmap (M28, M29, M31, M35, M38). Before M25, the latest built
-work, asked for by the owner on 21 October 2026: a pet going
-home early is billed to today or as booked, an issued bill whose stays got shorter is credited for the difference, and a
-refund can never give back more than was paid over (M20, D40, `WB120` to `WB122`); a request can wait on a waiting list
-in order, and Today offers it when a kennel frees up (M21, D42); requests and the waiting list show on the calendar
-(M22); a repeating day boarding series is billed once a month (M23, D41); owners take a photo posted by mistake off an
-update (`WB081`), and two-step sign-in has recovery codes kept inside Wagbook (M24, D43). Before that, Today lists the
-reminders to send on WhatsApp (M16,
-D39); a known parent asks for a stay through their own link, as a request that holds no kennel (M17, D36, two more
-public functions, eight in all); day boarding repeats on chosen weekdays, and packs of days are sold with a bill and
-paid from (M18, D37); and a GST kennel downloads the month's GSTR-1 as the offline tool's CSV files (M19, D38). Before
-that (M15): credit notes take back all or part of an issued
-bill with their own numbers, counted in their own month, and a tax invoice from an earlier month is credited, never
-cancelled (D34); each kennel sets its own tax rate and SAC code for boarding, day boarding and each extra (D35). Before
-that (M14, the owner's answers of 21 October 2026): a pet at
-the shared kennel price pays the usual price for the nights it has the kennel to itself, and day boarding that turns
-into boarding is billed as days and then nights, both priced by the database (`stay_charges`, D32); only owners and
-managers change a parent's phone numbers (D33); erasing a parent keeps their pets' records (D30); bills are in English,
-with the parent's language in brackets on request (D31); and what the law says on GST invoices, cancelling bills,
-keeping records and erasure is written up for the accountant and the lawyer (`06`, `05`). Before that: shared
-kennels and family bills (M11, D27), kennels named freely (M12), rough edges and only owners delete (M13, D29). The
-owner confirmed the licence (AGPL),
-dropped the public demo for a local quick start (D28, `npm run setup:local`), and keeps Wagbook independent of any
-kennel. The database rules are tested in-process (272 database tests, 176 unit tests), and the whole day is walked in a
-real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 49 tests). What has still never
+Every boarding milestone is built, M2 to M24, and so is all of Phase 1 of the roadmap's second part (D44): the
+groundwork (M25), then stock, recipes, food prices and portions, subscriptions and orders, the cook plan and batches,
+delivery runs with a rider role, a public food order page, and food reports (M26 to M33, `02` section H). Each is
+switched on per kennel (Settings, What this kennel offers): a kennel with the kitchen and delivery off sees exactly
+what it saw before, and the 49 boarding steps of the browser walk pass unchanged. The kitchen keeps stock as the sum of
+its movements, never below nothing; recipes in versions that never change, with foods a dog must never eat refused;
+portions from each dog's weight; subscriptions that make their deliveries ahead in whole packs with the rotation's
+recipe, closing to changes at a cut-off; food bills checked by the database like stays and credited for cancelled
+deliveries; batches that take stock out and answer who received them; riders, a fourth role that reaches no table
+(D45); and twelve public functions now, four for food (`05`). The owner's earlier answers (boarders' food, riders,
+monthly payment, credit reminders) are built in. Next is Phase 2, appointments (M34 to M37). What has still never
 happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
+
+Before Phase 1: M25 added what the kennel offers, parents' addresses matched to the areas served by PIN code, people's
+skills, and weights in grams. M20 to M24: going home early and refunds (D40), the waiting list (D42), requests on the
+calendar, a series billed by the month (D41), removing a photo, recovery codes (D43). M16 to M19: reminders on Today
+(D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
+in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
+(D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
+database rules are tested in-process (318 database tests, 196 unit tests), and the whole day is walked in a real
+browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 55 tests).
 
 ## What is verified, and how
 
@@ -128,6 +114,17 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Skills: set by owners and managers from the list, not by staff | `tests/db/groundwork.test.ts`; end-to-end: Cook set on People | High |
 | Weights in grams: the pet carries the latest by date whatever is written to it, corrected by owners and managers, removed by owners; in the export; the intake form's weight is the first weighing | `tests/db/groundwork.test.ts`, `tests/db/intake.test.ts` (the trigger and the delete policy each removed once to see the tests fail); `src/lib/core/groundwork.test.ts`; end-to-end: trend, target and a new weight | High |
 | M25 screens at 360 pixels (Settings, Areas you serve, a parent's addresses, a pet's weight, People with skills) | End-to-end checks no sideways scroll; screenshots taken 21 October 2026 | Medium: desktop Chromium at phone size |
+| Stock (M26): the sum of its movements, never below nothing (`WB130`), never changed or deleted by anyone; costs kept from staff; a purchase as an expense in one step; a stock take records the difference; a week of buying, cooking and throwing away adds up to a stock take | `tests/db/stock.test.ts`, `tests/db/kitchen.test.ts`; `src/lib/core/food.test.ts` (lots by use-by date) | High |
+| Recipes (M27): versions never change (`WB141`), owners and managers only (`WB142`), never-in-recipe items refused (`WB140`), cost per kilo from the latest prices for owners and managers (`WB145`), two versions each batch costed from its own, cooked recipes retired not deleted (`WB144`) | `tests/db/recipes.test.ts` | High |
+| Portions (M28): the worked example (20 kg dog, 500 g full, 167 g topper), size bands, goals, set by hand only by managers (`WB146`) | `src/lib/core/food.test.ts`, `tests/db/kitchen.test.ts` | High |
+| Subscriptions (M29): two days a week made ahead in whole packs, the rotation, one per day, price kept when the rate card changes, staff cannot set a price, paused for a week and resumed, changed, cancelled; the cut-off (`WB151`, `WB153`); trial once per pet; items per piece; food bills issued by staff only as the deliveries come to (`WB050`), no day on two bills (`WB155`), a subscription's delivery never billed alone (`WB154`), billed deliveries never deleted (`WB152`), a cancelled delivery credited | `tests/db/subscriptions.test.ts`; `src/lib/kitchen.test.ts` (bill lines) | High |
+| Batches (M30): numbered by day, use-by from the recipe, stock taken out by version and weight or refused as a whole (`WB130`), packing only from a batch of the delivery's recipe in date (`WB160`, `WB161`), who received a batch (deliveries and boarders on kitchen food), the cook plan for ten deliveries and six boarders equal to a count by hand, the shopping list | `tests/db/kitchen.test.ts`, `src/lib/core/food.test.ts` | High |
+| Riders (M31, D45): a rider reads every table and gets only their own membership; their run for today and nothing else, no prices or medical notes; marks only their own stops today (`WB172`, `WB173`); adds a photo only to their own stop; runs only for members (`WB170`); problems within the window (`WB174`) and replaced at no charge | `tests/db/riders.test.ts` | High |
+| Food orders (M32): the order page only while the kennel takes orders; the amount worked out in the database; a PIN code not served waits with nothing to pay; hostile input refused (`WB180` to `WB185`); the anonymous role reads no order back; Confirm makes the parent, pet, weight and subscription once (`WB188`); a parent's pause and skip from their own link (`WB186`, `WB187`); twelve public functions | `tests/db/food-orders.test.ts`, `tests/db/security.test.ts` | High |
+| Food reports (M33): staff, riders and other kennels refused (`WB060`); subscriptions, trials then subscribed, deliveries, kilos, value, cooking cost from batches, waste and its cost; riders by day; sources | `tests/db/food-reports.test.ts` | High |
+| Erasing a parent with food: refused while a subscription or delivery is still to come (`WB075`); then their food orders, addresses and the subscription's notes go; door photos are in the list of files to remove | `tests/db/food-orders.test.ts` | High |
+| Merging parents with food: subscriptions and deliveries follow their pets (`on update cascade`), today's included past the cut-off | `tests/db/subscriptions.test.ts` | High |
+| The kitchen and food in a browser at 360 pixels: stock, a recipe costed, food prices, Biscuit's portion, a subscription every day billed for two weeks and credited for a cancelled delivery, paused; the cook plan, a batch, packing, labels, who got the batch; a rider joining by link and seeing only their run, marking a stop delivered; an order from the food page (portion and price as typed, UPI, I have paid), an area not served, Confirm making a subscription; a parent's pause from their own link; the food report and its CSV, staff refused | `npm run test:e2e` against the local Supabase (55 tests), screenshots taken 22 October 2026 | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -153,6 +150,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
 | Recovery codes on a hosted Supabase project | Walked only against the CLI's Supabase Auth (v2.197.0) | They rely on the `session_id` claim in access tokens, which Supabase Auth has carried for years |
 | Two waiting requests for the same last kennel | The database test confirms both show as fitting, then the second is refused at Confirm | By design (D42); a kennel with long waiting lists may want "first in line only" |
+| The food order page's UPI QR scanned and paid | No phone here | As for bills (`07`) |
+| A rider's photo at the door through real Storage | The storage policy is tested in the database (`rider_upload_allowed`); the walk marks Delivered without a photo | Low |
+| Labels printed on paper | Looked at on screen only | Sizes and cutting lines may want adjusting for the kennel's printer |
 | An independent security review of M9 | The second review was Claude Code's own pass | Have a person outside the project review before a public instance |
 
 ## Do this next
@@ -175,9 +175,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: start M26** (stock), then go through Phase 1 in order (M27 to M33). Each milestone first writes its
+**Building: start M34** (services by appointment), then go through Phase 2 in order (M35 to M37). Each milestone first writes its
 section in `02-product-spec.md`. The owner has said production is not soon, so the launch steps above can wait and
-migrations stay editable in place until then. Steps 1 to 8 need the owner; M26 onwards does not.
+migrations stay editable in place until then. Steps 1 to 8 need the owner; M34 onwards does not. Before a kennel sells food, the accountant should answer questions
+13 and 14 in `06` (the food's HSN code and rate, the delivery charge, and any kitchen licence or label wording).
 
 To run everything locally in a session that has Docker (a Claude Code cloud container does, with `dockerd` started by
 hand):
@@ -244,6 +245,13 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 22 October 2026 (Phase 1), also unchecked: the whole of `src/messages/hi/kitchen.ts` and
+`src/messages/kn/kitchen.ts` (the kitchen, food for homes, riders, the food order page, food reports), and the 32 new
+error sentences and 20 constraint sentences in `core.ts`. Parents read the food order page, the food section of their
+link, the WhatsApp message asking about a subscription after a trial, and the rider's "on the way" message: check those
+first. "Topper" was kept as टॉपर and ಟಾಪರ್; "batch" as बैच and ಬ್ಯಾಚ್; "rotation" as बारी and ಸರದಿ; "run" as राउंड and
+ಸುತ್ತು; "cut-off" was said in words (बदलाव बंद, ಬದಲಾವಣೆ ಮುಚ್ಚುತ್ತದೆ).
 
 Drafted on 21 October 2026 (M25), also unchecked: the whole of `src/messages/hi/beyond.ts` and
 `src/messages/kn/beyond.ts` (what the kennel offers, areas served, addresses, weights, skills), the intake form's
@@ -339,10 +347,34 @@ Chosen in M25 as the simplest thing:
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
 
+Chosen in Phase 1 (M26 to M33) as the simplest thing:
+
+- A subscription is for one pet. A parent with two dogs has two subscriptions, delivered to the same door as two stops
+  (the run puts them next to each other by address).
+- Each delivery of a subscription takes the next recipe of the rotation (its n-th delivery the n-th place). Boarders
+  eat the rotation's recipes by day, each recipe for three or four days in fourteen, so the kitchen cooks one recipe a
+  day for its boarders. Is that how the kitchen wants to cook?
+- Who received a batch counts the boarders on the kitchen's food in house on the day the batch says they ate from it;
+  the cook says which day when recording the batch.
+- Changes to a subscription remake the deliveries still before their cut-off, and the rotation counts again from the
+  remade ones, so a recipe can repeat across a change.
+- A delivery charge takes the food's tax rate and code (question 13 in `06`).
+- A problem with a delivery is reported by staff for the parent (the parent sends the photo on WhatsApp); parents do not
+  report from their own link yet.
+- Confirming a website order makes the subscription but records no payment: staff make the week's bill and record the
+  money on it.
+- A rider marks Delivered without a photo if they choose; the photo is not required.
+- Portions are reviewed once, a week after a pet starts; there is no regular review after that.
+
 ## Known rough edges in what is built
 
-- Settings switches for what the kennel offers have nothing behind Appointments and Kitchen yet except the skills on
-  People; Food delivery turns on addresses and areas. The rest arrives with M26 onwards.
+- Food: pick-ups and drops of boarders do not join runs yet (M39). The parent's own link cannot report a damaged
+  delivery. The shopping list does not know what is already ordered from a supplier. Packing has no "pack all" button.
+  Labels have no barcode. Stock has no units other than grams, millilitres and pieces (no "a dozen eggs").
+- Deliveries are made ahead only when someone opens the Kitchen or Food for homes (three weeks each time); nothing runs
+  by itself overnight.
+
+- The Appointments switch has nothing behind it yet except the skills on People; Phase 2 (M34 onwards) builds it.
 - Managers may correct a weighing through the database, but the pet page offers only Remove (owners).
 
 - A no-show uses a pack day. A series that runs across two months gets a bill for each month; days paid from a pack
@@ -383,7 +415,7 @@ Chosen in M25 as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 448 tests, build
+npm run check        # dash check, lint, typecheck, 514 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -392,6 +424,13 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 22 October 2026. Phase 1, M26 to M33: stock, recipes, food prices and portions, subscriptions and orders, the cook
+  plan and batches, delivery runs and riders (D45), the food order page (four more public functions, twelve in all),
+  food reports. e2e walk extended to 55 tests, run against the local Supabase (images pulled through `mirror.gcr.io`,
+  then Supabase's own registry when Docker Hub refused). The walk found row actions whose sentence vanished with the
+  row (cancel a delivery, put a stop on a run, confirm an order, deal with a problem, a rider marking a stop): they now
+  go back to the page with `?done=`, as elsewhere. Counts of packs, stops and days read "1 pack", not "1 packs".
 
 - 21 October 2026. M25: what the kennel offers, parents' addresses and areas served, skills, weights in grams (D44).
   e2e walk extended to 49 tests, all passing against the local Supabase (images pulled through `mirror.gcr.io`).

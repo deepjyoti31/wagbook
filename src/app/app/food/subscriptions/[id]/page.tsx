@@ -6,7 +6,7 @@ import { PhotoInput } from "@/components/photo-input";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, billPeriod, deliveryCutoff, formatDate, formatKg, todayIn } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { PROBLEM_KINDS, requestTime, weekdayList, WEEKDAYS } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -28,7 +28,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const f = m.food;
   const w = m.subscription;
   const supabase = await createClient();
@@ -76,6 +76,9 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
         </Link>
       </PageTitle>
       {done === "started" ? <Notice tone="ok">{f.started}</Notice> : null}
+      {done === "cancelled" ? <Notice tone="ok">{w.cancelledDelivery}</Notice> : null}
+      {done === "replaced" ? <Notice tone="ok">{w.replaced}</Notice> : null}
+      {done === "resolved" ? <Notice tone="ok">{m.common.saved}</Notice> : null}
       <div className="mb-5 space-y-1">
         <p className="text-lg">
           <Link href={`/app/clients/${s.client_id}`} className="font-semibold underline underline-offset-4">
@@ -104,8 +107,8 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
               <LedgerRow key={d.id}>
                 <div className="min-w-48 flex-1">
                   <p className={d.status === "cancelled" ? "text-slate line-through" : "font-semibold"}>
-                    {fill(w.deliveryLine, { date: formatDate(d.delivery_date, locale), packs: d.packs, kg: formatKg(d.grams, locale), recipe: recipeName.get(d.recipe_id ?? "") ?? "" })}
-                    {d.covers_days ? ` ${fill(w.covers, { days: d.covers_days })}` : ""}
+                    {plural(language, d.packs, w.deliveryLine, { date: formatDate(d.delivery_date, locale), kg: formatKg(d.grams, locale), recipe: recipeName.get(d.recipe_id ?? "") ?? "" })}
+                    {d.covers_days ? ` ${plural(language, d.covers_days, w.covers)}` : ""}
                   </p>
                   {d.cancel_reason ? <p className="text-sm text-slate">{d.cancel_reason}</p> : null}
                 </div>

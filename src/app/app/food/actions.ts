@@ -158,10 +158,12 @@ export async function cancelDelivery(_state: FormState, form: FormData): Promise
     .update({ status: "cancelled", cancel_reason: reason })
     .eq("org_id", org.id)
     .eq("id", id.data)
-    .select("id");
+    .select("id, subscription_id");
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: t.m.food.errors.notFound };
   revalidatePath("/app", "layout");
+  // The row's form goes away once the delivery is cancelled, so the sentence is shown by the page instead.
+  if (data[0].subscription_id) redirect(`/app/food/subscriptions/${data[0].subscription_id}?done=cancelled`);
   return { ok: w.cancelledDelivery };
 }
 
@@ -290,7 +292,8 @@ export async function confirmOrder(_state: FormState, form: FormData): Promise<F
   const { error } = await supabase.rpc("confirm_food_order", { p_order: id.data });
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
-  return { ok: t.m.foodOrders.confirmed };
+  // The order leaves the waiting list, and its form with it, so the sentence is shown by the page instead.
+  redirect("/app/food/orders?done=confirmed");
 }
 
 /** Decline an order or a change. Any member. */
@@ -304,7 +307,7 @@ export async function declineOrder(_state: FormState, form: FormData): Promise<F
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: t.m.food.errors.notFound };
   revalidatePath("/app", "layout");
-  return { ok: t.m.foodOrders.declined };
+  redirect("/app/food/orders?done=declined");
 }
 
 /** A parent said a delivery was damaged, late or wrong, within the kennel's window (the database checks: WB174). Any member. */
@@ -348,7 +351,7 @@ export async function resolveProblem(_state: FormState, form: FormData): Promise
   const supabase = await createClient();
   const problem = await supabase
     .from("delivery_problems")
-    .select("id, deliveries!delivery_problems_org_id_delivery_id_fkey(id, client_id, pet_id, grams, recipe_id, version_id, address_id, slot)")
+    .select("id, deliveries!delivery_problems_org_id_delivery_id_fkey(id, client_id, pet_id, subscription_id, grams, recipe_id, version_id, address_id, slot)")
     .eq("org_id", org.id)
     .eq("id", id.data)
     .maybeSingle();
@@ -385,5 +388,7 @@ export async function resolveProblem(_state: FormState, form: FormData): Promise
     .eq("id", id.data);
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
+  // The problem's form goes away once it is dealt with, so the sentence is shown by the page instead.
+  if (original.subscription_id) redirect(`/app/food/subscriptions/${original.subscription_id}?done=${outcome.data === "replaced" ? "replaced" : "resolved"}`);
   return { ok: outcome.data === "replaced" ? w.replaced : t.m.common.saved };
 }

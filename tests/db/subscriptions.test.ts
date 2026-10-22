@@ -209,3 +209,22 @@ async function addDays(date: string, n: number): Promise<string> {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+
+describe("merging parents", () => {
+  it("moves subscriptions and deliveries, even ones past their cut-off, with their pets", async () => {
+    const [{ id: twin }] = await q<{ id: string }>(db, k.owner, "insert into public.clients (org_id, full_name, phone) values ($1, 'Twin', '+919811100777') returning id", [k.org]);
+    const [{ id: pet }] = await q<{ id: string }>(db, k.owner, "insert into public.pets (org_id, client_id, name) values ($1, $2, 'Twin dog') returning id", [k.org, twin]);
+    const [{ id: sub }] = await q<{ id: string }>(
+      db, k.owner,
+      "insert into public.subscriptions (org_id, client_id, pet_id, product_id, grams_per_day, weekdays, starts_on) values ($1, $2, $3, $4, 300, '{1,2,3,4,5,6,7}', $5) returning id",
+      [k.org, twin, pet, k.subscriptionFood, await dayFromToday(db, k, 0)],
+    );
+    await q(db, k.owner, "select public.plan_subscription($1, $2)", [sub, await dayFromToday(db, k, 5)]);
+    await q(db, manager, "select public.merge_clients($1, $2)", [k.client, twin]);
+    const moved = await q<{ client_id: string }>(db, k.owner, "select client_id from public.deliveries where subscription_id = $1", [sub]);
+    expect(moved.length).toBeGreaterThan(0);
+    expect(new Set(moved.map((d) => d.client_id))).toEqual(new Set([k.client]));
+    const [s] = await q<{ client_id: string }>(db, k.owner, "select client_id from public.subscriptions where id = $1", [sub]);
+    expect(s.client_id).toBe(k.client);
+  });
+});

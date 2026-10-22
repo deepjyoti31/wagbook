@@ -5,7 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, formatMoney } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { quantityText } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +27,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const r = m.recipes;
   const w = m.recipePage;
   const supabase = await createClient();
@@ -71,7 +71,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
       <p className="mb-4 flex flex-wrap items-center gap-2">
         {x.is_retired ? <Badge>{r.retired}</Badge> : x.rotation_position !== null ? <Badge tone="good">{fill(r.position, { n: x.rotation_position })}</Badge> : <Badge>{r.notInRotation}</Badge>}
         {current ? <Badge>{fill(r.version, { n: current.version })}</Badge> : null}
-        <span className="text-slate">{fill(w.cooked, { count: batches.count ?? 0 })}</span>
+        <span className="text-slate">{plural(language, batches.count ?? 0, w.cooked)}</span>
       </p>
 
       {current ? (

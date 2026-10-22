@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Ledger, LedgerRow, Loading, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, formatKg, formatMoney, formatPhone } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { quantityText } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +24,7 @@ async function Batch({ params }: Pick<PageProps<"/app/kitchen/batches/[id]">, "p
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
-  const { m, locale } = t;
+  const { m, locale, language } = t;
   const w = m.batchPage;
   const supabase = await createClient();
   const [batch, moves, who] = await Promise.all([
@@ -49,7 +49,7 @@ async function Batch({ params }: Pick<PageProps<"/app/kitchen/batches/[id]">, "p
       <div className="mb-5 space-y-1">
         <p className="text-lg font-bold">{fill(w.recipe, { recipe: b.recipes?.name ?? "", version: b.recipe_versions?.version ?? 1 })}</p>
         <p>{fill(w.cooked, { date: formatDate(b.cooked_on, locale), cook: cook ?? m.common.notKnown, date2: formatDate(b.use_by, locale) })}</p>
-        <p className="text-slate">{fill(w.weight, { kg: formatKg(b.grams, locale), packs: b.packs })}</p>
+        <p className="text-slate">{plural(language, b.packs, w.weight, { kg: formatKg(b.grams, locale) })}</p>
         {canManage ? (
           <p className="font-semibold">{cost != null ? fill(w.cost, { amount: money(cost), perKg: money(Math.round((cost * 1000) / b.grams)) }) : w.noCost}</p>
         ) : null}
