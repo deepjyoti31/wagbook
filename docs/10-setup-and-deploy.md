@@ -58,7 +58,8 @@ In Authentication settings:
 
 1. **Site URL:** your public address, for example `https://book.yourkennel.in`. For now, while testing on your own
    computer, `http://localhost:3000`.
-2. **Redirect URLs:** add `http://localhost:3000/auth/confirm` and, later, `https://YOUR-DOMAIN/auth/confirm`.
+2. **Redirect URLs:** add `http://localhost:3000/auth/confirm**` and, later, `https://YOUR-DOMAIN/auth/confirm**`. The
+   two stars at the end matter: they let the link say where to go next (a new password, an invitation).
 3. **Email confirmation:** leave on. (For a quick private trial you may turn it off, then anyone can sign up with any
    address. Turn it back on before real use.)
 4. **Email template (recommended).** In the "Confirm signup" template, make the link:
@@ -68,6 +69,15 @@ In Authentication settings:
    ```
 
    The default template also works; this one sends the person straight to your own site.
+
+5. **Reset password template (recommended).** In the "Reset Password" template, make the link:
+
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/login/new-password
+   ```
+
+   With it, the link works on any phone, not only the one that asked for it. "Forgot your password?" on the sign-in
+   page sends this email (M45).
 
 Supabase's built-in email sender is for testing and allows only a few emails an hour. Before your team signs up,
 connect your own email provider under the SMTP settings.
@@ -153,7 +163,8 @@ puts the demo back as it was. Nothing here is real; never load the demo data int
 5. Add your domain in Vercel's domain settings if you have one.
 6. Go back to Supabase (step 1.4) and set the Site URL and Redirect URL to the real address.
 
-`NEXT_PUBLIC_` values are built into the app. After changing one, redeploy.
+`NEXT_PUBLIC_` values are built into the app. After changing one, redeploy. To offer "Continue with Google", see "Sign
+in with Google" below.
 
 Vercel's free plan is meant for personal, non-commercial projects. Read their terms; a kennel running its business on
 Wagbook may need their paid plan or another host.
@@ -203,6 +214,43 @@ that sign-ins and sign-ups are at most 30 per 5 minutes per address, and token v
 30 per 5 minutes. On Vercel, where each copy of the app counts on its own, add a Firewall rate limit rule for `POST`
 requests to `/login` and `/i/` as well.
 
+### Sign in with Google
+
+Optional (M45). People can then sign in with their Google account instead of a password; someone who already has a
+Wagbook account with the same email lands in that account.
+
+1. In the Google Cloud console, make a project, then APIs and Services, OAuth consent screen: an external app with your
+   kennel's name and email. Then Credentials, Create credentials, OAuth client ID, type "Web application". Under
+   "Authorised redirect URIs" add the callback address Supabase shows you in the next step (it looks like
+   `https://YOUR-PROJECT.supabase.co/auth/v1/callback`).
+2. In Supabase, Authentication, Sign In / Providers, Google: switch it on and paste the client ID and secret.
+3. Set the environment variable `GOOGLE_SIGN_IN=on` for Wagbook (on Vercel, under Environment Variables), and redeploy.
+   Without it the button is not shown, so nothing changes for a kennel that does not want it.
+
+Two-step sign-in still applies after Google. Someone who only ever signed in with Google has no password; they can add
+one with "Forgot your password?".
+
+### Overnight jobs
+
+The migrations switch on Supabase's `pg_cron` and schedule `run_nightly_jobs()` at 02:00 India time (20:30 UTC): it
+makes food deliveries three weeks ahead for every subscription, and clears problems and job runs older than 90 days
+(M46). More, Problems and overnight jobs shows when each last ran and whether it worked. To run them by hand, in the SQL
+editor: `select public.run_nightly_jobs();`. Running them twice does nothing twice.
+
+### Know when it breaks
+
+`https://YOUR-DOMAIN/api/health` answers `{"status":"ok"}` while Wagbook can reach its database, and an error (503) when
+it cannot (M48). Put that address in a free uptime service (UptimeRobot, Better Stack and others), checking every five
+minutes, with an alert to the owner's phone or email. Errors the server meets while someone is signed in are listed for
+owners under More, Problems and overnight jobs.
+
+### Photos and space
+
+Supabase's free plan includes 1 GB of file storage. Photos are made smaller on the phone (about 1,600 pixels), so a
+photo is usually 200 to 400 KB: a few thousand photos fill the free plan. More, Photos and space shows how much each
+month takes. When space runs short, an owner downloads an old month as a ZIP (keep it on Google Drive or a computer)
+and then removes that month's photos from Wagbook; a small copy of each stays (M49, D49). Nothing is removed by itself.
+
 ### Two-step sign-in
 
 Supabase turns authenticator apps (TOTP) on by default; check under Authentication, Sign In / Providers, Multi-Factor.
@@ -248,6 +296,9 @@ kennel.
 | "Could not reach the server" at sign-in | Wrong project URL, project paused, or no internet | Check the URL; restore the project in the dashboard |
 | Confirmation email never arrives | Built-in sender's hourly limit, or spam folder | Wait, check spam, or set up SMTP |
 | Confirmation link goes to an error | Redirect URL not in the allow list, or Site URL wrong | Step 1.4 |
+| The password reset link opens the home page, or says the link expired | Redirect URL without the two stars, or the link opened on another phone with the default template | Step 1.4, items 2 and 5 |
+| "Continue with Google" says it did not work | Google client's redirect URI or Supabase's Google provider not set | "Sign in with Google" above |
+| More, Problems says the overnight jobs have not run | pg_cron not on (self-hosted), or the first night has not come | "Overnight jobs" above; `docs/14-self-hosting.md` |
 | After sign-in you always land on "Set up your kennel" | You have no kennel yet, or your invitation is not accepted | Create one, or accept the invitation shown there |
 | "You do not have permission to do that" | Your role does not allow it | Ask an owner or manager |
 | A migration fails with "already exists" | It was applied before | With Way A this cannot happen; with Way B, skip files already run |

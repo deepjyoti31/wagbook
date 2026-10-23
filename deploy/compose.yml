@@ -20,6 +20,9 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
         NEXT_PUBLIC_SITE_URL: ${WAGBOOK_PUBLIC_URL}
+    environment:
+      # "on" shows "Continue with Google" once Supabase Auth has a Google client (docs/14-self-hosting.md).
+      GOOGLE_SIGN_IN: ${GOOGLE_SIGN_IN:-off}
     restart: unless-stopped
     # Not published: only Caddy talks to it.
     expose:

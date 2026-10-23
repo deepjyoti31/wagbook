@@ -932,12 +932,531 @@ in M1 can happen at any point; the migration freeze waits for it.
 
 ---
 
+# Running for real: M45 to M65
+
+Added 22 October 2026, when the owner asked what a kennel will need once it runs on Wagbook every day, and chose the
+list below (D49). Nothing here is built yet. The same ways of working hold as for M25 to M44: each milestone starts by
+writing its section in `02-product-spec.md` (the table in section L names them all, marked "Planned"), every rule in
+`CLAUDE.md` holds, and every word is in English, Hindi and Kannada.
+
+**The order, and why.** Phase 5 comes first because a kennel cannot start without it: people who forget a password are
+locked out today, nothing runs by itself overnight, every parent and pet would be typed in by hand, nobody would know
+when the site breaks, and photos fill a small storage plan in months. Phase 6 makes the day smoother for staff and
+parents. Phase 7 finishes appointments, the parent's link and the rota. Phase 8 is money and stock. Phase 9, several
+sites, comes last because it touches the most code.
+
+**Not on the roadmap, by the owner's choice (22 October 2026):** online payment through a payment provider (later),
+and messaging many parents at once (not needed).
+
+---
+
+## Phase 5. Before the first kennel
+
+## M45. Sign-in: forgotten passwords, changing a password, Google
+
+- [x] Finished 22 October 2026 (L1 in `02`, D50). Google sign-in is built and switched off by default; it was not tried
+  against a real Google account (no Google client here), see `HANDOFF.md`.
+
+**Build**
+
+1. [x] "Forgot your password?" on the sign-in page: Supabase Auth sends a reset link by email, it lands on
+   `/auth/confirm`, and the person sets a new password. The same answer whether or not the email has an account.
+2. [x] "Change password" under More, for a person signed in. Asks for the current password first.
+3. [x] "Continue with Google" on the sign-in page, through Supabase Auth's Google provider. A Google account with the same
+   email as an existing account signs in to that account (Supabase links them).
+4. [x] `10-setup-and-deploy.md` and `14-self-hosting.md`: how to make the Google OAuth client and switch the provider on,
+   and the email template for the reset link. Google sign-in is optional: with no client set up, the button is not
+   shown.
+
+**Rules**
+
+- Two-step sign-in still applies after a password reset and after Google: a session without the second step reaches
+  nothing in the database, as today (D24).
+- Invitation links work the same whichever way a person signs in.
+- The reset form counts against the sign-in rate limit (`src/lib/rate-limit.ts`). Google sign-in starts from a link (a
+  GET, which the app's limits do not count, so the `form-action` rule can stay `'self'`); Supabase Auth's own limits
+  apply to it. Changing a password has a limit of its own.
+- The service role key is still never used.
+
+**Done when**
+
+- The e2e walk resets a password through the local Supabase's mail catcher (Inbucket) and signs in with the new one.
+- Signing in with Google is walked once on a hosted project by a person, or `HANDOFF.md` says plainly that it was not.
+
+---
+
+## M46. Jobs that run by themselves overnight
+
+- [x] Finished 22 October 2026 (L2 in `02`, D50). Credit that ends, Today's reminders and forgotten clock-outs needed no
+  job: Wagbook works each of them out when it is read. The jobs are making deliveries ahead and forgetting old rows.
+
+**Build**
+
+1. [x] A nightly run inside the database with Supabase's `pg_cron`, one job per task, each a plain function that can also
+   be run by hand:
+   - make food deliveries ahead for every active subscription (what opening the Kitchen does today);
+   - forget problems and job runs older than 90 days (M48);
+   - not needed as jobs, because they are worked out when read: credit that has run out, Today's reminders, and a
+     stretch of attendance still open after its shift (M60 shows it from the rows).
+2. [x] More, Problems and overnight jobs: when the last nightly run happened and whether each job worked.
+3. [x] Self-hosting: how to switch `pg_cron` on, and what happens without it (the jobs still run when the screens open, as
+   today).
+
+**Rules**
+
+- Each job is idempotent: running it twice makes nothing twice.
+- The jobs run as the database owner, so each one filters by kennel itself and is tested for it.
+- A job that fails leaves a row saying so; it never stops the other jobs.
+
+**Done when**
+
+- A database test runs each job twice and finds the same result as running it once.
+- A kennel where nobody opens the Kitchen for a week still has its deliveries made.
+
+---
+
+## M47. Bring in parents and pets from a spreadsheet
+
+- [x] Finished 22 October 2026 (L3 in `02`, D50).
+
+**Build**
+
+1. [x] More, Import: a CSV template to download (parents, their pets, vaccinations), and an upload.
+2. [x] A preview before anything is saved: rows that will be added, rows that look like an existing parent (same phone),
+   and rows with problems, each with a plain sentence.
+3. [x] Import saves the good rows in one go; the rows with problems can be downloaded, fixed and uploaded again.
+
+**Rules**
+
+- Owners and managers only.
+- Phone numbers are checked and written as the rest of Wagbook writes them; a duplicate phone is never a second
+  parent.
+- The whole import is one transaction: all of it or none of it.
+- No new library: the CSV reader is a small pure function with unit tests.
+
+**Done when**
+
+- A CSV of 500 rows with mistakes in it previews in seconds and imports the good rows.
+- A test feeds every kind of bad row (missing name, bad phone, bad date, unknown species) and gets a sentence for each.
+
+---
+
+## M48. Knowing when something breaks
+
+- [x] Finished 22 October 2026 (L4 in `02`, D50). Errors are written down only while someone is signed in: an error on
+  a public page stays in the server's log (writing it would need the service role key).
+
+**Build**
+
+1. [x] `/api/health`: answers "ok" when the app can reach the database, for an uptime service (UptimeRobot, Better Stack
+   or similar, free plans) to watch every few minutes.
+2. [x] Errors on the server written to a table (time, page, a short message, no personal data), and More, Problems and
+   overnight jobs for owners: the last 90 days, the same error once with how often it happened.
+3. [x] `10-setup-and-deploy.md`: set up an uptime service that sends a message to the owner's phone when the health check
+   fails.
+
+**Rules**
+
+- No parent's or pet's details in an error row. Messages are cut short and stripped of email addresses and phone
+  numbers.
+- Error rows are kept 90 days.
+
+**Done when**
+
+- Stopping the database makes `/api/health` fail; starting it again makes it pass.
+
+---
+
+## M49. Photo archive: download, then free the space
+
+- [x] Finished 22 October 2026 (L5 in `02`, D49, D50). On its own page, More, Photos and space, rather than in Settings.
+  "Archived" is not written under a small copy: the page simply shows the small copy where the photo was.
+
+**Build**
+
+1. [x] More, Photos and space: how much space photos and files take, month by month.
+2. [x] "Download photos for a month": a ZIP of every photo taken that month (updates, grooming before and after, a
+   rider's door photos, care task proof once M54 adds it; incidents have no photos), in folders by pet, named by date.
+3. [x] "Remove these from Wagbook": offered only after that month's ZIP was downloaded, for owners, with "This cannot be
+   undone." and a second tap. The full photos are removed from storage; the small copy (480 pixels) stays, so pages
+   still show something, with "Archived" under it.
+
+**Rules**
+
+- Photos are already made smaller on the phone before they are sent (1600 pixels on the long edge, JPEG). They are kept
+  in full until the owner archives them. Nothing is removed by itself.
+- Not archived: vaccination certificates and other health papers, expense receipts (tax records), and pets' own
+  photos (staff need them every day).
+- Only owners remove (D29). Each archive is a row: which month, who, when, how many files.
+- The ZIP is built one month at a time and sent a photo at a time, so it fits in memory on a small server.
+
+**Done when**
+
+- A test removes a month and finds the small copies still there and the full photos gone, and a staff member is
+  refused.
+- The e2e walk downloads a month and opens the ZIP.
+
+---
+
+## Phase 6. The day, smoother
+
+## M50. Kennel cleaning between guests
+
+- [ ] Not started.
+
+**Build**
+
+1. After check-out, the kennel shows "To clean" on Today and the calendar until someone taps "Cleaned".
+2. Checking a pet into a kennel still to clean asks "This kennel was not cleaned. Check in anyway?".
+
+**Rules**
+
+- Who cleaned and when is kept.
+- A kennel out of service is not asked about.
+
+**Done when**
+
+- A database test checks a pet out and finds its kennel to clean, and clean again after "Cleaned".
+
+---
+
+## M51. Jobs that are not about a pet
+
+- [ ] Not started.
+
+**Build**
+
+1. Checklists for the day: opening and closing (lights, water, gates locked), each item ticked by whoever did it.
+2. Cleaning jobs that repeat (yard daily, deep clean weekly), on Care alongside the pets' tasks.
+3. Repairs: something broken (pump, fan, fencing), who reported it, who fixed it, and what it cost, which can become an
+   expense.
+
+**Rules**
+
+- Owners and managers set the checklists and repeating jobs; anyone ticks them and reports a repair.
+
+**Done when**
+
+- Today shows the day's checklist and what is left of it.
+
+---
+
+## M52. A pet that has passed away
+
+- [ ] Not started.
+
+**Build**
+
+1. On the pet page, for owners and managers: "Passed away", with the date.
+2. From that day, nothing is sent or made for the pet: no vaccination, groom, health paper or review reminder, no food
+   delivery (subscriptions end), no booking requests, and future bookings and appointments are cancelled with no
+   charge.
+3. Today shows "Send flowers to {parent}", with the parent's address, until someone marks it done. The cost can be
+   written as an expense.
+4. The pet's page keeps everything, marked "Passed away", and the pet leaves the lists.
+
+**Rules**
+
+- The database stops the reminders, not the screens: every reminder query leaves the pet out, with a test.
+- Undo is possible for a week, for a mistake.
+
+**Done when**
+
+- A database test marks a pet with a subscription, a booking and a vaccination due, and finds nothing left to send.
+
+---
+
+## M53. A stay report at check-out
+
+- [ ] Not started.
+
+**Build**
+
+1. At check-out, a report for the parent on the stay page: nights, meals eaten (of those offered), play sessions,
+   weight in and out, any medicine given, incidents (as told to the parent), and the photos staff pick.
+2. "Send the stay report" opens WhatsApp with the link, alongside the bill.
+3. Staff can add a few words before sending.
+
+**Rules**
+
+- Worked out from what is already recorded (care tasks, play, weights, incidents); nothing is typed twice.
+- Internal notes never appear on it.
+
+**Done when**
+
+- A unit test builds a report from a stay's records; the walk sends one.
+
+---
+
+## M54. Photo proof on care tasks, and "Pack all"
+
+- [ ] Not started.
+
+**Build**
+
+1. A care task can ask for a photo (a medicine given, a wound cleaned). The task is done when the photo is added.
+2. The routine says which tasks want a photo; the photo goes on the pet's record, not the parent's page, unless staff
+   share it.
+3. Kitchen, packing: "Pack all" marks every pack of the day packed in one tap, with a count first.
+
+**Rules**
+
+- A photo on a care task uses the same storage rules as other pet photos.
+
+**Done when**
+
+- A task that wants a photo cannot be ticked without one (a database rule, with a test).
+
+---
+
+## M55. A parent's own food and medicines
+
+- [ ] Not started.
+
+**Build**
+
+1. At check-in, what the parent brought: food (packs and grams) and medicines (count), with the daily amount.
+2. Care counts it down as meals and doses are ticked; the booking shows "4 days left".
+3. A reminder on Today when it will run out before the stay ends: ask the parent, or switch to the kennel's food at
+   its price (an extra on the bill).
+4. At check-out, what is left goes home: it is listed with the belongings.
+
+**Rules**
+
+- Quantities are whole grams and whole doses.
+
+**Done when**
+
+- A test ticks meals and finds the days left go down, and a reminder appear when they fall short of the stay.
+
+---
+
+## M56. Trial day for new dogs
+
+- [ ] Not started.
+
+**Build**
+
+1. A trial visit, booked like day boarding, for a pet before its first stay. Optional: a kennel offers it if it wants;
+   nothing requires it.
+2. After it, staff note how the pet settled (settled, anxious, reactive with other dogs) and a sentence. It shows on the
+   pet page and at check-in.
+
+**Rules**
+
+- A trial never blocks a booking.
+
+**Done when**
+
+- The walk books a trial, notes the result and sees it at the next check-in.
+
+---
+
+## M57. Vet visits during a stay
+
+- [ ] Not started.
+
+**Build**
+
+1. On a stay: "Vet visit", with the reason, the vet, what the vet said, medicines prescribed (which become care tasks)
+   and the cost.
+2. The cost goes on the stay's bill as a line, and the kennel's spend as an expense, in one step.
+3. "Tell the parent" opens WhatsApp with a short message.
+
+**Rules**
+
+- A vet visit is part of the pet's health record and stays with the pet.
+
+**Done when**
+
+- A test records a visit and finds the line on the bill, the expense and the new care task.
+
+---
+
+## Phase 7. Appointments, parents and the team
+
+## M58. Move an appointment
+
+- [ ] Not started.
+
+**Build**
+
+1. "Move" on an appointment: pick a new day and time from the free times. The person and place can change too.
+2. The parent gets the new time on WhatsApp.
+
+**Rules**
+
+- The database checks the new time as it checks a new appointment (place, pet and person one at a time, D46).
+- A move keeps the appointment, its add-ons and its bill; History of changes shows the old time.
+
+**Done when**
+
+- A test moves an appointment onto a taken time and is refused, and onto a free one and succeeds.
+
+---
+
+## M59. More from the parent's own link
+
+- [ ] Not started.
+
+**Build**
+
+1. A parent books an appointment from their link: the service, the pet, a free time. It lands as a request, as stay
+   requests do, and staff confirm it.
+2. A parent reports a problem with a food delivery from their link, with a photo. It lands where staff see delivery
+   problems today.
+
+**Rules**
+
+- Any new public function is added to the list in `CLAUDE.md`, `tests/db/security.test.ts` and
+  `05-security-and-privacy.md`. Prefer extending the link's existing functions.
+- Rate limited, and the photo upload checked by a storage policy, as the intake form's certificates are.
+
+**Done when**
+
+- The walk books an appointment and reports a delivery problem from a parent's link in a private window.
+
+---
+
+## M60. A rota that repeats, and forgotten clock-outs
+
+- [ ] Not started.
+
+**Build**
+
+1. A weekly pattern for each person (Monday morning, Tuesday evening, and so on) that fills the rota week after week
+   until changed. A week can still be changed by hand.
+2. A stretch still open well after its shift ended shows on Today for owners and managers ("{name} did not clock out"),
+   with a one-tap "Clocked out at the end of the shift", which writes the shift's end time with a note.
+
+**Rules**
+
+- Leave still takes a person off the rota on its days, pattern or not.
+- The correction is a hand-written time like any other (with a note, in History of changes).
+
+**Done when**
+
+- A test sets a pattern and finds the next four weeks filled, minus a day of leave.
+
+---
+
+## M61. Alerts on staff phones
+
+- [ ] Not started.
+
+**Build**
+
+1. Browser notifications (web push) to people who allow them on their phone: a new booking request, intake form, food
+   order or appointment request; an incident written down; a bill still unpaid at check-out.
+2. Each person chooses which alerts they want, under More.
+
+**Rules**
+
+- An alert says what happened and links to it; it carries no parent's phone number or address.
+- No paid service. If a library is needed for the push messages, it needs a decision in `09`.
+
+**Done when**
+
+- An alert reaches Chromium in the walk when a booking request arrives.
+
+---
+
+## Phase 8. Money and stock
+
+## M62. Selling over the counter
+
+- [ ] Not started.
+
+**Build**
+
+1. Items to sell (treats, toys, collars, shampoo) with a price, tax rate and code, kept in stock like the kitchen's.
+2. "Sell" from the parent page or a stay: pick items, they go on a bill (the stay's, or a bill of their own), and stock
+   goes down.
+3. A walk-in sale with no parent: a bill to "Walk-in".
+4. Stock to reorder when it falls below a level.
+
+**Rules**
+
+- Stock is the sum of its movements and never below nothing, as in the kitchen (M26).
+- Switched on per kennel in What this kennel offers.
+
+**Done when**
+
+- A test sells the last item and is refused the next one.
+
+---
+
+## M63. Orders to suppliers
+
+- [ ] Not started.
+
+**Build**
+
+1. An order to a supplier: items and quantities, sent on WhatsApp.
+2. Received in full or in part, which puts the stock in.
+3. The supplier's bill recorded against the order, as an expense.
+4. The kitchen's shopping list counts what is already ordered.
+
+**Rules**
+
+- Stock goes in on receiving, not on ordering.
+
+**Done when**
+
+- The shopping list stops asking for what is on an order not yet received.
+
+---
+
+## M64. Export for Tally
+
+- [ ] Not started.
+
+**Build**
+
+1. Reports, "Download for Tally": a month's bills, credit notes, payments and expenses as a file Tally can import
+   (Tally's XML format), with the ledger names the kennel sets once.
+
+**Rules**
+
+- Written by a small function of Wagbook's own, with unit tests; no new library.
+- The accountant checks one month before it is relied on (`HANDOFF.md`).
+
+**Done when**
+
+- A month imports into Tally without errors, checked by a person, or `HANDOFF.md` says plainly that it was not.
+
+---
+
+## Phase 9. Several sites
+
+## M65. Several sites under one owner
+
+- [ ] Not started.
+
+**Build**
+
+1. Each site is a kennel of its own in Wagbook, as today; an owner of several sees "All sites" in Reports: occupancy,
+   money in, bills owed and expenses, side by side and together.
+2. Switching site stays where it is (More, switch kennel); staff working at two sites see both.
+3. The limit of five kennels per owner is looked at again.
+
+**Rules**
+
+- Each site keeps its own parents, pets, prices and bills (D49). Combining reports reads each site separately and adds
+  them up; it never mixes rows.
+- Only an owner of every site sees the combined report.
+
+**Done when**
+
+- A test with two sites and one owner gives the combined totals, and a manager of one site cannot see the other's.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
 
-- Multiple sites under one owner with combined reports.
-- Online payments through a payment provider, and UPI Autopay for subscriptions (a cost and a new decision).
-- Treats, toys and accessories sold over the counter, from stock (M26).
+- Online payments through a payment provider, and UPI Autopay for subscriptions (a cost and a new decision). The owner
+  will add this later (22 October 2026).
 - A link to the kennel's own camera service on the stay page. (Wagbook itself never streams video: cost and privacy.)
 - Referral codes, so a boarding parent who brings a food customer is credited (M38).

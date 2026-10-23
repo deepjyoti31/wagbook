@@ -75,6 +75,14 @@ One person can belong to several kennels, with a different role in each.
 /app/more/rota        The week's rota, shifts, who lives on site     signed in (rota on)
 /app/more/leave       Ask for leave; owners and managers answer      signed in (rota on)
 /app/more/attendance  Clocking in and out, the month's sheet, CSV    signed in (rota on)
+/app/more/password    Change one's own password                      signed in
+/app/more/import      Bring in parents and pets from a spreadsheet   owners and managers
+/app/more/photos      Photos and space, the photo archive            owners and managers
+/app/more/problems    Problems and overnight jobs                    owners and managers
+/login/forgot         Ask for a link to choose a new password        public
+/login/new-password   Choose the new password, from the emailed link signed in by the link
+/auth/google          Continue with Google (when set up)             public
+/api/health           For an uptime service                          public
 /book/{slug}          A kennel's booking form for new parents        public
 /rider                A rider's own run for today                    riders (D45)
 /f/{slug}             A kennel's food order page                     public
@@ -509,7 +517,7 @@ medicine has a red edge and badge and is never folded away. One tap on Done; a s
 the first who and when). Skip opens a note; a medicine cannot be skipped without one (constraint
 `care_tasks_skipped_medication_needs_note`). Undo puts a task back. Filters: Still to do, and by kind.
 
-Proof photos on care tasks are not built; the field meant for them was removed (M13).
+Proof photos on care tasks are not built; the field meant for them was removed (M13). Planned again in M54.
 
 ### D3. Solo play timetable. Built.
 
@@ -1022,6 +1030,84 @@ shifts on the rota, and stretches not clocked out, then day by day with the time
 day it began, so a night shift counts on its evening (`attendanceSheet()`). **Download the month (CSV)**: a line for
 each person and day, with first in, last out, hours as a decimal, leave, shifts and notes. Staff see and download their
 own.
+
+---
+
+## L. Running for real (M45 to M65, D49)
+
+Chosen by the owner on 22 October 2026 for a kennel that runs on Wagbook every day. Each milestone writes its own
+section here when it starts, and marks it "Built" when it ends. The roadmap holds what to build, the rules and when
+each is done.
+
+| Feature | Milestone | State |
+| --- | --- | --- |
+| Forgotten password by email, change password, sign in with Google | M45 | Built (L1) |
+| Jobs that run by themselves overnight (`pg_cron`) | M46 | Built (L2) |
+| Bring in parents, pets and vaccinations from a spreadsheet | M47 | Built (L3) |
+| A health check for an uptime service, and server errors for owners | M48 | Built (L4) |
+| Photo archive: download a month, then free the space (the owner's choice, never by itself) | M49 | Built (L5) |
+| Kennels to clean between guests | M50 | Planned |
+| Opening and closing checklists, repeating cleaning jobs, repairs | M51 | Planned |
+| A pet that has passed away: nothing more sent, flowers to the parent | M52 | Planned |
+| A stay report for the parent at check-out | M53 | Planned |
+| Photo proof on care tasks, and "Pack all" in the kitchen | M54 | Planned |
+| A parent's own food and medicines, counted down | M55 | Planned |
+| A trial day for new dogs, never required | M56 | Planned |
+| Vet visits during a stay, on the bill and the expenses | M57 | Planned |
+| Move an appointment | M58 | Planned |
+| Book an appointment and report a delivery problem from the parent's link | M59 | Planned |
+| A rota that repeats each week, and forgotten clock-outs put right | M60 | Planned |
+| Alerts on staff phones (web push) | M61 | Planned |
+| Treats, toys and accessories sold over the counter, from stock | M62 | Planned |
+| Orders to suppliers, received into stock | M63 | Planned |
+| Export for Tally | M64 | Planned |
+| Several sites under one owner, with combined reports | M65 | Planned |
+
+### L1. Passwords and Google. Built (M45, D50).
+
+**Forgot your password?** under the sign-in form opens `/login/forgot`: the person writes their email and is told a
+link is on its way, the same sentence whether or not the address has an account. The emailed link lands on
+`/auth/confirm` and opens `/login/new-password`, where they choose a new one and go to Today. With two-step sign-in on,
+the code page comes first. A link works once. **More, Change password** (`/app/more/password`) asks for the current
+password and a new one; the person's phones stay signed in. Someone who only signs in with Google is told they have no
+password and how to add one. **Continue with Google** shows on the sign-in page when the installation has set it up
+(`GOOGLE_SIGN_IN=on`, `10-setup-and-deploy.md`); a Google account with the same email as an existing one signs in to
+it, and an invitation link works either way.
+
+### L2. Overnight jobs. Built (M46, D50).
+
+Each night at 02:00 India time pg_cron runs `run_nightly_jobs()`: food deliveries are made three weeks ahead for every
+subscription, as opening the Kitchen does, and problems and job runs older than 90 days are cleared. Each job for each
+kennel is written down (`job_runs`); one that fails says why and the others still run. Running them twice does nothing
+twice. Owners and managers see the latest run of each under **More, Problems and overnight jobs**.
+
+### L3. Bring in parents and pets from a spreadsheet. Built (M47, D50).
+
+**More, Bring in parents and pets** (owners and managers): **Download the template (CSV)** gives the columns (in
+English, as they are) and one invented example line. One pet a line; several pets of one parent are several lines with
+the same phone; up to three vaccinations a line; dates as `2021-03-01` or `01/03/2021`. **Check the file** shows what
+would go in, saving nothing: new parents, parents already known by phone (left as they are), new pets, pets already
+known by name (left as they are), vaccinations, and every line with a problem, with its line, column and a sentence.
+**Download the lines with problems (CSV)** gives those lines back with a last column saying what is wrong. **Bring in
+N lines** saves the good lines, all of them or none (`import_parents_and_pets`, at most 2,000 lines, `WB240`). Staff
+see none of it.
+
+### L4. Knowing when something breaks. Built (M48, D50).
+
+`/api/health` answers `{"status":"ok"}` (200) while the app reaches its database, and 503 when it cannot, for an uptime
+service to watch. An error on the server while someone is signed in is written down for their kennel, with no email
+address or phone number in it (`log_app_error`, 200 an hour at most). **More, Problems and overnight jobs**: the
+overnight jobs (owners and managers), and for owners the errors of the last 90 days, the same error once with how
+often and when last, where it happened (opening a page, saving a form, a download) and Next.js's code for it.
+
+### L5. Photos and space. Built (M49, D49, D50).
+
+**More, Photos and space** (owners and managers): all files' size, then month by month how many files and how big,
+and how many photos an archive covers (updates to parents, grooming before and after, riders' door photos; never pets'
+own photos, certificates or receipts). For a month that has ended: **Download photos (ZIP)**, a folder for each pet,
+each photo named by its day. Once downloaded, an owner sees **Remove these from Wagbook**, which asks once more ("This
+cannot be undone") and removes that month's full photos; the small copy of each stays, and every page that showed the
+photo shows the small copy. The month then reads "Removed" with how many and how much. Nothing is removed by itself.
 
 ---
 

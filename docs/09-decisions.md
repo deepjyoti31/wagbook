@@ -1028,3 +1028,84 @@ hundreds of photos is built in memory on the server.
 **Look again** if kennels want repeating rotas, overtime rules, pay worked out in Wagbook, riders on the rota, or
 clocking in tied to being at the kennel (location or a code on the wall).
 
+
+## D49. Running for real: what comes after the roadmap, and photos kept until the owner archives them
+
+**Status:** Decided, 22 October 2026, by the owner, adding M45 to M65 to the roadmap.
+
+**Situation.** Every milestone to M44 is built. Asked what a kennel will need once it runs on Wagbook every day, the
+owner chose: forgotten and changed passwords and Google sign-in; jobs that run overnight; importing from a
+spreadsheet; knowing when the site breaks; cleaning kennels between guests; checklists and repairs; a pet that has
+passed away; a stay report; photo proof on care tasks and "Pack all"; a parent's own food and medicines; a trial day;
+vet visits; moving an appointment; booking an appointment and reporting a delivery problem from the parent's link; a
+repeating rota; alerts on staff phones; selling over the counter; orders to suppliers; an export for Tally; and
+several sites under one owner.
+
+**Decision.**
+
+- **Photos are kept until the owner archives them.** They are already made smaller on the phone before upload (1600
+  pixels on the long edge, JPEG, and a 480 pixel copy). Nothing is removed by itself. When space runs short, the owner
+  downloads a month of photos as a ZIP (to keep on Google Drive or elsewhere), and only then may remove that month's
+  full photos from Wagbook. The small copy stays so pages still show something. Health papers and expense receipts are
+  never archived this way.
+- **A trial day is offered, never required.** A kennel may book one; nothing stops a first stay without it.
+- **When a pet passes away, the kennel sends flowers.** Wagbook stops every reminder, delivery and request for the
+  pet and puts "Send flowers" on Today with the parent's address.
+- **Several sites stay separate kennels.** Each keeps its own parents, pets, prices and bills; an owner of several
+  sees combined reports. Sharing a parent's record across sites is not done: it would widen who sees personal data,
+  and change row level security everywhere.
+- **Not now:** online payment through a payment provider (the owner will add it later), and messaging many parents at
+  once (not needed).
+
+**Why.** Deleting a parent's photos is a choice that cannot be undone, so it is the owner's, made with a copy in hand,
+never a timer's. Separate sites keep the access model as it is and still answer the owner's question, "how are all my
+sites doing?".
+
+**Cost.** A kennel on a small storage plan has to remember to archive; Settings shows the space used (M49). An owner
+cannot see one parent's stays across two sites in one place.
+
+**Look again** if storage costs become a burden even with archiving, or if parents regularly use more than one site
+and want one link for all of them.
+
+## D50. Phase 5: jobs in the database, problems written as the person, an archive the owner holds
+
+**Status:** Decided, 22 October 2026, building Phase 5 (M45 to M49).
+
+**Situation.** Before a kennel runs on Wagbook: people who forget a password are locked out; nothing runs unless a
+screen opens; every parent and pet would be typed by hand; nobody would know when the site breaks; and photos fill a
+small storage plan within months. Wagbook never uses the service role key (D5), has no new library without a reason,
+and keeps the anonymous role to twelve functions.
+
+**Decision.**
+
+- **Sign-in (M45)** uses Supabase Auth's own reset, change and Google sign-in. A reset link lands on `/auth/confirm`
+  like the sign-up link and opens `/login/new-password`. Changing a password checks the current one on a second
+  connection that keeps no session (Supabase Auth's `current_password` is only checked when the project asks for it),
+  so the person's own session and two-step level are untouched. Google starts from a link to `/auth/google`, not a
+  form, so the `form-action` rule stays `'self'`; it is shown only when `GOOGLE_SIGN_IN=on`.
+- **Overnight jobs (M46)** are plain functions in the database, run by `run_nightly_jobs()`, each kennel and job in
+  its own sub-transaction, with a row in `job_runs` for each. The migration switches on pg_cron and schedules it where
+  the database has it, so a hosted project needs no setup. Only work that changes rows is a job: making deliveries
+  ahead and forgetting old rows. Credit that ends, reminders on Today and forgotten clock-outs are worked out when read,
+  so they need no job (M60 shows forgotten clock-outs from the rows).
+- **Import (M47)** reads the CSV in the app (`readImport()`, a small pure function, no library) and writes it in one
+  database function that runs as the caller, all or nothing. A parent is matched by phone and left as they are, as the
+  intake form does; a pet known by name for that parent is skipped.
+- **Problems (M48)** are written by the app's `onRequestError` hook as the signed-in person, through a `security
+  definer` function that scrubs contacts and stops a flood. Errors with nobody signed in stay in the server's log only:
+  writing them would need the service role key. The health check calls an existing public function with a name no
+  kennel has, so the public surface stays at twelve.
+- **The photo archive (M49)** follows D49: the owner downloads a month as a ZIP (written a file at a time by
+  `ZipWriter`, so a big month is never in memory whole), and only then may remove that month's full photos. The
+  database gives the list of files to remove only to an owner, only after the download; storage lets only owners
+  delete. The small copies stay and pages fall back to them.
+
+**Why.** Each piece keeps Wagbook's two oldest rules: the database decides, and no key that bypasses it is used.
+Jobs in the database run the same way on a hosted project and a self-hosted one, with nothing else to deploy.
+
+**Cost.** Errors on public pages are not listed for owners. A self-hosted database without pg_cron has no overnight
+jobs (the food screens still make deliveries). The archive's ZIP is the owner's to keep: once a month is removed,
+Wagbook holds only small copies.
+
+**Look again** if kennels want errors on public pages listed (a narrow public function would be the way, with a test
+and a paragraph in `05`), more nightly work, or an archive that goes straight to Google Drive.

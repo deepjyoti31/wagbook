@@ -35,3 +35,21 @@ export interface TwoStepSetup extends FormState {
 export interface RecoveryCodesState extends FormState {
   codes?: string[];
 }
+
+/** What the spreadsheet import hands back between checking a file and bringing it in (M47). */
+export interface ImportState extends FormState {
+  /** The file as sent, to bring in once the preview is read. */
+  csv?: string;
+  /** Counts for the preview, already in words. */
+  summary?: string[];
+  /** How many lines can go in. */
+  good?: number;
+  /** "Line 3: phone: Write a phone number ..." for the first problems. */
+  problems?: string[];
+  /** A sentence saying how many more problems there are, when not all are listed. */
+  moreProblems?: string;
+  /** Things to know that are not errors: columns not read, lines not read. */
+  notes?: string[];
+  /** The lines with problems as a CSV, with a last column saying what is wrong. */
+  badCsv?: string;
+}

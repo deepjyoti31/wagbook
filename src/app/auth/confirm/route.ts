@@ -4,9 +4,11 @@ import { safeDestination } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Where links in Supabase's emails land (confirm sign-up, magic link, reset).
- * Supabase sends either `token_hash` + `type` (the recommended email template)
- * or `code` (the default template). Both are handled.
+ * Where links in Supabase's emails land (confirm sign-up, reset a password),
+ * and where Google sends people back (M45). Supabase sends either
+ * `token_hash` + `type` (the recommended email templates) or `code` (the
+ * default templates, and Google). Both are handled. Google refusing, or the
+ * person pressing Cancel there, arrives as `error`.
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -16,6 +18,10 @@ export async function GET(request: NextRequest) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
   const code = url.searchParams.get("code");
+
+  if (url.searchParams.get("error") && !code && !tokenHash) {
+    return NextResponse.redirect(new URL("/login?error=google", url.origin));
+  }
 
   let ok = false;
   if (tokenHash && type) {

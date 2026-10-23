@@ -87,6 +87,12 @@ meet "Admit" or "Arrive" meaning the same thing.
 | On now | `who_is_on()` | Who is clocked in now, on Today. |
 | Attendance | `attendanceSheet()`, `/app/more/attendance` | A month's days and hours worked, leave and shifts, for pay. |
 | In service since | `kennels.service_from`, `kennel_service` | The day a kennel went into or out of service, so past reports count the kennels there that day. |
+| Forgot your password? | `/login/forgot`, `/login/new-password` | A link by email to choose a new password (M45). |
+| Continue with Google | `/auth/google` | Signing in with a Google account, when the installation offers it (M45). |
+| Overnight jobs | `run_nightly_jobs()`, `job_runs` | Work the database does each night by itself: making food deliveries ahead, clearing old problems (M46). |
+| Bring in parents and pets | `import_parents_and_pets()`, `/app/more/import` | Parents, pets and vaccinations from a spreadsheet, one pet a line (M47). |
+| Problems | `app_errors`, `/app/more/problems` | Errors the server met while someone was signed in, for owners (M48). |
+| Photos and space, archive | `photo_archives`, `/app/more/photos` | A month of photos downloaded as a ZIP, then removed from Wagbook by an owner, the small copies kept (M49). |
 
 ## Places
 

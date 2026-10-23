@@ -102,6 +102,9 @@ alter table public.shifts enable row level security;
 alter table public.rota enable row level security;
 alter table public.leave_requests enable row level security;
 alter table public.attendance enable row level security;
+alter table public.app_errors enable row level security;
+alter table public.job_runs enable row level security;
+alter table public.photo_archives enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -371,6 +374,20 @@ create policy attendance_update on public.attendance for update to authenticated
               or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 create policy attendance_delete on public.attendance for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- Running for real (Phase 5, M46 to M49). Problems are read by owners
+-- (M48); overnight job runs and photo archives by owners and managers (M46,
+-- M49). None is written directly: log_app_error(), run_nightly_jobs() and the
+-- photo archive's functions write them.
+grant select on public.app_errors to authenticated;
+create policy app_errors_select on public.app_errors for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select on public.job_runs to authenticated;
+create policy job_runs_select on public.job_runs for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+grant select on public.photo_archives to authenticated;
+create policy photo_archives_select on public.photo_archives for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 
 -- Weighings: any member weighs a pet and reads the weights; owners and
 -- managers correct one; owners delete (D29).
@@ -668,6 +685,17 @@ grant execute on function public.rider_mark_trip(uuid, public.trip_status) to au
 -- Phase 4 (M43, M44).
 grant execute on function public.who_is_on(uuid) to authenticated;
 grant execute on function public.kennels_in_service(uuid, date) to authenticated;
+
+-- Phase 5 (M45 to M49): running for real.
+grant execute on function public.import_parents_and_pets(uuid, jsonb) to authenticated;
+grant execute on function public.log_app_error(text, text, text, uuid, text) to authenticated;
+grant execute on function public.archivable_photo(text) to authenticated;
+grant execute on function public.check_photo_month(uuid, date, public.member_role[]) to authenticated;
+grant execute on function public.photo_space(uuid) to authenticated;
+grant execute on function public.photo_month_files(uuid, date) to authenticated;
+grant execute on function public.record_photo_download(uuid, date, integer, bigint) to authenticated;
+grant execute on function public.record_photo_removal(uuid, date, integer, bigint) to authenticated;
+grant execute on function public.photos_to_remove(uuid, date) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.
