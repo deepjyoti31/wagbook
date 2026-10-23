@@ -7,16 +7,17 @@ import { createClient } from "@/lib/supabase/server";
 import type { Messages } from "@/messages";
 import { ActionForm, SubmitButton } from "./action-form";
 import { SellForm } from "./sell-form";
-import { Field, Input, Section } from "./ui";
+import { Field, Input, Notice, Section } from "./ui";
 
 /** Cancel a sale made by mistake, with a reason. Owners and managers; the database refuses one whose bill has gone out. */
-export function CancelSaleForm({ id, m }: { id: string; m: Messages }) {
+export function CancelSaleForm({ id, m, back }: { id: string; m: Messages; back: string }) {
   const s = m.shop;
   return (
     <details>
       <summary className="inline-flex min-h-12 cursor-pointer items-center text-sm font-semibold underline underline-offset-4">{s.cancel}</summary>
       <ActionForm action={cancelSale} className="mt-2 flex flex-wrap items-end gap-2">
         <input type="hidden" name="saleId" value={id} />
+        <input type="hidden" name="back" value={back} />
         <div className="min-w-48 flex-1">
           <Field label={s.cancelReason}>
             <Input name="reason" required maxLength={300} autoComplete="off" />
@@ -34,7 +35,22 @@ export function CancelSaleForm({ id, m }: { id: string; m: Messages }) {
  * Things sold over the counter on a stay (M62): what went on its bill, and
  * the counter's form while the stay is booked or in the kennel.
  */
-export async function StayShop({ t, org, bookingId, open, canManage }: { t: I18n; org: { id: string; currency: string }; bookingId: string; open: boolean; canManage: boolean }) {
+export async function StayShop({
+  t,
+  org,
+  bookingId,
+  open,
+  canManage,
+  cancelled,
+}: {
+  t: I18n;
+  org: { id: string; currency: string };
+  bookingId: string;
+  open: boolean;
+  canManage: boolean;
+  /** A sale on it was cancelled just now (`?done=sale-cancelled`). */
+  cancelled: boolean;
+}) {
   const { m, locale } = t;
   const supabase = await createClient();
   const [items, sales] = await Promise.all([
@@ -51,6 +67,7 @@ export async function StayShop({ t, org, bookingId, open, canManage }: { t: I18n
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
   return (
     <Section title={m.sell.title}>
+      {cancelled ? <Notice tone="ok">{m.shop.cancelledOk}</Notice> : null}
       {sales.data.length > 0 ? (
         <>
           <h3 className="mb-1 font-bold">{m.sell.soldOnStay}</h3>
@@ -66,7 +83,7 @@ export async function StayShop({ t, org, bookingId, open, canManage }: { t: I18n
                   {sale.status === "cancelled" ? (
                     <p className="text-sm text-alert">{fill(m.shop.cancelled, { reason: sale.cancel_reason ?? "" })}</p>
                   ) : canManage && open ? (
-                    <CancelSaleForm id={sale.id} m={m} />
+                    <CancelSaleForm id={sale.id} m={m} back={`/app/bookings/${bookingId}`} />
                   ) : null}
                 </li>
               );

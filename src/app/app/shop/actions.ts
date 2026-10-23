@@ -85,6 +85,9 @@ export async function cancelSale(_state: FormState, form: FormData): Promise<For
   const { error } = await supabase.rpc("cancel_sale", { p_sale: sale.data, p_reason: reason.slice(0, 300) });
   if (error) return { error: friendlyError(error, t) };
   revalidatePath("/app", "layout");
+  // The sale's row changes under the form, so the sentence goes back with the page.
+  const back = text(form, "back");
+  if (back && /^\/app\/(shop|bookings\/[0-9a-f-]{36})$/.test(back)) redirect(`${back}?done=sale-cancelled`);
   return { ok: t.m.shop.cancelledOk };
 }
 

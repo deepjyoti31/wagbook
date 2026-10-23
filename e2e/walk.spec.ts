@@ -3108,8 +3108,9 @@ test("M62: a walk-in buys the last chew bones, more than is left is refused, and
   await signIn(page, "manager");
   await openBooking(page, pet, "In house");
   await page.locator("summary", { hasText: en.shop.cancel }).click();
-  await page.getByLabel(en.shop.cancelReason).fill("Wrong pet");
-  await page.getByRole("button", { name: en.shop.cancelButton }).click();
+  const cancel = page.locator("form").filter({ has: page.getByRole("button", { name: en.shop.cancelButton }) });
+  await cancel.getByLabel(en.shop.cancelReason).fill("Wrong pet");
+  await cancel.getByRole("button", { name: en.shop.cancelButton }).click();
   await expect(page.getByText(en.shop.cancelledOk)).toBeVisible();
   await page.goto("/app/shop");
   await expect(page.getByText(en.shop.inStock.replace("{n}", "3")).first()).toBeVisible();
@@ -3120,8 +3121,8 @@ test("M63: an order to a supplier, received in part by staff, the bill as an exp
   await signIn(page, "manager");
   await page.goto("/app/more/orders");
   await page.getByRole("link", { name: en.orders.newOrderTo.replace("{supplier}", "Ali Meats") }).click();
-  await page.locator("summary", { hasText: en.orderPage.others }).click();
-  await page.locator("input[name^=q-]").first().waitFor();
+  // Ali Meats has no usual things yet, so everything else is open already.
+  await expect(page.locator("details").filter({ hasText: en.orderPage.others })).toHaveAttribute("open", "");
   const chicken = adminSql("select id from public.stock_items where name = 'Chicken'");
   await page.locator(`input[name=q-${chicken}]`).fill("50 kg");
   await page.getByLabel(en.orderPage.note).fill("Boneless, please");

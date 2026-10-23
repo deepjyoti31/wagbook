@@ -456,7 +456,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       ) : null}
 
       {org.offers_shop && b.status !== "requested" ? (
-        <StayShop t={t} org={org} bookingId={b.id} open={b.status === "confirmed" || b.status === "checked_in"} canManage={canManage} />
+        <StayShop t={t} org={org} bookingId={b.id} open={b.status === "confirmed" || b.status === "checked_in"} canManage={canManage} cancelled={query.done === "sale-cancelled"} />
       ) : null}
 
       {pet && (b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") ? (

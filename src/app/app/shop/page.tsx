@@ -16,15 +16,16 @@ import { addShopItem, makeBillForSale, updateShopItem } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.shop.title);
 
-export default function ShopPage() {
+export default function ShopPage({ searchParams }: PageProps<"/app/shop">) {
   return (
     <Suspense fallback={<Loading />}>
-      <Shop />
+      <Shop searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Shop() {
+async function Shop({ searchParams }: Pick<PageProps<"/app/shop">, "searchParams">) {
+  const done = (await searchParams).done;
   const { org, canManage } = await requireOrg();
   const { m, locale } = await getAppI18n();
   const s = m.shop;
@@ -61,6 +62,7 @@ async function Shop() {
       </PageTitle>
       <p className="mb-4 text-slate">{s.about}</p>
       {org.offers_shop ? null : <Notice tone="info">{s.off}</Notice>}
+      {done === "sale-cancelled" ? <Notice tone="ok">{s.cancelledOk}</Notice> : null}
 
       <Section title={s.sellTitle}>
         <p className="mb-2 text-sm text-slate">{s.sellAbout}</p>
@@ -127,7 +129,7 @@ async function Shop() {
                           </SubmitButton>
                         </ActionForm>
                       )}
-                      {canManage && bill?.status !== "issued" ? <CancelSaleForm id={sale.id} m={m} /> : null}
+                      {canManage && bill?.status !== "issued" ? <CancelSaleForm id={sale.id} m={m} back="/app/shop" /> : null}
                     </div>
                   )}
                 </li>
