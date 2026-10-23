@@ -2980,6 +2980,10 @@ test("M60: a usual week fills the rota four weeks ahead, minus leave, and a forg
 test("M61: a person chooses alerts, and a push wakes the phone with what happened", async ({ page, context, baseURL }) => {
   await context.grantPermissions(["notifications"], { origin: baseURL });
   await signIn(page, "manager");
+  // A first visit registers the service worker; alerts need it.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
   await page.goto("/app/more");
   await page.getByRole("link", { name: new RegExp(en.more.links.alerts.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.alerts.title })).toBeVisible();

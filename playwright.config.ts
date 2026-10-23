@@ -48,7 +48,8 @@ export default defineConfig({
         ...devices["Pixel 7"],
         // The narrowest phone Wagbook promises to work on.
         viewport: { width: 360, height: 780 },
-        ...(existsSync(preinstalled) ? { launchOptions: { executablePath: preinstalled } } : {}),
+        // The full browser, not the headless shell: the shell refuses notifications, which the alerts step needs (M61).
+        ...(existsSync(preinstalled) ? { launchOptions: { executablePath: preinstalled } } : { channel: "chromium" }),
       },
     },
   ],

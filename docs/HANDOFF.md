@@ -686,6 +686,9 @@ One line per session, newest first. What changed, in a sentence. Details belong 
   the parent's link, the usual week and forgotten clock-outs, alerts on staff phones (pushes that carry nothing).
   28 database tests (each new rule removed once to see its test fail), 4 unit tests, 4 browser steps (78 in all,
   passing against the local Supabase). `npm run check`: 719 tests. The thirteenth public function is `take_pushes`.
+  CI's walk then failed at the alerts step: Playwright's headless shell reports notifications as denied, so the walk
+  now uses Playwright's full Chromium (`channel: "chromium"`) where no browser is preinstalled, and the alerts page
+  waits for the service worker on a first visit.
 - 23 October 2026: Phase 6 built (M50 to M57, D52): kennels to clean, checklists and repairs, a pet that passed away,
   the stay report, photo proof and Pack all, food and medicines from home, trial days, vet visits. 16 database tests
   (each new rule removed once to see its test fail), 6 unit tests, 3 browser steps (74 in all, passing against the

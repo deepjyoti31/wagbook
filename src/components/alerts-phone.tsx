@@ -31,7 +31,11 @@ export function AlertsPhone({ publicKey, words }: { publicKey: string; words: Me
     let live = true;
     (async () => {
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported" as const;
-      const registration = await navigator.serviceWorker.getRegistration("/");
+      // The service worker may still be registering on a first visit: wait a little for it.
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+      ]);
       if (!registration) return "unsupported" as const;
       if (Notification.permission === "denied") return "blocked" as const;
       // The words the service worker shows when it cannot reach Wagbook, in this person's language.
