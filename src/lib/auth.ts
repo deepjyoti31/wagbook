@@ -87,7 +87,8 @@ export const getMemberships = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("memberships")
-    .select("role, display_name, language, created_at, organizations(*)")
+    // Named: alert_choices and rota_patterns also join memberships to organizations.
+    .select("role, display_name, language, created_at, organizations!memberships_org_id_fkey(*)")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .order("created_at");

@@ -3,7 +3,7 @@ import type { Messages } from "../en";
 /** Kannada words for appointments (Phase 2, M34 to M37, D46): a first draft, to be checked by a native speaker. Part of kn.ts. */
 export const appointmentsArea: Pick<
   Messages,
-  "appointmentKinds" | "appointmentStatus" | "coats" | "pricings" | "sizes" | "packageDays" | "appointmentSetup" | "appointments" | "newAppointment" | "appointment" | "grooming" | "courses" | "stayAppointments" | "whatsappAppointments"
+  "appointmentKinds" | "appointmentStatus" | "coats" | "pricings" | "sizes" | "packageDays" | "appointmentSetup" | "appointments" | "newAppointment" | "appointment" | "moveAppointment" | "grooming" | "courses" | "stayAppointments" | "whatsappAppointments"
 > = {
   appointmentKinds: { groom: "ಗ್ರೂಮಿಂಗ್", swim: "ಈಜು", training: "ತರಬೇತಿ", party: "ಪಾರ್ಟಿ", other: "ಇತರೆ" },
   appointmentStatus: { requested: "ಕೋರಿಕೆ", confirmed: "ಖಚಿತ", done: "ಆಯಿತು", no_show: "ಬರಲಿಲ್ಲ", cancelled: "ರದ್ದು" },
@@ -133,6 +133,9 @@ export const appointmentsArea: Pick<
     todayEmpty: "ಇಂದು ಯಾವ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಇಲ್ಲ.",
     seeDay: "ದಿನ ನೋಡಿ",
     cleaning: "ಸ್ವಚ್ಛತೆ",
+    askedByParents: "ಪೋಷಕರು ಕೇಳಿದವು",
+    askedHint: "ಅವರದೇ ಲಿಂಕ್‌ನಿಂದ. ಖಚಿತಪಡಿಸಲು, ಸಮಯ ಬದಲಿಸಲು ಅಥವಾ ರದ್ದು ಮಾಡಲು ತೆರೆಯಿರಿ, ನಂತರ ಪೋಷಕರಿಗೆ WhatsApp ನಲ್ಲಿ ತಿಳಿಸಿ.",
+    parentAsked: { one: "ಒಬ್ಬ ಪೋಷಕರು ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಕೇಳಿದ್ದಾರೆ.", other: "ಪೋಷಕರು ಕೇಳಿದ {n} ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್‌ಗಳು ಕಾಯುತ್ತಿವೆ." },
   },
 
   newAppointment: {
@@ -240,6 +243,9 @@ export const appointmentsArea: Pick<
     cakeButton: "ಕೇಕ್ ಆರ್ಡರ್ ಮಾಡಿ",
     cakeOrdered: "{date} ಕ್ಕೆ ಕೇಕ್ ಆರ್ಡರ್ ಆಯಿತು.",
     cakeNone: "ಮೊದಲು ಅಡುಗೆಮನೆ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ಆರ್ಡರ್ ಮೇಲೆ ಮಾಡುವ ವಸ್ತು ಸೇರಿಸಿ.",
+    move: "ಸಮಯ ಬದಲಿಸಿ",
+    fromParent: "ಪೋಷಕರು ಕೇಳಿದ್ದು",
+    sendMoved: "ಪೋಷಕರಿಗೆ ಹೊಸ ಸಮಯ ಕಳುಹಿಸಿ",
     done_: {
       confirmed: "ಖಚಿತವಾಯಿತು.",
       done: "ಆಯಿತು ಎಂದು ಗುರುತಿಸಲಾಗಿದೆ.",
@@ -249,6 +255,7 @@ export const appointmentsArea: Pick<
       priced: "ಬೆಲೆ ಉಳಿಸಲಾಗಿದೆ.",
       addOn: "ಆಡ್-ಆನ್ ಸೇರಿಸಲಾಗಿದೆ.",
       booked: "ಬುಕ್ ಆಯಿತು.",
+      moved: "ಸಮಯ ಬದಲಾಯಿತು. ಪೋಷಕರಿಗೆ ಹೊಸ ಸಮಯ ಕಳುಹಿಸಿ.",
     },
     errors: {
       notFound: "ಆ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಸಿಗಲಿಲ್ಲ.",
@@ -262,6 +269,23 @@ export const appointmentsArea: Pick<
     },
   },
 
+  // Moving an appointment to another day, time, place or person (M58).
+  moveAppointment: {
+    title: "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಸಮಯ ಬದಲಿಸಿ",
+    now: "ಈಗ: {date}, {from} ರಿಂದ {to}",
+    date: "ಹೊಸ ದಿನ",
+    place: "ಸ್ಥಳ",
+    person: "ಯಾರ ಜೊತೆ",
+    showTimes: "ಖಾಲಿ ಸಮಯ ತೋರಿಸಿ",
+    times: "{date} ರಂದು ಖಾಲಿ ಸಮಯ",
+    lasts: "ಇದಕ್ಕೆ {minutes} ನಿಮಿಷ ಬೇಕು. ಶುರುವಾಗುವ ಸಮಯ ಆರಿಸಿ.",
+    timesEmpty: "ಆ ದಿನ ಖಾಲಿ ಸಮಯ ಇಲ್ಲ. ಬೇರೆ ದಿನ, ಸ್ಥಳ ಅಥವಾ ವ್ಯಕ್ತಿಯನ್ನು ಪ್ರಯತ್ನಿಸಿ.",
+    button: "ಈ ಸಮಯಕ್ಕೆ ಬದಲಿಸಿ",
+    notOpen: "ಇನ್ನೂ ಬರಬೇಕಿರುವ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಮಾತ್ರ ಬದಲಿಸಬಹುದು.",
+    errors: {
+      place: "ಸ್ಥಳ ಆರಿಸಿ.",
+    },
+  },
   grooming: {
     title: "ಗ್ರೂಮಿಂಗ್",
     coat: "ಕೂದಲು",
@@ -331,6 +355,7 @@ export const appointmentsArea: Pick<
   },
 
   whatsappAppointments: {
+    moved: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ {pet} ಅವರ {service} ಈಗ {date} ರಂದು {time} ಕ್ಕೆ ಇದೆ. ಅದು ಸರಿಹೊಂದದಿದ್ದರೆ ಇಲ್ಲೇ ಉತ್ತರಿಸಿ.",
     trainingNotes: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ {pet} ನ {service} ಟಿಪ್ಪಣಿ: {notes}",
     homework: "ಮನೆಗೆಲಸ: {homework}",
   },

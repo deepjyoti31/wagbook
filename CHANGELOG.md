@@ -98,6 +98,13 @@ The first release will be 0.1.0. Everything below is in it.
   and photos. Routines that need a photo, and Pack all in the kitchen. The parent's own food and medicines counted
   down, with a warning before they run out. Trial days for new dogs. Vet visits on the bill, in the expenses and on the
   pet's routine in one step.
+- Appointments move to another day, time, place or person from the free times, and the parent is told on WhatsApp.
+- From their own link, a parent asks for an appointment at a free time, and tells the kennel a delivery went wrong,
+  with a photo.
+- Each person's usual week fills the rota four weeks ahead, minus their leave; a forgotten clock-out is closed at the
+  end of the shift from Today.
+- Alerts on staff phones for requests from parents, new forms, incidents and pets gone home unpaid, chosen by each
+  person; nothing paid for, and no parent's contact in an alert.
 
 ### For whoever runs it
 
@@ -108,6 +115,8 @@ The first release will be 0.1.0. Everything below is in it.
 - Trying it on your own computer with a local Supabase and an invented kennel: `npm run setup:local` (see the
   README).
 - A backup and restore drill ([docs/15-backup-and-restore.md](docs/15-backup-and-restore.md)).
+- Alerts on phones, off until set up: `node scripts/push-keys.mjs` makes the four settings and the line for the
+  database ([docs/10-setup-and-deploy.md](docs/10-setup-and-deploy.md), "Alerts on phones").
 
 ### Database changes
 

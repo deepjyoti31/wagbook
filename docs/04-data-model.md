@@ -282,6 +282,22 @@ dose uses), and the view **stay_supply_left** counts it down from the ticked tas
 pet's visits to the vet, recorded with `record_vet_visit()`: the visit, a line on the stay's bill
 (`booking_item_id`), the expense (`expense_id`) and the medicines as the pet's own routines, in one step.
 
+## Appointments, parents and the team
+
+Phase 7 (M58 to M61, D53). A move is an update of `appointments.starts_at`, `ends_at`, `place_id` and `staff_id`,
+checked by `appointments_check` like a new one; only an appointment still to come moves (`WB270`, `WB271`).
+`free_starts()` lists a place's free times on a day, and `first_free_start()` takes the first or last of them.
+**appointments.source** and **delivery_problems.from_parent** say a parent asked or told it from their own link; only
+`submit_booking_request()` and `submit_food_request()` can set them. **rota_patterns** (in `20261008000470_team.sql`)
+is a person's usual week, one shift on one weekday; `fill_rota()` puts each on the rota four weeks ahead, skipping
+leave and clashes, and remembers how far it filled (`filled_until`), so a day is filled once; `rota.pattern_id` says
+which pattern made a day. `forgotten_clock_outs()` lists stretches still open two hours after their shift. Alerts are
+in `20261008000650_alerts.sql`: **alerts** (a kind, a pet's name and a page, written only by triggers),
+**alert_choices** (each person's own), **push_subscriptions** (each phone's push address, the person's own),
+**push_outbox** (a phone to wake for an alert, sealed) and **push_secret** (the SHA-256 of the installation's push
+secret, sealed). `take_pushes()` hands the app the phones to wake, for the secret only; `my_alerts()` is what a woken
+phone shows.
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

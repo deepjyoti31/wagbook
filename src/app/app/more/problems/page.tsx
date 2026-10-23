@@ -21,7 +21,7 @@ export default function ProblemsPage() {
   );
 }
 
-const JOBS = ["plan_deliveries", "forget_old_rows"] as const;
+const JOBS = ["plan_deliveries", "forget_old_rows", "fill_rota"] as const;
 
 async function Problems() {
   const { org, canManage, canDelete } = await requireOrg();

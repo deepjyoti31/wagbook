@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Field, Input, Ledger, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { appointmentsOn, workingPeople } from "@/lib/appointments";
 import { requireOrg } from "@/lib/auth";
-import { addDays, clockMinutes, formatDate, isISODate, localClock, todayIn } from "@/lib/core";
+import { addDays, clockMinutes, formatDate, isISODate, localClock, localDate, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -37,12 +37,22 @@ async function Appointments({ searchParams }: Pick<PageProps<"/app/appointments"
   const today = todayIn(org.time_zone);
   const day = typeof params.date === "string" && isISODate(params.date) ? params.date : today;
   const supabase = await createClient();
-  const [places, appointments, people] = await Promise.all([
+  const [places, appointments, people, asked] = await Promise.all([
     supabase.from("appointment_places").select("id, name, opens, closes").eq("org_id", org.id).eq("is_active", true).order("sort_order").order("name"),
     appointmentsOn(supabase, org.id, org.time_zone, day),
     workingPeople(supabase, org.id),
+    // Asked for by parents from their own link (M59), still waiting for an answer, on any day.
+    supabase
+      .from("appointments")
+      .select("id, starts_at, pets!appointments_org_id_client_id_pet_id_fkey(name), appointment_services(name), clients(full_name)")
+      .eq("org_id", org.id)
+      .eq("source", "parent")
+      .eq("status", "requested")
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at")
+      .limit(50),
   ]);
-  if (places.error || appointments.error || people.error) throw new Error("Could not load appointments.");
+  if (places.error || appointments.error || people.error || asked.error) throw new Error("Could not load appointments.");
   const personName = (id: string | null) => people.data.find((p) => p.user_id === id)?.display_name ?? null;
   const clock = (iso: string) => localClock(iso, org.time_zone);
 
@@ -65,6 +75,28 @@ async function Appointments({ searchParams }: Pick<PageProps<"/app/appointments"
           </Link>
         ) : null}
       </PageTitle>
+
+      {asked.data.length > 0 ? (
+        <Section title={w.askedByParents} count={asked.data.length}>
+          <p className="mb-2 text-sm text-slate">{w.askedHint}</p>
+          <Ledger>
+            {asked.data.map((a) => (
+              <li key={a.id}>
+                <Link href={`/app/appointments/${a.id}`} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-ground">
+                  <span className="font-bold tabular-nums">
+                    {formatDate(localDate(a.starts_at, org.time_zone), locale)}, {clock(a.starts_at)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="font-bold">{a.pets?.name}</span> {a.appointment_services?.name}
+                    <span className="block text-sm text-slate">{a.clients?.full_name}</span>
+                  </span>
+                  <Badge tone="attention">{m.appointmentStatus.requested}</Badge>
+                </Link>
+              </li>
+            ))}
+          </Ledger>
+        </Section>
+      ) : null}
 
       <form action="/app/appointments" className="mb-5 flex flex-wrap items-end gap-2">
         <div className="w-44">

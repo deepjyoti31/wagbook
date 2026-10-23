@@ -414,14 +414,24 @@ async function AppointmentsToday({ t, today }: { t: I18n; today: string }) {
   const { m } = t;
   const w = m.appointments;
   const supabase = await createClient();
-  const [list, places, people] = await Promise.all([
+  const [list, places, people, asked] = await Promise.all([
     appointmentsOn(supabase, org.id, org.time_zone, today),
     supabase.from("appointment_places").select("id, name").eq("org_id", org.id),
     workingPeople(supabase, org.id),
+    // Asked for by parents from their own link (M59), still waiting.
+    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("source", "parent").eq("status", "requested").gte("starts_at", new Date().toISOString()),
   ]);
   if (list.error) throw new Error("Could not load today's appointments.");
   return (
     <Section title={w.today} count={list.data.length}>
+      {(asked.count ?? 0) > 0 ? (
+        <p className="mb-3 rounded-lg bg-marigold-soft px-4 py-3">
+          {plural(t.language, asked.count ?? 0, w.parentAsked)}{" "}
+          <Link href="/app/appointments" className="font-semibold underline underline-offset-4">
+            {m.today.seeRequests}
+          </Link>
+        </p>
+      ) : null}
       {list.data.length === 0 ? (
         <Empty>{w.todayEmpty}</Empty>
       ) : (
@@ -463,7 +473,7 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
   const { m, locale } = t;
   const w = m.todayKitchen;
   const supabase = await createClient();
-  const [packing, orders, food, trials, asked, subs] = await Promise.all([
+  const [packing, orders, food, trials, asked, subs, problems] = await Promise.all([
     supabase.from("deliveries").select("status").eq("org_id", org.id).eq("delivery_date", today).neq("status", "cancelled"),
     supabase.from("food_orders").select("id", { count: "exact", head: true }).eq("org_id", org.id).in("status", ["paid", "requested"]),
     supabase.from("pet_food").select("pet_id, started_on, reviewed_on, pets(name)").eq("org_id", org.id).not("started_on", "is", null),
@@ -476,6 +486,8 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
       .gte("delivery_date", addDays(today, -14)),
     supabase.from("reminders_sent").select("subject_id").eq("org_id", org.id).eq("kind", "trial"),
     supabase.from("subscriptions").select("client_id").eq("org_id", org.id),
+    // Delivery problems not dealt with yet, many told by parents from their link (M59).
+    supabase.from("delivery_problems").select("id", { count: "exact", head: true }).eq("org_id", org.id).is("outcome", null),
   ]);
   if (packing.error || food.error || trials.error) return null;
   const packed = packing.data.filter((d) => d.status !== "planned").length;
@@ -504,6 +516,11 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
           {(orders.count ?? 0) > 0 ? (
             <Link href="/app/food/orders" className={buttonStyles.quiet}>
               {fill(w.orders, { count: orders.count ?? 0 })}
+            </Link>
+          ) : null}
+          {(problems.count ?? 0) > 0 ? (
+            <Link href="/app/food" className={buttonStyles.quiet}>
+              {fill(w.problems, { count: problems.count ?? 0 })}
             </Link>
           ) : null}
         </p>

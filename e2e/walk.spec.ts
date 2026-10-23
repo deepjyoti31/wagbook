@@ -2837,3 +2837,192 @@ test("M54: Pack all packs a day's deliveries from a batch in date, after saying 
   await page.getByRole("button", { name: en.packAll.yes }).click();
   await expect(page.getByText(/^Packed [1-9]\d* deliver(y|ies)\./)).toBeVisible();
 });
+
+test("M58: an appointment moves to another day and time, and the parent is told on WhatsApp", async ({ page }) => {
+  await signIn(page, "manager");
+  await openAppointmentForm(page, "Olive (Dev Sample)", "Swim (Swimming)", day(4));
+  await page.getByLabel("09:00").check();
+  await page.getByRole("button", { name: en.newAppointment.bookButton }).click();
+  await expect(page.getByText(en.appointment.done_.booked)).toBeVisible();
+
+  await page.getByRole("link", { name: en.appointment.move }).click();
+  await page.waitForURL(/\/move$/);
+  await expect(page.getByRole("heading", { level: 1, name: en.moveAppointment.title })).toBeVisible();
+  await page.getByLabel(en.moveAppointment.date).fill(day(5));
+  await page.getByRole("button", { name: en.moveAppointment.showTimes }).click();
+  await page.getByLabel("14:00").check();
+  await narrow(page);
+  await shot(page, "m58-move");
+  await page.getByRole("button", { name: en.moveAppointment.button }).click();
+  await expect(page.getByText(en.appointment.done_.moved)).toBeVisible();
+  await expect(page.getByText(/, 14:00 to 15:00$/)).toBeVisible();
+  const tell = page.getByRole("link", { name: en.appointment.sendMoved });
+  expect(decodeURIComponent((await tell.getAttribute("href"))!)).toMatch(/wa\.me\/.*14:00/);
+
+  // History of changes keeps the old time.
+  await page.goto("/app/more/history?table=appointments");
+  await expect(page.getByText(en.history.log.changed.replace("{what}", en.history.log.tables.appointments)).first()).toBeVisible();
+  await expect(page.getByText(en.history.log.fields.starts_at).first()).toBeVisible();
+  await narrow(page);
+});
+
+test("M59: a parent asks for an appointment and tells the kennel a delivery went wrong, from their own link", async ({ page, browser }) => {
+  await signIn(page, "manager");
+  const linkOf = async (pet: string, parentName: string) => {
+    await openPet(page, pet);
+    await page.getByRole("link", { name: parentName }).click();
+    const href = (await page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: en.parent.requestLink.title }) })
+      .getByRole("link", { name: en.parent.requestLink.send })
+      .getAttribute("href"))!;
+    return /\/b\/[0-9a-f]{64}/.exec(decodeURIComponent(href))![0];
+  };
+
+  // Vikram asks for a swim for Luna.
+  const vikram = await privateWindow(browser);
+  await vikram.page.goto(await linkOf("Rocky", "Vikram Mock"));
+  await expect(vikram.page.getByRole("heading", { name: en.appointmentLink.title })).toBeVisible();
+  await vikram.page.locator("select[name=service]").selectOption({ label: "Swim (60 minutes)" });
+  await vikram.page.locator("select[name=pet]").selectOption({ label: "Luna" });
+  await vikram.page.locator("input[name=day]").fill(day(6));
+  await vikram.page.getByRole("button", { name: en.appointmentLink.showTimes }).click();
+  await vikram.page.getByLabel("11:00").check();
+  await vikram.page.getByRole("button", { name: en.appointmentLink.send }).click();
+  await expect(vikram.page.getByText(en.appointmentLink.sent)).toBeVisible();
+  await vikram.page.reload();
+  await expect(vikram.page.getByText(/^Luna: Swim, .* at 11:00$/)).toBeVisible();
+  await narrow(vikram.page);
+  await shot(vikram.page, "m59-parent-appointment");
+  await vikram.context.close();
+
+  await page.goto("/app");
+  await expect(page.getByText(en.appointments.parentAsked.one)).toBeVisible();
+  await page.goto("/app/appointments");
+  const asked = page.locator("section").filter({ has: page.getByRole("heading", { name: new RegExp(`^${en.appointments.askedByParents}`) }) });
+  await expect(asked.getByText("Luna")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m59-asked");
+  await asked.getByRole("link").filter({ hasText: "Luna" }).click();
+  await expect(page.getByText(en.appointment.fromParent)).toBeVisible();
+
+  // Priya says Biscuit's trial, handed over today, came damaged, with a photo.
+  const priya = await privateWindow(browser);
+  await priya.page.goto(await linkOf("Biscuit", "Priya Demo"));
+  await expect(priya.page.getByRole("heading", { name: en.problemLink.title })).toBeVisible();
+  await priya.page.getByLabel(en.problemKinds.damaged).check();
+  await priya.page.getByLabel(en.problemLink.note).fill("The pack was torn");
+  await priya.page.locator("input[name=photo]").setInputFiles({ name: "torn.jpg", mimeType: "image/jpeg", buffer: await photoWithLocation(priya.page) });
+  await narrow(priya.page);
+  await shot(priya.page, "m59-parent-problem");
+  await priya.page.getByRole("button", { name: en.problemLink.send }).click();
+  await expect(priya.page.getByText(en.problemLink.sent)).toBeVisible();
+  await priya.page.reload();
+  await expect(priya.page.getByText(/^Already told: Biscuit, /)).toBeVisible();
+  await priya.context.close();
+
+  // Staff find it on Food, with the photo, and deal with it.
+  await page.goto("/app");
+  await expect(page.getByRole("link", { name: "Delivery problems to deal with: 1" })).toBeVisible();
+  await page.goto("/app/food");
+  const problems = page.locator("section").filter({ has: page.getByRole("heading", { name: new RegExp(`^${en.food.problems}`) }) });
+  await expect(problems.getByText(en.subscription.fromParent)).toBeVisible();
+  await expect(problems.getByText("The pack was torn")).toBeVisible();
+  await expect(problems.getByRole("img", { name: en.subscription.problemPhoto })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m59-food-problem");
+  await problems.getByRole("button", { name: en.subscription.noRefund }).click();
+  await expect(page.getByText(en.common.saved)).toBeVisible();
+});
+
+test("M60: a usual week fills the rota four weeks ahead, minus leave, and a forgotten clock-out is closed at the shift's end", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/rota");
+  const usual = page.locator("form").filter({ has: page.getByRole("button", { name: en.rota.pattern.button }) });
+  await usual.locator("select[name=userId]").selectOption({ label: "Meena" });
+  await usual.locator("select[name=shiftId]").selectOption({ label: "Morning, 07:00 to 15:00" });
+  for (const d of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]) await usual.getByLabel(d).check();
+  await usual.getByRole("button", { name: en.rota.pattern.button }).click();
+  await expect(page.getByText(/^Added\. \d+ shifts? put on the rota\.$/)).toBeVisible();
+  // Meena's leave on days 10 and 11 stays off the rota.
+  expect(adminSql(`select count(*) from public.rota r join public.memberships m on m.org_id = r.org_id and m.user_id = r.user_id
+    where m.display_name = 'Meena' and r.pattern_id is not null and r.work_date in ('${day(10)}', '${day(11)}')`)).toBe("0");
+  // 28 days, less her two days of leave and the three days the team step already put her on the morning shift by hand.
+  expect(adminSql(`select count(*) from public.rota r where r.pattern_id is not null and r.work_date between '${day(0)}' and '${day(27)}'`)).toBe("23");
+  await page.reload();
+  await expect(page.getByText("Monday: Morning", { exact: true })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m60-usual-week");
+
+  // Ravi was on yesterday's morning shift, clocked in, and never clocked out.
+  const put = page.locator("form").filter({ has: page.getByRole("button", { name: en.rota.put.button }) });
+  await put.locator("select[name=userId]").selectOption({ label: "Ravi" });
+  await put.locator("select[name=shiftId]").selectOption({ label: "Morning, 07:00 to 15:00" });
+  await put.locator("input[name=from]").fill(day(-1));
+  await put.locator("input[name=to]").fill(day(-1));
+  await put.getByRole("button", { name: en.rota.put.button }).click();
+  await expect(page.getByText("Put on 1 shift.")).toBeVisible();
+  const ravi = adminSql("select id from auth.users where email = 'manager@demo.wagbook.test'");
+  // Written as Ravi would by hand (the walk cannot wait for yesterday).
+  adminSql(`begin; select set_config('request.jwt.claims', '{"sub":"${ravi}","role":"authenticated"}', true);
+    insert into public.attendance (org_id, user_id, clocked_in_at, note)
+    select m.org_id, m.user_id, ('${day(-1)}'::date + time '06:55') at time zone 'Asia/Kolkata', 'Clocked in at the gate'
+    from public.memberships m where m.user_id = '${ravi}'; commit;`);
+  await page.goto("/app");
+  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"), { exact: true })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m60-forgot");
+  await page.getByRole("button", { name: en.forgotClockOut.button.replace("{time}", "15:00") }).click();
+  await expect(page.getByText(en.today.done.clockedOut)).toBeVisible();
+  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"), { exact: true })).toHaveCount(0);
+});
+
+test("M61: a person chooses alerts, and a push wakes the phone with what happened", async ({ page, context, baseURL }) => {
+  await context.grantPermissions(["notifications"], { origin: baseURL });
+  await signIn(page, "manager");
+  // A first visit registers the service worker; alerts need it.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.alerts.title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.alerts.title })).toBeVisible();
+  await expect(page.getByText(en.alerts.off)).toBeVisible();
+  await page.getByRole("button", { name: en.alerts.save }).click();
+  await expect(page.getByText(en.alerts.saved, { exact: true })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m61-alerts");
+
+  // A parent asks for a stay from their own link.
+  await openPet(page, "Rocky");
+  await page.getByRole("link", { name: "Vikram Mock" }).click();
+  const href = (await page.getByRole("link", { name: en.parent.requestLink.send }).first().getAttribute("href"))!;
+  const parent = await page.context().browser()!.newContext({ viewport: { width: 360, height: 780 } });
+  const p = await parent.newPage();
+  await p.goto(/\/b\/[0-9a-f]{64}/.exec(decodeURIComponent(href))![0]);
+  await p.getByRole("checkbox", { name: "Rocky" }).check();
+  await p.getByLabel(en.requestForm.checkIn).fill(day(140));
+  await p.getByLabel(en.requestForm.checkOut).fill(day(142));
+  await p.getByRole("button", { name: en.requestForm.send }).click();
+  await expect(p.getByText(en.requestForm.sent)).toBeVisible();
+  await parent.close();
+
+  // The push service is out of reach here, so the push is handed to this phone's service worker directly.
+  await page.goto("/app/more/alerts");
+  const registration = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
+  const cdp = await context.newCDPSession(page);
+  const registrationId = await new Promise<string>((resolve) => {
+    cdp.on("ServiceWorker.workerRegistrationUpdated", (e: { registrations: { registrationId: string; scopeURL: string; isDeleted: boolean }[] }) => {
+      const r = e.registrations.find((x) => x.scopeURL === registration && !x.isDeleted);
+      if (r) resolve(r.registrationId);
+    });
+    void cdp.send("ServiceWorker.enable");
+  });
+  await cdp.send("ServiceWorker.deliverPushMessage", { origin: new URL(baseURL!).origin, registrationId, data: "" });
+  await expect
+    .poll(async () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => `${n.title}: ${n.body}`)))
+    .toContainEqual("Wagbook Demo Kennel: A parent asked for a stay for Rocky.");
+  const shown = await page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => n.body).join(" "));
+  // No parent's phone number in what the phone shows.
+  expect(shown).not.toMatch(/\+91|98000/);
+});

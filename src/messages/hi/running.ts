@@ -1,7 +1,7 @@
 /** Hindi words for running Wagbook for real (Phase 5, M45 to M49): a first draft, to be checked by a native speaker. Same shape as en/running.ts. */
 import type { Messages } from "../en";
 
-export const runningArea: Pick<Messages, "account" | "importing" | "problems" | "photoArchive"> = {
+export const runningArea: Pick<Messages, "account" | "importing" | "problems" | "alerts" | "photoArchive"> = {
   account: {
     forgotLink: "पासवर्ड भूल गए?",
     forgot: {
@@ -97,7 +97,7 @@ export const runningArea: Pick<Messages, "account" | "importing" | "problems" | 
     title: "समस्याएं और रात के काम",
     intro: "हर रात चलने वाले काम हुए या नहीं, और आपकी टीम के इस्तेमाल के दौरान Wagbook को मिली गड़बड़ियां। अगर यहां कुछ बार-बार हो, तो जो आपका Wagbook संभालता है उसे बताएं।",
     jobsTitle: "रात के काम",
-    jobNames: { plan_deliveries: "खाने की डिलीवरी पहले से बनाएं", forget_old_rows: "90 दिन से पुरानी समस्याएं हटाएं" },
+    jobNames: { plan_deliveries: "खाने की डिलीवरी पहले से बनाएं", forget_old_rows: "90 दिन से पुरानी समस्याएं हटाएं", fill_rota: "हर किसी के आम हफ़्ते से रोटा भरें" },
     jobOk: "{when} को हुआ",
     jobMade: { one: "1 बनाया या हटाया", other: "{n} बनाए या हटाए" },
     jobFailed: "{when} को नहीं हुआ: {problem}",
@@ -109,6 +109,45 @@ export const runningArea: Pick<Messages, "account" | "importing" | "problems" | 
     lastAt: "आख़िरी बार {when}",
     kinds: { render: "पेज खोलते समय", route: "डाउनलोड या लिंक", action: "फ़ॉर्म सेव करते समय", proxy: "पेज से पहले" },
     code: "कोड {digest}",
+  },
+  // Alerts on staff phones (M61), under More.
+  alerts: {
+    title: "आपके फ़ोन पर अलर्ट",
+    about: "जब किसी काम में आपकी ज़रूरत हो, Wagbook आपके फ़ोन को बता सकता है: पेरेंट का अनुरोध, नया फ़ॉर्म, कोई घटना, बिना भुगतान घर गया पालतू। अलर्ट बताता है क्या हुआ और वह पेज खोलता है। यह कभी पेरेंट का फ़ोन नंबर या पता नहीं दिखाता।",
+    phone: "यह फ़ोन",
+    notSetUp: "इस Wagbook पर अभी अलर्ट चालू नहीं हैं। इसे चलाने वाला व्यक्ति इन्हें चालू करता है (सेटअप गाइड, फ़ोन पर अलर्ट)।",
+    checking: "इस फ़ोन को जाँच रहे हैं।",
+    unsupported: "यह ब्राउज़र यहाँ अलर्ट नहीं ले सकता। iPhone पर, Wagbook को होम स्क्रीन पर जोड़ें और वहीं से खोलें। अलर्ट लगी हुई साइट पर चलते हैं, डेवलपमेंट में नहीं।",
+    blocked: "इस फ़ोन ने Wagbook के अलर्ट रोक रखे हैं। ब्राउज़र में इस साइट की सेटिंग्स में इन्हें चालू करें, फिर बटन दबाएँ।",
+    on: "इस फ़ोन पर अलर्ट चालू हैं।",
+    off: "इस फ़ोन पर अलर्ट बंद हैं।",
+    allow: "इस फ़ोन पर अलर्ट चालू करें",
+    allowing: "फ़ोन से पूछ रहे हैं",
+    stop: "इस फ़ोन पर अलर्ट बंद करें",
+    failed: "फ़ोन ने अलर्ट की अनुमति नहीं दी। फिर से कोशिश करें।",
+    phones: { one: "अलर्ट आपके {n} फ़ोन पर जाते हैं।", other: "अलर्ट आपके {n} फ़ोन पर जाते हैं।" },
+    choose: "आपको कौन से अलर्ट चाहिए",
+    save: "मेरे अलर्ट सहेजें",
+    saved: "सहेज दिया।",
+    kinds: {
+      booking_request: "पेरेंट ठहराव माँगे",
+      appointment_request: "पेरेंट अपॉइंटमेंट माँगे",
+      intake_form: "पेरेंट का नया फ़ॉर्म",
+      food_order: "पेरेंट का खाने का ऑर्डर या बदलाव",
+      incident: "कोई घटना लिखी जाए",
+      unpaid_checkout: "पालतू बिना बिल भरे घर जाए",
+    },
+    // What the phone shows. {pet} is the pet's name.
+    says: {
+      booking_request: "एक पेरेंट ने {pet} के लिए ठहराव माँगा।",
+      appointment_request: "एक पेरेंट ने {pet} के लिए अपॉइंटमेंट माँगा।",
+      intake_form: "पेरेंट का एक नया फ़ॉर्म इंतज़ार में है।",
+      food_order: "{pet} के लिए खाने का ऑर्डर या बदलाव इंतज़ार में है।",
+      incident: "{pet} की एक घटना लिखी गई।",
+      unpaid_checkout: "{pet} बिना बिल भरे घर गया।",
+    },
+    somePet: "एक पालतू",
+    fallback: "केनल में कुछ नया है। देखने के लिए Wagbook खोलें।",
   },
   photoArchive: {
     title: "फ़ोटो और जगह",

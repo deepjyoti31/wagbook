@@ -10,6 +10,8 @@
 --   Attendance  clocking in and out from the phone. The database stamps the
 --               time; only an owner or manager writes a time by hand, with a
 --               note. A person sees their own; owners and managers everyone's.
+--   Patterns    a person's usual week (Monday morning, Tuesday evening), which
+--               fills the rota four weeks ahead, week after week (M60).
 --
 -- Who lives on site is memberships.lives_on_site. The whole area shows only
 -- while organizations.keeps_rota is on.
@@ -150,6 +152,7 @@ create table public.rota (
   work_date date not null,
   starts_at timestamp,
   ends_at timestamp,
+  pattern_id uuid,
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
   unique (org_id, id),
@@ -166,6 +169,7 @@ comment on table public.rota is
 comment on column public.rota.work_date is 'The day the shift starts, kennel date. A night shift ends the next morning.';
 comment on column public.rota.starts_at is 'When it starts, kennel clock, copied from the shift. Moves with the shift''s hours from today on.';
 comment on column public.rota.ends_at is 'When it ends, kennel clock, the next day for a night shift.';
+comment on column public.rota.pattern_id is 'The weekly pattern that put it there (M60), or empty when it was put there by hand. Its days still to come go when the pattern goes.';
 
 create index rota_org_date_idx on public.rota (org_id, work_date);
 
@@ -258,6 +262,136 @@ comment on function public.leave_clears_rota() is 'Trigger: leave being granted 
 create trigger leave_clears_rota
   after insert or update of status on public.leave_requests
   for each row execute function public.leave_clears_rota();
+
+-- ---------------------------------------------------------------------------
+-- A rota that repeats (M60)
+-- ---------------------------------------------------------------------------
+
+create table public.rota_patterns (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organizations (id) on delete cascade,
+  user_id uuid not null,
+  shift_id uuid not null,
+  weekday smallint not null check (weekday between 1 and 7),
+  starts_on date,
+  filled_until date,
+  created_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  unique (org_id, id),
+  unique (org_id, user_id, shift_id, weekday),
+  foreign key (org_id, user_id) references public.memberships (org_id, user_id) on delete cascade,
+  foreign key (org_id, shift_id) references public.shifts (org_id, id) on delete cascade,
+  -- rota_patterns_check fills it in.
+  constraint rota_patterns_dated check (starts_on is not null)
+);
+
+comment on table public.rota_patterns is
+  'A person''s usual week (M60): one shift on one weekday, which fill_rota() puts on the rota four weeks ahead, week after week, until the pattern is taken away. A week can still be changed by hand: a day taken off is not put back, because each pattern remembers how far it has filled. Owners and managers plan it; everyone reads it.';
+comment on column public.rota_patterns.weekday is 'The day of the week: 1 is Monday, 7 is Sunday.';
+comment on column public.rota_patterns.starts_on is 'The first day it fills, kennel date: the day it was made. Set by the database.';
+comment on column public.rota_patterns.filled_until is 'The last day fill_rota() has put it on the rota, kennel date. Empty: not filled yet.';
+
+alter table public.rota
+  add constraint rota_pattern_fkey foreign key (org_id, pattern_id) references public.rota_patterns (org_id, id) on delete set null (pattern_id);
+
+create trigger rota_patterns_stamp_actor
+  before insert or update on public.rota_patterns
+  for each row execute function public.stamp_actor('created_by');
+
+-- A pattern starts today and changes only by being made again. Runs as the caller.
+create function public.rota_patterns_check()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.starts_on := public.org_today(new.org_id);
+    new.filled_until := null;
+  elsif (new.user_id, new.shift_id, new.weekday, new.starts_on) is distinct from (old.user_id, old.shift_id, old.weekday, old.starts_on) then
+    raise exception 'WB275: a pattern is not changed. Take it away and add the new one.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.rota_patterns_check() is
+  'Trigger: a pattern starts on the day it is made, filled from then on; its person, shift and weekday never change (WB275): take it away and add another.';
+
+create trigger rota_patterns_check
+  before insert or update on public.rota_patterns
+  for each row execute function public.rota_patterns_check();
+
+-- Taking a pattern away takes its days still to come off the rota; the days
+-- worked stay. Runs as the caller, an owner or manager.
+create function public.rota_patterns_clear()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  delete from public.rota r
+  where r.org_id = old.org_id and r.pattern_id = old.id and r.work_date > public.org_today(old.org_id);
+  return old;
+end;
+$$;
+comment on function public.rota_patterns_clear() is 'Trigger: a pattern taken away takes its rota days after today with it.';
+
+create trigger rota_patterns_clear
+  before delete on public.rota_patterns
+  for each row execute function public.rota_patterns_clear();
+
+-- Put every pattern on the rota up to a day (four weeks from today unless
+-- said): each from the day after it last filled, on its weekday, skipping a
+-- day of the person's granted leave and a day they are already on a shift at
+-- that time. A day filled once is never filled again, so a day taken off by
+-- hand stays off. Runs as the caller (an owner or manager), and as the
+-- nightly job. Returns how many rota days it made.
+create function public.fill_rota(p_org uuid, p_until date default null)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_today date := public.org_today(p_org);
+  v_until date := coalesce(p_until, public.org_today(p_org) + 27);
+  v_pattern record;
+  v_count integer;
+  v_made integer := 0;
+begin
+  if v_until > v_today + 62 then
+    v_until := v_today + 62;
+  end if;
+  for v_pattern in
+    select p.*, s.starts_at as shift_start, s.ends_at as shift_end
+    from public.rota_patterns p
+    join public.shifts s on s.org_id = p.org_id and s.id = p.shift_id and s.is_active
+    join public.memberships m on m.org_id = p.org_id and m.user_id = p.user_id and m.is_active and m.role <> 'rider'
+    where p.org_id = p_org and coalesce(p.filled_until, p.starts_on - 1) < v_until
+    order by p.created_at, p.id
+    for update of p
+  loop
+    insert into public.rota (org_id, shift_id, user_id, work_date, pattern_id)
+    select p_org, v_pattern.shift_id, v_pattern.user_id, d::date, v_pattern.id
+    from generate_series(greatest(coalesce(v_pattern.filled_until + 1, v_pattern.starts_on), v_today), v_until, interval '1 day') d
+    where extract(isodow from d)::smallint = v_pattern.weekday
+      and not exists (
+        select 1 from public.leave_requests l
+        where l.org_id = p_org and l.user_id = v_pattern.user_id and l.status = 'granted' and d::date between l.starts_on and l.ends_on)
+      and not exists (
+        select 1 from public.rota r
+        where r.org_id = p_org and r.user_id = v_pattern.user_id
+          and tsrange(r.starts_at, r.ends_at) && tsrange(
+            d::date + v_pattern.shift_start,
+            d::date + v_pattern.shift_end + case when v_pattern.shift_end <= v_pattern.shift_start then interval '1 day' else interval '0 days' end));
+    get diagnostics v_count = row_count;
+    v_made := v_made + v_count;
+    update public.rota_patterns p set filled_until = v_until where p.id = v_pattern.id;
+  end loop;
+  return v_made;
+end;
+$$;
+comment on function public.fill_rota(uuid, date) is
+  'Puts each weekly pattern (M60) on the rota up to p_until (four weeks from today unless given, at most 62 days): every matching weekday after the last day it filled, skipping granted leave and days the person is already on a shift at that time. A day is filled once, so one taken off by hand stays off. Runs as the caller, an owner or manager, and overnight. Returns how many rota days it made.';
 
 -- ---------------------------------------------------------------------------
 -- Attendance: clocking in and out
@@ -379,3 +513,38 @@ as $$
 $$;
 comment on function public.who_is_on(uuid) is
   'The names of the people clocked in now at a kennel the caller works at (M43): names only, no times. SECURITY DEFINER because a person reads only their own attendance.';
+
+-- ---------------------------------------------------------------------------
+-- Clock-outs forgotten (M60)
+-- ---------------------------------------------------------------------------
+
+-- Each stretch still open well after the shift it began in ended: the shift
+-- is the person's rota row whose hours it began in (or up to two hours
+-- before). Read with the caller's own rights: an owner or manager sees
+-- everyone's, a person their own.
+create function public.forgotten_clock_outs(p_org uuid, p_grace_minutes integer default 120)
+returns table (attendance_id uuid, user_id uuid, display_name text, clocked_in_at timestamptz, shift_name text, shift_ended_at timestamptz)
+language sql
+stable
+set search_path = ''
+as $$
+  select a.id, a.user_id, m.display_name, a.clocked_in_at, s.name, r.ends_at at time zone o.time_zone
+  from public.attendance a
+  join public.organizations o on o.id = a.org_id
+  join public.memberships m on m.org_id = a.org_id and m.user_id = a.user_id
+  join lateral (
+    select r2.* from public.rota r2
+    where r2.org_id = a.org_id and r2.user_id = a.user_id
+      and (a.clocked_in_at at time zone o.time_zone) >= r2.starts_at - interval '2 hours'
+      and (a.clocked_in_at at time zone o.time_zone) < r2.ends_at
+    order by r2.starts_at
+    limit 1
+  ) r on true
+  join public.shifts s on s.org_id = r.org_id and s.id = r.shift_id
+  where a.org_id = p_org
+    and a.clocked_out_at is null
+    and now() > (r.ends_at at time zone o.time_zone) + make_interval(mins => greatest(p_grace_minutes, 0))
+  order by a.clocked_in_at;
+$$;
+comment on function public.forgotten_clock_outs(uuid, integer) is
+  'Stretches of attendance still open more than p_grace_minutes (two hours) after the end of the shift they began in (M60), with the shift''s end as an instant: for Today, where an owner or manager closes one at the end of the shift with a note. Runs with the caller''s rights.';

@@ -7,7 +7,7 @@ promised.
 ## The promises
 
 1. A kennel's data is visible only to that kennel's active members.
-2. Someone who is not signed in can do exactly twelve things, and can read no table.
+2. Someone who is not signed in can do exactly thirteen things, and can read no table.
 9. A rider (D45) sees only their own delivery run for the day, and can read no table.
 3. A parent's link shows one stay or one bill and nothing else, and a stay link opens only that stay's shared photos.
 4. Staff cannot do what only managers may do, and managers cannot touch owners.
@@ -147,8 +147,9 @@ in an intake form, and who reviewed it.
 
 ## What someone who is not signed in can do
 
-Twelve functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
-is changed on purpose.
+Thirteen functions, and no table. `tests/db/security.test.ts` pins this list; adding to it fails the build until the test
+is changed on purpose. The thirteenth, `take_pushes` (M61), is called only by the app's own server, and answers only to
+the installation's push secret.
 
 | Function | Returns | Guard |
 | --- | --- | --- |
@@ -156,14 +157,15 @@ is changed on purpose.
 | `submit_intake(slug, payload)` | The folder for this form's certificates and its upload secret | Refused when the form is switched off (`WB040`); size cap, shape checks, consent required, flood limits |
 | `get_public_stay(token)` | One stay: kennel contact, pet name, dates, status, parent-visible updates, care counts | 64 character secret; dead when cancelled, and 30 days after check-out |
 | `get_public_invoice(token)` | One issued or voided invoice with its lines, the total paid so far, and the UPI details frozen on it | 64 character secret; never a draft |
-| `get_public_booking_form(token)` | A known parent's own booking link: kennel name, WhatsApp number and usual times, the parent's first name, their pets' names, the kinds of stay they can ask for, and their stays already asked for or booked (dates and status) | 64 character secret per parent (`clients.request_token`); nothing for a hidden or erased parent; no prices, notes or other parents |
-| `submit_booking_request(token, payload)` | How many pets were asked for | Same secret; refused when the kennel turns requests off (`WB100`); only the parent's own listed pets (`WB102`); dates from today to a year ahead, 90 days at most (`WB103`); a usual price must exist (`WB104`); 12 requested pets a day at most (`WB105`); size cap. Makes bookings with status `requested`, which hold no kennel |
+| `get_public_booking_form(token, service, day)` | A known parent's own booking link: kennel name, WhatsApp number and usual times, the parent's first name, their pets' names, the kinds of stay they can ask for, and their stays already asked for or booked (dates and status); when the kennel offers appointments (M59), the services they may ask for (name, kind, minutes), their appointments still to come (day, time, status) and, for a service and a day from today to 60 days ahead, the free times; when the kennel delivers food, their deliveries handed over within the problem window (pet, date, whether told) | 64 character secret per parent (`clients.request_token`); nothing for a hidden or erased parent; no prices, notes or other parents. The free times say only when a place is free, never whose appointment fills it |
+| `submit_booking_request(token, payload)` | How many pets were asked for | Same secret; refused when the kennel turns requests off (`WB100`); only the parent's own listed pets (`WB102`); dates from today to a year ahead, 90 days at most (`WB103`); a usual price must exist (`WB104`); 12 requested pets a day at most (`WB105`); size cap. Makes bookings with status `requested`, which hold no kennel. With an appointment (M59): one of their pets (`WB102`), a service the kennel offers (`WB272`), one of the free times from today to 60 days ahead (`WB273`), six a day (`WB105`); makes an appointment with status `requested`, which holds nothing |
 | `get_public_food_form(slug)` | The kennel's food order page (M32): name, WhatsApp number, UPI details, consent wording, the trial and subscription food with their prices, the portion settings and pack size, and the PIN codes served with their charges | None beyond the link name, and only while the kennel delivers food and takes orders. Nothing here is private: a kennel publishes its prices and areas |
 | `submit_food_order(slug, payload)` | A token for the order, its status, and what to pay now, worked out by the database | Refused when the kennel takes no orders (`WB180`); size cap and shape checks (`WB181` to `WB185`), consent required, a valid phone and PIN code, a dog's weight; three orders a day per phone and thirty in ten minutes per kennel (`WB184`). Makes a `food_orders` row and nothing else: no parent, pet, subscription or charge |
 | `food_order_paid(token)` | The order's status | The order's 64 character token; only moves an unpaid order to "says paid", for staff to check |
-| `submit_food_request(token, payload)` | Nothing | A known parent's own link secret, as `submit_booking_request`; only their own subscriptions (`WB186`); dates from today to 120 days ahead (`WB187`); ten a day (`WB105`). Makes a request for staff, never a change by itself |
+| `submit_food_request(token, payload)` | Nothing, or for a problem with a photo the one path the photo may go to | A known parent's own link secret, as `submit_booking_request`; only their own subscriptions (`WB186`); dates from today to 120 days ahead (`WB187`); ten a day (`WB105`). Makes a request for staff, never a change by itself. A problem with a delivery (M59): only their own deliveries (`WB278`), within the problem window (`WB174`), once each (`WB274`), five a day |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
-| `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
+| `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Or, for a delivery problem's photo (M59): the parent's link secret in the `x-wagbook-link` header, and the name must be the path `submit_food_request` gave back for a problem that parent told under an hour ago. Adding only: one file per name, nothing can be read back, replaced or removed |
+| `take_pushes(secret, gone)` | The push addresses of the phones with an alert waiting (M61), each once; nothing else | The installation's push secret (`PUSH_SECRET`, at least 32 characters), checked against its SHA-256 in the sealed `push_secret` table (`WB277` otherwise). Only the app server holds it. It can only remove the push addresses a push service said are gone. The addresses alone send nothing: a push service takes only a push signed with the installation's own key, and a push carries no words |
 
 **Pages without a function of their own (Phase 5).** `/api/health` (M48) calls `get_public_intake_form()` with a name
 no kennel can have and says only whether the database answered. `/login/forgot` and `/login/new-password` (M45) go to
@@ -177,6 +179,16 @@ of the kennel (the folder is the kennel's own). The bucket keeps its limits: 10 
 photo into a JPEG without its hidden data first; someone calling Storage directly could send a file as it is, which
 only staff ever open, from Supabase's address rather than Wagbook's. Worst case for a kennel that is flooded: 60
 waiting forms an hour (`WB048`), six files each.
+
+**Alerts on staff phones (milestone M61, D53).** The database writes an alert (a pet's name and a page in Wagbook,
+never a parent's contact) and a row in the sealed `push_outbox` for each phone of each person who chose that kind.
+After a request that may raise one, the app server takes the phones to wake with `take_pushes()` and the
+installation's secret, and sends each an empty push signed with its VAPID key (`src/lib/vapid.ts`). The phone's service
+worker then asks `/api/alerts`, with the person's own session, for the alerts they chose (`my_alerts()`). So nothing
+about the kennel passes through the browser makers' push services, and a phone that is signed out shows only "Something
+new at the kennel". Each person sees and removes only their own phones and choices; nobody reads the outbox or the
+secret. Alerts are kept 30 days. The secret is set from the SQL editor (`set_push_secret`, granted to no role) and
+should be changed if it leaks; it is shared by every kennel on one installation.
 
 **Booking requests from parents (milestone M17).** A known parent gets a link of their own from the kennel (Copy or
 Send on the parent page). Behind it, the parent sees their pets' names and the dates of their own stays, and can ask

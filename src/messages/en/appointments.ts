@@ -128,6 +128,9 @@ export const appointmentsArea = {
     todayEmpty: "No appointments today.",
     seeDay: "See the day",
     cleaning: "Cleaning",
+    askedByParents: "Asked for by parents",
+    askedHint: "From their own link. Open one to confirm it, move it or cancel it, then tell the parent on WhatsApp.",
+    parentAsked: { one: "A parent has asked for an appointment.", other: "{n} appointments asked for by parents are waiting." },
   },
 
   newAppointment: {
@@ -235,6 +238,9 @@ export const appointmentsArea = {
     cakeButton: "Order the cake",
     cakeOrdered: "Cake ordered for {date}.",
     cakeNone: "Add a made-to-order item in Kitchen settings first.",
+    move: "Move",
+    fromParent: "Asked for by the parent",
+    sendMoved: "Send the new time to the parent",
     done_: {
       confirmed: "Confirmed.",
       done: "Marked done.",
@@ -244,6 +250,7 @@ export const appointmentsArea = {
       priced: "Price saved.",
       addOn: "Add-on added.",
       booked: "Booked.",
+      moved: "Moved. Send the new time to the parent.",
     },
     errors: {
       notFound: "That appointment could not be found.",
@@ -257,6 +264,23 @@ export const appointmentsArea = {
     },
   },
 
+  // Moving an appointment to another day, time, place or person (M58).
+  moveAppointment: {
+    title: "Move the appointment",
+    now: "Now: {date}, {from} to {to}",
+    date: "New day",
+    place: "Place",
+    person: "With",
+    showTimes: "Show free times",
+    times: "Free times on {date}",
+    lasts: "It takes {minutes} minutes. Pick a start time.",
+    timesEmpty: "No free time that day. Try another day, place or person.",
+    button: "Move it to this time",
+    notOpen: "Only an appointment still to come can be moved.",
+    errors: {
+      place: "Choose a place.",
+    },
+  },
   grooming: {
     title: "Grooming",
     coat: "Coat",
@@ -326,6 +350,7 @@ export const appointmentsArea = {
   },
 
   whatsappAppointments: {
+    moved: "Hi {parent}, {pet}'s {service} at {kennel} has moved to {date} at {time}. Reply here if that does not suit you.",
     trainingNotes: "Hi {parent}, notes from {pet}'s {service} at {kennel}: {notes}",
     homework: "Homework: {homework}",
   },

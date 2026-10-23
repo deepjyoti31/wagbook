@@ -23,6 +23,11 @@ services:
     environment:
       # "on" shows "Continue with Google" once Supabase Auth has a Google client (docs/14-self-hosting.md).
       GOOGLE_SIGN_IN: ${GOOGLE_SIGN_IN:-off}
+      # Alerts on staff phones: all four, from `node scripts/push-keys.mjs` (docs/14-self-hosting.md). Empty keeps them off.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      PUSH_SECRET: ${PUSH_SECRET:-}
     restart: unless-stopped
     # Not published: only Caddy talks to it.
     expose:

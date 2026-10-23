@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { isISODate, MAX_WEIGHT_G, normalizePhone, parseKgToGrams, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { sendAlertsAfter } from "@/lib/push";
 import { checked, text, type FormState } from "@/lib/forms";
 import { setHidden } from "@/lib/hiding";
 import { getAppI18n } from "@/lib/i18n-server";
@@ -226,6 +227,7 @@ export async function addIncident(_state: FormState, form: FormData): Promise<Fo
     parent_notified_at: checked(form, "parentTold") ? new Date().toISOString() : null,
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   revalidatePath("/app", "layout");
   redirect(`/app/dogs/${petId.data}?done=incident`);
 }

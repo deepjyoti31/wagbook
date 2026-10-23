@@ -1199,3 +1199,55 @@ offers one at a time.
 
 **Look again** if kennels want the report frozen at check-out, supplies by the meal (a different amount at breakfast
 and dinner), or house jobs with photo proof too.
+
+## D53. Phase 7: moves checked like bookings, the parent's link extended, a rota that fills itself, pushes that carry nothing
+
+**Status:** Decided, 23 October 2026, building Phase 7 (M58 to M61).
+
+**Situation.** The owner's list (D49) asked for appointments that move, more from the parent's own link (an
+appointment, a delivery problem with a photo), a rota that repeats with forgotten clock-outs put right, and alerts on
+staff phones. Two of these reach the public internet, and one needs the app to wake phones while no one is signed in,
+without the service role key (D5) and without a paid service.
+
+**Decision.**
+
+- **A move (M58)** is an update of the appointment's time, place and person, and the appointment's own trigger and
+  constraints check it as they check a new one (the place with its clean-up, the pet and the person one at a time, the
+  place's hours, the stay's days). Only an appointment still to come moves (`WB270`), and only to a time still to come
+  (`WB271`). It keeps its add-ons and its bill; an issued bill keeps the old date in its line text, because an issued
+  bill is never rewritten. History of changes now lists appointments, with the old time.
+- **The parent's link (M59)** grows inside its own two functions, so the anonymous role still reaches twelve from
+  the page: `get_public_booking_form` takes a service and a day and gives the free times (`free_starts()`, which
+  `first_free_start()` now reads too), and `submit_booking_request` takes an appointment at one of them, as a request
+  holding nothing. `submit_food_request` takes a problem with one of the parent's deliveries and gives back the one
+  path its photo may go to; `intake_upload_allowed`, which already let in certificates, lets that file in with the link's secret,
+  once, within the hour. Only those functions can mark a request or problem as the parent's (a transaction setting the
+  triggers read), so staff cannot pass their own as a parent's.
+- **The rota (M60)** keeps a usual week per person (`rota_patterns`) and `fill_rota()` puts it on the rota four weeks
+  ahead: when a manager opens the rota, after a pattern is added, and overnight. Each pattern remembers the last day it
+  filled, so a day filled once is never filled again and a day taken off by hand stays off. Leave and clashes are
+  skipped. A pattern is never changed in place (`WB275`): it is taken away (with its days still to come) and added
+  again. A forgotten clock-out is worked out when read (`forgotten_clock_outs()`): open two hours after the end of the
+  shift it began in. Closing it is a time by hand with a note, as any other.
+- **Alerts (M61)** are written by the database (triggers, `security definer`, since nobody writes alerts directly) with
+  a row in a sealed outbox for each phone of each person who chose that kind. **A push carries nothing**: the phone's
+  service worker wakes and asks Wagbook, signed in, what happened (`/api/alerts`, `my_alerts()`), in the person's own
+  language. So nothing is encrypted for the push service and no library is needed: the VAPID signature (RFC 8292) is
+  `node:crypto` (`src/lib/vapid.ts`, unit tested). The app takes the phones to wake right after anything that may raise
+  an alert, with `take_pushes()`, which the anonymous role may call (a parent's request has no one signed in) but which
+  answers only to the installation's push secret, kept in the database as its SHA-256 and set from the SQL editor.
+  That makes thirteen functions the anonymous role can call. Alerts are off until an installation sets the four
+  settings (`node scripts/push-keys.mjs` makes them).
+
+**Why.** Every rule stays in the database, the link's surface barely grows, and the push design keeps the words of an
+alert between the kennel's own server and its staff, never with the browser makers' push services. No new dependency.
+
+**Cost.** A move that changes the day keeps the bill's old date in an issued bill's line. A parent's free times count
+the place only; a time their own pet is busy is refused when they send it (`WB273`). The rota fills only where someone
+opens it or the overnight job runs (without `pg_cron`, opening the rota fills it). An alert waits until the next
+request that may raise one if the app could not send it; pushes are best-effort, as push services are. The push secret
+is one more thing to set up, and is shared by every kennel on an installation. A phone that was asleep longer than a
+day misses alerts older than a day (Today still shows the requests).
+
+**Look again** if parents should see times their pet is free only, if alerts should be sent from the database itself
+(`pg_net`), or if a kennel asks for a message in the push for phones that cannot reach Wagbook.

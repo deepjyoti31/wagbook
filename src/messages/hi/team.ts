@@ -1,7 +1,7 @@
 import type { Messages } from "../en";
 
 /** Hindi words for the team (Phase 4, M43, D48): a first draft, to be checked by a native speaker. Part of hi.ts. */
-export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow"> = {
+export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "forgotClockOut" | "onNow"> = {
   rota: {
     title: "रोस्टर",
     off: "रोस्टर बंद है। मालिक या मैनेजर इसे सेटिंग्स में, यह केनेल क्या देता है के नीचे, चालू करते हैं।",
@@ -52,6 +52,19 @@ export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow">
       about: "देखभाल करने वाले जो केनेल में ही रहते हैं, दिन-रात वहीं। आज का पेज उन्हें अभी काम पर लोगों के साथ दिखाता है।",
       save: "सेव करें",
       saved: "यहीं रहने वाले सेव हुए।",
+    },
+    // A person's usual week, which fills the rota (M60).
+    pattern: {
+      title: "आम हफ़्ता",
+      about: "हर व्यक्ति की आम शिफ़्टें। ये रोटा को चार हफ़्ते आगे तक भरती हैं, हर हफ़्ते, जब तक बदली न जाएँ। छुट्टी का दिन छोड़ दिया जाता है, और ऊपर किसी हफ़्ते को हाथ से बदला जा सकता है।",
+      none: "अभी कोई आम हफ़्ता नहीं।",
+      line: "{day}: {shift}",
+      removeLabel: "{name} के आम हफ़्ते से {what} हटाएँ",
+      days: "इन दिनों",
+      button: "आम हफ़्ते में जोड़ें",
+      added: { one: "जोड़ दिया। {n} शिफ़्ट रोटा पर लगी।", other: "जोड़ दिया। {n} शिफ़्टें रोटा पर लगीं।" },
+      removed: "हटा दिया। इसके आने वाले दिन रोटा से हट गए।",
+      errors: { days: "एक या ज़्यादा दिन चुनें।" },
     },
     links: { leave: "छुट्टी", attendance: "हाज़िरी" },
     errors: {
@@ -152,6 +165,15 @@ export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow">
     },
   },
 
+  // A stretch still open well after its shift ended, on Today for owners and managers (M60).
+  forgotClockOut: {
+    line: "{name} ने क्लॉक आउट नहीं किया",
+    since: "{date} को {time} बजे {shift} शिफ़्ट के लिए क्लॉक इन किया।",
+    button: "शिफ़्ट ख़त्म होने पर क्लॉक आउट ({time})",
+    // Written on the stretch as the note for the time by hand.
+    note: "क्लॉक आउट नहीं किया। {shift} शिफ़्ट के ख़त्म होने का समय लिखा।",
+    gone: "यह पहले ही देख लिया गया है।",
+  },
   onNow: {
     title: "अभी काम पर",
     clockedIn: "हाज़िरी लगी",

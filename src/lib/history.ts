@@ -21,6 +21,7 @@ export const HISTORY_TABLES = [
   "expenses",
   "services",
   "incidents",
+  "appointments",
   "organizations",
   "memberships",
 ] as const satisfies readonly (keyof HistoryWords["tables"])[];
@@ -135,6 +136,8 @@ export function historyLink(entry: HistoryEntry): string | null {
       return id(data.invoice_id) ? `/app/bills/${data.invoice_id}` : id(data.booking_id) ? `/app/bookings/${data.booking_id}` : null;
     case "incidents":
       return id(data.pet_id) ? `/app/dogs/${data.pet_id}` : null;
+    case "appointments":
+      return entry.action === "delete" || !id(entry.row_id) ? null : `/app/appointments/${entry.row_id}`;
     default:
       return null;
   }

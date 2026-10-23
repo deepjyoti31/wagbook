@@ -3,7 +3,7 @@ import type { Messages } from "../en";
 /** Hindi words for appointments (Phase 2, M34 to M37, D46): a first draft, to be checked by a native speaker. Part of hi.ts. */
 export const appointmentsArea: Pick<
   Messages,
-  "appointmentKinds" | "appointmentStatus" | "coats" | "pricings" | "sizes" | "packageDays" | "appointmentSetup" | "appointments" | "newAppointment" | "appointment" | "grooming" | "courses" | "stayAppointments" | "whatsappAppointments"
+  "appointmentKinds" | "appointmentStatus" | "coats" | "pricings" | "sizes" | "packageDays" | "appointmentSetup" | "appointments" | "newAppointment" | "appointment" | "moveAppointment" | "grooming" | "courses" | "stayAppointments" | "whatsappAppointments"
 > = {
   appointmentKinds: { groom: "ग्रूमिंग", swim: "तैराकी", training: "ट्रेनिंग", party: "पार्टी", other: "अन्य" },
   appointmentStatus: { requested: "अनुरोध", confirmed: "पक्का", done: "हो गया", no_show: "नहीं आया", cancelled: "रद्द" },
@@ -133,6 +133,9 @@ export const appointmentsArea: Pick<
     todayEmpty: "आज कोई अपॉइंटमेंट नहीं।",
     seeDay: "दिन देखें",
     cleaning: "सफ़ाई",
+    askedByParents: "पेरेंट ने माँगे",
+    askedHint: "उनके अपने लिंक से। पक्का करने, समय बदलने या रद्द करने के लिए खोलें, फिर पेरेंट को WhatsApp पर बताएँ।",
+    parentAsked: { one: "एक पेरेंट ने अपॉइंटमेंट माँगा है।", other: "पेरेंट के माँगे {n} अपॉइंटमेंट इंतज़ार में हैं।" },
   },
 
   newAppointment: {
@@ -240,6 +243,9 @@ export const appointmentsArea: Pick<
     cakeButton: "केक ऑर्डर करें",
     cakeOrdered: "{date} के लिए केक ऑर्डर हुआ।",
     cakeNone: "पहले रसोई की सेटिंग्स में ऑर्डर पर बनने वाली चीज़ जोड़ें।",
+    move: "समय बदलें",
+    fromParent: "पेरेंट ने माँगा",
+    sendMoved: "पेरेंट को नया समय भेजें",
     done_: {
       confirmed: "पक्का हुआ।",
       done: "हो गया लिखा।",
@@ -249,6 +255,7 @@ export const appointmentsArea: Pick<
       priced: "दाम सेव हुआ।",
       addOn: "ऐड-ऑन जोड़ा।",
       booked: "बुक हो गया।",
+      moved: "समय बदल गया। पेरेंट को नया समय भेजें।",
     },
     errors: {
       notFound: "यह अपॉइंटमेंट नहीं मिला।",
@@ -262,6 +269,23 @@ export const appointmentsArea: Pick<
     },
   },
 
+  // Moving an appointment to another day, time, place or person (M58).
+  moveAppointment: {
+    title: "अपॉइंटमेंट का समय बदलें",
+    now: "अभी: {date}, {from} से {to}",
+    date: "नया दिन",
+    place: "जगह",
+    person: "किसके साथ",
+    showTimes: "खाली समय दिखाएँ",
+    times: "{date} को खाली समय",
+    lasts: "इसमें {minutes} मिनट लगते हैं। शुरू होने का समय चुनें।",
+    timesEmpty: "उस दिन कोई खाली समय नहीं। कोई और दिन, जगह या व्यक्ति आज़माएँ।",
+    button: "इस समय पर करें",
+    notOpen: "सिर्फ़ आने वाले अपॉइंटमेंट का समय बदला जा सकता है।",
+    errors: {
+      place: "जगह चुनें।",
+    },
+  },
   grooming: {
     title: "ग्रूमिंग",
     coat: "बाल",
@@ -331,6 +355,7 @@ export const appointmentsArea: Pick<
   },
 
   whatsappAppointments: {
+    moved: "नमस्ते {parent}, {kennel} में {pet} का {service} अब {date} को {time} बजे है। अगर यह ठीक न हो तो यहीं जवाब दें।",
     trainingNotes: "नमस्ते {parent}, {kennel} में {pet} की {service} के नोट: {notes}",
     homework: "होमवर्क: {homework}",
   },

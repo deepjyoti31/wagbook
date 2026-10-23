@@ -55,12 +55,14 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
 
   // Ids in the log become names: people, pets, parents, kennels and price list rows.
   const ids = [...new Set(shown.flatMap(idsIn))].slice(0, 300);
-  const [pets, clients, kennels, services] = ids.length
+  const [pets, clients, kennels, services, places, appointmentServices] = ids.length
     ? await Promise.all([
         supabase.from("pets").select("id, name").eq("org_id", org.id).in("id", ids),
         supabase.from("clients").select("id, full_name").eq("org_id", org.id).in("id", ids),
         supabase.from("kennels").select("id, name").eq("org_id", org.id).in("id", ids),
         supabase.from("services").select("id, name").eq("org_id", org.id).in("id", ids),
+        supabase.from("appointment_places").select("id, name").eq("org_id", org.id).in("id", ids),
+        supabase.from("appointment_services").select("id, name").eq("org_id", org.id).in("id", ids),
       ])
     : [];
   const names = new Map<string, string>([
@@ -69,6 +71,8 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
     ...(clients?.data ?? []).map((c) => [c.id, c.full_name] as const),
     ...(kennels?.data ?? []).map((k) => [k.id, fill(h.kennel, { name: k.name })] as const),
     ...(services?.data ?? []).map((x) => [x.id, x.name] as const),
+    ...(places?.data ?? []).map((x) => [x.id, x.name] as const),
+    ...(appointmentServices?.data ?? []).map((x) => [x.id, x.name] as const),
   ]);
   const when = new Intl.DateTimeFormat(locale, { timeZone: org.time_zone, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
   const fmt: HistoryFormat = {

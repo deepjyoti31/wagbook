@@ -230,11 +230,29 @@ Wagbook account with the same email lands in that account.
 Two-step sign-in still applies after Google. Someone who only ever signed in with Google has no password; they can add
 one with "Forgot your password?".
 
+### Alerts on phones
+
+Optional (M61, D53). Staff can then have their phones tell them when a parent asks for a stay or an appointment, a new
+form arrives, an incident is written down, and so on. No paid service is used: browsers wake phones for free, and the
+push carries no words (the phone asks Wagbook what happened).
+
+1. On your computer, in the Wagbook folder: `node scripts/push-keys.mjs`. It prints four settings and one line of SQL.
+2. Add the four settings (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` with your email as
+   `mailto:you@example.com`, and `PUSH_SECRET`) as environment variables for Wagbook (on Vercel, under Environment
+   Variables), and redeploy.
+3. In the Supabase SQL editor, run the line it printed: `select public.set_push_secret('...');`.
+4. Each person opens More, Alerts on your phone, taps **Allow alerts on this phone** and chooses their alerts. On an
+   iPhone, add Wagbook to the home screen first and open it from there.
+
+Keep the private key and the secret like a password. If either leaks, run the script again, change all four settings
+and the SQL line, and ask everyone to allow alerts again. Without the four settings the page says alerts are not set up,
+and nothing else changes.
+
 ### Overnight jobs
 
 The migrations switch on Supabase's `pg_cron` and schedule `run_nightly_jobs()` at 02:00 India time (20:30 UTC): it
-makes food deliveries three weeks ahead for every subscription, and clears problems and job runs older than 90 days
-(M46). More, Problems and overnight jobs shows when each last ran and whether it worked. To run them by hand, in the SQL
+makes food deliveries three weeks ahead for every subscription, fills the rota four weeks ahead from each person's
+usual week (M60), and clears problems and job runs older than 90 days and alerts older than 30 (M46). More, Problems and overnight jobs shows when each last ran and whether it worked. To run them by hand, in the SQL
 editor: `select public.run_nightly_jobs();`. Running them twice does nothing twice.
 
 ### Know when it breaks

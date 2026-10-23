@@ -203,3 +203,12 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB256` | a vet visit is written on its day or after | `20261008000570_the_day.sql` |
 | `WB260` | a stay report is for a pet in the kennel or gone home | `20261008000570_the_day.sql` |
 | `WB261` | pick the report's photos from this stay's updates to the parent | `20261008000570_the_day.sql` |
+| `WB270` | only an appointment still to come can be moved | `20261008000450_appointments.sql` |
+| `WB271` | move it to a time still to come | `20261008000450_appointments.sql` |
+| `WB272` | choose one of the kennel's appointments | `20261008000600_intake_and_public_pages.sql` |
+| `WB273` | that time is not free. Pick one of the free times. | `20261008000600_intake_and_public_pages.sql` |
+| `WB274` | the kennel already knows about a problem with that delivery | `20261008000600_intake_and_public_pages.sql` |
+| `WB275` | a pattern is not changed. Take it away and add the new one. | `20261008000470_team.sql` |
+| `WB276` | the push secret is at least 32 characters | `20261008000650_alerts.sql` |
+| `WB277` | alerts are not set up here | `20261008000650_alerts.sql` |
+| `WB278` | choose one of your deliveries | `20261008000600_intake_and_public_pages.sql` |

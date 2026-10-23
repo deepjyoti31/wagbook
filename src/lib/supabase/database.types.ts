@@ -6,6 +6,77 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      alert_choices: {
+        Row: {
+          org_id: string;
+          user_id: string;
+          kind: Database["public"]["Enums"]["alert_kind"];
+          created_at: string;
+        };
+        Insert: {
+          org_id: string;
+          user_id: string;
+          kind: Database["public"]["Enums"]["alert_kind"];
+          created_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          user_id?: string;
+          kind?: Database["public"]["Enums"]["alert_kind"];
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "alert_choices_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "alert_choices_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+        ];
+      };
+      alerts: {
+        Row: {
+          id: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["alert_kind"];
+          pet_name: string | null;
+          link: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kind: Database["public"]["Enums"]["alert_kind"];
+          pet_name?: string | null;
+          link: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kind?: Database["public"]["Enums"]["alert_kind"];
+          pet_name?: string | null;
+          link?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "alerts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       app_errors: {
         Row: {
           id: string;
@@ -316,6 +387,7 @@ export type Database = {
           cancelled_at: string | null;
           done_at: string | null;
           done_by: string | null;
+          source: string;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -354,6 +426,7 @@ export type Database = {
           cancelled_at?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          source?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -392,6 +465,7 @@ export type Database = {
           cancelled_at?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          source?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1860,6 +1934,7 @@ export type Database = {
           replacement_id: string | null;
           resolved_at: string | null;
           resolved_by: string | null;
+          from_parent: boolean;
         };
         Insert: {
           id?: string;
@@ -1874,6 +1949,7 @@ export type Database = {
           replacement_id?: string | null;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          from_parent?: boolean;
         };
         Update: {
           id?: string;
@@ -1888,6 +1964,7 @@ export type Database = {
           replacement_id?: string | null;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          from_parent?: boolean;
         };
         Relationships: [
           {
@@ -4104,6 +4181,113 @@ export type Database = {
           },
         ];
       };
+      push_outbox: {
+        Row: {
+          id: number;
+          org_id: string;
+          alert_id: string;
+          subscription_id: string;
+          created_at: string;
+          sent_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          org_id: string;
+          alert_id: string;
+          subscription_id: string;
+          created_at?: string;
+          sent_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          org_id?: string;
+          alert_id?: string;
+          subscription_id?: string;
+          created_at?: string;
+          sent_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_outbox_org_id_alert_id_fkey";
+            columns: ["org_id", "alert_id"];
+            isOneToOne: false;
+            referencedRelation: "alerts";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "push_outbox_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "push_outbox_org_id_subscription_id_fkey";
+            columns: ["org_id", "subscription_id"];
+            isOneToOne: false;
+            referencedRelation: "push_subscriptions";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      push_secret: {
+        Row: {
+          id: boolean;
+          secret_hash: string;
+          set_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          secret_hash: string;
+          set_at?: string;
+        };
+        Update: {
+          id?: boolean;
+          secret_hash?: string;
+          set_at?: string;
+        };
+        Relationships: [
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          endpoint: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          endpoint: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          endpoint?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "push_subscriptions_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+        ];
+      };
       recipe_ingredients: {
         Row: {
           org_id: string;
@@ -4427,6 +4611,7 @@ export type Database = {
           work_date: string;
           starts_at: string | null;
           ends_at: string | null;
+          pattern_id: string | null;
           created_by: string | null;
           created_at: string;
         };
@@ -4438,6 +4623,7 @@ export type Database = {
           work_date: string;
           starts_at?: string | null;
           ends_at?: string | null;
+          pattern_id?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -4449,6 +4635,7 @@ export type Database = {
           work_date?: string;
           starts_at?: string | null;
           ends_at?: string | null;
+          pattern_id?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -4469,6 +4656,71 @@ export type Database = {
           },
           {
             foreignKeyName: "rota_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+          {
+            foreignKeyName: "rota_pattern_fkey";
+            columns: ["org_id", "pattern_id"];
+            isOneToOne: false;
+            referencedRelation: "rota_patterns";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      rota_patterns: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          shift_id: string;
+          weekday: number;
+          starts_on: string | null;
+          filled_until: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          shift_id: string;
+          weekday: number;
+          starts_on?: string | null;
+          filled_until?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          shift_id?: string;
+          weekday?: number;
+          starts_on?: string | null;
+          filled_until?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rota_patterns_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rota_patterns_org_id_shift_id_fkey";
+            columns: ["org_id", "shift_id"];
+            isOneToOne: false;
+            referencedRelation: "shifts";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "rota_patterns_org_id_user_id_fkey";
             columns: ["org_id", "user_id"];
             isOneToOne: false;
             referencedRelation: "memberships";
@@ -5578,6 +5830,10 @@ export type Database = {
         Args: { p_client: string };
         Returns: Json;
       };
+      fill_rota: {
+        Args: { p_org: string; p_until?: string };
+        Returns: number;
+      };
       first_delivery_day: {
         Args: { p_org: string; p_weekdays?: number[] };
         Returns: string;
@@ -5598,6 +5854,14 @@ export type Database = {
         Args: { p_token: string };
         Returns: string;
       };
+      forgotten_clock_outs: {
+        Args: { p_org: string; p_grace_minutes?: number };
+        Returns: { attendance_id: string; user_id: string; display_name: string; clocked_in_at: string; shift_name: string; shift_ended_at: string }[];
+      };
+      free_starts: {
+        Args: { p_org: string; p_place: string; p_pet: string; p_day: string; p_minutes: number; p_cleanup: number; p_latest_end?: string };
+        Returns: string[];
+      };
       generate_care_tasks: {
         Args: { p_org: string; p_date: string };
         Returns: number;
@@ -5607,7 +5871,7 @@ export type Database = {
         Returns: { org_name: string; role: Database["public"]["Enums"]["member_role"]; display_name: string; usable: boolean; already_member: boolean }[];
       };
       get_public_booking_form: {
-        Args: { p_token: string };
+        Args: { p_token: string; p_service?: string; p_day?: string };
         Returns: Json;
       };
       get_public_food_form: {
@@ -5678,6 +5942,10 @@ export type Database = {
         Args: { p_keep: string; p_merge: string };
         Returns: string;
       };
+      my_alerts: {
+        Args: { p_after?: string };
+        Returns: { id: string; org_id: string; kennel: string; kind: Database["public"]["Enums"]["alert_kind"]; pet_name: string; link: string; created_at: string }[];
+      };
       my_invitations: {
         Args: Record<PropertyKey, never>;
         Returns: { org_id: string; org_name: string; role: Database["public"]["Enums"]["member_role"]; invited_at: string }[];
@@ -5733,6 +6001,10 @@ export type Database = {
       plan_subscription: {
         Args: { p_subscription: string; p_until: string };
         Returns: number;
+      };
+      raise_alert: {
+        Args: { p_org: string; p_kind: Database["public"]["Enums"]["alert_kind"]; p_pet_name: string; p_link: string };
+        Returns: undefined;
       };
       recipe_cost_per_kg: {
         Args: { p_org: string; p_version: string; p_on?: string };
@@ -5842,6 +6114,10 @@ export type Database = {
         Args: { p_language: string };
         Returns: undefined;
       };
+      set_push_secret: {
+        Args: { p_secret: string };
+        Returns: undefined;
+      };
       stay_charges: {
         Args: { p_org: string; p_bookings: string[] };
         Returns: { booking_id: string; part: string; quantity: number; unit_price_minor: number; discount_minor: number }[];
@@ -5868,11 +6144,15 @@ export type Database = {
       };
       submit_food_request: {
         Args: { p_token: string; p_payload: Json };
-        Returns: undefined;
+        Returns: string;
       };
       submit_intake: {
         Args: { p_slug: string; p_payload: Json };
         Returns: Json;
+      };
+      take_pushes: {
+        Args: { p_secret: string; p_gone?: string[] };
+        Returns: { endpoint: string }[];
       };
       use_recovery_code: {
         Args: { p_code: string };
@@ -5893,6 +6173,7 @@ export type Database = {
     };
     Enums: {
       address_kind: "home" | "work" | "other";
+      alert_kind: "booking_request" | "intake_form" | "food_order" | "appointment_request" | "incident" | "unpaid_checkout";
       appointment_kind: "groom" | "swim" | "training" | "party" | "other";
       appointment_pricing: "fixed" | "by_size" | "by_coat" | "quote";
       appointment_status: "requested" | "confirmed" | "done" | "no_show" | "cancelled";

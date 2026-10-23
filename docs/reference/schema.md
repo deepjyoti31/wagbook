@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 18. Tables: 78. Views: 7. Functions: 172.
+Migrations applied: 19. Tables: 84. Views: 7. Functions: 186.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
+- Tables: [alert_choices](#alert_choices), [alerts](#alerts), [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [push_outbox](#push_outbox), [push_secret](#push_secret), [push_subscriptions](#push_subscriptions), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [rota_patterns](#rota_patterns), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
 - Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stay_supply_left](#stay_supply_left), [stock_levels](#stock_levels)
 - [Functions](#functions)
 
@@ -20,6 +20,7 @@ Migrations applied: 18. Tables: 78. Views: 7. Functions: 172.
 | Type | Values | Meaning |
 | --- | --- | --- |
 | `address_kind` | `home`, `work`, `other` | What a parent's address is, so it is named in the reader's language: home, work or other. |
+| `alert_kind` | `booking_request`, `intake_form`, `food_order`, `appointment_request`, `incident`, `unpaid_checkout` | What an alert is about: booking_request (a stay asked for from a parent's link), intake_form (a new intake form), food_order (an order or a change from a parent), appointment_request (an appointment asked for from a parent's link), incident (an incident written down), unpaid_checkout (a pet went home with its bill unpaid or not made). |
 | `appointment_kind` | `groom`, `swim`, `training`, `party`, `other` | What an appointment service is: groom (grooming and spa), swim (one dog at a time in the pool), training (a session, often of a course), party (the party yard for a birthday), other. |
 | `appointment_pricing` | `fixed`, `by_size`, `by_coat`, `quote` | How a service is priced: fixed (one price), by_size (small, medium or large from the pet's latest weight), by_coat (the pet's coat, a named breed overriding it), quote (an owner or manager sets the price for each appointment). |
 | `appointment_status` | `requested`, `confirmed`, `done`, `no_show`, `cancelled` | requested: written down, holds nothing. confirmed: holds the place, the pet and the person. done: it happened. no_show: the pet did not come (still billed). cancelled: with a reason; it stays cancelled. |
@@ -67,6 +68,68 @@ Migrations applied: 18. Tables: 78. Views: 7. Functions: 172.
 | `waste_reason` | `spoiled`, `past_date`, `dropped`, `other` | Why stock was thrown away: spoiled, past its use-by date, dropped, or another reason in the note. |
 
 ## Tables
+
+### alert_choices
+
+The alerts a person wants on their phones (M61), one row for each kind. Each person chooses their own, under More.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `kind` | `alert_kind` | yes |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `alert_choices_pkey`: `PRIMARY KEY (org_id, user_id, kind)`
+- Foreign key `alert_choices_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `alert_choices_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+
+**Triggers**
+
+- `alert_choices_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `alert_choices_delete` (delete): rows where `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+- `alert_choices_insert` (insert): new values must satisfy `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+- `alert_choices_select` (select): rows where `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+
+### alerts
+
+Something staff should know now (M61), for the phones of the people who chose that kind. Written only by the triggers in 00065; read by members of the kennel; removed after 30 days by the overnight job. Holds a pet's name and a page, never a parent's contact.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `kind` | `alert_kind` | yes |  |  |
+| `pet_name` | `text` |  |  | The pet it is about, when there is one, as its name was then. |
+| `link` | `text` | yes |  | The page in Wagbook to open, such as /app/bookings/{id}. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `alerts_pkey`: `PRIMARY KEY (id)`
+- Unique `alerts_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `alerts_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `alerts_link_check`: `CHECK ((link ~ '^/app(/[a-z0-9/-]*)?(\?[a-z0-9=&-]*)?$'::text))`
+- Check `alerts_pet_name_check`: `CHECK (((pet_name IS NULL) OR (char_length(pet_name) <= 80)))`
+
+**Indexes**
+
+- `CREATE INDEX alerts_org_created_idx ON public.alerts USING btree (org_id, created_at DESC)`
+
+**Triggers**
+
+- `alerts_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `alerts_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### app_errors
 
@@ -327,6 +390,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 | `cancelled_at` | `timestamp with time zone` |  |  |  |
 | `done_at` | `timestamp with time zone` |  |  | When it was marked done. Stamped by the database. |
 | `done_by` | `uuid` |  |  |  |
+| `source` | `text` | yes | `'staff'::text` | staff: booked by the kennel. parent: asked for by the parent through their own link (M59), as a request for staff to confirm. |
 | `created_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -365,6 +429,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 - Check `appointments_place_named`: `CHECK ((place_id IS NOT NULL))`
 - Check `appointments_price_minor_check`: `CHECK (((price_minor IS NULL) OR (price_minor >= 0)))`
 - Check `appointments_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `appointments_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'parent'::text])))`
 - Check `appointments_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
 - Check `appointments_times_in_order`: `CHECK (((ends_at > starts_at) AND ((ends_at - starts_at) <= '12:00:00'::interval)))`
 
@@ -377,6 +442,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 
 **Triggers**
 
+- `appointments_alert` (after insert) runs `alert_on_appointment()`
 - `appointments_audit` (after insert or delete or update) runs `audit_row()`
 - `appointments_check` (before insert or update) runs `appointments_check()`
 - `appointments_check_health` (before insert or update of status) runs `appointments_check_health()`
@@ -690,6 +756,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 
 **Triggers**
 
+- `bookings_alert` (after insert or update of status) runs `alert_on_booking()`
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
@@ -1400,6 +1467,7 @@ A parent said a delivery was damaged, late or wrong, within problem_window_hours
 | `replacement_id` | `uuid` |  |  | The delivery made again, when it was replaced. |
 | `resolved_at` | `timestamp with time zone` |  |  |  |
 | `resolved_by` | `uuid` |  |  |  |
+| `from_parent` | `boolean` | yes | `false` | Told by the parent from their own link (M59), rather than written down by staff. Set only by submit_food_request(). |
 
 **Constraints**
 
@@ -1416,7 +1484,7 @@ A parent said a delivery was damaged, late or wrong, within problem_window_hours
 
 **Triggers**
 
-- `delivery_problems_check` (before insert) runs `delivery_problems_check()`
+- `delivery_problems_check` (before insert or update) runs `delivery_problems_check()`
 - `delivery_problems_forbid_org_change` (before update) runs `forbid_org_change()`
 - `delivery_problems_stamp_actor` (before insert or update) runs `stamp_actor()`
 - `delivery_problems_stamp_resolved` (before insert or update of resolved_at) runs `stamp_when_set()`
@@ -1584,6 +1652,7 @@ Food asked for from outside: an order from the website order page (a trial or a 
 
 **Triggers**
 
+- `food_orders_alert` (after insert) runs `alert_on_food_order()`
 - `food_orders_forbid_org_change` (before update) runs `forbid_org_change()`
 - `food_orders_stamp_review` (before update of status) runs `food_orders_stamp_review()`
 
@@ -1798,6 +1867,7 @@ Anything out of the ordinary: illness, injury, a fight, an escape. A written, ti
 
 **Triggers**
 
+- `incidents_alert` (after insert) runs `alert_on_incident()`
 - `incidents_audit` (after insert or delete or update) runs `audit_row()`
 - `incidents_forbid_org_change` (before update) runs `forbid_org_change()`
 - `incidents_guard_content` (before update) runs `incidents_guard_content()`
@@ -1850,6 +1920,7 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 
 **Triggers**
 
+- `intake_submissions_alert` (after insert) runs `alert_on_intake()`
 - `intake_submissions_forbid_org_change` (before update) runs `forbid_org_change()`
 - `intake_submissions_set_updated_at` (before update) runs `set_updated_at()`
 - `intake_submissions_stamp_review` (before update) runs `intake_submissions_stamp_review()`
@@ -2115,7 +2186,7 @@ Each time an overnight job ran for a kennel (M46), whether it worked, and how mu
 | --- | --- | --- | --- | --- |
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
-| `job` | `text` | yes |  | plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. |
+| `job` | `text` | yes |  | plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. fill_rota: each weekly pattern put on the rota four weeks ahead (M60). |
 | `ran_at` | `timestamp with time zone` | yes | `now()` |  |
 | `ok` | `boolean` | yes |  |  |
 | `made` | `integer` | yes | `0` | How many rows the job made or removed. |
@@ -2125,7 +2196,7 @@ Each time an overnight job ran for a kennel (M46), whether it worked, and how mu
 
 - Primary key `job_runs_pkey`: `PRIMARY KEY (id)`
 - Foreign key `job_runs_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
-- Check `job_runs_job_check`: `CHECK ((job = ANY (ARRAY['plan_deliveries'::text, 'forget_old_rows'::text])))`
+- Check `job_runs_job_check`: `CHECK ((job = ANY (ARRAY['plan_deliveries'::text, 'forget_old_rows'::text, 'fill_rota'::text])))`
 - Check `job_runs_made_check`: `CHECK ((made >= 0))`
 - Check `job_runs_problem_check`: `CHECK (((problem IS NULL) OR (char_length(problem) <= 300)))`
 - Check `job_runs_problem_when_failed`: `CHECK ((ok = (problem IS NULL)))`
@@ -3057,6 +3128,92 @@ A fenced area where one pet at a time plays or exercises.
 - `play_yards_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `play_yards_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### push_outbox
+
+One phone to wake for one alert (M61). Sealed: no policy, so no member reads or writes it; filled by alerts_fan_out() and emptied by take_pushes(), which the app calls with the installation's secret.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `bigint` | yes |  |  |
+| `org_id` | `uuid` | yes |  |  |
+| `alert_id` | `uuid` | yes |  |  |
+| `subscription_id` | `uuid` | yes |  |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `sent_at` | `timestamp with time zone` |  |  | When take_pushes() handed it to the app to send. Empty: still to send. |
+
+**Constraints**
+
+- Primary key `push_outbox_pkey`: `PRIMARY KEY (id)`
+- Foreign key `push_outbox_org_id_alert_id_fkey`: `FOREIGN KEY (org_id, alert_id) REFERENCES alerts(org_id, id) ON DELETE CASCADE`
+- Foreign key `push_outbox_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `push_outbox_org_id_subscription_id_fkey`: `FOREIGN KEY (org_id, subscription_id) REFERENCES push_subscriptions(org_id, id) ON DELETE CASCADE`
+
+**Indexes**
+
+- `CREATE INDEX push_outbox_waiting_idx ON public.push_outbox USING btree (created_at) WHERE (sent_at IS NULL)`
+
+**Triggers**
+
+- `push_outbox_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: nothing directly (then narrowed by the policies below). Anonymous visitors: nothing.
+- No policies: no row is reachable except through SECURITY DEFINER functions.
+
+### push_secret
+
+The SHA-256 of the installation's push secret (M61), the PUSH_SECRET the app is given. One row at most. Sealed: no policy; set only with set_push_secret() from the SQL editor.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `boolean` | yes | `true` |  |
+| `secret_hash` | `text` | yes |  |  |
+| `set_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `push_secret_pkey`: `PRIMARY KEY (id)`
+- Check `push_secret_id_check`: `CHECK (id)`
+- Check `push_secret_secret_hash_check`: `CHECK ((secret_hash ~ '^[0-9a-f]{64}$'::text))`
+
+**Access**
+
+- Signed-in users may: nothing directly (then narrowed by the policies below). Anonymous visitors: nothing.
+- No policies: no row is reachable except through SECURITY DEFINER functions.
+
+### push_subscriptions
+
+A phone (a browser) a person allowed alerts on (M61): its push address from the browser's push service. Pushes carry nothing, so no keys for encrypting them are kept. A person sees and removes only their own.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `endpoint` | `text` | yes |  | The browser's push address. Only the app's own key (VAPID) can send to it. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `push_subscriptions_pkey`: `PRIMARY KEY (id)`
+- Unique `push_subscriptions_org_id_endpoint_key`: `UNIQUE (org_id, endpoint)`
+- Unique `push_subscriptions_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `push_subscriptions_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `push_subscriptions_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Check `push_subscriptions_endpoint_check`: `CHECK (((endpoint ~ '^https://[^\s]+$'::text) AND (char_length(endpoint) <= 1000)))`
+
+**Triggers**
+
+- `push_subscriptions_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `push_subscriptions_delete` (delete): rows where `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+- `push_subscriptions_insert` (insert): new values must satisfy `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+- `push_subscriptions_select` (select): rows where `((user_id = ( SELECT auth.uid() AS uid)) AND (org_id IN ( SELECT my_org_ids() AS my_org_ids)))`
+
 ### recipe_ingredients
 
 What goes into a version of a recipe: each stock item, raw, per kilo of cooked food.
@@ -3345,6 +3502,7 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 | `work_date` | `date` | yes |  | The day the shift starts, kennel date. A night shift ends the next morning. |
 | `starts_at` | `timestamp without time zone` |  |  | When it starts, kennel clock, copied from the shift. Moves with the shift's hours from today on. |
 | `ends_at` | `timestamp without time zone` |  |  | When it ends, kennel clock, the next day for a night shift. |
+| `pattern_id` | `uuid` |  |  | The weekly pattern that put it there (M60), or empty when it was put there by hand. Its days still to come go when the pattern goes. |
 | `created_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -3356,6 +3514,7 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 - Foreign key `rota_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `rota_org_id_shift_id_fkey`: `FOREIGN KEY (org_id, shift_id) REFERENCES shifts(org_id, id) ON DELETE CASCADE`
 - Foreign key `rota_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Foreign key `rota_pattern_fkey`: `FOREIGN KEY (org_id, pattern_id) REFERENCES rota_patterns(org_id, id) ON DELETE SET NULL (pattern_id)`
 - Exclusion `rota_one_shift_at_a_time`: `EXCLUDE USING gist (org_id WITH =, user_id WITH =, tsrange(starts_at, ends_at) WITH &&)`
 - Check `rota_timed`: `CHECK (((starts_at IS NOT NULL) AND (ends_at IS NOT NULL) AND (ends_at > starts_at)))`
 
@@ -3377,6 +3536,50 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 - `rota_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `rota_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `rota_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### rota_patterns
+
+A person's usual week (M60): one shift on one weekday, which fill_rota() puts on the rota four weeks ahead, week after week, until the pattern is taken away. A week can still be changed by hand: a day taken off is not put back, because each pattern remembers how far it has filled. Owners and managers plan it; everyone reads it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `shift_id` | `uuid` | yes |  |  |
+| `weekday` | `smallint` | yes |  | The day of the week: 1 is Monday, 7 is Sunday. |
+| `starts_on` | `date` |  |  | The first day it fills, kennel date: the day it was made. Set by the database. |
+| `filled_until` | `date` |  |  | The last day fill_rota() has put it on the rota, kennel date. Empty: not filled yet. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `rota_patterns_pkey`: `PRIMARY KEY (id)`
+- Unique `rota_patterns_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `rota_patterns_org_id_user_id_shift_id_weekday_key`: `UNIQUE (org_id, user_id, shift_id, weekday)`
+- Foreign key `rota_patterns_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `rota_patterns_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `rota_patterns_org_id_shift_id_fkey`: `FOREIGN KEY (org_id, shift_id) REFERENCES shifts(org_id, id) ON DELETE CASCADE`
+- Foreign key `rota_patterns_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Check `rota_patterns_dated`: `CHECK ((starts_on IS NOT NULL))`
+- Check `rota_patterns_weekday_check`: `CHECK (((weekday >= 1) AND (weekday <= 7)))`
+
+**Triggers**
+
+- `rota_patterns_check` (before insert or update) runs `rota_patterns_check()`
+- `rota_patterns_clear` (before delete) runs `rota_patterns_clear()`
+- `rota_patterns_forbid_org_change` (before update) runs `forbid_org_change()`
+- `rota_patterns_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `rota_patterns_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_delete_by_managers` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `rota_patterns_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### service_areas
 
@@ -4222,6 +4425,66 @@ accept_invitation_link(p_token text) returns uuid
 
 Joins the signed-in person to the organisation of an invitation link, in its role. Works once; refuses an expired or withdrawn link and someone who is already a member.
 
+### alert_on_appointment
+
+```
+alert_on_appointment() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger (M61): an appointment asked for from a parent's link raises an appointment_request alert.
+
+### alert_on_booking
+
+```
+alert_on_booking() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger (M61): a stay asked for from a parent's link raises a booking_request alert; a stay checked out without a bill paid in full (none issued, or money still due; a day from a pack or a repeating series aside) raises unpaid_checkout.
+
+### alert_on_food_order
+
+```
+alert_on_food_order() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger (M61): a food order from the order page, or a change asked for from a parent's link, raises a food_order alert.
+
+### alert_on_incident
+
+```
+alert_on_incident() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger (M61): an incident written down raises an incident alert, opening the pet's page.
+
+### alert_on_intake
+
+```
+alert_on_intake() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger (M61): a new intake form raises an intake_form alert, naming no one.
+
 ### apply_package
 
 ```
@@ -4268,7 +4531,7 @@ appointments_check() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party's people (WB197). Done needs the certificates seen (WB194), a swim's supervisor and life jacket (WB195) and a guest's certificates (WB196). A cancelled one stays cancelled (WB198).
+Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party's people (WB197). Done needs the certificates seen (WB194), a swim's supervisor and life jacket (WB195) and a guest's certificates (WB196). A cancelled one stays cancelled (WB198). Only one still to come (requested or confirmed) changes its time or place, and only to a time still to come (WB270, WB271: a move, M58). Only the parent's own link marks one as asked for by the parent (source, M59).
 
 ### appointments_check_health
 
@@ -4760,7 +5023,7 @@ delivery_problems_check() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: a problem is reported about a delivery that was handed over, within the kennel's problem_window_hours of it (WB174).
+Trigger: a problem is reported about a delivery that was handed over, within the kennel's problem_window_hours of it (WB174). Whether the parent told it (from_parent) is set by submit_food_request() alone and never changed.
 
 ### delivery_runs_check_rider
 
@@ -4798,6 +5061,18 @@ export_client(p_client uuid) returns jsonb
 
 Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, appointments with their add-ons and training courses, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
+### fill_rota
+
+```
+fill_rota(p_org uuid, p_until date) returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Puts each weekly pattern (M60) on the rota up to p_until (four weeks from today unless given, at most 62 days): every matching weekday after the last day it filled, skipping granted leave and days the person is already on a shift at that time. A day is filled once, so one taken off by hand stays off. Runs as the caller, an owner or manager, and overnight. Returns how many rota days it made.
+
 ### first_delivery_day
 
 ```
@@ -4820,7 +5095,7 @@ first_free_start(p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes int
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The first (or with p_latest, the last) start every 30 minutes inside a place's hours on a day where the place, with clean-up, and the pet are free, in the future and ending by p_latest_end if given. Empty when there is none. Must agree with freeTimes() in src/lib/core/appointments.ts.
+The first (or with p_latest, the last) of free_starts(). Empty when there is none.
 
 ### fiscal_year_label
 
@@ -4882,6 +5157,30 @@ forbid_org_change() returns trigger
 
 Trigger: a row never changes organisation. Without this, a member of two organisations could make a row vanish from one by moving it to the other.
 
+### forgotten_clock_outs
+
+```
+forgotten_clock_outs(p_org uuid, p_grace_minutes integer) returns TABLE(attendance_id uuid, user_id uuid, display_name text, clocked_in_at timestamp with time zone, shift_name text, shift_ended_at timestamp with time zone)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Stretches of attendance still open more than p_grace_minutes (two hours) after the end of the shift they began in (M60), with the shift's end as an instant: for Today, where an owner or manager closes one at the end of the shift with a note. Runs with the caller's rights.
+
+### free_starts
+
+```
+free_starts(p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes integer, p_cleanup integer, p_latest_end time without time zone) returns SETOF timestamp with time zone
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Every start, every 30 minutes inside a place's hours on a day, where the place, with clean-up, and the pet (when given) are free, in the future and ending by p_latest_end if given, earliest first. Must agree with freeTimes() in src/lib/core/appointments.ts.
+
 ### generate_care_tasks
 
 ```
@@ -4909,14 +5208,14 @@ What an invitation link is for (kennel name, role, name), for a signed-in person
 ### get_public_booking_form
 
 ```
-get_public_booking_form(p_token text) returns jsonb
+get_public_booking_form(p_token text, p_service uuid, p_day date) returns jsonb
 ```
 
 - Who may call: public
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only), and, when the kennel delivers food, their subscriptions with the next deliveries. Nothing for a hidden or erased parent.
+PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only); when the kennel offers appointments, the services they may ask for, their appointments still to come (day, time, status), and with p_service and p_day the free times that day (M59); and, when the kennel delivers food, their subscriptions with the next deliveries, and their deliveries handed over within the problem window (M59). Nothing for a hidden or erased parent.
 
 ### get_public_food_form
 
@@ -5024,7 +5323,7 @@ intake_upload_allowed(p_name text) returns boolean
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
+PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets; or when it carries a parent's own link secret (x-wagbook-link header) and the file is the photo path of a delivery problem that parent told from their link less than an hour ago (M59). SECURITY DEFINER because the anonymous role can read no table.
 
 ### invite_member_by_email
 
@@ -5156,7 +5455,7 @@ job_forget_old_rows(p_org uuid) returns integer
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Overnight job (M46): removes the kennel's problems (app_errors) and job runs older than 90 days. Returns how many it removed.
+Overnight job (M46): removes the kennel's problems (app_errors) and job runs older than 90 days, and its alerts (M61) older than 30. Returns how many it removed.
 
 ### job_plan_deliveries
 
@@ -5277,6 +5576,18 @@ merge_clients(p_keep uuid, p_merge uuid) returns uuid
 - Volatility: volatile
 
 Merges a duplicate parent into another of the same kennel: moves pets (and their bookings, food subscriptions and deliveries), bills, payments, credit, forms, food orders and addresses, fills in missing details, and hides the duplicate. Owner or manager. Issued bills keep the buyer details printed on them.
+
+### my_alerts
+
+```
+my_alerts(p_after timestamp with time zone) returns TABLE(id uuid, org_id uuid, kennel text, kind alert_kind, pet_name text, link text, created_at timestamp with time zone)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The newest alerts (five at most, from the last day, after p_after) of the kinds the signed-in person chose, at the kennels they work at (M61): what their phone shows when a push wakes it.
 
 ### my_invitations
 
@@ -5578,6 +5889,18 @@ protect_last_owner() returns trigger
 
 Trigger: stops the last active owner from being removed, demoted or deactivated.
 
+### raise_alert
+
+```
+raise_alert(p_org uuid, p_kind alert_kind, p_pet_name text, p_link text) returns void
+```
+
+- Who may call: internal
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Writes an alert (M61) and an outbox row for each phone of each active member who chose its kind. SECURITY DEFINER because alerts and the outbox are written by no one else; called only by the alert triggers, granted to no role.
+
 ### recipe_cost_per_kg
 
 ```
@@ -5866,6 +6189,30 @@ rota_check() returns trigger
 
 Trigger: a rota row takes its shift's hours on its day (the next morning for a night shift); never a shift off the list (WB220), a person not working here or a rider (WB221), or a day of their granted leave (WB222).
 
+### rota_patterns_check
+
+```
+rota_patterns_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pattern starts on the day it is made, filled from then on; its person, shift and weekday never change (WB275): take it away and add another.
+
+### rota_patterns_clear
+
+```
+rota_patterns_clear() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pattern taken away takes its rota days after today with it.
+
 ### rotation_recipe
 
 ```
@@ -5961,6 +6308,18 @@ set_my_language(p_language text) returns void
 - Volatility: volatile
 
 Sets the signed-in person's language (en, hi or kn) in every kennel they belong to. Changes nothing else.
+
+### set_push_secret
+
+```
+set_push_secret(p_secret text) returns void
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Sets the installation's push secret (M61) from the SQL editor, at least 32 characters (WB276). Only its SHA-256 is kept. Not granted to the app.
 
 ### set_updated_at
 
@@ -6128,7 +6487,7 @@ submit_booking_request(p_token text, p_payload jsonb) returns integer
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).
+PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105). With an appointment in the payload (M59), one pet of theirs (WB102), a service the kennel offers (WB272) at one of its free times from today to 60 days ahead (WB273, free_starts()) becomes an appointment requested from the parent, on the pet's stay if it is staying that day, holding nothing until staff confirm it; six a day at most (WB105).
 
 ### submit_food_order
 
@@ -6145,14 +6504,14 @@ PUBLIC. An order from the kennel's food order page: a trial, or a subscription w
 ### submit_food_request
 
 ```
-submit_food_request(p_token text, p_payload jsonb) returns void
+submit_food_request(p_token text, p_payload jsonb) returns text
 ```
 
 - Who may call: public
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105).
+PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105). A problem with one of their deliveries (kind problem, M59; WB278 for one not theirs) is written down for staff as the kennel's own report is (delivery_problems, WB174), once per delivery (WB274), five a day at most (WB105); with a photo, returns the path the photo may be added at (intake_upload_allowed()). Returns nothing otherwise.
 
 ### submit_intake
 
@@ -6177,6 +6536,18 @@ subscriptions_replan() returns trigger
 - Volatility: volatile
 
 Trigger: when a subscription's grams, days, slot, address, food, plan, pause or end change, its deliveries still before their cut-off are made again: cancelled (when a bill has them, so the bill can be credited) or removed, and made anew up to as far ahead as before.
+
+### take_pushes
+
+```
+take_pushes(p_secret text, p_gone text[]) returns TABLE(endpoint text)
+```
+
+- Who may call: public
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+PUBLIC, but useless without the installation's push secret (WB277). Hands the app the push addresses of the phones with an alert waiting (M61), each once, marking the alerts as handed over; removes first the addresses in p_gone that a push service said are gone. Returns addresses only: the phone then asks Wagbook, signed in, what happened. SECURITY DEFINER because the outbox and other people's phones are sealed.
 
 ### trips_check
 

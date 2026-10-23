@@ -54,18 +54,20 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 2. **Every tenant table has `org_id`, row level security, grants and policies.** Until the migration freeze they go
    in `…800_row_level_security.sql`, where the whole access model is read in one place; after it, in the new migration
    that creates the table. The test suite fails if a table has row level security off or no policy
-   (`invoice_counters` and `recovery_codes` are the deliberate exceptions, sealed with no policy at all).
+   (`invoice_counters`, `recovery_codes`, `push_outbox` and `push_secret` are the deliberate exceptions, sealed with no
+   policy at all).
 3. **Foreign keys between tenant tables are composite**: `(org_id, x_id) references x (org_id, id)`. A plain
    `x_id references x (id)` lets one kennel point at another kennel's row.
 4. **Every function sets `search_path = ''`** and schema-qualifies every name. After creating one:
    `revoke all on function ... from public, anon;` then grant to `authenticated` only if the app calls it.
 5. **`security definer` is the exception.** Use it only when the caller must do something row level security forbids,
    and then the function must check `auth.uid()` and membership itself. Say why in the comment.
-6. **The anonymous role can call exactly twelve functions** (`get_public_intake_form`, `submit_intake`,
+6. **The anonymous role can call exactly thirteen functions** (`get_public_intake_form`, `submit_intake`,
    `get_public_stay`, `get_public_invoice`, `get_public_booking_form`, `submit_booking_request`, the food order page's
-   `get_public_food_form`, `submit_food_order`, `food_order_paid` and `submit_food_request`, and two that Storage calls:
-   `stay_media_visible` for photos on a stay page and `intake_upload_allowed` for certificates sent with the intake form)
-   and can touch no table. Adding another needs
+   `get_public_food_form`, `submit_food_order`, `food_order_paid` and `submit_food_request`, two that Storage calls:
+   `stay_media_visible` for photos on a stay page and `intake_upload_allowed` for certificates sent with the intake form
+   and a parent's photo of a delivery problem, and `take_pushes`, which the app server calls with the installation's
+   push secret to wake phones for alerts) and can touch no table. Adding another needs
    a line in `tests/db/security.test.ts` and a paragraph in `docs/05-security-and-privacy.md`.
 7. **The service role key is never used.** Not in the app, not in scripts, not in tests.
 8. **Money is `bigint` in minor units** (paise), in columns ending `_minor`. Tax rates are integer basis points,

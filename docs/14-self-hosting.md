@@ -110,6 +110,12 @@ behind a network that inspects HTTPS and `npm ci` fails on certificates, build w
 Caddy sets `X-Real-IP` and `X-Forwarded-For` from the connection and drops what a visitor sends, which the rate limits
 depend on ([05-security-and-privacy.md](05-security-and-privacy.md)).
 
+**Alerts on phones (optional, M61).** Run `node scripts/push-keys.mjs`, put the four values it prints in `deploy/.env`
+(`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_SECRET`), run the `select public.set_push_secret(...)`
+line it prints in the database (`docker exec -it supabase-db psql -U postgres`), and start Compose again. The server
+must be able to reach the browsers' push services on the internet (`fcm.googleapis.com`, `updates.push.services.mozilla.com`,
+`web.push.apple.com`). See [10-setup-and-deploy.md](10-setup-and-deploy.md), "Alerts on phones".
+
 ## Part 4. Check it
 
 1. `curl -sI https://book.yourkennel.in/login | grep -i content-security-policy` shows `script-src 'self' 'nonce-`

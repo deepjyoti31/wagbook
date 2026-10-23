@@ -11,7 +11,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  addAppointmentItem, makeAppointmentBill, moveAppointment, orderPartyCake, saveAppointmentNotes, saveParty, setAppointmentPerson, setAppointmentPrice,
+  addAppointmentItem, makeAppointmentBill, setAppointmentStatus, orderPartyCake, saveAppointmentNotes, saveParty, setAppointmentPerson, setAppointmentPrice,
 } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.appointment.title);
@@ -25,7 +25,7 @@ export default function AppointmentPage({ params, searchParams }: PageProps<"/ap
 }
 
 const APPOINTMENT =
-  "id, kind, status, starts_at, ends_at, held_until, place_id, staff_id, booking_id, course_id, in_package, price_minor, vaccinations_checked_at, life_jacket, guest_pet_id, guest_vaccinations_checked_at, people, notes, after_notes, homework, cancel_reason, client_id, pet_id, service_id, pets!appointments_org_id_client_id_pet_id_fkey(name), clients(full_name, phone), appointment_services(name, checks_vaccinations, max_people), appointment_places(name), bookings(id, status, vaccinations_checked_at), courses(name, invoice_id)" as const;
+  "id, kind, status, source, starts_at, ends_at, held_until, place_id, staff_id, booking_id, course_id, in_package, price_minor, vaccinations_checked_at, life_jacket, guest_pet_id, guest_vaccinations_checked_at, people, notes, after_notes, homework, cancel_reason, client_id, pet_id, service_id, pets!appointments_org_id_client_id_pet_id_fkey(name), clients(full_name, phone), appointment_services(name, checks_vaccinations, max_people), appointment_places(name), bookings(id, status, vaccinations_checked_at), courses(name, invoice_id)" as const;
 
 async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appointments/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -77,6 +77,21 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
           a.clients.phone,
         )
       : null;
+  // The new time after a move (M58), for the parent on WhatsApp.
+  const movedMessage =
+    doneKey === "moved" && a.clients
+      ? whatsappLink(
+          fill(p.m.whatsappAppointments.moved, {
+            parent: a.clients.full_name.split(" ")[0],
+            pet,
+            service: service?.name ?? "",
+            kennel: org.name,
+            date: formatDate(day, p.locale),
+            time: clock(a.starts_at),
+          }),
+          a.clients.phone,
+        )
+      : null;
   const peopleSelect = (name: string, value: string | null) => (
     <Select name={name} defaultValue={value ?? ""}>
       <option value="">{w.nobody}</option>
@@ -102,6 +117,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
             {m.appointmentStatus[a.status]}
           </Badge>
           <Badge>{m.appointmentKinds[a.kind]}</Badge>
+          {a.source === "parent" ? <Badge tone="attention">{w.fromParent}</Badge> : null}
           <span className="text-lg font-bold">{service?.name}</span>
         </p>
         <p className="text-lg">{fill(w.when, { date: formatDate(day, locale), from: clock(a.starts_at), to: clock(a.ends_at) })}</p>
@@ -134,19 +150,24 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
       </div>
 
       {doneKey ? <Notice tone="ok">{w.done_[doneKey]}</Notice> : null}
+      {doneKey === "moved" && movedMessage ? (
+        <a href={movedMessage} target="_blank" rel="noreferrer" className={`${buttonStyles.whatsapp} mb-5`}>
+          {w.sendMoved}
+        </a>
+      ) : null}
       {open && !a.booking_id && a.appointment_services?.checks_vaccinations ? <HealthAtTheDoor t={t} petId={a.pet_id} on={day} appointmentId={a.id} /> : null}
 
       {open ? (
         <Section title={w.next}>
           <div className="space-y-4">
             {a.status === "requested" ? (
-              <ActionForm action={moveAppointment}>
+              <ActionForm action={setAppointmentStatus}>
                 <input type="hidden" name="appointmentId" value={a.id} />
                 <input type="hidden" name="intent" value="confirmed" />
                 <SubmitButton pendingLabel={m.common.saving}>{w.confirm}</SubmitButton>
               </ActionForm>
             ) : (
-              <ActionForm action={moveAppointment} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
+              <ActionForm action={setAppointmentStatus} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
                 <input type="hidden" name="appointmentId" value={a.id} />
                 <input type="hidden" name="intent" value="done" />
                 {service?.checks_vaccinations ? (
@@ -180,8 +201,11 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
                 </div>
               </ActionForm>
             )}
+            <Link href={`/app/appointments/${a.id}/move`} className={buttonStyles.secondary}>
+              {w.move}
+            </Link>
             {a.status === "confirmed" ? (
-              <ActionForm action={moveAppointment}>
+              <ActionForm action={setAppointmentStatus}>
                 <input type="hidden" name="appointmentId" value={a.id} />
                 <input type="hidden" name="intent" value="no_show" />
                 <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
@@ -191,7 +215,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
             ) : null}
             <details>
               <summary className={`${buttonStyles.quiet} cursor-pointer`}>{w.cancel}</summary>
-              <ActionForm action={moveAppointment} className="mt-2 space-y-3 rounded-xl border border-rule bg-paper p-4">
+              <ActionForm action={setAppointmentStatus} className="mt-2 space-y-3 rounded-xl border border-rule bg-paper p-4">
                 <input type="hidden" name="appointmentId" value={a.id} />
                 <input type="hidden" name="intent" value="cancelled" />
                 <Field label={w.cancelReason}>

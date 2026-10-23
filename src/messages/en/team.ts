@@ -53,6 +53,19 @@ export const teamArea = {
       save: "Save",
       saved: "Saved who lives on site.",
     },
+    // A person's usual week, which fills the rota (M60).
+    pattern: {
+      title: "Usual week",
+      about: "Each person's usual shifts. They fill the rota four weeks ahead, week after week, until changed. A day of leave is left out, and a week can still be changed by hand above.",
+      none: "No usual weeks yet.",
+      line: "{day}: {shift}",
+      removeLabel: "Take {what} away from {name}'s usual week",
+      days: "On these days",
+      button: "Add to the usual week",
+      added: { one: "Added. {n} shift put on the rota.", other: "Added. {n} shifts put on the rota." },
+      removed: "Taken away. Its days still to come are off the rota.",
+      errors: { days: "Choose one or more days." },
+    },
     links: { leave: "Leave", attendance: "Attendance" },
     errors: {
       managersOnly: "Only an owner or manager plans the rota.",
@@ -155,6 +168,15 @@ export const teamArea = {
   },
 
   // Today, while the kennel keeps a rota.
+  // A stretch still open well after its shift ended, on Today for owners and managers (M60).
+  forgotClockOut: {
+    line: "{name} did not clock out",
+    since: "Clocked in on {date} at {time}, for the {shift} shift.",
+    button: "Clocked out at the end of the shift ({time})",
+    // Written on the stretch as the note for the time by hand.
+    note: "Did not clock out. Set to the end of the {shift} shift.",
+    gone: "That is already dealt with.",
+  },
   onNow: {
     title: "On now",
     clockedIn: "Clocked in",

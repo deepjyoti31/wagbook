@@ -364,6 +364,7 @@ export const moneyArea = {
         incidents: "Incident",
         organizations: "Kennel settings",
         memberships: "Person",
+        appointments: "Appointment",
       },
       // {what} is one of the tables above.
       added: "{what} added",
