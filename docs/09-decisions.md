@@ -1028,3 +1028,38 @@ hundreds of photos is built in memory on the server.
 **Look again** if kennels want repeating rotas, overtime rules, pay worked out in Wagbook, riders on the rota, or
 clocking in tied to being at the kennel (location or a code on the wall).
 
+
+---
+
+## D49. Next.js 16.4.1 for three security advisories
+
+**Status:** Decided, 23 October 2026.
+
+**Situation.** `npm audit --omit=dev` listed three advisories for `next` from 16.0.0 to 16.4.0: remote code execution
+in the image optimization API when SVG files are used (critical, GHSA-2464-fhr4-w9xw), denial of service in the App
+Router through Server Actions (high, GHSA-p3m5-59mp-jv5r), and remote code execution in `use cache` functions
+returning typed arrays (critical, GHSA-673q-mjm6-r5xr). `next build` on 16.4.0 also stopped once with a
+"SecurityFatalError" upgrade notice and went on when run again.
+
+**Decision.** `next` and `eslint-config-next` go from 16.4.0 to 16.4.1, the first release outside all three ranges,
+still pinned exactly. 16.4.2 came out a day later with wider changes (its own documentation differs in about forty
+pages); 16.4.1 is the smallest step that fixes the advisories. The documentation in `node_modules/next/dist/docs/` is
+the same in 16.4.0 and 16.4.1, so nothing in the code had to change. Only the Next.js packages moved in
+`package-lock.json`.
+
+**How exposed Wagbook was.** Server Actions: fully, as every form in the app is one, and the public forms (intake,
+booking, food order) take them from anyone. `use cache`: not used anywhere in `src/`. The image optimization API:
+Wagbook never imports `next/image` (photos are short-lived signed Storage links shown with a plain `<img>`, see
+`src/components/pet-avatar.tsx`) and `next.config.ts` has no `images` setting. But Next.js still answers
+`/_next/image` for files in `public/` unless `images.unoptimized` is set, and `public/icons/` holds two SVG files, so
+the route was reachable on a self-hosted server even though no page uses it (checked on 16.4.1 with `next start`:
+`/_next/image?url=/icons/icon.svg&w=64&q=75` reads the file and answers 400, "image type is not allowed"). Lower
+than for an app that serves images through it, not none.
+
+**Cost.** None found: the full gate passes on 16.4.1. `npm audit` without `--omit=dev` still reports `braces` (high,
+denial of service on deeply nested patterns) through `eslint-config-next`'s `fast-glob`; that runs only at lint time
+on the project's own files, and npm's only offer is a downgrade to `eslint-config-next` 14.
+
+**Look again** at the next advisory for `next`: upgrade to the first patched release in the same way, and run
+`npm audit --omit=dev` before each release. Setting `images: { unoptimized: true }` in `next.config.ts` would make
+`/_next/image` answer 404 and close that route for good, since nothing uses it.
