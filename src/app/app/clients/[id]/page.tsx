@@ -52,7 +52,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
   const hidden = c.deleted_at !== null;
 
   const [pets, stays, bills] = await Promise.all([
-    supabase.from("pets").select("id, name, breed, flags, photo_path, deleted_at").eq("org_id", org.id).eq("client_id", id).order("name"),
+    supabase.from("pets").select("id, name, breed, flags, photo_path, deleted_at, passed_away_on").eq("org_id", org.id).eq("client_id", id).order("name"),
     supabase.from("bookings").select("id, kind, status, start_date, end_date, pets(name)").eq("org_id", org.id).eq("client_id", id).order("start_date", { ascending: false }).limit(50),
     supabase.from("invoices").select("id, status, number, issued_on, total_minor").eq("org_id", org.id).eq("client_id", id).order("created_at", { ascending: false }).limit(50),
   ]);
@@ -110,6 +110,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                   <span className="flex flex-1 flex-wrap items-center gap-2">
                     <span className="font-bold">{p.name}</span>
                     {p.deleted_at ? <Badge>{m.hiding.badge}</Badge> : null}
+                    {p.passed_away_on ? <Badge>{m.passing.badge}</Badge> : null}
                     {p.breed ? <span className="text-slate">{p.breed}</span> : null}
                     {p.flags.map((f) => (
                       <Badge key={f} tone="alert">

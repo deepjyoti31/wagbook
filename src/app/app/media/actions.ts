@@ -193,3 +193,64 @@ export async function removeUpdatePhoto(_state: FormState, form: FormData): Prom
   revalidatePath("/app", "layout");
   redirect(`/app/bookings/${update.data.booking_id}?done=photo_removed`);
 }
+
+/**
+ * Tick a care task that asks for a photo (M54): the photo first, under
+ * {org_id}/care/{task_id}/, then the task done with it. The database refuses
+ * the task done without one (care_tasks_done_with_photo).
+ */
+export async function completeWithPhoto(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const taskId = Id.safeParse(form.get("taskId"));
+  if (!taskId.success) return { error: m.errors.taskNotFound };
+  const read = await readPhotos(form, "photo", 1, m);
+  if ("error" in read) return { error: read.error };
+  if (read.photos.length === 0) return { error: m.proof.choose };
+
+  const supabase = await createClient();
+  const task = await supabase.from("care_tasks").select("id").eq("org_id", org.id).eq("id", taskId.data).eq("status", "pending").maybeSingle();
+  if (task.error || !task.data) return { error: m.errors.taskNotFound };
+
+  const path = `${org.id}/care/${taskId.data}/${crypto.randomUUID()}.jpg`;
+  const failed = await store(supabase, path, read.photos[0].full);
+  if (failed) return { error: m.proof.failed };
+  if (read.photos[0].small) await store(supabase, smallPath(path), read.photos[0].small);
+
+  const { error } = await supabase.from("care_tasks").update({ status: "done", photo_path: path }).eq("org_id", org.id).eq("id", taskId.data).eq("status", "pending");
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: m.proof.done };
+}
+
+/**
+ * Share a care task's photo with the parent (M54): it goes on an update shown
+ * on the stay page. Until then it is on the pet's record only.
+ */
+export async function shareProof(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const { m } = t;
+  const taskId = Id.safeParse(form.get("taskId"));
+  if (!taskId.success) return { error: m.errors.taskNotFound };
+  const supabase = await createClient();
+  const task = await supabase
+    .from("care_tasks")
+    .select("booking_id, pet_id, label, photo_path, bookings(pets(name))")
+    .eq("org_id", org.id)
+    .eq("id", taskId.data)
+    .maybeSingle();
+  if (task.error || !task.data?.photo_path) return { error: m.errors.taskNotFound };
+  const { error } = await supabase.from("stay_updates").insert({
+    org_id: org.id,
+    booking_id: task.data.booking_id,
+    pet_id: task.data.pet_id,
+    body: fill(m.proof.sharedBody, { task: task.data.label, pet: task.data.bookings?.pets?.name ?? "" }),
+    media_paths: [task.data.photo_path],
+    is_visible_to_parent: true,
+  });
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: m.proof.shared };
+}

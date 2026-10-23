@@ -30,6 +30,7 @@ const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; mana
   { href: "/app/more/kennels", key: "kennels" },
   { href: "/app/more/people", key: "people" },
   { href: "/app/more/routines", key: "routines" },
+  { href: "/app/more/house", key: "house" },
   { href: "/app/more/play", key: "play" },
   { href: "/app/more/extras", key: "extras" },
   { href: "/app/more/peak", key: "peak" },

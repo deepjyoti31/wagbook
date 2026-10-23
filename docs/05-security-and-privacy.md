@@ -95,6 +95,16 @@ In summary (deleting anything is for owners, D29):
 | Problems: errors on the server (M48) | Write their own through `log_app_error()`, never read | Same as staff | Also read |
 | Photo archive (M49): space by month, a month's photos as a ZIP | Nothing (`WB002`) | Read, download | Same |
 | Removing a downloaded month's photos (M49) | No | No (`WB242`); storage deletes are for owners | Yes, only after the month was downloaded (`WB243`); the small copies stay |
+| Kennels to clean (M50) | Read; mark one cleaned (stamped, never undone, `WB250`) | Same | Same |
+| Checklists and cleaning that repeats (M51) | Read; tick and untick | Also set the lists | Also delete |
+| Repairs (M51) | Report, mark fixed with the cost | Also write the cost as an expense (`cost_to_expense`, `WB002` for staff) | Also delete |
+| Marking a pet as passed away (M52) | No (`WB251`) | Yes, today or before (`WB252`), undone within a week (`WB253`) | Same |
+| Flowers sent (M52) | Mark sent | Also write the cost as an expense | Same |
+| Stay report (M53) | Write the words and pick photos already shown to the parent (`WB261`) | Same | Also delete |
+| A task's photo proof (M54) | Add it; share it on an update | Same | Also delete the file |
+| Food and medicines from home (M55) | Read, add | Same | Also delete |
+| Trial days (M56) | Mark one, note how it went | Same | Same |
+| Vet visits (M57) | Record one with its bill line and medicines (`record_vet_visit`, as the caller) | Also the expense, in the same step or later | Also delete |
 | A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()` and their own pick-ups and drops through `rider_mark_trip()` (M39), a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 
@@ -102,6 +112,17 @@ In summary (deleting anything is for owners, D29):
 may know who else is clocked in. It checks the caller works at the kennel asked about and returns names only, no
 times. `kennels_keep_service()` is a `security definer` trigger: `kennel_service` has no grant to write, so it only
 ever says what `kennels.is_active` said, and when. Neither is granted to the anonymous role.
+
+Phase 6 (M50 to M57, D52) adds one `security definer` trigger, `bookings_leave_kennel_to_clean()`: nobody may add to
+`kennel_cleans`, so a kennel is to clean only because its last pet was checked out (the check-out itself passed the
+bookings policies first). `record_vet_visit()` and `cost_to_expense()` run as the caller, so a staff member's visit
+gets its bill line (a one-off line, as before) and no expense. The parent's stay page (`get_public_stay`, still one of
+the twelve public functions) now carries the stay report once the pet has gone home: the kennel's words, photos already
+on its updates to the parent, meals and medicines by label and whether done, play sessions done, weighings around the
+stay and the kinds of incident the parent was told of. No incident's account, note or price. A pet that has passed away
+is left out of the parent's booking link. A parent's export carries their stays' supplies and reports and their pets'
+vet visits; erasing them deletes the stay reports (said to the parent, as updates are) and keeps vet visits with the
+pet (D30).
 
 Phase 5 (M46 to M49, D50) adds three `security definer` functions. `log_app_error()` writes a problem for the kennel
 the caller works at (or their first): nobody may insert into `app_errors` directly, so every row is scrubbed of email

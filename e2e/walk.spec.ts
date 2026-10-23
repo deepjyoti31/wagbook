@@ -2599,3 +2599,241 @@ test("M49: a month of photos is downloaded as a ZIP, then removed by an owner, k
   expect(Number(adminSql("select count(*) from storage.objects where bucket_id = 'pet-media' and name like '%/updates/%' and name not like '%.small.jpg'"))).toBe(0);
   expect(Number(adminSql("select count(*) from storage.objects where bucket_id = 'pet-media' and name like '%/updates/%.small.jpg'"))).toBeGreaterThan(0);
 });
+
+// ---------------------------------------------------------------------------
+// Phase 6 (M50 to M57): the day, smoother.
+// ---------------------------------------------------------------------------
+
+test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kennel to clean and the stay report", async ({ page, browser }) => {
+  test.setTimeout(240_000);
+  await signIn(page, "manager");
+  await addPet(page, "9800000601", "Asha Sample", "Nori");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Nori (Asha Sample)" });
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(3));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  const bookingUrl = page.url().replace(/\?.*$/, "");
+
+  // M55: the parent's own food, 500 g at 100 g a meal; three meals a day lasts one day of three.
+  await page.locator("summary").filter({ hasText: en.supplies.add }).click();
+  const supplies = page.locator("form").filter({ hasText: en.supplies.brought });
+  await supplies.locator("select[name=kind]").selectOption("food");
+  await supplies.locator("input[name=label]").fill("Own kibble");
+  await supplies.locator("input[name=brought]").fill("500");
+  await supplies.locator("input[name=perTask]").fill("100");
+  await supplies.getByRole("button", { name: en.supplies.add, exact: true }).click();
+  await expect(page.getByText("Added Own kibble.")).toBeVisible();
+
+  // Check in to a kennel, remembered for later.
+  const checkInForm = () => page.locator("form").filter({ has: page.getByRole("button", { name: "Check in", exact: true }) });
+  const kennelSelect = checkInForm().locator("select[name=kennelId]");
+  // A kennel nobody is in now, so Nori is the last pet out of it.
+  const occupied = adminSql("select coalesce(string_agg(distinct kennel_id::text, ','), '') from public.bookings where status = 'checked_in' and kennel_id is not null").split(",");
+  const options = await kennelSelect.locator("option").evaluateAll((list) => list.map((o) => ({ value: (o as HTMLOptionElement).value, text: o.textContent ?? "" })));
+  const free = options.find((o) => o.value && !occupied.includes(o.value))!;
+  const kennelId = free.value;
+  const kennelName = free.text.split(",")[0].trim();
+  await kennelSelect.selectOption(kennelId!);
+  await page.getByRole("button", { name: "Check in", exact: true }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+  await expect(page.getByText(en.supplies.short)).toBeVisible();
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: en.supplies.runningOut })).toBeVisible();
+  await expect(page.getByText("Nori's Own kibble: lasts 1 more days, 3 to go.")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m55-running-out");
+
+  // M54: a routine that asks for a photo; the task is done with one, and shared with the parent.
+  await page.goto(bookingUrl);
+  const routine = page.locator("form").filter({ has: page.getByRole("button", { name: en.routines.add }) });
+  await routine.locator("input[name=label]").fill("Clean the wound");
+  await routine.locator("select[name=kind]").selectOption("medication");
+  await routine.locator("input[name=dueTime]").fill("09:00");
+  await routine.locator("input[name=needsPhoto]").check();
+  await routine.getByRole("button", { name: en.routines.add }).click();
+  await expect(page.getByText(/^Added Clean the wound at 09:00/)).toBeVisible();
+  await page.goto("/app/care?kind=medication");
+  const task = page.getByRole("listitem").filter({ hasText: "Nori" }).filter({ hasText: "Clean the wound" });
+  await expect(task.getByRole("button", { name: en.care.markDone })).toHaveCount(0);
+  await task.locator("input[name=photo]").setInputFiles({ name: "wound.jpg", mimeType: "image/jpeg", buffer: await photoWithLocation(page) });
+  await task.getByRole("button", { name: en.proof.doneWithPhoto }).click();
+  // The form goes once the task is done; the row shows the photo.
+  await expect(task.getByRole("img", { name: "Photo for Clean the wound" })).toBeVisible();
+  await task.getByRole("button", { name: en.proof.share }).click();
+  await expect(page.getByText(en.proof.shared)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m54-photo-task");
+
+  // M57: a vet visit, on the bill and the expenses, its medicine on the routine.
+  await page.goto(bookingUrl);
+  await page.locator("summary").filter({ hasText: en.vet.add }).click();
+  await page.getByLabel(en.vet.reason).fill("Limping on the back leg");
+  await page.getByLabel(en.vet.vet).fill("City Vet");
+  await page.getByLabel(en.vet.cost).fill("800");
+  await page.locator("input[name=med1]").fill("Painkiller");
+  await page.locator("input[name=med1Time]").fill("20:00");
+  await page.getByRole("button", { name: en.vet.save }).click();
+  await expect(page.getByText(en.vet.saved)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Vet visit: Limping on the back leg")).toBeVisible();
+  await expect(page.getByText(en.vet.onExpenses)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.vet.tell })).toHaveAttribute("href", /wa\.me/);
+  // The medicine is now on the pet's own routine.
+  await expect(page.getByRole("listitem").filter({ hasText: "Painkiller" }).filter({ hasText: "20:00" }).first()).toBeVisible();
+  await narrow(page);
+  await shot(page, "m57-vet-visit");
+
+  // M55 at check-out: what is left goes home. M50: the kennel is then to clean.
+  await expect(page.getByText(/^Goes home: Own kibble \(500 g\)\.$/)).toBeVisible();
+  await page.getByRole("button", { name: en.booking.step.checkOutAsBooked }).click();
+  await page.waitForURL(/done=checked_out/);
+
+  // M53: the stay report, with words and a photo, seen by the parent.
+  await expect(page.getByRole("heading", { name: en.stayReport.title })).toBeVisible();
+  await page.getByLabel(en.stayReport.words).fill("Nori was a lovely guest.");
+  await page.locator("input[name=photos]").first().check();
+  await page.getByRole("button", { name: en.stayReport.save }).click();
+  await expect(page.getByText(en.stayReport.saved)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.stayReport.send })).toHaveAttribute("href", /wa\.me/);
+  await narrow(page);
+  await shot(page, "m53-report-staff");
+  const stayUrl = await page.getByRole("link", { name: en.booking.openIt }).getAttribute("href");
+  const parent = await privateWindow(browser);
+  await parent.page.goto(stayUrl!);
+  await expect(parent.page.getByRole("heading", { name: "Nori's stay report" })).toBeVisible();
+  await expect(parent.page.getByText("Nori was a lovely guest.")).toBeVisible();
+  await expect(parent.page.getByText("Clean the wound: given 1 of 1")).toBeVisible();
+  await expect(parent.page.locator("img[alt=Nori]").first()).toBeVisible();
+  await narrow(parent.page);
+  await shot(parent.page, "m53-report-parent");
+  await parent.context.close();
+
+  // M50: the next pet into that kennel is asked about, then checked in anyway; then it is cleaned.
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: en.cleaning.title })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: kennelName }).getByRole("button", { name: en.cleaning.cleaned })).toBeVisible();
+  await page.goto(`/app/calendar?from=${day(0)}`);
+  await expect(page.getByRole("rowheader", { name: new RegExp(`^${kennelName}`) }).getByText(en.cleaning.badge)).toBeVisible();
+  await addPet(page, "9800000602", "Asha Sample Two", "Pip");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Pip (Asha Sample Two)" });
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(1));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  await checkInForm().locator("select[name=kennelId]").selectOption(kennelId!);
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText(`${kennelName} was not cleaned. Check in anyway?`)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m50-ask");
+  await page.getByRole("button", { name: en.cleaning.anyway }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+  await page.goto("/app");
+  await page.getByRole("listitem").filter({ hasText: kennelName }).getByRole("button", { name: en.cleaning.cleaned }).click();
+  await expect(page.getByText(en.today.done.cleaned)).toBeVisible();
+});
+
+test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed away", async ({ page }) => {
+  test.setTimeout(240_000);
+  await signIn(page, "manager");
+  // M51: the usual checklists, ticked on Today; a repair fixed and written as an expense.
+  await page.goto("/app/more/house");
+  await page.getByRole("button", { name: en.house.jobs.addUsual }).click();
+  await expect(page.getByText(en.house.jobs.addedUsual)).toBeVisible();
+  await page.getByLabel(en.house.repairs.what).fill("Pump in yard 2");
+  await page.getByRole("button", { name: en.house.repairs.report, exact: true }).click();
+  await expect(page.getByText(en.house.repairs.reported)).toBeVisible();
+  const pump = page.getByRole("listitem").filter({ hasText: "Pump in yard 2" });
+  await pump.locator("summary").click();
+  await pump.getByLabel(en.house.repairs.cost).fill("1500");
+  await pump.getByRole("button", { name: en.house.repairs.fix }).click();
+  await expect(page.getByText(en.house.repairs.fixed)).toBeVisible();
+  await page.getByRole("button", { name: en.house.repairs.toExpense }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Pump in yard 2" }).getByText(en.house.repairs.onExpenses)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m51-house");
+
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Opening 0 of 4" })).toBeVisible();
+  await page.getByRole("button", { name: "Mark Lights on done" }).click();
+  await expect(page.getByRole("heading", { name: "Opening 1 of 4" })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m51-today");
+  await page.goto("/app/care");
+  await expect(page.getByText("Yards cleaned")).toBeVisible();
+
+  // M56: a trial day, how it went, and the result on the pet's page.
+  await addPet(page, "9800000603", "Ravi Sample", "Bean");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Bean (Ravi Sample)" });
+  await page.locator("select[name=kind]").selectOption("daycare");
+  await page.getByLabel("Check-in date").fill(day(0));
+  await page.getByLabel("Check-out date").fill(day(0));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  await page.getByRole("button", { name: en.trial.mark }).click();
+  await expect(page.getByText(en.trial.marked)).toBeVisible();
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("Checked in.")).toBeVisible();
+  await page.getByLabel(en.trial.outcomes.anxious).check();
+  await page.getByLabel(en.trial.note).fill("Barked at the gate, calm by lunch");
+  await page.getByRole("button", { name: en.trial.save, exact: true }).click();
+  await expect(page.getByText(en.trial.saved)).toBeVisible();
+  await openPet(page, "Bean");
+  await expect(page.getByText(/^Trial day on .*: Anxious\./)).toBeVisible();
+
+  // M52: Bean has a stay to come; marked as passed away, it is cancelled, flowers are on Today, and it can be undone.
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Bean (Ravi Sample)" });
+  await page.getByLabel("Check-in date").fill(day(40));
+  await page.getByLabel("Check-out date").fill(day(42));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+  const later = page.url().replace(/\?.*$/, "");
+  await openPet(page, "Bean");
+  const beanPage = page.url().replace(/\?.*$/, "");
+  await page.locator("summary").filter({ hasText: en.passing.mark }).click();
+  await page.getByRole("button", { name: en.passing.mark }).click();
+  await expect(page.getByText("Bean is marked as passed away. Today reminds you to send flowers.")).toBeVisible();
+  await expect(page.getByText(/^Bean passed away on /)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.pet.bookStay })).toHaveCount(0);
+  await narrow(page);
+  await shot(page, "m52-pet");
+  await page.goto(later);
+  await expect(page.getByText("Cancelled: Passed away")).toBeVisible();
+  await page.goto("/app/dogs?q=Bean");
+  await expect(page.getByRole("link", { name: "Bean", exact: true })).toHaveCount(0);
+  await page.goto("/app");
+  await expect(page.getByText("Send flowers to Ravi Sample, for Bean.")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m52-flowers");
+  await page.getByRole("listitem").filter({ hasText: "Send flowers to Ravi Sample" }).getByRole("button", { name: en.passing.flowers.done }).click();
+  await expect(page.getByText(en.today.done.flowers)).toBeVisible();
+  // Marked by mistake: undone within the week, from the pet's page.
+  await page.goto(beanPage);
+  await page.getByRole("button", { name: en.passing.undo }).click();
+  await expect(page.getByText("Undone. Bean is back on the lists.")).toBeVisible();
+  await page.goto("/app/dogs?q=Bean");
+  await expect(page.getByRole("link", { name: "Bean", exact: true }).first()).toBeVisible();
+});
+
+test("M54: Pack all packs a day's deliveries from a batch in date, after saying how many", async ({ page }) => {
+  await signIn(page, "manager");
+  // The first day with food still to pack, made ahead by the earlier steps (four days out), and a recipe that keeps a
+  // week, so a batch cooked today is in date for it.
+  adminSql("update public.recipes set use_by_days = 7");
+  const date = adminSql("select coalesce(min(delivery_date)::text, '') from public.deliveries where status = 'planned' and kind = 'subscription' and delivery_date between current_date and current_date + 6");
+  expect(date).not.toBe("");
+  await page.goto(`/app/kitchen?date=${date}`);
+  await page.locator("input[name=packs]").fill("6");
+  await page.getByRole("button", { name: en.kitchen.recordBatch }).click();
+  await expect(page.getByText(/^Batch \d{6}-\d+ recorded\./)).toBeVisible();
+  await page.locator("summary").filter({ hasText: en.packAll.button }).click();
+  await expect(page.getByText(/^Mark \d+ deliver(y|ies) packed, each from the first batch in date/)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m54-pack-all");
+  await page.getByRole("button", { name: en.packAll.yes }).click();
+  await expect(page.getByText(/^Packed [1-9]\d* deliver(y|ies)\./)).toBeVisible();
+});

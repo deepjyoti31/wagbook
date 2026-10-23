@@ -9,13 +9,14 @@ import { PetAvatar } from "@/components/pet-avatar";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { dailyGrams, formatDate, formatKg, formatPhone, portionReviewDue, sizeBand, todayIn, weightChange, type PortionSettings } from "@/lib/core";
+import { canUndoPassing, dailyGrams, formatDate, formatKg, formatPhone, portionReviewDue, sizeBand, todayIn, weightChange, type PortionSettings } from "@/lib/core";
 import { percentText, portionSettings, weekdayList } from "@/lib/kitchen";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
 import { incidentCategoryText, PET_FLAGS } from "@/lib/pets";
 import { PetAppointments } from "@/components/pet-appointments";
+import { LastTrial, MarkPassedAway, PassingPanel, PetVetVisits } from "@/components/stay-day";
 import { createClient } from "@/lib/supabase/server";
 import { addWeight, markPortionReviewed, removeWeight, savePetFood, setPetHidden, setTargetWeight, updateIncident, updatePet } from "../actions";
 
@@ -43,7 +44,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   const res = await supabase
     .from("pets")
     .select(
-      "id, name, species, breed, sex, is_neutered, date_of_birth, dewormed_on, tick_treated_on, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, clients(id, full_name, phone, deleted_at, erased_at)",
+      "id, name, species, breed, sex, is_neutered, date_of_birth, dewormed_on, tick_treated_on, weight_g, target_weight_g, color, microchip, photo_path, food_notes, medical_notes, allergies, behaviour_notes, flags, vet_name, vet_phone, deleted_at, passed_away_on, passed_away_at, clients(id, full_name, phone, deleted_at, erased_at)",
     )
     .eq("org_id", org.id)
     .eq("id", id)
@@ -53,6 +54,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
   if (!res.data || res.data.clients?.erased_at) notFound();
   const pet = res.data;
   const hidden = pet.deleted_at !== null;
+  const passed = pet.passed_away_on !== null;
 
   const [stays, incidents, vaccinations, weights] = await Promise.all([
     supabase.from("bookings").select("id, kind, status, start_date, end_date, kennels(name)").eq("org_id", org.id).eq("pet_id", id).order("start_date", { ascending: false }).limit(50),
@@ -89,7 +91,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         <PetAvatar name={pet.name} url={pet.photo_path ? photo.get(pet.photo_path) : null} size="lg" />
       </div>
       <PageTitle title={pet.name}>
-        {hidden ? null : (
+        {hidden || passed ? null : (
           <Link href={`/app/bookings/new?pet=${pet.id}`} className={buttonStyles.primary}>
             {m.pet.bookStay}
           </Link>
@@ -98,6 +100,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       <div className="mb-5 space-y-1">
         <p className="flex flex-wrap items-center gap-2">
           {[pet.breed, pet.species !== "dog" ? ((m.pet.speciesInLine as Record<string, string>)[pet.species] ?? pet.species) : null, pet.weight_g ? fill(m.pet.weight, { kg: formatKg(pet.weight_g, t.locale) }) : null].filter(Boolean).join(", ")}
+          {passed ? <Badge>{m.passing.badge}</Badge> : null}
           {pet.flags.map((f) => (
             <Badge key={f} tone="alert">
               {flagText(m, f)}
@@ -118,6 +121,9 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       </div>
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
+      {doneKey === "passed" && passed ? <Notice tone="ok">{fill(m.passing.marked, { pet: pet.name })}</Notice> : null}
+      {doneKey === "unpassed" && !passed ? <Notice tone="ok">{fill(m.passing.undone, { pet: pet.name })}</Notice> : null}
+      <PassingPanel t={t} pet={pet} canManage={canManage} canUndo={canUndoPassing(pet.passed_away_at)} />
       {doneKey === "hidden" ? <Notice tone="ok">{m.hiding.doneHidden}</Notice> : null}
       {doneKey === "shown" && !hidden ? <Notice tone="ok">{m.hiding.doneShown}</Notice> : null}
       {hidden ? (
@@ -182,6 +188,9 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           {m.pet.writeIncident}
         </Link>
       </Section>
+
+      <LastTrial t={t} petId={pet.id} />
+      <PetVetVisits t={t} petId={pet.id} />
 
       <Section title={m.pet.vaccinations} count={vaccinations.data.length}>
         <div className="space-y-3 rounded-xl border border-rule bg-paper p-4">
@@ -310,6 +319,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
       </Section>
 
       {hidden ? null : <HidePanel action={setPetHidden} field="petId" id={pet.id} hidden={false} canManage={canManage} words={hideWords} />}
+      {canManage && !passed ? <MarkPassedAway t={t} pet={pet} today={today} /> : null}
     </>
   );
 }

@@ -2,17 +2,25 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 23 October 2026, after upgrading Next.js to 16.4.1 for three security advisories (D51).
+Last updated: 23 October 2026, after building Phase 6 (M50 to M57, D52).
 
 ## In one paragraph
 
-Every milestone from M2 to M49 is built, and the launch work in M1 waits for the owner. M45 to M65 ("Running for
+Every milestone from M2 to M57 is built, and the launch work in M1 waits for the owner. Phase 6 (M50 to M57, `02`
+sections L6 to L13, D52) is built: a kennel left by its last pet is "To clean" on Today and the calendar until someone
+taps Cleaned, and checking into one asks first; opening and closing checklists on Today, cleaning that repeats on
+Care, and repairs whose cost becomes an expense; a pet marked as passed away has its stays, appointments and food
+cancelled with no charge, nothing new made for it, and flowers to send on Today (undone within a week); a stay report
+for the parent once the pet has gone home, worked out from what was recorded, with the kennel's words and photos;
+routines that need a photo, and Pack all in the kitchen; the parent's own food and medicines counted down by the ticks,
+with a warning when they will not last; trial days and how they went; and vet visits that put the cost on the bill and
+in the expenses and the medicines on the routine in one step. Next is Phase 7, from M58. M45 to M65 ("Running for
 real", D49) were added on 22 October 2026; Phase 5 (M45 to M49, `02` section L, D50) is built: "Forgot your password?"
 by email, Change password under More, and "Continue with Google" when an installation sets it up (`GOOGLE_SIGN_IN=on`);
 overnight jobs run by pg_cron in the database (deliveries made ahead, old rows forgotten), each run written down;
 parents, pets and vaccinations brought in from a CSV with a preview and the bad lines to download, all or nothing;
 `/api/health` for an uptime service and errors on the server listed for owners, scrubbed of contacts; and a photo
-archive, a month downloaded as a ZIP and then removed by an owner, the small copies kept. Next is Phase 6, from M50. Phase 4 (M43
+archive, a month downloaded as a ZIP and then removed by an owner, the small copies kept. Phase 4 (M43
 and M44, `02` section K, D48): shifts and a week's rota planned by owners and managers, who lives on site, clocking in
 and out from Today with the time stamped by the database and "On now" for everyone, leave asked for and answered
 (never one's own, unless an owner) taking the person off the rota, and a month's attendance for pay with a CSV; a
@@ -53,8 +61,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (394 database tests, 241 unit tests), and the whole day is walked in a real
-browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 67 tests).
+database rules are tested in-process (`npm run check`: 687 tests in all on 23 October 2026), and the whole day is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 74 steps).
 
 ## What is verified, and how
 
@@ -172,6 +180,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 5 in the database: overnight jobs make deliveries ahead once (a second run makes none), a failing job written down while the others and other kennels still run, old problems forgotten, the jobs out of the app's reach; problems scrubbed of emails and phone numbers (dates kept), written for the person's own kennel, read by owners only, 200 an hour; the import matching parents by phone and pets by name, all or nothing, owners and managers only, 2,000 rows; the photo archive's space by month, a month's files with their pets, this month refused (`WB241`), removal only by an owner (`WB242`) after a download (`WB243`), the small copies left; and the migration with pg_cron on Supabase's Postgres (`cron.job` holds `wagbook-nightly`) | `tests/db/operations.test.ts` (14 tests); `supabase db reset` on the local Supabase | High |
 | The CSV reader and import checker, error scrubbing, the reset link's session check, file sizes, the ZIP written a piece at a time | `src/lib/core/import.test.ts`, `problems.test.ts`, `sign-in.test.ts`, `sizes.test.ts`, `zip.test.ts` | High |
 | Phase 5 in a browser at 360 pixels: a new owner asks for a reset link (the same answer for an unknown address), opens it from the local mail catcher, chooses a new password, the old one refused, changes it again under More (a wrong current one refused), a normal session refused the reset page, the link refused a second time; a manager checks a CSV (a bad phone named by line), brings in a parent with two pets, the same file then finding them known, staff kept out; `/api/health` answering ok; owners seeing the overnight jobs after `run_nightly_jobs()`, a page made to fail on purpose listed under Problems by the error hook, managers seeing jobs only, staff kept out; a month of update photos downloaded as a ZIP with a folder for the pet, removed by the owner after the manager's download, the small copies left | `npm run test:e2e` against the local Supabase: the whole walk, 71 steps passing, 22 October 2026; screenshots taken | High for the local stack |
+| Phase 6 in the database: the last pet out leaves its kennel to clean (a sibling still in keeps it off), Cleaned stamped and never undone (`WB250`), nobody adds to the list by hand; checklists set by managers and ticked by anyone with who and when; a repair's cost an expense for managers only (`WB002`), once; a pet passed away: staff refused (`WB251`), never a later day (`WB252`), its stay, subscription, deliveries and appointment cancelled, nothing new booked or subscribed (`WB254`), left off the parent's booking link, undone within a week only (`WB253`); a stay report only for a stay in or gone home (`WB260`), only photos the parent was shown (`WB261`), on the stay page only after check-out; a task that needs a photo refused done without one, even when told it does not; supplies counted down from the ticks, short when they will not last; a trial is day boarding and only a trial has a result; a vet visit's bill line, expense (managers) and medicine task in one step, staff leaving the expense, never a later day (`WB256`), never another kennel's stay; the export carries vet visits and supplies | `tests/db/the-day.test.ts` (16 tests); the photo rule, the kept photo rule, the last-pet check, the refusal for a passed pet, the report's photo check and the week each removed once to see the tests fail | High |
+| The stay report's figures, house jobs by weekday, the week to undo a passing, supplies in words | `src/lib/core/the-day.test.ts` | High |
+| Phase 6 in a browser at 360 pixels: food from home added and running short on Today; check-in; a routine that needs a photo, ticked only with the photo and shared with the parent; a vet visit on the bill and the expenses with its medicine on the routine; what goes home at check-out; the stay report saved with words and a photo, then read by the parent in a private window; the kennel to clean on Today and the calendar, the next pet asked about and checked in anyway, then Cleaned; the usual checklists added and ticked on Today, cleaning on Care; a repair fixed and written as an expense; a trial day marked, checked in and noted, shown on the pet page; a pet with a stay to come marked as passed away, the stay cancelled, the pet off the list, flowers on Today and marked sent, then undone; Pack all after the count | `npm run test:e2e` against the local Supabase (Postgres 17.11, pg_cron): the whole walk, 74 steps passing, 23 October 2026; screenshots taken. The walk found four sentences that vanished with their row (Cleaned, Flowers sent, a repair fixed, a list taken off or added): they now go back to the page with `?done=`; Pack all's form stays to say what it did | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
 | Next.js 16.4.1 (D51): `npm audit --omit=dev` finds nothing; the build no longer stops with the "SecurityFatalError" notice; the whole app works on it | `npm run check` (665 tests and the build, after merging Phase 5), and `npm run test:e2e` against the local Supabase (71 passed after the merge), 23 October 2026 | High |
@@ -214,6 +225,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | pg_cron firing at night on a hosted project | On the local Supabase the migration scheduled it (`cron.job` shows `wagbook-nightly`) and the walk ran `run_nightly_jobs()` by hand; nobody waited for 02:00 | Low |
 | An uptime service watching `/api/health` | Checked with a request in the walk; no service set up | Low |
 | A month's ZIP of thousands of photos | Built a photo at a time (`ZipWriter`), so memory holds one photo; the walk zips a handful | Low; a ZIP over 4 GB or 65,535 photos would need ZIP64, which is not written |
+| Phase 6 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The house jobs on Today and the vet visit form may wrap in Kannada |
+| A photo task done with a real phone camera, and the stay report opened on a parent's phone | Walked in Chromium at 360 pixels with a photo made in the browser | Low: the same photo path as updates (M5) |
+| The demo kennel with the Phase 6 setup | `supabase/seed.sql` adds no checklists, supplies or vet visits | Low: "Add the usual checklists" fills the lists in one tap |
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
@@ -241,8 +255,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: M50 to M65 are next**, in order, starting with M50 (kennel cleaning between guests). The owner chose them
-on 22 October 2026 (D49); `02` section L lists them. Phase 5 (M45 to M49) is built. Alongside, steps 1 to 9 above still
+**Building: M58 to M65 are next**, in order, starting with M58 (move an appointment). The owner chose them on 22
+October 2026 (D49); `02` section L lists them. Phases 5 and 6 (M45 to M57) are built. Alongside, steps 1 to 9 above still
 need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
 template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
 check `cron.job` has `wagbook-nightly`, and point an uptime service at `/api/health`.
@@ -322,6 +336,14 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 23 October 2026 (Phase 6), also unchecked: the whole of `src/messages/hi/day.ts` and
+`src/messages/kn/day.ts` (to clean, checklists and repairs, passed away and flowers, the stay report, photo proof, Pack
+all, brought from home, trial days, vet visits), the nine new error sentences and three constraint sentences in
+`core.ts`, and the More link. Parents read the stay report, its WhatsApp message, the message asking for more food or
+medicine, and the vet visit message: check those first. "Passed away" was drafted as नहीं रहा and ಇನ್ನಿಲ್ಲ (gentle, but
+check), "to clean" as सफ़ाई बाकी and ಸ್ವಚ್ಛಗೊಳಿಸಬೇಕು, "trial day" as ट्रायल दिन and ಪ್ರಯೋಗದ ದಿನ, "vet" as डॉक्टर and
+ವೈದ್ಯರು, "dose" as खुराक and ಡೋಸ್.
 
 Drafted on 22 October 2026 (Phase 4), also unchecked: the whole of `src/messages/hi/team.ts` and
 `src/messages/kn/team.ts` (rota, leave, attendance, On now), the eight new constraint sentences and eleven error
@@ -445,6 +467,28 @@ Chosen in M25 as the simplest thing:
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
 
+Chosen in Phase 6 (M50 to M57) as the simplest thing:
+
+- A kennel is to clean only when its last pet leaves; siblings sharing one leave it to clean when the second goes. A
+  pet checked in anyway leaves the kennel on the list until someone taps Cleaned.
+- House jobs are every day or one weekday; a weekly job not done on its day is not carried to the next. Nobody but an
+  owner deletes a tick; Undo puts it back to be done.
+- A repair's cost is written as an expense on the day it was marked fixed, in the category "Repairs" in the reader's
+  language. Flowers are "Flowers", vet visits "Vet", likewise.
+- Passing cancels stays still requested or confirmed, whatever their dates. A pet in the kennel when it passed away
+  is checked out by hand. Bills already issued, credit and packs are left as they are. Undoing the passing restores
+  nothing that was cancelled.
+- The stay report counts a meal offered when it was ticked done or skipped; one never reached is left out. Incidents
+  appear by kind only, and only those the parent was told of. Weight in is the last weighing up to the first day (up to
+  a month before); weight out the last one during the stay.
+- Supplies count against the pet's routines as they are now, the same amount every meal or dose. A medicine without a
+  routine chosen counts every medicine round of the pet.
+- A trial day is marked on the booking page of day boarding, not on New booking, and its price is the day's price
+  unless a manager changes it.
+- A vet visit's cost always goes on the stay's bill (marked to be paid back on the expense). A visit the kennel pays
+  for itself is recorded with no cost, and the expense written by hand.
+- A task that needs a photo cannot be ticked offline.
+
 Chosen in Phase 5 (M45 to M49) as the simplest thing:
 
 - A spreadsheet's parent who is already known by phone is left exactly as they are: a new email or address in the file
@@ -538,8 +582,9 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 ## Known rough edges in what is built
 
 - Food: pick-ups and drops of boarders do not join runs yet (M39). The parent's own link cannot report a damaged
-  delivery. The shopping list does not know what is already ordered from a supplier. Packing has no "pack all" button.
-  Labels have no barcode. Stock has no units other than grams, millilitres and pieces (no "a dozen eggs").
+  delivery. The shopping list does not know what is already ordered from a supplier. Labels have no barcode. Pack all
+  takes the newest batch in date of each recipe; to use another, pack one at a time. Stock has no units other than
+  grams, millilitres and pieces (no "a dozen eggs").
 - Deliveries are made ahead only when someone opens the Kitchen or Food for homes (three weeks each time); nothing runs
   by itself overnight.
 
@@ -563,7 +608,11 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - No debit notes, and no composition scheme mode (a bill of supply's own words are not printed).
 - The credit note form offers "the whole bill" only while nothing has been credited; after that, an amount.
 
-- Proof photos on care tasks are not built (the unused field was removed in M13).
+- A care task's photo cannot be replaced once the task is done; undo the task and add it again (the old file stays in
+  storage). A shared proof photo becomes an update like any other.
+- The stay report is worked out each time it is read, so changing a care task after check-out changes it.
+- Supplies cannot be corrected or removed on screen once added (an owner can, through the database); add another line
+  for a second pack.
 - The calendar has no drag and drop (by design in M2). It draws 30 requests at most; more are on the bookings list.
 - The bills list puts the parent and pets on their own line under the number, so a phone row is taller than before.
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
@@ -592,7 +641,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 665 tests, build
+npm run check        # dash check, lint, typecheck, 687 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -602,6 +651,10 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 23 October 2026: Phase 6 built (M50 to M57, D52): kennels to clean, checklists and repairs, a pet that passed away,
+  the stay report, photo proof and Pack all, food and medicines from home, trial days, vet visits. 16 database tests
+  (each new rule removed once to see its test fail), 6 unit tests, 3 browser steps (74 in all, passing against the
+  local Supabase, images pulled through `mirror.gcr.io` where Docker Hub answered 429). `npm run check`: 687 tests.
 - 23 October 2026. Next.js and `eslint-config-next` 16.4.0 to 16.4.1, the first release outside three advisories
   (image optimization with SVG, Server Actions denial of service, `use cache` with typed arrays); D51 says how exposed
   Wagbook was. `npm run check` (665 tests) and the 71-step e2e walk pass on it, with Phase 5 merged in. Before the

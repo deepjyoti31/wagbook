@@ -15,7 +15,7 @@ type Client = Awaited<ReturnType<typeof createClient>>;
 
 // One string literal, not pieces joined with +, so that the Supabase client can work out the row type from it.
 const BOOKING_CARD =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, notes, group_id, waitlisted_at, pets(id, name, breed, species, flags, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, notes, group_id, waitlisted_at, is_trial, pets(id, name, breed, species, flags, photo_path, passed_away_on), clients(id, full_name, phone), kennels(id, name)" as const;
 
 export function bookingCards(supabase: Client, orgId: string) {
   return supabase.from("bookings").select(BOOKING_CARD).eq("org_id", orgId);

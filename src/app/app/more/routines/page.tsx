@@ -26,7 +26,7 @@ async function Routines() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("care_items")
-    .select("id, kind, label, details, due_time")
+    .select("id, kind, label, details, due_time, needs_photo")
     .eq("org_id", org.id)
     .is("pet_id", null)
     .eq("is_active", true)
@@ -62,6 +62,7 @@ async function Routines() {
                 <span className="min-w-0 flex-1">
                   <span className="font-bold">{clockText(m, item.due_time)}</span> {item.label}{" "}
                   <Badge tone={item.kind === "medication" ? "alert" : "neutral"}>{m.labels.careKind[item.kind]}</Badge>
+                  {item.needs_photo ? <> <Badge>{m.proof.needsPhoto}</Badge></> : null}
                   {item.details ? <span className="block text-slate">{item.details}</span> : null}
                 </span>
                 {canManage ? (

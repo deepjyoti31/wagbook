@@ -35,3 +35,4 @@ export * from "./import";
 export * from "./problems";
 export * from "./sizes";
 export * from "./sign-in";
+export * from "./the-day";

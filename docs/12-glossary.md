@@ -93,6 +93,16 @@ meet "Admit" or "Arrive" meaning the same thing.
 | Bring in parents and pets | `import_parents_and_pets()`, `/app/more/import` | Parents, pets and vaccinations from a spreadsheet, one pet a line (M47). |
 | Problems | `app_errors`, `/app/more/problems` | Errors the server met while someone was signed in, for owners (M48). |
 | Photos and space, archive | `photo_archives`, `/app/more/photos` | A month of photos downloaded as a ZIP, then removed from Wagbook by an owner, the small copies kept (M49). |
+| To clean, Cleaned | `kennel_cleans` | A kennel a pet has left, until someone cleans it (M50). |
+| Checklists, Opening, Closing | `house_jobs`, `house_job_days`, `/app/more/house` | Jobs that are not about a pet, ticked each day (M51). |
+| Repairs | `repairs` | Something broken, reported and then fixed, its cost an expense (M51). |
+| Passed away | `pets.passed_away_on` | A pet that has died. Nothing more is booked, sent or made for it; flowers go to the family (M52). |
+| Stay report | `stay_reports`, `stayReport()` | What the parent sees after the stay: nights, meals, medicines, play, weight, and the kennel's words and photos (M53). |
+| Needs a photo | `care_items.needs_photo` | A routine whose tasks are done only with a photo (M54). |
+| Pack all | `packAll()` | Packing every delivery of a day in one tap (M54). |
+| Brought from home | `stay_supplies`, `stay_supply_left` | Food or medicine the parent brought, counted down as it is used (M55). |
+| Trial day | `bookings.is_trial` | Day boarding for a new dog before its first stay, and how it settled (M56). |
+| Vet visit | `vet_visits`, `record_vet_visit()` | A visit to the vet during a stay, on the bill, the expenses and the pet's routine (M57). |
 
 ## Places
 

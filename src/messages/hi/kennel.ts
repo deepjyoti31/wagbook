@@ -30,6 +30,7 @@ export const kennelArea: typeof English = {
       import: { title: "पेरेंट और पालतू लाएं", about: "स्प्रेडशीट से, जब आप Wagbook पर आते हैं। मालिक और मैनेजर।" },
       photos: { title: "फ़ोटो और जगह", about: "फ़ोटो कितनी जगह लेती हैं, और पुराने महीनों को संभालना। मालिक और मैनेजर।" },
       problems: { title: "समस्याएं और रात के काम", about: "रात के काम हुए या नहीं, और ऐसी गड़बड़ियां जो किसी को बतानी हैं। मालिक और मैनेजर।" },
+      house: { title: "चेकलिस्ट और मरम्मत", about: "खोलने और बंद करने की चेकलिस्ट, बार-बार होने वाली सफ़ाई, और ठीक करने वाली चीज़ें।" },
     },
     // {role} is one of roleInSentence, written as it sits in the middle of a sentence.
     signedInAs: "{name} ({email}) के रूप में साइन इन, {kennel} में {role}।",

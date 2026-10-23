@@ -1144,3 +1144,58 @@ on the project's own files, and npm's only offer is a downgrade to `eslint-confi
 **Look again** at the next advisory for `next`: upgrade to the first patched release in the same way, and run
 `npm audit --omit=dev` before each release. Setting `images: { unoptimized: true }` in `next.config.ts` would make
 `/_next/image` answer 404 and close that route for good, since nothing uses it.
+
+---
+
+## D52. Phase 6: the day, smoother, with the rules in the database and nothing worked out twice
+
+**Status:** Decided, 23 October 2026, building Phase 6 (M50 to M57).
+
+**Situation.** The owner's list for running every day (D49) asked for kennels cleaned between guests, the jobs that
+are not about a pet, a kind end for a pet that has passed away, a report for the parent at check-out, photo proof on
+care, the parent's own food and medicines, trial days and vet visits. Each touches money, bookings or what parents
+see, so the database has to hold the rule, and nothing new may be typed twice.
+
+**Decision.**
+
+- **Cleaning (M50).** A kennel is to clean only because a pet really left it: the check-out writes the row
+  (`bookings_leave_kennel_to_clean`, `security definer`, as `kennel_service` is written), and only when the last pet in
+  it leaves, so a sibling still in it is not disturbed. Cleaned is stamped by the database and never cleared.
+  Checking into a kennel still to clean is asked about, not refused: the check-in action stops, keeps the checklist,
+  and the booking page asks "Check in anyway?". A kennel out of service is never asked about.
+- **House jobs (M51)** are a list owners and managers set (opening, closing, cleaning; every day or one weekday) and a
+  row a day only once someone ticks one, stamped as care tasks are. Repairs are anyone's to report and mark fixed; the
+  cost becomes an expense through `cost_to_expense()`, which runs as the caller so the expenses policies decide.
+- **A pet that has passed away (M52)** is a day on the pet, set by owners and managers. A trigger then cancels the
+  stays and appointments still to come with no charge ("Passed away"), ends its food and cancels deliveries still to
+  go; another refuses anything new for it (`WB254`). The reminders stop because what they are worked out from is
+  gone; the three read from history (a groom due, a review, a food trial's follow-up) leave the pet out in their
+  queries. Undo is for a week, and brings nothing back. Flowers are on Today until marked sent, with the cost as an
+  expense for owners and managers.
+- **The stay report (M53)** is not stored: it is worked out when read (`stayReport()`), from the stay's care tasks,
+  play, weighings and the incidents the parent was told of. Only the kennel's words and the photos picked are stored,
+  and the photos must already be on an update shown to the parent, so the report shows nothing new. The public stay
+  page gets the report from `get_public_stay`, still one of the twelve public functions; incidents are named by kind,
+  never by their account.
+- **Photo proof (M54)** is a routine's choice, copied on to each task and never changed afterwards, and a check
+  constraint keeps such a task from being done without its photo. The photo sits on the pet's record under
+  `{org}/care/` (which the photo archive already covers) until staff share it on an update. Such a task is not ticked
+  offline: it needs the connection for the photo. "Pack all" packs each delivery from the newest batch of its recipe
+  in date, as the page offers one at a time, and leaves the rest.
+- **Supplies (M55)** count down from the ticks, not from a counter anyone keeps: a view (`stay_supply_left`) works out
+  what is left, how many days that lasts by the pet's routines now, and whether it runs out before the stay ends.
+- **A trial day (M56)** is day boarding marked as one, with its result on the booking; nothing requires one.
+- **Vet visits (M57)** are recorded in one step by `record_vet_visit()`, as the caller: the visit, a line on the stay's
+  bill (staff may add a one-off line, as before), the expense when the caller is an owner or manager (staff leave it for
+  them, with a button), and each medicine as the pet's own routine.
+
+**Why.** The same two rules as before: the database decides, and nothing is entered twice. A report or a count
+worked out when read can never disagree with the care that was ticked.
+
+**Cost.** The report changes if a care task is changed after check-out (it is what was recorded). Supplies are
+counted against the routines as they are now, so a routine stopped mid-stay changes the days left. A passing undone
+leaves its cancellations as they are. Pack all can pack from a batch the cook meant for another day; the page still
+offers one at a time.
+
+**Look again** if kennels want the report frozen at check-out, supplies by the meal (a different amount at breakfast
+and dinner), or house jobs with photo proof too.

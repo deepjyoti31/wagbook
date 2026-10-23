@@ -17,6 +17,7 @@ import { appointmentsArea } from "./en/appointments";
 import { rulesArea } from "./en/rules";
 import { teamArea } from "./en/team";
 import { runningArea } from "./en/running";
+import { dayArea } from "./en/day";
 
 export const en = {
   ...core,
@@ -31,6 +32,7 @@ export const en = {
   ...rulesArea,
   ...teamArea,
   ...runningArea,
+  ...dayArea,
 };
 
 export type Messages = typeof en;

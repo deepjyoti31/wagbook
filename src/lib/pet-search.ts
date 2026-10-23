@@ -22,7 +22,7 @@ const PET = "id, name, breed, client_id, clients(full_name, phone)" as const;
 /** The pets of these parents that are not hidden, so a family can be ticked together. */
 async function petsOf(supabase: Client, orgId: string, clientIds: string[]): Promise<PetChoice[]> {
   if (clientIds.length === 0) return [];
-  const { data, error } = await supabase.from("pets").select(PET).eq("org_id", orgId).in("client_id", clientIds).is("deleted_at", null).order("name").limit(500);
+  const { data, error } = await supabase.from("pets").select(PET).eq("org_id", orgId).in("client_id", clientIds).is("deleted_at", null).is("passed_away_on", null).order("name").limit(500);
   if (error) throw new Error("Could not load pets.");
   return data.map((p) => ({ id: p.id, name: p.name, breed: p.breed, clientId: p.client_id, parentName: p.clients?.full_name ?? null, parentPhone: p.clients?.phone ?? null }));
 }
@@ -50,8 +50,8 @@ export async function searchPets(supabase: Client, orgId: string, query: string)
     : supabase.from("clients").select("id").eq("org_id", orgId).is("deleted_at", null).ilike("full_name", first).limit(PET_SEARCH_LIMIT);
   const [byParent, byName, byBreed] = await Promise.all([
     parents,
-    byPhone ? Promise.resolve({ data: [], error: null }) : supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).ilike("name", first).limit(PET_SEARCH_LIMIT),
-    byPhone ? Promise.resolve({ data: [], error: null }) : supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).ilike("breed", first).limit(PET_SEARCH_LIMIT),
+    byPhone ? Promise.resolve({ data: [], error: null }) : supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).is("passed_away_on", null).ilike("name", first).limit(PET_SEARCH_LIMIT),
+    byPhone ? Promise.resolve({ data: [], error: null }) : supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).is("passed_away_on", null).ilike("breed", first).limit(PET_SEARCH_LIMIT),
   ]);
   if (byParent.error || byName.error || byBreed.error) throw new Error("Could not search pets.");
 
@@ -68,9 +68,9 @@ export async function searchPets(supabase: Client, orgId: string, query: string)
  */
 export async function startingPets(supabase: Client, orgId: string, petId?: string): Promise<PetChoice[]> {
   const [asked, booked, added] = await Promise.all([
-    petId ? supabase.from("pets").select("client_id").eq("org_id", orgId).eq("id", petId).is("deleted_at", null).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    petId ? supabase.from("pets").select("client_id").eq("org_id", orgId).eq("id", petId).is("deleted_at", null).is("passed_away_on", null).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("bookings").select("client_id").eq("org_id", orgId).order("created_at", { ascending: false }).limit(60),
-    supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
+    supabase.from("pets").select("client_id").eq("org_id", orgId).is("deleted_at", null).is("passed_away_on", null).order("created_at", { ascending: false }).limit(20),
   ]);
   if (asked.error || booked.error || added.error) throw new Error("Could not load pets.");
   const clientIds = [...new Set([...(asked.data ? [asked.data.client_id] : []), ...booked.data.map((b) => b.client_id), ...added.data.map((p) => p.client_id)])].slice(0, PET_SEARCH_LIMIT);
@@ -79,7 +79,7 @@ export async function startingPets(supabase: Client, orgId: string, petId?: stri
 
 /** Does the kennel have any pet at all (not hidden)? */
 export async function hasPets(supabase: Client, orgId: string): Promise<boolean> {
-  const { count, error } = await supabase.from("pets").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("deleted_at", null);
+  const { count, error } = await supabase.from("pets").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("deleted_at", null).is("passed_away_on", null);
   if (error) throw new Error("Could not load pets.");
   return (count ?? 0) > 0;
 }

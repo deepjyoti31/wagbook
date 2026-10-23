@@ -91,6 +91,13 @@ The first release will be 0.1.0. Everything below is in it.
   afterwards; delivery runs with a rider role that sees only its own run; problems replaced or refunded; a public
   food order page with the price worked out and UPI payment; parents pausing or skipping from their own link; and food
   reports with CSV downloads.
+- The day, smoother: a kennel the last pet left is "To clean" on Today and the calendar until someone taps Cleaned,
+  and checking into one asks first. Opening and closing checklists on Today, cleaning that repeats on Care, and repairs
+  whose cost becomes an expense. A pet that has passed away has everything still to come cancelled with no charge, and
+  Today reminds you to send the family flowers. A stay report for the parent once the pet goes home, with your words
+  and photos. Routines that need a photo, and Pack all in the kitchen. The parent's own food and medicines counted
+  down, with a warning before they run out. Trial days for new dogs. Vet visits on the bill, in the expenses and on the
+  pet's routine in one step.
 
 ### For whoever runs it
 

@@ -33,7 +33,7 @@ async function NewFood({ searchParams }: Pick<PageProps<"/app/food/new">, "searc
   const title = isOrder ? f.order : f.start;
 
   if (!petId) {
-    const pets = await supabase.from("pets").select("id, name, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).order("name").limit(1000);
+    const pets = await supabase.from("pets").select("id, name, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).is("passed_away_on", null).order("name").limit(1000);
     if (pets.error) throw new Error("Could not load pets.");
     return (
       <>

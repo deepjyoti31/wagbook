@@ -16,6 +16,7 @@ import { appointmentsOn, workingPeople } from "@/lib/appointments";
 import { lacksInWords, petsLacking } from "@/lib/health";
 import { signedUrls } from "@/lib/media";
 import { OnNow } from "@/components/on-now";
+import { FlowersToSend, HouseJobs, SuppliesRunningOut, ToClean, TrialBadge, trialResults } from "@/components/today-day";
 import { PetAvatar } from "@/components/pet-avatar";
 import { ReminderLink } from "@/components/reminder-link";
 import { siteOrigin } from "@/lib/site";
@@ -104,6 +105,8 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     arrivals.map((b) => [b.id, vaccinationWarnings(vaccinations.filter((v) => v.pet_id === b.pets?.id), { startDate: b.start_date, endDate: b.end_date })]),
   );
   const reminders = await todaysReminders(supabase, org, today, origin, upcomingRes.data ?? [], inHouse, oldBillsRes.data ?? []);
+  // How each arriving pet settled on its trial day, if it had one (M56).
+  const trials = await trialResults(supabase, org.id, arrivals.flatMap((b) => (b.pets ? [b.pets.id] : [])));
   const capacity = kennelsRes.count ?? 0;
   const newForms = intakeRes.count ?? 0;
   // Done out of what is owed: a task skipped on purpose is no longer owed.
@@ -267,6 +270,19 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
+      <Suspense fallback={null}>
+        <FlowersToSend t={t} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ToClean t={t} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <HouseJobs t={t} today={today} lists={["opening", "closing"]} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SuppliesRunningOut t={t} />
+      </Suspense>
+
       {org.offers_appointments ? (
         <Suspense fallback={null}>
           <AppointmentsToday t={t} today={today} />
@@ -309,6 +325,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                   today={today}
                   photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
                   vaccineWarning={(vaccineWarnings.get(b.id) ?? []).length > 0}
+                  trial={b.pets ? trials.get(b.pets.id)?.outcome : undefined}
                 />
                 <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
                   <input type="hidden" name="bookingId" value={b.id} />
@@ -452,7 +469,7 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
     supabase.from("pet_food").select("pet_id, started_on, reviewed_on, pets(name)").eq("org_id", org.id).not("started_on", "is", null),
     supabase
       .from("deliveries")
-      .select("id, delivery_date, status, client_id, pets(name), clients(full_name, phone)")
+      .select("id, delivery_date, status, client_id, pets(name, passed_away_on), clients(full_name, phone)")
       .eq("org_id", org.id)
       .eq("kind", "trial")
       .eq("status", "delivered")
@@ -465,7 +482,7 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
   const review = food.data.filter((f) => portionReviewDue(f, today));
   const askedAbout = new Set((asked.data ?? []).map((r) => r.subject_id));
   const follow = trialsToFollowUp(
-    trials.data.filter((d) => !askedAbout.has(d.id)),
+    trials.data.filter((d) => !askedAbout.has(d.id) && !d.pets?.passed_away_on),
     new Set((subs.data ?? []).map((s) => s.client_id)),
     new Set(),
     today,
@@ -579,7 +596,22 @@ async function TomorrowSummary({ t, today }: { t: I18n; today: string }) {
   );
 }
 
-function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I18n; booking: BookingCard; today: string; photo?: string | null; vaccineWarning?: boolean }) {
+function BookingSummary({
+  t,
+  booking: b,
+  today,
+  photo,
+  vaccineWarning,
+  trial,
+}: {
+  t: I18n;
+  booking: BookingCard;
+  today: string;
+  photo?: string | null;
+  vaccineWarning?: boolean;
+  /** How the pet settled on its last trial day (M56). */
+  trial?: "settled" | "anxious" | "reactive";
+}) {
   const { m, locale } = t;
   const leavesToday = b.status === "checked_in" && b.end_date === today;
   const overdue = b.status === "checked_in" && b.end_date < today;
@@ -595,6 +627,8 @@ function BookingSummary({ t, booking: b, today, photo, vaccineWarning }: { t: I1
         </Link>
         {b.pets?.breed ? <span className="text-slate">{b.pets.breed}</span> : null}
         {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+        {b.is_trial ? <Badge tone="attention">{m.trial.badge}</Badge> : null}
+        {trial ? <TrialBadge t={t} outcome={trial} /> : null}
         {leavesToday ? <Badge tone="attention">{m.today.leavesToday}</Badge> : null}
         {overdue ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
         {late ? <Badge tone="alert">{fill(m.today.wasDue, { date: formatDate(b.start_date, locale) })}</Badge> : null}
@@ -660,7 +694,7 @@ async function todaysReminders(
     org.review_url && org.offers_appointments
       ? supabase
           .from("appointments")
-          .select("id, starts_at, pets!appointments_org_id_client_id_pet_id_fkey(name), clients(full_name, phone)")
+          .select("id, starts_at, pets!appointments_org_id_client_id_pet_id_fkey(name, passed_away_on), clients(full_name, phone)")
           .eq("org_id", org.id)
           .eq("status", "done")
           .is("booking_id", null)
@@ -669,8 +703,8 @@ async function todaysReminders(
       : Promise.resolve({ data: [] }),
   ]);
   const ended = [
-    ...(endedStays.data ?? []).map((b) => ({ id: b.id, petName: b.pets?.name ?? "", parentName: b.clients?.full_name ?? "", phone: b.clients?.phone ?? "", endedOn: b.end_date })),
-    ...(endedVisits.data ?? []).map((a) => ({ id: a.id, petName: a.pets?.name ?? "", parentName: a.clients?.full_name ?? "", phone: a.clients?.phone ?? "", endedOn: localDate(a.starts_at, org.time_zone) })),
+    ...(endedStays.data ?? []).filter((b) => !b.pets?.passed_away_on).map((b) => ({ id: b.id, petName: b.pets?.name ?? "", parentName: b.clients?.full_name ?? "", phone: b.clients?.phone ?? "", endedOn: b.end_date })),
+    ...(endedVisits.data ?? []).filter((a) => !a.pets?.passed_away_on).map((a) => ({ id: a.id, petName: a.pets?.name ?? "", parentName: a.clients?.full_name ?? "", phone: a.clients?.phone ?? "", endedOn: localDate(a.starts_at, org.time_zone) })),
   ]
     .filter((e) => e.phone)
     // One ask for each parent: the latest stay or visit.
@@ -754,11 +788,12 @@ function sentWords({ m }: I18n) {
 async function groomCards(supabase: Awaited<ReturnType<typeof createClient>>, org: { id: string; time_zone: string }): Promise<GroomCard[]> {
   const cards = await supabase
     .from("pet_grooming")
-    .select("pet_id, every_weeks, pets(name, deleted_at, clients(full_name, phone))")
+    .select("pet_id, every_weeks, pets(name, deleted_at, passed_away_on, clients(full_name, phone))")
     .eq("org_id", org.id)
     .not("every_weeks", "is", null)
     .limit(500);
-  const live = (cards.data ?? []).filter((c) => c.pets && !c.pets.deleted_at && c.pets.clients);
+  // Not a pet that has passed away (M52), nor one hidden from lists.
+  const live = (cards.data ?? []).filter((c) => c.pets && !c.pets.deleted_at && !c.pets.passed_away_on && c.pets.clients);
   if (live.length === 0) return [];
   const done = await supabase
     .from("appointments")

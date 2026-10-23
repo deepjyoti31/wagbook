@@ -16,6 +16,7 @@ create table public.care_items (
   label text not null check (char_length(label) between 1 and 80),
   details text,
   due_time time not null,
+  needs_photo boolean not null default false,
   is_active boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -28,6 +29,7 @@ comment on table public.care_items is
   'A routine that repeats every day. With no pet it is the house routine for every boarded pet (e.g. breakfast at 9); with a pet it is that pet''s own (e.g. a tablet at 8).';
 comment on column public.care_items.pet_id is 'Empty for a house routine that applies to every pet in house.';
 comment on column public.care_items.details is 'How to do it: "200 g kibble with warm water", "1 tablet with food".';
+comment on column public.care_items.needs_photo is 'True when each task made from it is done only with a photo (M54): a medicine given, a wound cleaned.';
 
 create index care_items_org_pet_idx on public.care_items (org_id, pet_id);
 
@@ -52,6 +54,7 @@ create table public.care_tasks (
   done_at timestamptz,
   done_by uuid references auth.users (id) on delete set null,
   note text,
+  needs_photo boolean not null default false,
   photo_path text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -61,14 +64,17 @@ create table public.care_tasks (
   -- A medicine that was not given is something the parent and the next shift
   -- must be able to read about, so skipping one needs a reason.
   constraint care_tasks_skipped_medication_needs_note
-    check (kind <> 'medication' or status <> 'skipped' or char_length(btrim(coalesce(note, ''))) > 0)
+    check (kind <> 'medication' or status <> 'skipped' or char_length(btrim(coalesce(note, ''))) > 0),
+  -- A task that asks for a photo is done when its photo is added (M54).
+  constraint care_tasks_done_with_photo check (not needs_photo or status <> 'done' or photo_path is not null)
 );
 
 comment on table public.care_tasks is
   'One thing to do for one pet on one day. The Tasks screen is this table, grouped by time. Created from care_items by generate_care_tasks, or added by hand.';
 comment on column public.care_tasks.care_item_id is 'The routine this task came from. Empty for one-off tasks added by staff.';
 comment on column public.care_tasks.done_by is 'Who ticked it. Stamped automatically.';
-comment on column public.care_tasks.photo_path is 'Proof photo inside the pet-media storage bucket.';
+comment on column public.care_tasks.needs_photo is 'Copied from its routine when the task is made (M54): the task is done only with a photo (care_tasks_done_with_photo). Never changed afterwards.';
+comment on column public.care_tasks.photo_path is 'Proof photo inside the pet-media storage bucket, under {org_id}/care/{task_id}/ (M54). On the pet''s record, not the parent''s page, unless staff share it on an update.';
 
 -- A routine produces at most one task per booking per day, which makes
 -- generate_care_tasks safe to run as often as anyone likes.
@@ -109,6 +115,25 @@ create trigger care_tasks_stamp_done
   before insert or update on public.care_tasks
   for each row execute function public.stamp_done();
 
+-- Whether a task asks for a photo is its routine's choice when it is made;
+-- nobody turns it off to tick the task without one. Runs as the caller.
+create function public.care_tasks_keep_photo_rule()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.needs_photo := old.needs_photo;
+  return new;
+end;
+$$;
+comment on function public.care_tasks_keep_photo_rule() is
+  'Trigger: a task keeps whether it asks for a photo (needs_photo) as it was made, so it cannot be ticked done without one by turning that off.';
+
+create trigger care_tasks_keep_photo_rule
+  before update on public.care_tasks
+  for each row execute function public.care_tasks_keep_photo_rule();
+
 create function public.generate_care_tasks(p_org uuid, p_date date)
 returns integer
 language plpgsql
@@ -117,8 +142,8 @@ as $$
 declare
   v_created integer;
 begin
-  insert into public.care_tasks (org_id, booking_id, pet_id, care_item_id, task_date, kind, label, details, due_time)
-  select b.org_id, b.id, b.pet_id, ci.id, p_date, ci.kind, ci.label, ci.details, ci.due_time
+  insert into public.care_tasks (org_id, booking_id, pet_id, care_item_id, task_date, kind, label, details, due_time, needs_photo)
+  select b.org_id, b.id, b.pet_id, ci.id, p_date, ci.kind, ci.label, ci.details, ci.due_time, ci.needs_photo
   from public.bookings b
   join public.care_items ci
     on ci.org_id = b.org_id

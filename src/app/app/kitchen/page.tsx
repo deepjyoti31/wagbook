@@ -19,7 +19,7 @@ import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { percentText, planAhead, portionSettings, quantityText } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
-import { packDelivery, recordBatch } from "./actions";
+import { packAll, packDelivery, recordBatch } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.kitchen.title);
 
@@ -109,6 +109,7 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
 
   const cooks = members.data.filter((x) => x.role !== "rider");
   const usable = (recipeId: string | null) => batches.data.filter((b) => b.recipe_id === recipeId && b.cooked_on <= day && b.use_by >= day);
+  const toPack = deliveries.data.filter((d) => d.status === "planned").length;
   const dates = [today, addDays(today, 1), addDays(today, 2)];
 
   return (
@@ -258,6 +259,21 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
 
       <Section title={k.packing} count={deliveries.data.length}>
         <p className="mb-2 text-sm text-slate">{k.packingAbout}</p>
+        {deliveries.data.length > 0 ? (
+          // Pack all (M54): the count first, then one tap. The form stays once all are packed, to say so.
+          <ActionForm action={packAll} className="mb-3">
+            <input type="hidden" name="date" value={day} />
+            {toPack > 0 ? (
+              <details>
+                <summary className={`${buttonStyles.secondary} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>{m.packAll.button}</summary>
+                <div className="mt-2 space-y-3 rounded-lg bg-marigold-soft p-3">
+                  <p className="font-semibold">{plural(language, toPack, m.packAll.confirm)}</p>
+                  <SubmitButton pendingLabel={m.packAll.packing}>{m.packAll.yes}</SubmitButton>
+                </div>
+              </details>
+            ) : null}
+          </ActionForm>
+        ) : null}
         {deliveries.data.length === 0 ? (
           <Empty>{k.packingEmpty}</Empty>
         ) : (

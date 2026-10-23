@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { Badge, buttonStyles, Loading, Section } from "@/components/ui";
 import { datesText } from "@/lib/bookings";
-import { formatDate, whatsappLink, type ISODate } from "@/lib/core";
+import { formatDate, stayReport, whatsappLink, type ISODate } from "@/lib/core";
+import { ReportFigures } from "@/components/report-figures";
 import { fill } from "@/lib/i18n";
 import { parentI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -16,6 +17,15 @@ interface PublicStay {
   booking: { kind: "boarding" | "daycare"; status: string; start_date: ISODate; end_date: ISODate; checked_in_at: string | null; checked_out_at: string | null };
   updates: { at: string; body: string; photos: string[] | null }[];
   care: { date: ISODate; kind: string; done: number; total: number }[];
+  /** Once the pet has gone home (M53): the kennel's words and photos, and the records the report is worked out from. */
+  report: {
+    words: string | null;
+    photos: string[] | null;
+    tasks: { kind: string; label: string; status: string }[] | null;
+    play: number | null;
+    weights: { on: ISODate; grams: number }[] | null;
+    incidents: { on: ISODate; category: string }[] | null;
+  } | null;
 }
 
 const TONE: Record<string, "neutral" | "attention" | "good"> = { requested: "attention", checked_in: "good" };
@@ -70,7 +80,7 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
 
   // Short-lived links (an hour) to the photos, asked for with this stay's token.
   // The small copy is shown; tapping opens the photo itself.
-  const paths = [stay.pet.photo, ...stay.updates.flatMap((u) => u.photos ?? [])].filter((p): p is string => Boolean(p));
+  const paths = [stay.pet.photo, ...stay.updates.flatMap((u) => u.photos ?? []), ...(stay.report?.photos ?? [])].filter((p): p is string => Boolean(p));
   const links = new Map<string, { small?: string; full?: string }>();
   if (paths.length > 0) {
     const small = (p: string) => p.replace(/\.jpg$/, ".small.jpg");
@@ -105,6 +115,47 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
         {datesText(t, stay.booking.start_date, stay.booking.end_date)}
         <span className="block text-base text-slate">{fill(w.times, { checkIn: stay.kennel.check_in_time, checkOut: stay.kennel.check_out_time })}</span>
       </p>
+
+      {stay.report ? (
+        <Section title={fill(m.stayReport.pageTitle, { pet: stay.pet.name })}>
+          <div className="space-y-3 rounded-xl border border-rule bg-paper p-4">
+            {stay.report.words ? (
+              <div>
+                <p className="whitespace-pre-line">{stay.report.words}</p>
+                <p className="mt-1 text-sm text-slate">{fill(m.stayReport.fromKennel, { kennel: stay.kennel.name })}</p>
+              </div>
+            ) : null}
+            {(stay.report.photos ?? []).length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {(stay.report.photos ?? []).map((p) => {
+                  const l = links.get(p);
+                  return l?.small ? (
+                    <a key={p} href={l.full ?? l.small} target="_blank" rel="noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
+                      <img src={l.small} alt={stay.pet.name} className="aspect-square w-full rounded-lg object-cover" />
+                    </a>
+                  ) : null;
+                })}
+              </div>
+            ) : null}
+            <ReportFigures
+              m={m}
+              language={t.language}
+              locale={t.locale}
+              kind={stay.booking.kind}
+              report={stayReport({
+                kind: stay.booking.kind,
+                startDate: stay.booking.start_date,
+                endDate: stay.booking.end_date,
+                tasks: stay.report.tasks ?? [],
+                play: stay.report.play ?? 0,
+                weights: stay.report.weights ?? [],
+                incidents: stay.report.incidents ?? [],
+              })}
+            />
+          </div>
+        </Section>
+      ) : null}
 
       <Section title={w.updates}>
         {stay.updates.length === 0 ? (

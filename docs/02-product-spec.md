@@ -1046,14 +1046,14 @@ each is done.
 | Bring in parents, pets and vaccinations from a spreadsheet | M47 | Built (L3) |
 | A health check for an uptime service, and server errors for owners | M48 | Built (L4) |
 | Photo archive: download a month, then free the space (the owner's choice, never by itself) | M49 | Built (L5) |
-| Kennels to clean between guests | M50 | Planned |
-| Opening and closing checklists, repeating cleaning jobs, repairs | M51 | Planned |
-| A pet that has passed away: nothing more sent, flowers to the parent | M52 | Planned |
-| A stay report for the parent at check-out | M53 | Planned |
-| Photo proof on care tasks, and "Pack all" in the kitchen | M54 | Planned |
-| A parent's own food and medicines, counted down | M55 | Planned |
-| A trial day for new dogs, never required | M56 | Planned |
-| Vet visits during a stay, on the bill and the expenses | M57 | Planned |
+| Kennels to clean between guests | M50 | Built (L6) |
+| Opening and closing checklists, repeating cleaning jobs, repairs | M51 | Built (L7) |
+| A pet that has passed away: nothing more sent, flowers to the parent | M52 | Built (L8) |
+| A stay report for the parent at check-out | M53 | Built (L9) |
+| Photo proof on care tasks, and "Pack all" in the kitchen | M54 | Built (L10) |
+| A parent's own food and medicines, counted down | M55 | Built (L11) |
+| A trial day for new dogs, never required | M56 | Built (L12) |
+| Vet visits during a stay, on the bill and the expenses | M57 | Built (L13) |
 | Move an appointment | M58 | Planned |
 | Book an appointment and report a delivery problem from the parent's link | M59 | Planned |
 | A rota that repeats each week, and forgotten clock-outs put right | M60 | Planned |
@@ -1108,6 +1108,76 @@ own photos, certificates or receipts). For a month that has ended: **Download ph
 each photo named by its day. Once downloaded, an owner sees **Remove these from Wagbook**, which asks once more ("This
 cannot be undone") and removes that month's full photos; the small copy of each stays, and every page that showed the
 photo shows the small copy. The month then reads "Removed" with how many and how much. Nothing is removed by itself.
+
+### L6. Kennels to clean. Built (M50, D52).
+
+When the last pet in a kennel is checked out, the kennel is **to clean**: Today lists it under **To clean** with when
+the pet left and a **Cleaned** button, and the calendar marks it under its name. The database writes the row and
+stamps who cleaned and when (`kennel_cleans`); a kennel cleaned stays cleaned (`WB250`). A sibling still in the kennel
+keeps it off the list. Checking a pet into a kennel still to clean, from Today or the booking page, opens the booking
+page with "K03 was not cleaned. Check in anyway?" (the checklist typed so far is kept); **Check in anyway** checks in,
+or another kennel can be chosen. A kennel out of service is not listed or asked about.
+
+### L7. Checklists, cleaning and repairs. Built (M51, D52).
+
+**More, Checklists and repairs**: owners and managers keep three lists, **Opening**, **Closing** and **Cleaning**, each
+job every day or on one weekday, with a time if wanted; **Add the usual checklists** gives a start. Today shows
+"Opening 1 of 4" and "Closing 0 of 4" with a **Done** button on each job (and Undo); Care shows the day's cleaning.
+Who ticked and when is stamped (`house_job_days`). **Repairs**: anyone reports something broken and marks it fixed
+with what it cost and what was done; an owner or manager taps **Write as an expense** (category Repairs,
+`cost_to_expense`).
+
+### L8. A pet that has passed away. Built (M52, D52).
+
+On the pet page, owners and managers **Mark as passed away** with the day (today or before, `WB252`). From then: stays
+and appointments still to come are cancelled with no charge ("Passed away"), food subscriptions end and deliveries
+still to go are cancelled, and nothing new is booked, asked for or made for the pet (`WB254`, the parent's booking
+link no longer lists it). No reminder is left about it: the stays it came from are gone, and grooms, reviews and food
+trial follow-ups leave it out. The pet leaves the pet list, search and New booking; its page keeps everything, marked
+"Passed away", and its parent's page says so. Today shows **Send flowers to {parent}, for {pet}** with the parent's
+address until someone taps **Flowers sent** (an owner or manager can write the cost, an expense under Flowers). **Undo,
+this was a mistake** is offered for a week (`WB253`); what was cancelled stays cancelled.
+
+### L9. The stay report. Built (M53, D52).
+
+Once a pet has gone home, the booking page shows its **Stay report**: nights (or days), meals eaten of those offered,
+each medicine given of those due, play sessions, the weight coming in and going home, and the kinds of incident the
+parent was told of, all worked out from what was recorded (`stayReport()`). Staff add a few words and pick up to six
+photos from those already sent to the parent (`WB261`), then **Send the stay report** opens WhatsApp with the stay link.
+The parent's stay page shows "{pet}'s stay report" at the top for the 30 days the link lasts. Internal notes, prices and
+what an incident said never appear.
+
+### L10. Photo proof and Pack all. Built (M54, D52).
+
+A routine can ask for a photo (**Needs a photo**, on Daily routines and a pet's own routine). Its tasks show "Needs a
+photo" on Care and have no Done button: staff take the photo and tap **Done with photo**; the database refuses such a
+task done without one (`care_tasks_done_with_photo`), and the task keeps the rule whatever is sent. The photo is on the
+pet's record; **Share with the parent** puts it on an update the parent sees. The photo archive covers these photos.
+In the Kitchen, **Pack all** says how many deliveries it will pack, then packs each from the newest batch of its recipe
+in date; any with no batch in date are left and counted.
+
+### L11. Brought from home. Built (M55, D52).
+
+On the booking page, before or during the stay, **Brought from home**: food (grams) or a medicine (doses), how much each
+meal or dose uses, and for a medicine the routine it is given at. It counts down as meals or doses are ticked
+(`stay_supply_left`): "800 g left of 1 kg", "Lasts 2 more days", and **Will run out before the stay ends** when it
+will. Today lists those under **Running out**, with **Ask the parent** (WhatsApp) and, for food, **Use our food** (to
+the booking's extras). At check-out the booking page says what goes home: "Goes home: Own kibble (500 g)."
+
+### L12. Trial day. Built (M56, D52).
+
+Day boarding can be marked **This is a trial day** on its booking page. Once the dog is in, staff note **How did it
+go?** (settled, anxious, or reactive with other dogs) and a sentence. The pet page and the next booking's check-in say
+"Trial day on 3 Nov 2026: Anxious." with the sentence, and Today's arrivals carry the result as a badge. Nothing
+requires a trial.
+
+### L13. Vet visits. Built (M57, D52).
+
+On a stay in the kennel, **Vet visit**: the day, why, the vet, what the vet said, the cost and up to three medicines
+with their time. In one step (`record_vet_visit`): the visit goes on the pet's health record, the cost on the stay's
+bill as "Vet visit: {why}", and for an owner or manager in the expenses (category Vet, marked to be paid back); staff
+leave the expense to an owner or manager, who taps **Write as an expense**. Each medicine becomes the pet's own routine,
+so its tasks start today. **Tell the parent** opens WhatsApp with a short message. The pet page lists every visit.
 
 ---
 

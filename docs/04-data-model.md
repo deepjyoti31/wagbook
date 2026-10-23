@@ -264,6 +264,24 @@ month of photos downloaded as a ZIP and then removed by an owner (never removed 
 (M47) adds no table: `import_parents_and_pets()` writes clients, addresses, pets, weights and vaccinations as the
 caller, all or nothing.
 
+## The day, smoother
+
+Phase 6 (M50 to M57, D52), in `20261008000570_the_day.sql`. **kennel_cleans** is a kennel to clean: written by the
+database when the last pet in it is checked out (`bookings_leave_kennel_to_clean`), cleaned when someone taps Cleaned
+(stamped, never cleared, `WB250`); one open at a time for each kennel. **house_jobs** are the opening, closing and
+cleaning lists (every day or one weekday); **house_job_days** is a job ticked on a day, stamped like a care task.
+**repairs** are things broken, reported and fixed by anyone, their cost an expense through `cost_to_expense()`.
+**pets.passed_away_on** marks a pet that has passed away: `pets_after_passing` cancels its stays, appointments,
+subscriptions and deliveries still to come, `refuse_passed_pet` refuses anything new (`WB254`), and
+`pets.flowers_sent_at` is the flowers on Today. **stay_reports** holds what staff add to a stay's report (words, picked
+photos from its updates to the parent); the report itself is worked out when read. **care_items.needs_photo** is
+copied on to **care_tasks.needs_photo**, and `care_tasks_done_with_photo` keeps such a task from being done without
+its photo. **stay_supplies** is what a parent brought (grams of food or doses of medicine, and how much each meal or
+dose uses), and the view **stay_supply_left** counts it down from the ticked tasks. **bookings.is_trial**,
+`trial_outcome` and `trial_note` are a trial day (day boarding only, `bookings_trial_is_a_day`). **vet_visits** are a
+pet's visits to the vet, recorded with `record_vet_visit()`: the visit, a line on the stay's bill
+(`booking_item_id`), the expense (`expense_id`) and the medicines as the pet's own routines, in one step.
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

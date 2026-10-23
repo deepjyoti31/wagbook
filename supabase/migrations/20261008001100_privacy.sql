@@ -121,7 +121,9 @@ begin
           'own_routine', coalesce((select jsonb_agg(to_jsonb(ci) - 'org_id' order by ci.due_time)
                                    from public.care_items ci where ci.pet_id = p.id), '[]'::jsonb),
           'incidents', coalesce((select jsonb_agg(to_jsonb(i) - 'org_id' order by i.occurred_at)
-                                 from public.incidents i where i.pet_id = p.id), '[]'::jsonb)
+                                 from public.incidents i where i.pet_id = p.id), '[]'::jsonb),
+          'vet_visits', coalesce((select jsonb_agg(to_jsonb(vv) - 'org_id' order by vv.visited_on, vv.created_at)
+                                  from public.vet_visits vv where vv.org_id = p.org_id and vv.pet_id = p.id), '[]'::jsonb)
         ) order by p.name)
       from public.pets p where p.org_id = v_client.org_id and p.client_id = v_client.id
     ), '[]'::jsonb),
@@ -136,7 +138,10 @@ begin
           'care', coalesce((select jsonb_agg(to_jsonb(t) - 'org_id' order by t.task_date, t.due_time)
                             from public.care_tasks t where t.booking_id = b.id), '[]'::jsonb),
           'play', coalesce((select jsonb_agg(to_jsonb(ps) - 'org_id' order by ps.session_date, ps.starts_at)
-                            from public.play_sessions ps where ps.booking_id = b.id), '[]'::jsonb)
+                            from public.play_sessions ps where ps.booking_id = b.id), '[]'::jsonb),
+          'supplies', coalesce((select jsonb_agg(to_jsonb(ss) - 'org_id' order by ss.created_at)
+                                from public.stay_supplies ss where ss.org_id = b.org_id and ss.booking_id = b.id), '[]'::jsonb),
+          'report', (select to_jsonb(sr) - 'org_id' from public.stay_reports sr where sr.org_id = b.org_id and sr.booking_id = b.id)
         ) order by b.start_date)
       from public.bookings b where b.org_id = v_client.org_id and b.client_id = v_client.id
     ), '[]'::jsonb),
@@ -316,6 +321,7 @@ begin
   where fo.org_id = v_client.org_id and (fo.client_id = v_client.id or fo.phone = v_client.phone);
   -- What was said to the parent, and the forms they sent.
   delete from public.stay_updates u where u.org_id = v_client.org_id and u.booking_id = any (v_bookings);
+  delete from public.stay_reports r where r.org_id = v_client.org_id and r.booking_id = any (v_bookings);
   delete from public.intake_submissions s
   where s.org_id = v_client.org_id and (s.client_id = v_client.id or s.parent_phone = v_client.phone);
   update public.vaccinations v set certificate_path = null
@@ -369,7 +375,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates and stay reports sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, vet visits, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;
