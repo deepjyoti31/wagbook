@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { isISODate, parseKgToGrams } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
-import { fill } from "@/lib/i18n";
 import { parentI18n } from "@/lib/i18n-server";
 import { BUCKET, readUpload } from "@/lib/media";
 import { sendAlertsAfter } from "@/lib/push";
@@ -103,7 +103,7 @@ export async function submitAppointmentRequest(token: string, language: string, 
  * gives back the one path the photo may go to; the photo goes there with the
  * link's secret (intake_upload_allowed). The problem is told either way.
  */
-export async function reportDeliveryProblem(token: string, language: string, kennelName: string, _state: FormState, form: FormData): Promise<FormState> {
+export async function reportDeliveryProblem(token: string, language: string, _state: FormState, form: FormData): Promise<FormState> {
   const t = parentI18n(language);
   const w = t.m.problemLink;
   if (!isSupabaseConfigured() || !/^[0-9a-f]{64}$/.test(token)) return { error: t.m.requestForm.unavailable };
@@ -121,10 +121,12 @@ export async function reportDeliveryProblem(token: string, language: string, ken
   });
   if (error) return { error: friendlyError(error, t) };
   sendAlertsAfter();
-  revalidatePath(`/b/${token}`);
+  let photoSent = true;
   if (photo && typeof data === "string") {
     const { error: uploadError } = await anon.storage.from(BUCKET).upload(data, photo.bytes, { contentType: photo.contentType, upsert: false });
-    if (uploadError) return { ok: fill(w.photoNotSent, { kennel: kennelName }) };
+    photoSent = !uploadError;
   }
-  return { ok: w.sent };
+  revalidatePath(`/b/${token}`);
+  // The delivery leaves the form once it is told, so the page says so instead.
+  redirect(`/b/${token}?told=${photoSent ? "yes" : "nophoto"}`);
 }

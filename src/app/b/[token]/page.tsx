@@ -4,7 +4,7 @@ import { cache, Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { HtmlLang } from "@/components/html-lang";
 import { PhotoInput } from "@/components/photo-input";
-import { buttonStyles, Empty, Field, Input, Loading, Section, Select, Textarea } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Notice, Section, Select, Textarea } from "@/components/ui";
 import { datesText } from "@/lib/bookings";
 import { addDays, formatDate, isISODate, whatsappLink, type ISODate } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -72,6 +72,8 @@ async function RequestForm({ params, searchParams }: Pick<PageProps<"/b/[token]"
   const service = typeof query.service === "string" && UUID.test(query.service) ? query.service : null;
   const day = typeof query.day === "string" && isISODate(query.day) ? query.day : null;
   const petAsked = typeof query.pet === "string" && UUID.test(query.pet) ? query.pet : null;
+  // A problem just told (M59): its form is gone, so the page says it went.
+  const toldNow = query.told === "yes" || query.told === "nophoto" ? query.told : null;
   const f = await loadForm(token, service, day);
   if (!f) notFound();
   const t = parentI18n(f.kennel.language, f.kennel.locale);
@@ -281,6 +283,7 @@ async function RequestForm({ params, searchParams }: Pick<PageProps<"/b/[token]"
       {f.enabled && recent.length > 0 ? (
         <Section title={m.problemLink.title}>
           <p className="mb-3 text-slate">{fill(m.problemLink.about, { hours: f.problem_window_hours })}</p>
+          {toldNow ? <Notice tone="ok">{toldNow === "yes" ? m.problemLink.sent : fill(m.problemLink.photoNotSent, { kennel: f.kennel.name })}</Notice> : null}
           {told.length > 0 ? (
             <ul className="mb-3 space-y-1">
               {told.map((d) => (
@@ -291,7 +294,7 @@ async function RequestForm({ params, searchParams }: Pick<PageProps<"/b/[token]"
             </ul>
           ) : null}
           {untold.length > 0 ? (
-            <ActionForm action={reportDeliveryProblem.bind(null, token, language, f.kennel.name)} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+            <ActionForm action={reportDeliveryProblem.bind(null, token, language)} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
               <Field label={m.problemLink.which}>
                 <Select name="delivery_id" defaultValue={untold[0].id}>
                   {untold.map((d) => (

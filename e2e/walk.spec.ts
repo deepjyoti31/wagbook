@@ -2846,8 +2846,9 @@ test("M58: an appointment moves to another day and time, and the parent is told 
   await expect(page.getByText(en.appointment.done_.booked)).toBeVisible();
 
   await page.getByRole("link", { name: en.appointment.move }).click();
+  await page.waitForURL(/\/move$/);
   await expect(page.getByRole("heading", { level: 1, name: en.moveAppointment.title })).toBeVisible();
-  await page.locator("input[name=date]").fill(day(5));
+  await page.getByLabel(en.moveAppointment.date).fill(day(5));
   await page.getByRole("button", { name: en.moveAppointment.showTimes }).click();
   await page.getByLabel("14:00").check();
   await narrow(page);
@@ -2946,9 +2947,10 @@ test("M60: a usual week fills the rota four weeks ahead, minus leave, and a forg
   // Meena's leave on days 10 and 11 stays off the rota.
   expect(adminSql(`select count(*) from public.rota r join public.memberships m on m.org_id = r.org_id and m.user_id = r.user_id
     where m.display_name = 'Meena' and r.pattern_id is not null and r.work_date in ('${day(10)}', '${day(11)}')`)).toBe("0");
-  expect(Number(adminSql(`select count(*) from public.rota r where r.pattern_id is not null and r.work_date between '${day(0)}' and '${day(27)}'`))).toBeGreaterThanOrEqual(24);
+  // 28 days, less her two days of leave and the three days the team step already put her on the morning shift by hand.
+  expect(adminSql(`select count(*) from public.rota r where r.pattern_id is not null and r.work_date between '${day(0)}' and '${day(27)}'`)).toBe("23");
   await page.reload();
-  await expect(page.getByText("Monday: Morning")).toBeVisible();
+  await expect(page.getByText("Monday: Morning", { exact: true })).toBeVisible();
   await narrow(page);
   await shot(page, "m60-usual-week");
 
@@ -2967,12 +2969,12 @@ test("M60: a usual week fills the rota four weeks ahead, minus leave, and a forg
     select m.org_id, m.user_id, ('${day(-1)}'::date + time '06:55') at time zone 'Asia/Kolkata', 'Clocked in at the gate'
     from public.memberships m where m.user_id = '${ravi}'; commit;`);
   await page.goto("/app");
-  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"))).toBeVisible();
+  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"), { exact: true })).toBeVisible();
   await narrow(page);
   await shot(page, "m60-forgot");
   await page.getByRole("button", { name: en.forgotClockOut.button.replace("{time}", "15:00") }).click();
   await expect(page.getByText(en.today.done.clockedOut)).toBeVisible();
-  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"))).toHaveCount(0);
+  await expect(page.getByText(en.forgotClockOut.line.replace("{name}", "Ravi"), { exact: true })).toHaveCount(0);
 });
 
 test("M61: a person chooses alerts, and a push wakes the phone with what happened", async ({ page, context, baseURL }) => {
@@ -2983,7 +2985,7 @@ test("M61: a person chooses alerts, and a push wakes the phone with what happene
   await expect(page.getByRole("heading", { level: 1, name: en.alerts.title })).toBeVisible();
   await expect(page.getByText(en.alerts.off)).toBeVisible();
   await page.getByRole("button", { name: en.alerts.save }).click();
-  await expect(page.getByText(en.alerts.saved)).toBeVisible();
+  await expect(page.getByText(en.alerts.saved, { exact: true })).toBeVisible();
   await narrow(page);
   await shot(page, "m61-alerts");
 
