@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after Phase 4 (M43 and M44: the team, and rough edges before production).
+Last updated: 23 October 2026, after upgrading Next.js to 16.4.1 for three security advisories (D49).
 
 ## In one paragraph
 
@@ -165,6 +165,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 4 in a browser at 360 pixels: the rota switched on, the usual shifts, Meena on three mornings and Ravi living on site; Meena clocking in on Today and seeing On now; her leave asked for and granted, the rota then refusing her; clocking out; a manager writing yesterday by hand, the month's sheet and its CSV; Meena seeing only her own; a kennel out of service from three days ago and back; Send asking whether the message went ("Not yet" keeps it); a parent's export as a ZIP holding the certificate | `npm run test:e2e` against the local Supabase: the whole walk (65 steps passing, the team step then failing on a vanishing message, fixed with `?done=`), then the 2 new steps alone after the fix; screenshots taken 22 October 2026 | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
+| Next.js 16.4.1 (D49): `npm audit --omit=dev` finds nothing; the build no longer stops with the "SecurityFatalError" notice; the whole app works on it | `npm run check` (635 tests and the build), and `npm run test:e2e` against the local Supabase (67 passed), 23 October 2026 | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
 
 ## What is NOT verified
@@ -557,6 +558,12 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 23 October 2026. Next.js and `eslint-config-next` 16.4.0 to 16.4.1, the first release outside three advisories
+  (image optimization with SVG, Server Actions denial of service, `use cache` with typed arrays); D49 says how exposed
+  Wagbook was. `npm run check` and the 67-step e2e walk pass on it. Before the upgrade the build stopped with
+  Next.js's "SecurityFatalError" notice. `npm audit` still lists `braces` through `eslint-config-next` (lint time
+  only, see D49).
 
 - 22 October 2026. Phase 4, M43 and M44: shifts, the rota, living on site, clocking in and out with On now on Today,
   leave, the month's attendance and its CSV (D48); Send asks whether the message went; kennels in and out of service
