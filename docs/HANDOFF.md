@@ -606,7 +606,8 @@ One line per session, newest first. What changed, in a sentence. Details belong 
   (image optimization with SVG, Server Actions denial of service, `use cache` with typed arrays); D51 says how exposed
   Wagbook was. `npm run check` (665 tests) and the 71-step e2e walk pass on it, with Phase 5 merged in. Before the
   upgrade the build stopped with Next.js's "SecurityFatalError" notice. `npm audit` still lists `braces` through
-  `eslint-config-next` (lint time only, see D51).
+  `eslint-config-next` (lint time only, see D51). CI's walk once failed at "Switch to" after Join: the step went on
+  before Join's redirect; it now waits for `/app` after Join and after Switch.
 - 22 October 2026: Phase 5 built (M45 to M49, D50): passwords and Google, overnight jobs, import, problems, photo archive.
 - 22 October 2026: the owner chose what comes after M44; M45 to M65 written into the roadmap, `02` section L and D49.
 

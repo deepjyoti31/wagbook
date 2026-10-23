@@ -289,8 +289,11 @@ test("a new person creates a kennel, invites a colleague, who joins and switches
   await signIn(staff.page, "staff");
   await staff.page.goto("/onboarding");
   await staff.page.getByRole("button", { name: "Join" }).click();
+  // Both actions end by going to /app; going on before then can outrun them.
+  await staff.page.waitForURL(/\/app$/);
   await staff.page.goto("/app/more");
   await staff.page.getByRole("button", { name: /Switch to/ }).first().click();
+  await staff.page.waitForURL(/\/app$/);
   await staff.page.goto("/app/more");
   await expect(staff.page.getByText(/You also work at/)).toBeVisible();
   await staff.page.getByRole("button", { name: "Sign out" }).click();
