@@ -50,6 +50,17 @@ export function LedgerRow({ children }: { children: ReactNode }) {
   return <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">{children}</li>;
 }
 
+/** One figure on a report: a label, a number, and a line under it. */
+export function Figure({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-rule bg-paper p-3">
+      <p className="text-sm text-slate">{label}</p>
+      <p className="text-xl font-extrabold tabular-nums">{children}</p>
+      {hint ? <p className="text-sm text-slate">{hint}</p> : null}
+    </div>
+  );
+}
+
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-xl border border-dashed border-rule bg-paper px-4 py-6 text-slate">{children}</p>;
 }

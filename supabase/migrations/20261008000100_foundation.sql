@@ -605,7 +605,8 @@ begin
 
   -- One at a time per person, so the limit below cannot be raced past.
   perform pg_advisory_xact_lock(hashtextextended('create-org:' || v_user::text, 0));
-  if (select count(*) from public.memberships m where m.user_id = v_user and m.role = 'owner') >= 5 then
+  -- Ten sites at most (D55): enough for a chain, small enough that a shared installation is not filled by one account.
+  if (select count(*) from public.memberships m where m.user_id = v_user and m.role = 'owner') >= 10 then
     raise exception 'WB012: you already own the maximum number of kennels' using errcode = '23514';
   end if;
 
@@ -620,7 +621,7 @@ begin
 end;
 $$;
 comment on function public.create_organization(text, text, text) is
-  'Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being.';
+  'Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being. A person owns ten at most (WB012, D55).';
 
 -- Adding people is an invitation, never an enrolment: the invited person has
 -- to accept before they become a member. Otherwise anyone could create a

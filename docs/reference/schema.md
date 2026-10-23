@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 20. Tables: 89. Views: 9. Functions: 199.
+Migrations applied: 20. Tables: 89. Views: 9. Functions: 200.
 
 ## Contents
 
@@ -5211,7 +5211,7 @@ create_organization(p_name text, p_slug text, p_display_name text) returns uuid
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being.
+Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being. A person owns ten at most (WB012, D55).
 
 ### credits_check
 
@@ -6460,6 +6460,18 @@ report_occupancy(p_org uuid, p_from date, p_to date) returns TABLE(day date, boa
 - Volatility: stable
 
 For each day: pets staying the night (boarding), pets in for the day (day boarding), kennels in service that day (kennels_in_service), and kennels used (two pets sharing a kennel use one). Counts stays that happened or are booked; not requests, cancellations or no-shows. A boarding stay counts on its nights, so not on its check-out day. Owners and managers only.
+
+### report_sites
+
+```
+report_sites(p_from date, p_to date) returns TABLE(org_id uuid, name text, currency text, nights integer, day_boarding_days integer, kennel_days integer, kennels_used integer, billed_minor bigint, credited_minor bigint, received_minor bigint, refunded_minor bigint, spent_minor bigint, owed_minor bigint, bills_owed integer)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+All sites (M65): one row for each kennel the caller owns, from that kennel's own reports over the period: nights and day boarding days sold, kennels available and used summed over the days (for how full), billed, credited, received, refunded and spent, and what is owed on issued bills today. Each row is in its own kennel's currency; adding them up is done per currency by the reader. Refuses a caller who owns no kennel (WB062); a manager of one site never sees another through it.
 
 ### report_tax
 

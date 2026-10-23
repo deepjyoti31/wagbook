@@ -3203,3 +3203,52 @@ test("M64: ledger names are set once, and a month downloads as two files for Tal
   await narrow(page);
   await shot(page, "m64-reports");
 });
+
+test("M65: an owner adds a second site and sees both side by side and together; a manager sees only their own kennel", async ({ page }) => {
+  await signIn(page, "owner");
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: en.more.addSite }).click();
+  await page.waitForURL(/\/onboarding/);
+  await expect(page.getByRole("link", { name: en.onboarding.backToApp })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m65-add-site");
+  await page.getByLabel(en.onboarding.kennelName).fill("Demo City Site");
+  await page.getByLabel(en.onboarding.linkName).fill(`city-${Date.now() % 100000}`);
+  await page.getByLabel(en.onboarding.yourName).fill("Asha");
+  await page.getByRole("button", { name: en.onboarding.create }).click();
+  await page.waitForURL(/\/app\/more\/kennels/);
+  await page.getByRole("button", { name: "Add the row" }).click();
+  await expect(page.getByText("Added 10 kennels.")).toBeVisible();
+
+  await page.goto("/app/more/reports");
+  await page.getByRole("link", { name: en.reports.sites.link }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.reports.sites.title })).toBeVisible();
+  const section = (name: string) => page.locator("section").filter({ has: page.getByRole("heading", { level: 2, name, exact: true }) });
+  const figure = (name: string, label: string) => section(name).locator("div.p-3").filter({ has: page.getByText(label, { exact: true }) }).locator("p").nth(1);
+  const together = en.reports.sites.together;
+  await expect(section(together).getByText("2 sites")).toBeVisible();
+  await expect(section("Demo City Site").getByText(en.reports.sites.here)).toBeVisible();
+  // The new site has sold nothing and taken nothing, so together is the demo kennel's month.
+  await expect(figure("Demo City Site", en.reports.nightsSold)).toHaveText("0");
+  await expect(figure("Demo City Site", en.reports.received)).toHaveText("₹0");
+  for (const label of [en.reports.nightsSold, en.reports.billed, en.reports.received, en.reports.sites.owed]) {
+    await expect(figure(together, label)).toHaveText(await figure("Wagbook Demo Kennel", label).innerText());
+  }
+  await narrow(page);
+  await shot(page, "m65-all-sites");
+
+  // Back to the demo kennel from its own section.
+  await section("Wagbook Demo Kennel").getByRole("button", { name: en.more.switchTo.replace("{kennel}", "Wagbook Demo Kennel") }).click();
+  await page.waitForURL(/\/app$/);
+  await page.goto("/app/more");
+  await expect(page.getByText(en.more.alsoWorkAt)).toBeVisible();
+  await signOutHere(page);
+
+  // A manager of the demo kennel is offered no such report and is refused it.
+  await signIn(page, "manager");
+  await page.goto("/app/more/reports");
+  await expect(page.getByRole("link", { name: en.reports.sites.link })).toHaveCount(0);
+  await page.goto("/app/more/reports/sites");
+  await expect(page.getByText(en.reports.sites.ownersOnly)).toBeVisible();
+  await expect(page.getByText("Demo City Site")).toHaveCount(0);
+});

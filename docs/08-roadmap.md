@@ -935,7 +935,7 @@ in M1 can happen at any point; the migration freeze waits for it.
 # Running for real: M45 to M65
 
 Added 22 October 2026, when the owner asked what a kennel will need once it runs on Wagbook every day, and chose the
-list below (D49). M45 to M64 are built; M65 is next. The same ways of working hold as for M25 to M44: each milestone starts by
+list below (D49). M45 to M65 are built. The same ways of working hold as for M25 to M44: each milestone starts by
 writing its section in `02-product-spec.md` (the table in section L names them all, marked "Planned"), every rule in
 `CLAUDE.md` holds, and every word is in English, Hindi and Kannada.
 
@@ -1440,7 +1440,8 @@ and messaging many parents at once (not needed).
 
 ## M65. Several sites under one owner
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L21 in `02`, D55). `report_sites()` reads each kennel the caller owns through its own
+  reports; the app adds them up per currency (`combineSites()`). An owner may now own ten kennels, not five.
 
 **Build**
 

@@ -331,6 +331,91 @@ $$;
 comment on function public.report_food_sources(uuid, date, date) is
   'Where the food customers who started in the period came from (a boarding parent, a referral, the website, elsewhere), and how many are still subscribed. Owners and managers only.';
 
+-- ---------------------------------------------------------------------------
+-- All sites (M65, D55). An owner of several kennels sees them side by side.
+-- Each site stays a kennel of its own (D49): this reads each one through its
+-- own reports, as the caller, and never joins one site's rows to another's.
+-- ---------------------------------------------------------------------------
+
+create function public.report_sites(p_from date, p_to date)
+returns table (
+  org_id uuid,
+  name text,
+  currency text,
+  nights integer,
+  day_boarding_days integer,
+  kennel_days integer,
+  kennels_used integer,
+  billed_minor bigint,
+  credited_minor bigint,
+  received_minor bigint,
+  refunded_minor bigint,
+  spent_minor bigint,
+  owed_minor bigint,
+  bills_owed integer
+)
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_sites uuid[];
+begin
+  -- Only the kennels the caller owns: a manager of one site never reaches another through this.
+  select coalesce(array_agg(x.id), '{}') into v_sites
+  from public.my_org_ids_with_role(array['owner']::public.member_role[]) as x (id);
+  if cardinality(v_sites) = 0 then
+    raise exception 'WB062: The report for all sites is for owners.' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    o.id,
+    o.name,
+    o.currency,
+    occ.nights,
+    occ.day_boarding_days,
+    occ.kennel_days,
+    occ.kennels_used,
+    mon.billed_minor,
+    mon.credited_minor,
+    mon.received_minor,
+    mon.refunded_minor,
+    mon.spent_minor,
+    due.owed_minor,
+    due.bills_owed
+  from public.organizations o
+  -- Each site's own report, which checks the caller and the period for that site (WB060, WB061).
+  cross join lateral (
+    select
+      coalesce(sum(r.boarding), 0)::integer as nights,
+      coalesce(sum(r.day_boarding), 0)::integer as day_boarding_days,
+      coalesce(sum(r.capacity), 0)::integer as kennel_days,
+      coalesce(sum(r.kennels_used), 0)::integer as kennels_used
+    from public.report_occupancy(o.id, p_from, p_to) r
+  ) occ
+  cross join lateral (
+    select
+      coalesce(sum(r.billed_minor), 0)::bigint as billed_minor,
+      coalesce(sum(r.credited_minor), 0)::bigint as credited_minor,
+      coalesce(sum(r.received_minor), 0)::bigint as received_minor,
+      coalesce(sum(r.refunded_minor), 0)::bigint as refunded_minor,
+      coalesce(sum(r.spent_minor), 0)::bigint as spent_minor
+    from public.report_money(o.id, p_from, p_to) r
+  ) mon
+  -- Owed today, whatever the period, as on the site's own report.
+  cross join lateral (
+    select coalesce(sum(b.due_minor), 0)::bigint as owed_minor, count(*)::integer as bills_owed
+    from public.invoice_balances b
+    where b.org_id = o.id and b.status = 'issued' and b.due_minor > 0
+  ) due
+  where o.id = any (v_sites)
+  order by o.name, o.id;
+end;
+$$;
+comment on function public.report_sites(date, date) is
+  'All sites (M65): one row for each kennel the caller owns, from that kennel''s own reports over the period: nights and day boarding days sold, kennels available and used summed over the days (for how full), billed, credited, received, refunded and spent, and what is owed on issued bills today. Each row is in its own kennel''s currency; adding them up is done per currency by the reader. Refuses a caller who owns no kennel (WB062); a manager of one site never sees another through it.';
+
 revoke all on function public.check_report_access(uuid, date, date) from public, anon;
 revoke all on function public.report_occupancy(uuid, date, date) from public, anon;
 revoke all on function public.report_money(uuid, date, date) from public, anon;
@@ -339,6 +424,7 @@ revoke all on function public.report_extras(uuid, date, date) from public, anon;
 revoke all on function public.report_food(uuid, date, date) from public, anon;
 revoke all on function public.report_food_riders(uuid, date, date) from public, anon;
 revoke all on function public.report_food_sources(uuid, date, date) from public, anon;
+revoke all on function public.report_sites(date, date) from public, anon;
 grant execute on function public.check_report_access(uuid, date, date) to authenticated;
 grant execute on function public.report_occupancy(uuid, date, date) to authenticated;
 grant execute on function public.report_money(uuid, date, date) to authenticated;
@@ -347,3 +433,4 @@ grant execute on function public.report_extras(uuid, date, date) to authenticate
 grant execute on function public.report_food(uuid, date, date) to authenticated;
 grant execute on function public.report_food_riders(uuid, date, date) to authenticated;
 grant execute on function public.report_food_sources(uuid, date, date) to authenticated;
+grant execute on function public.report_sites(date, date) to authenticated;

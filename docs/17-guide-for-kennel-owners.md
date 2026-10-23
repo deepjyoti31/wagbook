@@ -218,6 +218,16 @@ If your accountant uses Tally, give them the names of your ledgers once under **
 Each month, **Download for Tally** gives a ZIP of two files: they import the ledgers first, then the vouchers. Ask them
 to check the first month carefully before relying on it.
 
+### More than one site
+
+Each site is a kennel of its own in Wagbook, with its own parents, prices, bills and people. To open another, go to
+**More, Add another site** and answer the same three questions as for the first. Switch between them under **More**,
+where each has a **Switch to** button. People who work at two sites are invited to each.
+
+With two sites or more, **Reports** has **See all your sites together**: each site's month side by side, then all of
+them added up (nights sold, how full, billed, received, spent, and what is owed today). Only you, as the owner, see it;
+a site's managers see that site's own reports.
+
 ## The team: rota, leave and attendance
 
 Switch on **A rota for the team** in Settings, under What this kennel offers.

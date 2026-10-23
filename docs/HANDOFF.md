@@ -2,11 +2,16 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 23 October 2026, after building Phase 8 (M62 to M64, D54).
+Last updated: 23 October 2026, after building Phase 9 (M65, D55).
 
 ## In one paragraph
 
-Every milestone from M2 to M64 is built, and the launch work in M1 waits for the owner. Phase 8 (M62 to M64, `02`
+Every milestone from M2 to M65 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. Phase 9 (M65, `02` section L21, D55) is built: each site is a kennel of its own,
+added by an owner from More ("Add another site", up to ten kennels each, `WB012`); an owner of two or more sees **All
+sites** under Reports, each kennel they own from its own reports and then added up per currency (nights, day boarding,
+how full, billed, received, refunded, spent, owed today), through `report_sites()`, which reads only kennels the caller
+owns and refuses anyone who owns none (`WB062`). Phase 8 (M62 to M64, `02`
 sections L18 to L20, D54) is built: treats, toys and accessories sold over the counter from the same stock as the
 kitchen's (switched on in Settings), each line priced by the database from its item and its stock taken out in the same
 step, all or nothing, more than is in stock refused (`WB130`); a sale goes on a stay's bill (until that bill is out,
@@ -16,7 +21,7 @@ runs low is listed to reorder. Orders to suppliers are placed by managers and se
 as they come, never more than is still to come (`WB290` to `WB292`), with the supplier's bill an expense once
 (`WB293`); the kitchen's shopping list leaves out what is on order and can place the order. Reports downloads a month
 as two XML files for Tally (ledgers, then vouchers) with the ledger names the kennel sets once; **not yet imported into
-Tally by a person**. Next is Phase 9, M65. Phase 7 (M58 to M61, `02`
+Tally by a person**. Phase 7 (M58 to M61, `02`
 sections L14 to L17, D53) is built: an appointment moves to another day, time, place or person from the free times,
 checked by the database like a new one (`WB270`, `WB271`), with the new time sent to the parent on WhatsApp and the old
 one in History of changes; from their own link a parent asks for an appointment at a free time (a request, on
@@ -207,6 +212,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 7 in the database: a move onto a taken place, pet or person refused and onto a free time made, keeping its add-ons, within the place's hours and the stay's days, only for an appointment still to come (`WB270`) and to a time still to come (`WB271`), the old time in the audit log; the parent's link offering a day's free times without those taken, an appointment asked for at one of them landing as a request from the parent priced by the kennel and on the pet's stay, refused for another parent's pet, an add-on, a time not free or too far, past six a day, or when appointments are off; a problem told for the parent's own delivery within the window, once, with its photo let in only at the path given back, with the link's secret, within the hour; staff unable to pass anything as the parent's; a usual week filling four weeks minus leave, a day taken off by hand staying off, a clash skipped, a pattern's days to come taken with it, never changed in place (`WB275`), planned by managers only; a forgotten clock-out found two hours after its shift and closed at the shift's end, another's not closable by staff; alerts for the people who chose them only, taken once with the secret only (`WB277`), a pet gone home unpaid alerted and a paid one not, choices and phones each person's own, the outbox and secret sealed, a gone phone forgotten | `tests/db/moving.test.ts` (6), `parent-link.test.ts` (10), `rota-patterns.test.ts` (7), `alerts.test.ts` (5), `security.test.ts` (thirteen public functions, four sealed tables); each new rule removed once to see its tests fail (the move rules, the free-time check, the one-problem rule, the parent marker, the leave skip, the filled-once rule, the secret, the choices) | High |
 | VAPID signing, alert sentences in every language | `src/lib/vapid.test.ts` (a token the public key verifies, keys that are not a pair refused), `src/lib/alerts.test.ts` | High |
 | Phase 7 in a browser at 360 pixels: a swim booked and moved to another day and time from the free times, the WhatsApp link with the new time, History of changes showing the appointment's old start; a parent asking for a swim from their own link in a private window, staff seeing it under "Asked for by parents" and on Today; a parent telling a trial delivery came damaged with a photo (the photo reached the local Storage through the policy), staff seeing it on Food with the photo and on Today, and dealing with it; a usual week of mornings filling 23 days (28, less two of leave and three already on by hand), the rota listing it; a manager left clocked in from yesterday's shift shown on Today and clocked out at 15:00 with one tap; alerts chosen under More, a parent's booking request, then a push handed to the phone's service worker (through the browser's DevTools protocol) showing "Wagbook Demo Kennel: A parent asked for a stay for Rocky." with no phone number | `npm run test:e2e` against the local Supabase: the whole walk, 78 steps passing, 23 October 2026; screenshots taken. The walk found the problem form's sentence vanishing with the form (the delivery moves to "Already told"): it now goes back to the page with `?told=`; and PostgREST seeing two ways from memberships to organizations once `alert_choices` and `rota_patterns` existed: the one embed now names its key | High for the local stack |
+| Phase 9 in the database: all sites for an owner of two gives each site's nights, day boarding, kennels available and used, money received, refunded and spent by its own dates, bills by the month issued and what is owed today, and the totals added up; requests and cancellations left out; a manager, staff, a stranger and the anonymous role refused (`WB062`), a manager of one site refused the other's reports (`WB060`); a person who owns one kennel and manages another gets only the one they own; a period over 400 days refused (`WB061`); staff of two sites read each site's rows one at a time; ten kennels owned and the eleventh refused (`WB012`) | `tests/db/sites.test.ts` (8); the owner-only rule and the limit each removed once to see the tests fail | High |
+| Adding up sites: one site as its own report, two together, how full from the kennels and not an average, currencies never added together | `src/lib/core/sites.test.ts` | High |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Phase 8 in the database: selling the last piece and refused the next (`WB130`), nothing of a refused sale left; refused while the kennel does not sell (`WB280`), for what has no price (`WB281`), by weight (`stock_items_sold_by_the_piece`), with no lines (`WB287`), by riders and other kennels; priced from the item whatever is sent, a later price change leaving a sale as it was, staff unable to change a price; nobody writing a sale, its lines or a sale's stock by hand; the walk-in buyer one per kennel, no phone, no pets (`WB286`), never merged (`WB018`), not made by hand; a bill of its own issued by staff only as sold (`WB050`), once (`invoices_one_live_per_sale`), only to its buyer (`WB288`); a sale on a stay on that stay's bill (staff refused without it), nothing more once it is out (`WB283`), not on a cancelled stay (`WB282`); cancelled by owners and managers with a reason (`WB002`, `WB285`), once (`WB284`), its stock back and its draft bill gone, in the history; in the parent's export. Orders: placed by managers only, nothing in stock until it comes, lines never changed, received in part by staff (no cost) and in full by a manager with a cost, never more than still to come (`WB292`), only what is on it (`WB291`), not once closed (`WB290`); the bill an expense once (`WB293`); the shopping list leaving out what is on order; an order with receipts never deleted | `tests/db/shop.test.ts` (10), `tests/db/supplier-orders.test.ts` (8); the cap on what comes, the issued stay bill check and the price from the item each removed once to see the tests fail | High |
 | Sale bill lines, the counter's quantities, what to reorder, quantities typed back; the shopping list less what is on order; the Tally files: party ledgers, XML escaping, every voucher balanced, bills, credit notes, receipts, refunds, credit journals, expenses, one tax and IGST, masters once each | `src/lib/core/shop.test.ts`, `food.test.ts`, `tally.test.ts` | High for the arithmetic; none for Tally accepting the file (see below) |
@@ -260,6 +267,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | The overnight `fill_rota` job on a hosted project | Run inside `run_nightly_jobs()` in the database tests and when the rota opens in the walk; pg_cron not watched at night | Low |
 | The Tally files imported into Tally | No Tally here. The XML follows Tally's published import format (ENVELOPE, Import Data, LEDGER and VOUCHER messages, debits negative with ISDEEMEDPOSITIVE Yes), and every voucher is checked to balance; nobody has imported one | Medium: ask the accountant to import one month into a copy of the company (question 17 in `06`) and fix `src/lib/core/tally.ts` where Tally objects. Ledgers that already exist in Tally are written without an action so they should be left alone; that is not proven |
 | Phase 8 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The counter's form and the order lines may wrap in Kannada |
+| Phase 9 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | Long site names may wrap the figures' grid |
+| An owner with sites in two currencies or two time zones, in the browser | The adding up per currency is unit tested; the walk has two sites in rupees in one time zone | Low |
 | HSN codes and rates for things sold over the counter | The kennel types them; nobody has checked them | Question 16 in `06` |
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
@@ -288,9 +297,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: M65 is next** (several sites under one owner). The owner chose it on 22 October 2026 (D49); `02` section
-L lists it. Phases 5 to 8 (M45 to M64) are built. Before a kennel relies on the file for Tally, the accountant imports
-one month (`06`, questions 16 and 17). Alongside, steps 1 to 9 above still
+**Building: nothing is scheduled.** Phases 5 to 9 (M45 to M65) are built, so the roadmap is finished but for M1. The
+next milestone comes from the owner, or from an idea under "Ideas not scheduled" in `08` once it has an issue and a
+kennel reason. Before a kennel relies on the file for Tally, the accountant imports one month (`06`, questions 16 and
+17). Alongside, steps 1 to 9 above still
 need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
 template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
 check `cron.job` has `wagbook-nightly`, point an uptime service at `/api/health`, and if the kennel wants alerts on
@@ -331,6 +341,7 @@ migration. Add new files."
 | --- | --- | --- |
 | Rate and SAC for boarding, day boarding and grooming (after the accountant) | [06-billing-and-gst.md](06-billing-and-gst.md), "What the law says" and the questions | Tax off; each kennel sets its own rate and code (D35) |
 | Whether erasure must wait a year under DPDP Rule 8(3) (after the lawyer; the Rule starts around 13 May 2027) | [05-security-and-privacy.md](05-security-and-privacy.md), "What the law says" | Erased at once |
+| How many kennels one person may own (M65 asked for the limit of five to be looked at again) | [09-decisions.md](09-decisions.md), D55 | Ten |
 
 Decided: only owners and managers set or change a price (D15), extended to bills in M4. The licence is AGPL-3.0-or-later
 (D2, confirmed 19 October 2026). The repository is public on the owner's GitHub account; conduct reports go to the owner
@@ -372,6 +383,10 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 23 October 2026 (Phase 9), also unchecked: All sites (सभी शाखाएं, ಎಲ್ಲಾ ಶಾಖೆಗಳು; "site" drafted as "branch",
+शाखा and ಶಾಖೆ), "Add another site" on More, "Back to Wagbook" on the page that creates a kennel, and `WB062`. Only
+owners read these.
 
 Drafted on 23 October 2026 (Phase 7), also unchecked: moving an appointment (समय बदलें, ಸಮಯ ಬದಲಿಸಿ) and the WhatsApp
 message with the new time (parents read it); the parent's link asking for an appointment and telling a delivery went
@@ -477,7 +492,7 @@ Product behaviours that were chosen as the simplest thing and may need the owner
   hidden parent has no list of their own: they are reached from their pets (under Hidden pets) or a past stay. Right?
 - Staff may still change the emergency contact's number; only the parent's own numbers are for managers (D33).
 - The intake form asks for up to six pets, and New booking books up to six together. Enough?
-- A person can own at most five kennels on one installation. Enough?
+- A person can own at most ten kennels on one installation (D55, raised from five for several sites). Enough?
 - Forms from parents stay "new" until someone deals with them; there is no expiry.
 - Words stored as data stay in the language they were typed in: routine names, extras, kennel names, notes, the
   default prices (named in the language of whoever set them), and expense categories. Is that right for a kennel
@@ -508,6 +523,16 @@ Chosen in M25 as the simplest thing:
   is all or nothing.
 - A weight can be written for any day up to today, and the latest by date is the pet's weight; one written today for
   last week does not replace a newer one.
+
+Chosen in Phase 9 (M65) as the simplest thing:
+
+- All sites covers only the kennels the reader owns. A manager over several sites (an "area manager") does not see it;
+  should they?
+- All sites shows one month, for the calendar month in each site's own dates; there is no month by month table and no
+  CSV of all sites. Each site's own Reports still has both.
+- "Owed today" on All sites is today's, whatever the month chosen, as on a site's own report.
+- A new site starts empty: prices, routines, settings and people are set up again in it. Nothing is copied from the
+  first site.
 
 Chosen in Phase 6 (M50 to M57) as the simplest thing:
 
@@ -672,6 +697,8 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - Phase 5: the photo page does not refresh itself after a download: reload to see "Remove these from Wagbook". The
   import's preview is lost if the page is reloaded (send the file again). Errors on public pages are not listed.
   Archived small copies are shown without the word "Archived".
+- All sites (M65): no CSV, no month by month table, and no way to compare one site's month with another month. A site
+  the owner suspended themselves from, or left, drops out of it.
 - Rota and attendance: a usual week fills the rota only when an owner or manager opens it, after a usual week is
   added, or overnight (M60); a usual week changes by taking a day away and adding it again. No cover requests or swaps, no overtime rules, no pay worked out, no
   clocking in tied to the kennel's place. A shift taken off the list keeps its old rota rows; its name cannot change.

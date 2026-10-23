@@ -215,6 +215,7 @@ export const core = {
       WB057: "This day is on its month's bill. Cancel it and book the new day instead.",
       WB060: "Reports are for owners and managers.",
       WB061: "Choose a period of a year or less, with the start before the end.",
+      WB062: "The report for all sites is for owners.",
       WB070: "Only an owner or manager can download or erase a parent's details.",
       WB071: "A pet of this parent is in the kennel now. Check it out first.",
       WB072: "This parent has stays still to come. Cancel them first.",
