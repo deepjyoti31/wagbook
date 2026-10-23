@@ -87,8 +87,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (`npm run check`: 754 tests in all on 23 October 2026), and the whole day is
-walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 81 steps).
+database rules are tested in-process (`npm run check`: 766 tests in all on 23 October 2026), and the whole day is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 82 steps).
 
 ## What is verified, and how
 
@@ -214,6 +214,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 7 in a browser at 360 pixels: a swim booked and moved to another day and time from the free times, the WhatsApp link with the new time, History of changes showing the appointment's old start; a parent asking for a swim from their own link in a private window, staff seeing it under "Asked for by parents" and on Today; a parent telling a trial delivery came damaged with a photo (the photo reached the local Storage through the policy), staff seeing it on Food with the photo and on Today, and dealing with it; a usual week of mornings filling 23 days (28, less two of leave and three already on by hand), the rota listing it; a manager left clocked in from yesterday's shift shown on Today and clocked out at 15:00 with one tap; alerts chosen under More, a parent's booking request, then a push handed to the phone's service worker (through the browser's DevTools protocol) showing "Wagbook Demo Kennel: A parent asked for a stay for Rocky." with no phone number | `npm run test:e2e` against the local Supabase: the whole walk, 78 steps passing, 23 October 2026; screenshots taken. The walk found the problem form's sentence vanishing with the form (the delivery moves to "Already told"): it now goes back to the page with `?told=`; and PostgREST seeing two ways from memberships to organizations once `alert_choices` and `rota_patterns` existed: the one embed now names its key | High for the local stack |
 | Phase 9 in the database: all sites for an owner of two gives each site's nights, day boarding, kennels available and used, money received, refunded and spent by its own dates, bills by the month issued and what is owed today, and the totals added up; requests and cancellations left out; a manager, staff, a stranger and the anonymous role refused (`WB062`), a manager of one site refused the other's reports (`WB060`); a person who owns one kennel and manages another gets only the one they own; a period over 400 days refused (`WB061`); staff of two sites read each site's rows one at a time; ten kennels owned and the eleventh refused (`WB012`) | `tests/db/sites.test.ts` (8); the owner-only rule and the limit each removed once to see the tests fail | High |
 | Adding up sites: one site as its own report, two together, how full from the kennels and not an average, currencies never added together | `src/lib/core/sites.test.ts` | High |
+| Phase 9 in a browser at 360 pixels: the demo owner adds a second site from More (Back to Wagbook offered), adds its kennels, opens All sites from Reports: "2 sites", the new site at nothing and "You are working here now", nights, billed, received and owed together equal to the demo kennel's; Switch to the demo kennel from its section; the manager offered no link and refused the page with the sentence, the new site's name nowhere | `npm run test:e2e` against the local Supabase: the whole walk, 82 steps passing, 23 October 2026; screenshots taken (`m65-add-site`, `m65-all-sites`) | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Phase 8 in the database: selling the last piece and refused the next (`WB130`), nothing of a refused sale left; refused while the kennel does not sell (`WB280`), for what has no price (`WB281`), by weight (`stock_items_sold_by_the_piece`), with no lines (`WB287`), by riders and other kennels; priced from the item whatever is sent, a later price change leaving a sale as it was, staff unable to change a price; nobody writing a sale, its lines or a sale's stock by hand; the walk-in buyer one per kennel, no phone, no pets (`WB286`), never merged (`WB018`), not made by hand; a bill of its own issued by staff only as sold (`WB050`), once (`invoices_one_live_per_sale`), only to its buyer (`WB288`); a sale on a stay on that stay's bill (staff refused without it), nothing more once it is out (`WB283`), not on a cancelled stay (`WB282`); cancelled by owners and managers with a reason (`WB002`, `WB285`), once (`WB284`), its stock back and its draft bill gone, in the history; in the parent's export. Orders: placed by managers only, nothing in stock until it comes, lines never changed, received in part by staff (no cost) and in full by a manager with a cost, never more than still to come (`WB292`), only what is on it (`WB291`), not once closed (`WB290`); the bill an expense once (`WB293`); the shopping list leaving out what is on order; an order with receipts never deleted | `tests/db/shop.test.ts` (10), `tests/db/supplier-orders.test.ts` (8); the cap on what comes, the issued stay bill check and the price from the item each removed once to see the tests fail | High |
 | Sale bill lines, the counter's quantities, what to reorder, quantities typed back; the shopping list less what is on order; the Tally files: party ledgers, XML escaping, every voucher balanced, bills, credit notes, receipts, refunds, credit journals, expenses, one tax and IGST, masters once each | `src/lib/core/shop.test.ts`, `food.test.ts`, `tally.test.ts` | High for the arithmetic; none for Tally accepting the file (see below) |
@@ -716,7 +717,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 754 tests, build
+npm run check        # dash check, lint, typecheck, 766 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -726,6 +727,11 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 23 October 2026: Phase 9 built (M65, D55): several sites under one owner, All sites under Reports from
+  `report_sites()` (each owned kennel through its own reports, added up per currency in the app), Add another site on
+  More, and ten kennels per owner instead of five. 8 database tests (the owner-only rule and the limit each removed
+  once to see a test fail), 4 unit tests, 1 browser step (82 in all, passing against the local Supabase). `npm run
+  check`: 766 tests. No new public function. The roadmap is finished but for M1.
 - 23 October 2026: Phase 8 built (M62 to M64, D54): selling over the counter from stock (a walk-in buyer, sales on a
   stay's bill or a bill of their own), orders to suppliers received into stock with the bill as an expense, and the
   month's file for Tally. 18 database tests (the cap on what comes, the issued stay bill check and the price from the
