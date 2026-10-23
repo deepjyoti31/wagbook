@@ -329,6 +329,9 @@ export const core = {
       WB273: "That time is not free. Pick one of the free times.",
       WB274: "The kennel already knows about a problem with that delivery.",
       WB275: "A usual week is not changed. Take the day away and add the new one.",
+      WB276: "The push secret is at least 32 characters.",
+      WB277: "Alerts are not set up here.",
+      WB278: "Choose one of your deliveries.",
     },
   },
   labels: {

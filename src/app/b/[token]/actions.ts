@@ -7,6 +7,7 @@ import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { parentI18n } from "@/lib/i18n-server";
 import { BUCKET, readUpload } from "@/lib/media";
+import { sendAlertsAfter } from "@/lib/push";
 import { isRateLimited } from "@/lib/rate-limit-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
@@ -35,6 +36,7 @@ export async function submitBookingRequest(token: string, language: string, _sta
     p_payload: { kind, start_date: start, end_date: end ?? (kind === "daycare" ? start : null), pet_ids: [...new Set(petIds)], note: text(form, "note") },
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   revalidatePath(`/b/${token}`);
   return { ok: w.sent };
 }
@@ -61,6 +63,7 @@ export async function submitFoodRequest(token: string, language: string, _state:
     p_payload: { kind, subscription_id: text(form, "subscription_id"), from, until, grams, note: text(form, "note") },
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   revalidatePath(`/b/${token}`);
   return { ok: t.m.foodLink.sent };
 }
@@ -89,6 +92,7 @@ export async function submitAppointmentRequest(token: string, language: string, 
     p_payload: { appointment: { pet_id: pet, service_id: service, date: day, time, note: text(form, "note") } },
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   revalidatePath(`/b/${token}`);
   return { ok: t.m.appointmentLink.sent };
 }
@@ -116,6 +120,7 @@ export async function reportDeliveryProblem(token: string, language: string, ken
     p_payload: { kind: "problem", delivery_id: delivery, problem, note: text(form, "note")?.slice(0, 500) ?? null, photo: Boolean(photo) },
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   revalidatePath(`/b/${token}`);
   if (photo && typeof data === "string") {
     const { error: uploadError } = await anon.storage.from(BUCKET).upload(data, photo.bytes, { contentType: photo.contentType, upsert: false });

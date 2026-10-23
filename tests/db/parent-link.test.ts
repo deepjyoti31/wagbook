@@ -30,7 +30,7 @@ type Form = {
   appointment_services: { id: string; name: string }[] | null;
   free_times: string[] | null;
   appointments: { pet: string; service: string; status: string; date: string; time: string }[] | null;
-  food: { id: string; recent: { id: string; date: string; reported: boolean }[] | null }[] | null;
+  recent_deliveries: { id: string; pet: string; date: string; reported: boolean }[] | null;
 };
 const form = (t: string, service: string | null = null, onDay: string | null = null) =>
   as(db, anon, async () => (await db.query<{ v: Form }>("select public.get_public_booking_form($1, $2, $3) as v", [t, service, onDay])).rows[0].v);
@@ -160,13 +160,13 @@ describe("telling the kennel a delivery went wrong", () => {
 
   it("lists the deliveries handed over within the window, and lands where staff see problems", async () => {
     const v = await form(link);
-    expect(v.food?.[0].recent?.map((r) => r.id).sort()).toEqual([delivered, later].sort());
+    expect(v.recent_deliveries?.map((r) => r.id).sort()).toEqual([delivered, later].sort());
     const path = await tell({ delivery_id: delivered, problem: "damaged", note: "The pack was torn", photo: true });
     expect(path).toMatch(new RegExp(`^${f.org}/deliveries/${delivered}/problem-[0-9a-f-]{36}\\.jpg$`));
     const [p] = await q<{ kind: string; note: string; from_parent: boolean; photo_path: string; reported_by: string | null }>(
       db, f.owner, "select kind, note, from_parent, photo_path, reported_by from public.delivery_problems where delivery_id = $1", [delivered]);
     expect([p.kind, p.note, p.from_parent, p.photo_path, p.reported_by]).toEqual(["damaged", "The pack was torn", true, path, null]);
-    expect((await form(link)).food?.[0].recent?.find((r) => r.id === delivered)?.reported).toBe(true);
+    expect((await form(link)).recent_deliveries?.find((r) => r.id === delivered)?.reported).toBe(true);
 
     // The photo goes in once, at that path, with the link's secret.
     await upload(path!);
@@ -178,11 +178,11 @@ describe("telling the kennel a delivery went wrong", () => {
   it("is told once per delivery, about the parent's own deliveries, within the window", async () => {
     expect((await errorOf(() => tell({ delivery_id: delivered, problem: "late" }))).message).toContain("WB274");
     const other = await seedKitchen(db);
-    expect((await errorOf(() => tell({ delivery_id: other.client, problem: "late" }))).message).toContain("WB186");
+    expect((await errorOf(() => tell({ delivery_id: other.client, problem: "late" }))).message).toContain("WB278");
     expect((await errorOf(() => tell({ delivery_id: later, problem: "cold" }))).message).toContain("WB181");
     await as(db, admin, () => db.query("update public.deliveries set delivered_at = now() - interval '3 days' where id = $1", [later]));
     expect((await errorOf(() => tell({ delivery_id: later, problem: "late" }))).message).toContain("WB174");
-    expect((await form(link)).food?.[0].recent?.map((r) => r.id)).toEqual([delivered]);
+    expect((await form(link)).recent_deliveries?.map((r) => r.id)).toEqual([delivered]);
   });
 
   it("takes no photo without a path given back, after the hour, or with another link", async () => {

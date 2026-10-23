@@ -1054,10 +1054,10 @@ each is done.
 | A parent's own food and medicines, counted down | M55 | Built (L11) |
 | A trial day for new dogs, never required | M56 | Built (L12) |
 | Vet visits during a stay, on the bill and the expenses | M57 | Built (L13) |
-| Move an appointment | M58 | Planned |
-| Book an appointment and report a delivery problem from the parent's link | M59 | Planned |
-| A rota that repeats each week, and forgotten clock-outs put right | M60 | Planned |
-| Alerts on staff phones (web push) | M61 | Planned |
+| Move an appointment | M58 | Built (L14) |
+| Book an appointment and report a delivery problem from the parent's link | M59 | Built (L15) |
+| A rota that repeats each week, and forgotten clock-outs put right | M60 | Built (L16) |
+| Alerts on staff phones (web push) | M61 | Built (L17) |
 | Treats, toys and accessories sold over the counter, from stock | M62 | Planned |
 | Orders to suppliers, received into stock | M63 | Planned |
 | Export for Tally | M64 | Planned |
@@ -1178,6 +1178,44 @@ with their time. In one step (`record_vet_visit`): the visit goes on the pet's h
 bill as "Vet visit: {why}", and for an owner or manager in the expenses (category Vet, marked to be paid back); staff
 leave the expense to an owner or manager, who taps **Write as an expense**. Each medicine becomes the pet's own routine,
 so its tasks start today. **Tell the parent** opens WhatsApp with a short message. The pet page lists every visit.
+
+### L14. Move an appointment. Built (M58, D53).
+
+On an appointment still to come, **Move** opens the free times: a new day, and the place and person if they change.
+The appointment keeps its length, add-ons and bill. The database checks the new time as it checks a new appointment
+(the place with its clean-up, the pet and the person one at a time, the place's hours, a boarder's stay), refuses a
+done, missed or cancelled appointment (`WB270`) and a time already gone (`WB271`). After the move, **Send the new time to
+the parent** opens WhatsApp in the kennel's language for parents. History of changes (owners and managers) lists
+appointments, with the old time and the new.
+
+### L15. More from the parent's own link. Built (M59, D53).
+
+When the kennel offers appointments, the parent's link has **Book an appointment**: what, which pet and the day, then
+one of the free times (from today to 60 days ahead). It lands as a request, holding nothing, priced as the kennel
+prices it, on the pet's stay if it is staying that day; six a day at most. Staff see it on Appointments under **Asked
+for by parents**, and Today says one is waiting. When the kennel delivers food, a delivery handed over within the
+problem window shows under **Something wrong with a delivery?**: damaged, late or wrong, a note and a photo, once per
+delivery. It lands on Food under **Delivery problems to deal with** (and on the subscription's page), marked **Told by
+the parent**, with the photo; Today counts the problems waiting. A problem with a trial or an order is dealt with on
+Food. The link still reaches the database through its own functions only.
+
+### L16. A rota that repeats, and forgotten clock-outs. Built (M60, D53).
+
+On Rota, **Usual week**: a person, a shift and the weekdays. It fills the rota four weeks ahead and on, week after
+week (when an owner or manager opens the rota, and overnight). A day of granted leave or a day the person is already on
+a shift at that time is left out; a day taken off by hand stays off. Taking a weekday away takes its days still to come
+off the rota. A stretch still open two hours after the end of the shift it began in shows on Today for owners and
+managers: "{name} did not clock out", with **Clocked out at the end of the shift (15:00)**, which writes that time with
+a note, in History of changes as any time by hand.
+
+### L17. Alerts on staff phones. Built (M61, D53).
+
+Under More, **Alerts on your phone**: **Allow alerts on this phone**, and which alerts the person wants: a parent asks
+for a stay or an appointment, a new form from a parent, a food order or change, an incident written down, a pet gone
+home with the bill unpaid. An alert names the kennel and the pet and opens the page; it never shows a parent's phone
+number or address. The push itself carries nothing: the phone asks Wagbook, signed in, what happened. Alerts are off
+until an installation sets them up (`10-setup-and-deploy.md`, "Alerts on phones"); no paid service is used. On an
+iPhone, Wagbook must be added to the home screen first.
 
 ---
 

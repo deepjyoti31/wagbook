@@ -68,7 +68,12 @@ A regular in day boarding can be booked once for set weekdays: tick **Repeat**, 
 **day boarding packs** (add them on **Extras**, sell one from the parent's page), their days are paid from the pack.
 
 Parents you know can ask for a stay themselves: on a parent's page, **Booking link** sends them their own link. What
-they ask for arrives as a request, which holds no kennel until you confirm it.
+they ask for arrives as a request, which holds no kennel until you confirm it. The same link lets them ask for an
+appointment at one of your free times (it waits on Appointments under **Asked for by parents**), and tell you a
+delivery went wrong, with a photo (it waits on Food under **Delivery problems to deal with**).
+
+An appointment that needs another time: open it and press **Move**, pick the new day (and the place or person, if they
+change) and one of the free times, then **Send the new time to the parent**.
 
 Two pets of one family can be booked together, in a kennel each or in one kennel, the second at your shared kennel
 price. If one goes home early, the nights the other has the kennel to itself are billed at your usual price. A booking
@@ -201,6 +206,9 @@ Switch on **A rota for the team** in Settings, under What this kennel offers.
 - **More, Rota**: press **Add morning, evening and night** for the usual shifts (change their hours if yours differ),
   then **Put someone on the rota** for a shift, one day or up to 31 days in a row. Tick who lives at the kennel under
   **Living on site**. Everyone can read the rota; owners and managers change it.
+- **More, Rota, Usual week**: each person's usual shifts (Meena, Morning, Monday to Friday). They fill the rota four
+  weeks ahead and keep filling it week after week, leaving out days of leave. Change any week by hand above; a day you
+  take off stays off.
 - **Today, On now**: each person taps **Clock in** when they start and **Clock out** when they finish. The time is
   the server's, not the phone's. Everyone sees who is clocked in and who lives on site; owners and managers also see
   the times.
@@ -209,6 +217,12 @@ Switch on **A rota for the team** in Settings, under What this kennel offers.
 - **More, Attendance**: the month for pay, each person's days and hours, with a CSV download. Someone forgot to clock
   in or out? An owner or manager writes the time by hand, with the reason; History of changes keeps it.
 - Someone with attendance on record is **suspended** on People, not removed, so their attendance stays for pay.
+- Someone still clocked in two hours after their shift ended shows on Today for owners and managers ("Meena did not
+  clock out"): one tap clocks them out at the end of the shift, with a note.
+
+**Alerts on your phone** (More): once whoever runs Wagbook has set them up, each person allows alerts on their phone and
+chooses which they want: requests from parents, new forms, incidents, a pet gone home unpaid. On an iPhone, add Wagbook
+to the home screen first.
 
 ## Keeping it safe
 

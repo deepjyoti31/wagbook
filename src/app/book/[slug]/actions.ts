@@ -2,6 +2,7 @@
 
 import { isISODate, normalizePhone, normalizePostalCode } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { sendAlertsAfter } from "@/lib/push";
 import { checked, text, type FormState } from "@/lib/forms";
 import { parentI18n } from "@/lib/i18n-server";
 import { IntakePayload } from "@/lib/intake";
@@ -86,5 +87,6 @@ export async function submitBookingForm(slug: string, language: string, _state: 
 
   const { error } = await createAnonClient().rpc("submit_intake", { p_slug: slug, p_payload: parsed.data });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   return { ok: "sent" };
 }

@@ -2,6 +2,7 @@
 
 import { formatMoney, normalizePhone, normalizePostalCode, parseKgToGrams, qrMatrix, qrSvgPath, upiLink } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { sendAlertsAfter } from "@/lib/push";
 import { checked, text } from "@/lib/forms";
 import { parentI18n } from "@/lib/i18n-server";
 import { WEEKDAYS } from "@/lib/kitchen";
@@ -83,6 +84,7 @@ export async function submitFoodOrder(slug: string, language: string, payTo: Pay
     },
   });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
   const r = data as { token: string; status: string; amount_minor: number | null; starts_on: string | null };
   const amount = r.amount_minor === null ? undefined : formatMoney(r.amount_minor, { currency: payTo.currency, locale: payTo.locale, trimZeros: true });
   let pay: FoodOrderState["pay"] = null;

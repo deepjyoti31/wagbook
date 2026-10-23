@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getMemberships, rememberOrg, requireOrg } from "@/lib/auth";
 import { shortenedEnd, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { sendAlertsAfter } from "@/lib/push";
 import { getAppI18n } from "@/lib/i18n-server";
 import { checked, text, type FormState } from "@/lib/forms";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
@@ -119,6 +120,8 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
     .select("id");
   if (error) return { error: friendlyError(error, t) };
   if (data.length === 0) return { error: t.m.errors.notCheckedIn };
+  // A bill still unpaid at check-out raises an alert (M61).
+  sendAlertsAfter();
 
   revalidatePath("/app", "layout");
   if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=${update.end_date ? "checked_out_early" : "checked_out"}`);

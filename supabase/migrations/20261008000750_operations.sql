@@ -160,16 +160,20 @@ as $$
 declare
   v_errors integer;
   v_runs integer;
+  v_alerts integer;
 begin
   delete from public.app_errors e where e.org_id = p_org and e.happened_at < now() - interval '90 days';
   get diagnostics v_errors = row_count;
   delete from public.job_runs r where r.org_id = p_org and r.ran_at < now() - interval '90 days';
   get diagnostics v_runs = row_count;
-  return v_errors + v_runs;
+  -- Alerts on staff phones (M61) are for now: kept 30 days.
+  delete from public.alerts a where a.org_id = p_org and a.created_at < now() - interval '30 days';
+  get diagnostics v_alerts = row_count;
+  return v_errors + v_runs + v_alerts;
 end;
 $$;
 comment on function public.job_forget_old_rows(uuid) is
-  'Overnight job (M46): removes the kennel''s problems (app_errors) and job runs older than 90 days. Returns how many it removed.';
+  'Overnight job (M46): removes the kennel''s problems (app_errors) and job runs older than 90 days, and its alerts (M61) older than 30. Returns how many it removed.';
 revoke all on function public.job_forget_old_rows(uuid) from public, anon;
 
 -- Every job for every kennel, each in its own sub-transaction: a job that

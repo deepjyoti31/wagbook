@@ -3,6 +3,7 @@
 import type { z } from "zod";
 import { isISODate, normalizePhone, normalizePostalCode } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
+import { sendAlertsAfter } from "@/lib/push";
 import { checked, text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
 import { parentI18n, type I18n } from "@/lib/i18n-server";
@@ -124,6 +125,7 @@ export async function submitIntake(slug: string, kennelName: string, language: s
 
   const { data, error } = await createAnonClient().rpc("submit_intake", { p_slug: slug, p_payload: parsed.data });
   if (error) return { error: friendlyError(error, t) };
+  sendAlertsAfter();
 
   // Certificates go after the form, into its own folder, with the secret it
   // gave back (intake_upload_allowed). The form is in either way.

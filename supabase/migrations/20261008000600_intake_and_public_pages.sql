@@ -698,6 +698,17 @@ as $$
     ), '[]'::jsonb) end,
     'food_cutoff_hours', o.food_cutoff_hours,
     'problem_window_hours', o.problem_window_hours,
+    -- Their deliveries handed over within the kennel's window, to say one went wrong (M59).
+    'recent_deliveries', case when o.offers_food_delivery then coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', d.id, 'pet', p.name, 'date', d.delivery_date,
+        'reported', exists (select 1 from public.delivery_problems dp where dp.org_id = d.org_id and dp.delivery_id = d.id))
+        order by d.delivered_at desc)
+      from public.deliveries d
+      join public.pets p on p.org_id = d.org_id and p.id = d.pet_id
+      where d.org_id = c.org_id and d.client_id = c.id and d.status = 'delivered'
+        and d.delivered_at > now() - make_interval(hours => o.problem_window_hours)
+    ), '[]'::jsonb) end,
     -- Their food, when the kennel delivers: what they may pause, skip or add to (M32).
     'food', case when o.offers_food_delivery then coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -707,15 +718,7 @@ as $$
                  from (select d2.delivery_date, d2.status from public.deliveries d2
                        where d2.org_id = s.org_id and d2.subscription_id = s.id and d2.status <> 'cancelled'
                          and d2.delivery_date >= (now() at time zone o.time_zone)::date
-                       order by d2.delivery_date limit 6) d),
-        -- Deliveries handed over within the kennel's window, to say one went wrong (M59).
-        'recent', (select jsonb_agg(jsonb_build_object(
-                     'id', d3.id, 'date', d3.delivery_date,
-                     'reported', exists (select 1 from public.delivery_problems dp where dp.org_id = d3.org_id and dp.delivery_id = d3.id))
-                     order by d3.delivery_date desc)
-                   from public.deliveries d3
-                   where d3.org_id = s.org_id and d3.subscription_id = s.id and d3.status = 'delivered'
-                     and d3.delivered_at > now() - make_interval(hours => o.problem_window_hours))
+                       order by d2.delivery_date limit 6) d)
       ) order by p.name)
       from public.subscriptions s
       join public.pets p on p.org_id = s.org_id and p.id = s.pet_id
@@ -730,7 +733,7 @@ as $$
     and c.erased_at is null;
 $$;
 comment on function public.get_public_booking_form(text, uuid, date) is
-  'PUBLIC. The parent''s own booking link: the kennel''s name, WhatsApp number and usual times, the parent''s first name, their pets'' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only); when the kennel offers appointments, the services they may ask for, their appointments still to come (day, time, status), and with p_service and p_day the free times that day (M59); and, when the kennel delivers food, their subscriptions with the next deliveries and those handed over within the problem window. Nothing for a hidden or erased parent.';
+  'PUBLIC. The parent''s own booking link: the kennel''s name, WhatsApp number and usual times, the parent''s first name, their pets'' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only); when the kennel offers appointments, the services they may ask for, their appointments still to come (day, time, status), and with p_service and p_day the free times that day (M59); and, when the kennel delivers food, their subscriptions with the next deliveries, and their deliveries handed over within the problem window (M59). Nothing for a hidden or erased parent.';
 
 create function public.submit_booking_request(p_token text, p_payload jsonb)
 returns integer
@@ -1195,16 +1198,15 @@ begin
     raise exception 'WB181: the order could not be read' using errcode = '22023';
   end if;
 
-  -- A problem with a delivery (M59): one of their own subscription's, handed
+  -- A problem with a delivery (M59): one of their own deliveries, handed
   -- over within the kennel's window (WB174, checked by delivery_problems),
   -- told once. With a photo, the path it goes to is made here and given back;
   -- intake_upload_allowed() lets that one file in, within the hour.
   if p_payload ->> 'kind' = 'problem' then
     select d.* into v_delivery from public.deliveries d
-    join public.subscriptions s on s.org_id = d.org_id and s.id = d.subscription_id
-    where d.org_id = v_client.org_id and s.client_id = v_client.id and d.id::text = p_payload ->> 'delivery_id';
+    where d.org_id = v_client.org_id and d.client_id = v_client.id and d.id::text = p_payload ->> 'delivery_id';
     if v_delivery.id is null then
-      raise exception 'WB186: choose one of your food subscriptions' using errcode = '22023';
+      raise exception 'WB278: choose one of your deliveries' using errcode = '22023';
     end if;
     if coalesce(p_payload ->> 'problem', '') not in ('damaged', 'late', 'wrong') then
       raise exception 'WB181: the order could not be read' using errcode = '22023';
@@ -1250,7 +1252,7 @@ begin
 end;
 $$;
 comment on function public.submit_food_request(text, jsonb) is
-  'PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105). A problem with one of their deliveries (kind problem, M59) is written down for staff as the kennel''s own report is (delivery_problems, WB174), once per delivery (WB274), five a day at most (WB105); with a photo, returns the path the photo may be added at (intake_upload_allowed()). Returns nothing otherwise.';
+  'PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105). A problem with one of their deliveries (kind problem, M59; WB278 for one not theirs) is written down for staff as the kennel''s own report is (delivery_problems, WB174), once per delivery (WB274), five a day at most (WB105); with a photo, returns the path the photo may be added at (intake_upload_allowed()). Returns nothing otherwise.';
 
 -- Staff confirm an order: a website order makes or matches the parent (by
 -- phone), the pet (by name, with its weight), the address, and the trial or

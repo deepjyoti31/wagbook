@@ -38,6 +38,7 @@ const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; mana
   { href: "/app/more/health", key: "health" },
   { href: "/app/more/areas", key: "areas", when: (o) => o.offers_food_delivery },
   { href: "/app/more/appointments", key: "appointmentSetup", when: (o) => o.offers_appointments },
+  { href: "/app/more/alerts", key: "alerts" },
   { href: "/app/more/settings", key: "settings" },
   { href: "/app/more/history", key: "history", managers: true },
   { href: "/app/more/import", key: "import", managers: true },

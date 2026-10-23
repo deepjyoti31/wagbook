@@ -1,7 +1,7 @@
 /** Kannada words for running Wagbook for real (Phase 5, M45 to M49): a first draft, to be checked by a native speaker. Same shape as en/running.ts. */
 import type { Messages } from "../en";
 
-export const runningArea: Pick<Messages, "account" | "importing" | "problems" | "photoArchive"> = {
+export const runningArea: Pick<Messages, "account" | "importing" | "problems" | "alerts" | "photoArchive"> = {
   account: {
     forgotLink: "ಪಾಸ್‌ವರ್ಡ್ ಮರೆತಿರಾ?",
     forgot: {
@@ -109,6 +109,45 @@ export const runningArea: Pick<Messages, "account" | "importing" | "problems" | 
     lastAt: "ಕೊನೆಯದಾಗಿ {when}",
     kinds: { render: "ಪುಟ ತೆರೆಯುವಾಗ", route: "ಡೌನ್‌ಲೋಡ್ ಅಥವಾ ಲಿಂಕ್", action: "ಫಾರ್ಮ್ ಉಳಿಸುವಾಗ", proxy: "ಪುಟದ ಮೊದಲು" },
     code: "ಕೋಡ್ {digest}",
+  },
+  // Alerts on staff phones (M61), under More.
+  alerts: {
+    title: "ನಿಮ್ಮ ಫೋನ್‌ನಲ್ಲಿ ಎಚ್ಚರಿಕೆಗಳು",
+    about: "ನಿಮ್ಮ ಅಗತ್ಯವಿರುವಾಗ Wagbook ನಿಮ್ಮ ಫೋನ್‌ಗೆ ತಿಳಿಸಬಹುದು: ಪೋಷಕರ ವಿನಂತಿ, ಹೊಸ ಫಾರ್ಮ್, ಒಂದು ಘಟನೆ, ಬಿಲ್ ಕಟ್ಟದೆ ಮನೆಗೆ ಹೋದ ಸಾಕುಪ್ರಾಣಿ. ಎಚ್ಚರಿಕೆ ಏನಾಯಿತು ಎಂದು ಹೇಳಿ ಆ ಪುಟ ತೆರೆಯುತ್ತದೆ. ಇದು ಎಂದಿಗೂ ಪೋಷಕರ ಫೋನ್ ಸಂಖ್ಯೆ ಅಥವಾ ವಿಳಾಸ ತೋರಿಸುವುದಿಲ್ಲ.",
+    phone: "ಈ ಫೋನ್",
+    notSetUp: "ಈ Wagbook ನಲ್ಲಿ ಇನ್ನೂ ಎಚ್ಚರಿಕೆಗಳು ಸಿದ್ಧವಾಗಿಲ್ಲ. ಇದನ್ನು ನಡೆಸುವವರು ಅವುಗಳನ್ನು ಆನ್ ಮಾಡುತ್ತಾರೆ (ಸೆಟಪ್ ಮಾರ್ಗದರ್ಶಿ, ಫೋನ್‌ಗಳಲ್ಲಿ ಎಚ್ಚರಿಕೆಗಳು).",
+    checking: "ಈ ಫೋನ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ.",
+    unsupported: "ಈ ಬ್ರೌಸರ್ ಇಲ್ಲಿ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ. iPhone ನಲ್ಲಿ, Wagbook ಅನ್ನು ಹೋಮ್ ಸ್ಕ್ರೀನ್‌ಗೆ ಸೇರಿಸಿ ಅಲ್ಲಿಂದ ತೆರೆಯಿರಿ. ಎಚ್ಚರಿಕೆಗಳು ಸ್ಥಾಪಿಸಿದ ಸೈಟ್‌ನಲ್ಲಿ ಕೆಲಸ ಮಾಡುತ್ತವೆ, ಡೆವಲಪ್‌ಮೆಂಟ್‌ನಲ್ಲಿ ಅಲ್ಲ.",
+    blocked: "ಈ ಫೋನ್ Wagbook ಎಚ್ಚರಿಕೆಗಳನ್ನು ತಡೆದಿದೆ. ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಈ ಸೈಟ್‌ನ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ಅನುಮತಿಸಿ, ನಂತರ ಬಟನ್ ಒತ್ತಿ.",
+    on: "ಈ ಫೋನ್‌ಗೆ ಎಚ್ಚರಿಕೆಗಳು ಆನ್ ಆಗಿವೆ.",
+    off: "ಈ ಫೋನ್‌ಗೆ ಎಚ್ಚರಿಕೆಗಳು ಆಫ್ ಆಗಿವೆ.",
+    allow: "ಈ ಫೋನ್‌ನಲ್ಲಿ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಅನುಮತಿಸಿ",
+    allowing: "ಫೋನ್ ಅನ್ನು ಕೇಳಲಾಗುತ್ತಿದೆ",
+    stop: "ಈ ಫೋನ್‌ನಲ್ಲಿ ಎಚ್ಚರಿಕೆಗಳನ್ನು ನಿಲ್ಲಿಸಿ",
+    failed: "ಫೋನ್ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಅನುಮತಿಸಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    phones: { one: "ಎಚ್ಚರಿಕೆಗಳು ನಿಮ್ಮ {n} ಫೋನ್‌ಗೆ ಹೋಗುತ್ತವೆ.", other: "ಎಚ್ಚರಿಕೆಗಳು ನಿಮ್ಮ {n} ಫೋನ್‌ಗಳಿಗೆ ಹೋಗುತ್ತವೆ." },
+    choose: "ನಿಮಗೆ ಯಾವ ಎಚ್ಚರಿಕೆಗಳು ಬೇಕು",
+    save: "ನನ್ನ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಉಳಿಸಿ",
+    saved: "ಉಳಿಸಲಾಗಿದೆ.",
+    kinds: {
+      booking_request: "ಪೋಷಕರು ವಾಸ್ತವ್ಯ ಕೇಳಿದಾಗ",
+      appointment_request: "ಪೋಷಕರು ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಕೇಳಿದಾಗ",
+      intake_form: "ಪೋಷಕರಿಂದ ಹೊಸ ಫಾರ್ಮ್",
+      food_order: "ಪೋಷಕರಿಂದ ಊಟದ ಆರ್ಡರ್ ಅಥವಾ ಬದಲಾವಣೆ",
+      incident: "ಒಂದು ಘಟನೆ ಬರೆದಾಗ",
+      unpaid_checkout: "ಸಾಕುಪ್ರಾಣಿ ಬಿಲ್ ಕಟ್ಟದೆ ಮನೆಗೆ ಹೋದಾಗ",
+    },
+    // What the phone shows. {pet} is the pet's name.
+    says: {
+      booking_request: "ಒಬ್ಬ ಪೋಷಕರು {pet} ಗೆ ವಾಸ್ತವ್ಯ ಕೇಳಿದ್ದಾರೆ.",
+      appointment_request: "ಒಬ್ಬ ಪೋಷಕರು {pet} ಗೆ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಕೇಳಿದ್ದಾರೆ.",
+      intake_form: "ಪೋಷಕರ ಒಂದು ಹೊಸ ಫಾರ್ಮ್ ಕಾಯುತ್ತಿದೆ.",
+      food_order: "{pet} ಗೆ ಊಟದ ಆರ್ಡರ್ ಅಥವಾ ಬದಲಾವಣೆ ಕಾಯುತ್ತಿದೆ.",
+      incident: "{pet} ಗೆ ಒಂದು ಘಟನೆ ಬರೆಯಲಾಗಿದೆ.",
+      unpaid_checkout: "{pet} ಬಿಲ್ ಕಟ್ಟದೆ ಮನೆಗೆ ಹೋಗಿದೆ.",
+    },
+    somePet: "ಒಂದು ಸಾಕುಪ್ರಾಣಿ",
+    fallback: "ಕೆನಲ್‌ನಲ್ಲಿ ಹೊಸದೇನೋ ಇದೆ. ನೋಡಲು Wagbook ತೆರೆಯಿರಿ.",
   },
   photoArchive: {
     title: "ಫೋಟೋಗಳು ಮತ್ತು ಜಾಗ",

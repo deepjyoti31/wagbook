@@ -1277,7 +1277,8 @@ and messaging many parents at once (not needed).
 
 ## M58. Move an appointment
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L14 in `02`, D53). The appointment's own trigger and constraints check the new time;
+  `WB270` and `WB271` keep a move to appointments and times still to come.
 
 **Build**
 
@@ -1297,7 +1298,9 @@ and messaging many parents at once (not needed).
 
 ## M59. More from the parent's own link
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L15 in `02`, D53). Both go through the link's existing functions
+  (`get_public_booking_form`, `submit_booking_request`, `submit_food_request`) and the photo through
+  `intake_upload_allowed`: no new public function for the page. Any delivery to the parent can be reported, a trial too.
 
 **Build**
 
@@ -1320,7 +1323,8 @@ and messaging many parents at once (not needed).
 
 ## M60. A rota that repeats, and forgotten clock-outs
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L16 in `02`, D53). `fill_rota()` fills four weeks ahead from the rota page, after a
+  pattern is added, and overnight; a day filled once is never filled again.
 
 **Build**
 
@@ -1342,7 +1346,9 @@ and messaging many parents at once (not needed).
 
 ## M61. Alerts on staff phones
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L17 in `02`, D53). Pushes carry nothing; the phone asks Wagbook what happened. No
+  library: VAPID signing with `node:crypto`. `take_pushes()` is the thirteenth function the anonymous role may call,
+  useless without the installation's secret. See `HANDOFF.md` for what the walk could and could not reach.
 
 **Build**
 

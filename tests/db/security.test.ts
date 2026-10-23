@@ -24,7 +24,7 @@ describe("every table is locked down", () => {
       where n.nspname = 'public' and c.relkind = 'r'
       order by 1`);
     // Tables nobody may touch directly: only SECURITY DEFINER functions do.
-    const sealed = new Set(["invoice_counters", "recovery_codes"]);
+    const sealed = new Set(["invoice_counters", "recovery_codes", "push_outbox", "push_secret"]);
     for (const t of res.rows) {
       expect(t.rls, `${t.table} must have row level security enabled`).toBe(true);
       if (!sealed.has(t.table)) expect(t.policies, `${t.table} needs policies`).toBeGreaterThan(0);
@@ -43,7 +43,7 @@ describe("every table is locked down", () => {
     expect(res.rows).toEqual([]);
   });
 
-  it("lets the anonymous role run exactly the twelve public functions and nothing else", async () => {
+  it("lets the anonymous role run exactly the thirteen public functions and nothing else", async () => {
     const res = await db.query<{ name: string }>(`
       select p.proname as name
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -67,6 +67,8 @@ describe("every table is locked down", () => {
       // A known parent's changes to their food, from their own link.
       "submit_food_request",
       "submit_intake",
+      // The app server takes the phones to wake for alerts (M61), with the installation's secret.
+      "take_pushes",
     ]);
   });
 
@@ -100,6 +102,7 @@ describe("tenant isolation", () => {
     "trips", "required_vaccines", "health_overrides", "cancellation_rules", "credits", "credit_uses",
     "kennel_service", "shifts", "rota", "leave_requests", "attendance",
     "kennel_cleans", "house_jobs", "house_job_days", "repairs", "stay_reports", "stay_supplies", "vet_visits", "stay_supply_left",
+    "rota_patterns", "alerts", "alert_choices", "push_subscriptions",
   ];
 
   it("shows a member only their own organisation's rows, in every table", async () => {

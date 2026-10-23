@@ -110,6 +110,11 @@ alter table public.kennel_cleans enable row level security;
 alter table public.house_jobs enable row level security;
 alter table public.house_job_days enable row level security;
 alter table public.repairs enable row level security;
+alter table public.alerts enable row level security;
+alter table public.alert_choices enable row level security;
+alter table public.push_subscriptions enable row level security;
+alter table public.push_outbox enable row level security;
+alter table public.push_secret enable row level security;
 alter table public.stay_reports enable row level security;
 alter table public.stay_supplies enable row level security;
 alter table public.vet_visits enable row level security;
@@ -551,6 +556,29 @@ create policy credit_note_lines_select on public.credit_note_lines for select to
 -- invoice_counters: row level security is on and there are no policies and no
 -- grants, so nobody reaches it except issue_invoice() and issue_credit_note().
 
+-- Alerts on staff phones (M61). Members read their kennel's alerts (a pet's
+-- name and a page); nobody writes them, the triggers in 00065 do. Each person
+-- chooses their own alerts and adds or removes only their own phones.
+-- push_outbox and push_secret have row level security on and no policy and no
+-- grant: only raise_alert() and take_pushes() reach them.
+grant select on public.alerts to authenticated;
+create policy alerts_select on public.alerts for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+grant select, insert, delete on public.alert_choices to authenticated;
+create policy alert_choices_select on public.alert_choices for select to authenticated
+  using (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+create policy alert_choices_insert on public.alert_choices for insert to authenticated
+  with check (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+create policy alert_choices_delete on public.alert_choices for delete to authenticated
+  using (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+grant select, insert, delete on public.push_subscriptions to authenticated;
+create policy push_subscriptions_select on public.push_subscriptions for select to authenticated
+  using (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+create policy push_subscriptions_insert on public.push_subscriptions for insert to authenticated
+  with check (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+create policy push_subscriptions_delete on public.push_subscriptions for delete to authenticated
+  using (user_id = (select auth.uid()) and org_id in (select public.my_org_ids()));
+
 -- ---------------------------------------------------------------------------
 -- payments: any member records money received and reads; only managers
 -- record refunds, correct or remove.
@@ -717,6 +745,7 @@ grant execute on function public.kennels_in_service(uuid, date) to authenticated
 -- Phase 7 (M58 to M61).
 grant execute on function public.fill_rota(uuid, date) to authenticated;
 grant execute on function public.forgotten_clock_outs(uuid, integer) to authenticated;
+grant execute on function public.my_alerts(timestamptz) to authenticated;
 
 -- Phase 5 (M45 to M49): running for real.
 grant execute on function public.import_parents_and_pets(uuid, jsonb) to authenticated;
@@ -747,3 +776,6 @@ grant execute on function public.get_public_food_form(text) to anon, authenticat
 grant execute on function public.submit_food_order(text, jsonb) to anon, authenticated;
 grant execute on function public.food_order_paid(text) to anon, authenticated;
 grant execute on function public.submit_food_request(text, jsonb) to anon, authenticated;
+-- Alerts (M61): the app server, holding the installation's push secret,
+-- takes the phones to wake right after a parent's request, signed in or not.
+grant execute on function public.take_pushes(text, text[]) to anon, authenticated;

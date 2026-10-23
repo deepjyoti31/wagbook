@@ -20,6 +20,7 @@ export const kennelArea = {
       appointmentSetup: { title: "Appointment setup", about: "Places and their hours, services and prices, and packages." },
       kitchen: { title: "Kitchen", about: "What to cook, batches, packing, labels, stock and recipes." },
       food: { title: "Food for homes", about: "Subscriptions, orders, deliveries and runs." },
+      alerts: { title: "Alerts on your phone", about: "Which alerts you want, and this phone on or off." },
       settings: { title: "Settings", about: "Kennel details, prices, tax and UPI." },
       history: { title: "History of changes", about: "Who changed what, and when. Owners and managers." },
       rota: { title: "Rota", about: "Shifts, who works when, and who lives on site." },

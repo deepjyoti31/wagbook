@@ -2,11 +2,22 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 23 October 2026, after building Phase 6 (M50 to M57, D52).
+Last updated: 23 October 2026, after building Phase 7 (M58 to M61, D53).
 
 ## In one paragraph
 
-Every milestone from M2 to M57 is built, and the launch work in M1 waits for the owner. Phase 6 (M50 to M57, `02`
+Every milestone from M2 to M61 is built, and the launch work in M1 waits for the owner. Phase 7 (M58 to M61, `02`
+sections L14 to L17, D53) is built: an appointment moves to another day, time, place or person from the free times,
+checked by the database like a new one (`WB270`, `WB271`), with the new time sent to the parent on WhatsApp and the old
+one in History of changes; from their own link a parent asks for an appointment at a free time (a request, on
+Appointments under "Asked for by parents") and tells the kennel a delivery went wrong, with a photo (on Food under
+"Delivery problems to deal with"), through the link's own functions; each person's usual week fills the rota four
+weeks ahead, minus leave and clashes, a day taken off by hand staying off, and a stretch still open two hours after its
+shift shows on Today for owners and managers, closed at the shift's end with a note; and alerts on staff phones
+(chosen by each person under More) for requests, new forms, food orders, incidents and pets gone home unpaid, where the
+push carries nothing and the phone asks Wagbook what happened, signed in. Alerts are off until an installation sets
+four settings (`node scripts/push-keys.mjs`); `take_pushes()`, guarded by the installation's push secret, is the
+thirteenth function the anonymous role may call. Next is Phase 8, from M62. Phase 6 (M50 to M57, `02`
 sections L6 to L13, D52) is built: a kennel left by its last pet is "To clean" on Today and the calendar until someone
 taps Cleaned, and checking into one asks first; opening and closing checklists on Today, cleaning that repeats on
 Care, and repairs whose cost becomes an expense; a pet marked as passed away has its stays, appointments and food
@@ -14,7 +25,7 @@ cancelled with no charge, nothing new made for it, and flowers to send on Today 
 for the parent once the pet has gone home, worked out from what was recorded, with the kennel's words and photos;
 routines that need a photo, and Pack all in the kitchen; the parent's own food and medicines counted down by the ticks,
 with a warning when they will not last; trial days and how they went; and vet visits that put the cost on the bill and
-in the expenses and the medicines on the routine in one step. Next is Phase 7, from M58. M45 to M65 ("Running for
+in the expenses and the medicines on the routine in one step. M45 to M65 ("Running for
 real", D49) were added on 22 October 2026; Phase 5 (M45 to M49, `02` section L, D50) is built: "Forgot your password?"
 by email, Change password under More, and "Continue with Google" when an installation sets it up (`GOOGLE_SIGN_IN=on`);
 overnight jobs run by pg_cron in the database (deliveries made ahead, old rows forgotten), each run written down;
@@ -255,11 +266,13 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: M58 to M65 are next**, in order, starting with M58 (move an appointment). The owner chose them on 22
-October 2026 (D49); `02` section L lists them. Phases 5 and 6 (M45 to M57) are built. Alongside, steps 1 to 9 above still
+**Building: M62 to M65 are next**, in order, starting with M62 (selling over the counter). The owner chose them on 22
+October 2026 (D49); `02` section L lists them. Phases 5 to 7 (M45 to M61) are built. Alongside, steps 1 to 9 above still
 need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
 template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
-check `cron.job` has `wagbook-nightly`, and point an uptime service at `/api/health`.
+check `cron.job` has `wagbook-nightly`, point an uptime service at `/api/health`, and if the kennel wants alerts on
+phones, set them up (`10`, "Alerts on phones") and allow them on a real Android phone and an iPhone added to the home
+screen.
 Ideas beyond M65 wait for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
 owner has said production is not soon, so migrations stay editable in place until then. Worth doing before
 production without the owner: have a person read the Phase 1 to 4 Hindi and Kannada, and walk the team screens on a
@@ -336,6 +349,12 @@ Drafted on 19 October 2026, also unchecked: sharing a kennel (एक केन�
 price" as साझा केनेल का दाम and ಹಂಚಿಕೊಂಡ ಕೆನೆಲ್ ಬೆಲೆ), the family bill, naming and ordering kennels (क्रम, ಕ್ರಮ),
 correcting an incident (ठीक करें, ತಿದ್ದಿ), the second vaccine on the intake form, and the 127 field names of History of
 changes (`src/messages/hi/fields.ts`, `src/messages/kn/fields.ts`).
+
+Drafted on 23 October 2026 (Phase 7), also unchecked: moving an appointment (समय बदलें, ಸಮಯ ಬದಲಿಸಿ) and the WhatsApp
+message with the new time (parents read it); the parent's link asking for an appointment and telling a delivery went
+wrong (डिलीवरी में कुछ गड़बड़?, ಡೆಲಿವರಿಯಲ್ಲಿ ಏನಾದರೂ ತಪ್ಪಾಗಿದೆಯೇ?); the usual week on the rota (आम हफ़्ता, ಸಾಮಾನ್ಯ ವಾರ)
+and "did not clock out" (क्लॉक आउट, ಕ್ಲಾಕ್ ಔಟ್ kept close to English); and alerts (अलर्ट, ಎಚ್ಚರಿಕೆಗಳು), whose
+sentences show on a locked phone, so they must be short and plain.
 
 Drafted on 23 October 2026 (Phase 6), also unchecked: the whole of `src/messages/hi/day.ts` and
 `src/messages/kn/day.ts` (to clean, checklists and repairs, passed away and flowers, the stay report, photo proof, Pack
@@ -572,8 +591,10 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - Changes to a subscription remake the deliveries still before their cut-off, and the rotation counts again from the
   remade ones, so a recipe can repeat across a change.
 - A delivery charge takes the food's tax rate and code (question 13 in `06`).
-- A problem with a delivery is reported by staff for the parent (the parent sends the photo on WhatsApp); parents do not
-  report from their own link yet.
+- A parent tells the kennel a delivery went wrong from their own link (M59), once per delivery, within the problem
+  window; staff can still write one down for them. A parent's appointment request offers the times the place is free;
+  a time their own pet is busy is refused when they send it, rather than left out of the list. Should the list leave
+  those out too?
 - Confirming a website order makes the subscription but records no payment: staff make the week's bill and record the
   money on it.
 - A rider marks Delivered without a photo if they choose; the photo is not required.
@@ -581,17 +602,17 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ## Known rough edges in what is built
 
-- Food: pick-ups and drops of boarders do not join runs yet (M39). The parent's own link cannot report a damaged
-  delivery. The shopping list does not know what is already ordered from a supplier. Labels have no barcode. Pack all
+- Food: pick-ups and drops of boarders do not join runs yet (M39). The shopping list does not know what is already ordered from a supplier. Labels have no barcode. Pack all
   takes the newest batch in date of each recipe; to use another, pack one at a time. Stock has no units other than
   grams, millilitres and pieces (no "a dozen eggs").
 - Deliveries are made ahead only when someone opens the Kitchen or Food for homes (three weeks each time); nothing runs
   by itself overnight.
 
-- Appointments: an appointment cannot be moved to another time; it is cancelled and booked again. Two pets of one
-  family cannot share one appointment (two dogs in the pool together). There is no group class. A visitor's add-ons on
+- Appointments: a move keeps the bill; an issued bill keeps the old date in its line text (bills are never rewritten).
+  Two pets of one family cannot share one appointment (two dogs in the pool together). There is no group class. A visitor's add-ons on
   a course session have no bill to go on. Before and after photos reach the parent only for a boarder (a visitor has no
-  stay page; send them on WhatsApp). Parents cannot book appointments themselves yet (M41). Appointment setup has no
+  stay page; send them on WhatsApp). Parents ask for appointments from their own link (M59), not from the booking form
+  for new parents. Appointment setup has no
   way to rename a place or a service: take it off the list and add it again. The day's board draws an appointment from
   its start to its end rounded to the half hour. The grooming menu is what the kennel types in; no list is filled in
   for it. A party's cake is a one-off food order with its own bill, not a line of the party's bill.
@@ -628,12 +649,16 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 - Phase 5: the photo page does not refresh itself after a download: reload to see "Remove these from Wagbook". The
   import's preview is lost if the page is reloaded (send the file again). Errors on public pages are not listed.
   Archived small copies are shown without the word "Archived".
-- Rota and attendance: no repeating rota, no cover requests or swaps, no overtime rules, no pay worked out, no
+- Rota and attendance: a usual week fills the rota only when an owner or manager opens it, after a usual week is
+  added, or overnight (M60); a usual week changes by taking a day away and adding it again. No cover requests or swaps, no overtime rules, no pay worked out, no
   clocking in tied to the kennel's place. A shift taken off the list keeps its old rota rows; its name cannot change.
 - A certificate sent with the intake form is lost if the form arrives but the upload fails: the parent is told to send
   it on WhatsApp.
 - On the two-step page, after the first code is accepted, the page redraws in its "on" state, so the longer "have your
   phone with you" sentence is not seen (the "on" panel says to keep the app instead).
+- Alerts (M61): an alert the app could not hand to a push service waits until the next request that may raise one.
+  A phone asleep for more than a day misses alerts older than a day (Today still shows what waits). A forgotten
+  clock-out shows only for a stretch that began within a shift on the rota.
 - `scripts/race-checks.sh` and `scripts/backup-drill.sh` need the local Supabase, so they are not part of
   `npm run check` or CI.
 

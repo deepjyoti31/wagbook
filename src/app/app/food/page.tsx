@@ -1,24 +1,28 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Badge, buttonStyles, Empty, Ledger, Loading, Notice, PageTitle, Section } from "@/components/ui";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { Badge, buttonStyles, Empty, Field, Input, Ledger, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatDate, formatKg, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { planAhead, weekdayList } from "@/lib/kitchen";
+import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
+import { resolveProblem } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.food.title);
 
-export default function FoodPage() {
+export default function FoodPage({ searchParams }: PageProps<"/app/food">) {
   return (
     <Suspense fallback={<Loading />}>
-      <Food />
+      <Food searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Food() {
+async function Food({ searchParams }: Pick<PageProps<"/app/food">, "searchParams">) {
+  const query = await searchParams;
   const { org } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale, language } = t;
@@ -46,12 +50,13 @@ async function Food() {
     // Problems told by parents or written down by staff, not dealt with yet (M59).
     supabase
       .from("delivery_problems")
-      .select("id, kind, from_parent, reported_at, deliveries!delivery_problems_org_id_delivery_id_fkey(delivery_date, subscription_id, pets(name))")
+      .select("id, kind, note, photo_path, from_parent, reported_at, deliveries!delivery_problems_org_id_delivery_id_fkey(delivery_date, subscription_id, pets(name))")
       .eq("org_id", org.id)
       .is("outcome", null)
       .order("reported_at"),
   ]);
   if (orders.error || subs.error || deliveries.error || problems.error) throw new Error("Could not load food.");
+  const photos = await signedUrls(supabase, problems.data.map((p) => p.photo_path));
   const paused = (s: (typeof subs.data)[number]) => s.paused_from !== null && s.paused_from <= today && (s.paused_until === null || s.paused_until >= today);
 
   return (
@@ -77,23 +82,61 @@ async function Food() {
         </Link>
       </nav>
 
+      {query.done === "replaced" || query.done === "resolved" ? (
+        <Notice tone="ok">{query.done === "replaced" ? m.subscription.replaced : m.common.saved}</Notice>
+      ) : null}
       {problems.data.length > 0 ? (
         <Section title={f.problems} count={problems.data.length}>
-          <Ledger>
-            {problems.data.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={p.deliveries?.subscription_id ? `/app/food/subscriptions/${p.deliveries.subscription_id}` : "/app/food"}
-                  className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-3 hover:bg-ground"
-                >
-                  <span className="flex-1 font-semibold">
-                    {fill(f.problemLine, { date: formatDate(p.deliveries?.delivery_date ?? today, locale), pet: p.deliveries?.pets?.name ?? "", kind: m.problemKinds[p.kind] })}
-                  </span>
-                  {p.from_parent ? <Badge tone="attention">{m.subscription.fromParent}</Badge> : null}
-                </Link>
-              </li>
-            ))}
-          </Ledger>
+          <ul className="space-y-3">
+            {problems.data.map((p) => {
+              const line = fill(f.problemLine, { date: formatDate(p.deliveries?.delivery_date ?? today, locale), pet: p.deliveries?.pets?.name ?? "", kind: m.problemKinds[p.kind] });
+              return (
+                <li key={p.id} className="rounded-xl border border-rule bg-paper p-4">
+                  <p className="flex flex-wrap items-center gap-2">
+                    {p.deliveries?.subscription_id ? (
+                      <Link href={`/app/food/subscriptions/${p.deliveries.subscription_id}`} className="flex-1 font-semibold underline underline-offset-4">
+                        {line}
+                      </Link>
+                    ) : (
+                      <span className="flex-1 font-semibold">{line}</span>
+                    )}
+                    {p.from_parent ? <Badge tone="attention">{m.subscription.fromParent}</Badge> : null}
+                  </p>
+                  {p.note ? <p className="text-slate">{p.note}</p> : null}
+                  {p.photo_path && photos.get(p.photo_path) ? (
+                    <a href={photos.get(p.photo_path)} target="_blank" rel="noreferrer" className="mt-2 block w-32">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link, not an optimisable image */}
+                      <img src={photos.get(p.photo_path)} alt={m.subscription.problemPhoto} className="aspect-square w-32 rounded-lg object-cover" />
+                    </a>
+                  ) : null}
+                  {/* A trial or an order has no subscription page: it is dealt with here. */}
+                  {p.deliveries?.subscription_id ? null : (
+                    <div className="mt-2 space-y-2">
+                      <ActionForm action={resolveProblem} className="flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="problemId" value={p.id} />
+                        <input type="hidden" name="outcome" value="replaced" />
+                        <Field label={m.subscription.replaceOn}>
+                          <Input type="date" name="on" min={today} defaultValue={addDays(today, 1)} required />
+                        </Field>
+                        <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
+                          {m.subscription.replace}
+                        </SubmitButton>
+                      </ActionForm>
+                      <ActionForm action={resolveProblem} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="problemId" value={p.id} />
+                        <SubmitButton variant="quiet" name="outcome" value="refunded" pendingLabel={m.common.saving}>
+                          {m.subscription.refund}
+                        </SubmitButton>
+                        <SubmitButton variant="quiet" name="outcome" value="none" pendingLabel={m.common.saving}>
+                          {m.subscription.noRefund}
+                        </SubmitButton>
+                      </ActionForm>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </Section>
       ) : null}
 

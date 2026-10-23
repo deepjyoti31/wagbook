@@ -23,17 +23,10 @@ interface PublicBookingForm {
   stays: { pet: string; kind: "boarding" | "daycare"; start_date: ISODate; end_date: ISODate; status: "requested" | "confirmed" | "checked_in" }[];
   food_cutoff_hours: number;
   problem_window_hours: number;
-  /** The parent's food subscriptions, when the kennel delivers (M32), with deliveries handed over within the problem window (M59). */
-  food:
-    | {
-        id: string;
-        pet: string;
-        paused_from: ISODate | null;
-        paused_until: ISODate | null;
-        next: { date: ISODate; status: string }[] | null;
-        recent: { id: string; date: ISODate; reported: boolean }[] | null;
-      }[]
-    | null;
+  /** The parent's food subscriptions, when the kennel delivers (M32). */
+  food: { id: string; pet: string; paused_from: ISODate | null; paused_until: ISODate | null; next: { date: ISODate; status: string }[] | null }[] | null;
+  /** Their deliveries handed over within the problem window, to say one went wrong (M59). */
+  recent_deliveries: { id: string; pet: string; date: ISODate; reported: boolean }[] | null;
   /** Appointments the parent may ask for, when the kennel offers them (M59). */
   appointment_services: { id: string; name: string; kind: string; minutes: number }[] | null;
   /** Free times on the day asked about, for the service asked about. */
@@ -87,7 +80,7 @@ async function RequestForm({ params, searchParams }: Pick<PageProps<"/b/[token]"
   const contact = f.kennel.whatsapp_phone ? whatsappLink("", f.kennel.whatsapp_phone) : null;
   const open = f.enabled && f.kinds.length > 0 && f.pets.length > 0;
   // Deliveries handed over within the window, to say one went wrong (M59).
-  const recent = (f.food ?? []).flatMap((s) => (s.recent ?? []).map((d) => ({ ...d, pet: s.pet })));
+  const recent = f.recent_deliveries ?? [];
   const told = recent.filter((d) => d.reported);
   const untold = recent.filter((d) => !d.reported);
 

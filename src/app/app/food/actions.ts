@@ -343,7 +343,6 @@ export async function reportProblem(_state: FormState, form: FormData): Promise<
 export async function resolveProblem(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
   const t = await getAppI18n();
-  const w = t.m.subscription;
   const id = Id.safeParse(form.get("problemId"));
   if (!id.success) return { error: t.m.food.errors.notFound };
   const outcome = z.enum(["replaced", "refunded", "none"]).safeParse(form.get("outcome"));
@@ -390,5 +389,6 @@ export async function resolveProblem(_state: FormState, form: FormData): Promise
   revalidatePath("/app", "layout");
   // The problem's form goes away once it is dealt with, so the sentence is shown by the page instead.
   if (original.subscription_id) redirect(`/app/food/subscriptions/${original.subscription_id}?done=${outcome.data === "replaced" ? "replaced" : "resolved"}`);
-  return { ok: outcome.data === "replaced" ? w.replaced : t.m.common.saved };
+  // A problem with a trial or an order is dealt with on Food (M59).
+  redirect(`/app/food?done=${outcome.data === "replaced" ? "replaced" : "resolved"}`);
 }
