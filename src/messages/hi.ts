@@ -15,6 +15,7 @@ import { kitchenArea } from "./hi/kitchen";
 import { appointmentsArea } from "./hi/appointments";
 import { rulesArea } from "./hi/rules";
 import { teamArea } from "./hi/team";
+import { runningArea } from "./hi/running";
 
 export const hi: Messages = {
   ...core,
@@ -28,4 +29,5 @@ export const hi: Messages = {
   ...appointmentsArea,
   ...rulesArea,
   ...teamArea,
+  ...runningArea,
 };

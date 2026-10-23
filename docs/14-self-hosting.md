@@ -50,7 +50,7 @@ In `/srv/supabase/.env`, before the first start:
 | --- | --- |
 | `POSTGRES_PASSWORD`, `JWT_SECRET`, `ANON_KEY`, `SERVICE_ROLE_KEY`, `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD` | New secrets, made as Supabase's guide says. Never the examples. |
 | `SITE_URL` | `https://book.yourkennel.in` |
-| `ADDITIONAL_REDIRECT_URLS` | `https://book.yourkennel.in/auth/confirm` |
+| `ADDITIONAL_REDIRECT_URLS` | `https://book.yourkennel.in/auth/confirm**` (the two stars let a link say where to go next) |
 | `API_EXTERNAL_URL`, `SUPABASE_PUBLIC_URL` | `https://api.book.yourkennel.in` |
 | `ENABLE_EMAIL_SIGNUP` | `true` |
 | `ENABLE_EMAIL_AUTOCONFIRM` | `false` (people confirm their email) |
@@ -65,6 +65,13 @@ Two-step sign-in with authenticator apps is on in Supabase Auth by default. If y
 `GOTRUE_MFA_TOTP_ENROLL_ENABLED: "true"` and `GOTRUE_MFA_TOTP_VERIFY_ENABLED: "true"` to the `auth` service's
 `environment`.
 
+For "Continue with Google" (optional, M45): make a Google OAuth client as in
+[10-setup-and-deploy.md](10-setup-and-deploy.md), "Sign in with Google", with the redirect URI
+`https://api.book.yourkennel.in/auth/v1/callback`, and add to the `auth` service's `environment`:
+`GOTRUE_EXTERNAL_GOOGLE_ENABLED: "true"`, `GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID`, `GOTRUE_EXTERNAL_GOOGLE_SECRET` and
+`GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: https://api.book.yourkennel.in/auth/v1/callback`. Then set `GOOGLE_SIGN_IN=on` in
+`deploy/.env` (Part 3).
+
 Start it: `docker compose up -d`. Note the name of its network (`docker network ls`; usually `supabase_default`).
 
 ## Part 2. Wagbook's database
@@ -77,6 +84,11 @@ npx -y supabase@2.120.0 db push --db-url 'postgresql://postgres.your-tenant-id:P
 ```
 
 Do not load `supabase/seed.sql`: it is the invented demo kennel.
+
+The migrations switch on `pg_cron` and schedule the overnight jobs (M46) when the database has it; Supabase's own
+Postgres image does. Check with `select jobname, schedule from cron.job;` (one row, `wagbook-nightly`). Without
+pg_cron, food deliveries are still made when someone opens the Kitchen or Food for homes, and old problems stay until
+someone runs `select public.run_nightly_jobs();`.
 
 ## Part 3. Wagbook and Caddy
 
@@ -105,7 +117,9 @@ depend on ([05-security-and-privacy.md](05-security-and-privacy.md)).
 2. Open `https://book.yourkennel.in`, create your account, confirm the email, create the kennel. Then follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) from "Part 2" onwards (kennels, prices, team).
 3. Turn on two-step sign-in for yourself under More.
-4. Set up backups before the first real booking: [15-backup-and-restore.md](15-backup-and-restore.md). On your own
+4. `curl -s https://book.yourkennel.in/api/health` answers `{"status":"ok"}`. Give that address to an uptime service
+   (M48, [10-setup-and-deploy.md](10-setup-and-deploy.md), "Know when it breaks").
+5. Set up backups before the first real booking: [15-backup-and-restore.md](15-backup-and-restore.md). On your own
    server, nobody else takes them.
 
 ## Updating

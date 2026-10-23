@@ -38,6 +38,8 @@ export const RATE_RULES: RateRule[] = [
   { name: "requests", matches: (p) => p.startsWith("/b/"), limit: 10, windowSeconds: 10 * 60 },
   // An order from the kennel's food order page, and saying it was paid (M32): as the intake form.
   { name: "food", matches: (p) => p.startsWith("/f/"), limit: 10, windowSeconds: 10 * 60 },
+  // Changing a password checks the current one (M45): a stolen session must not be able to guess it.
+  { name: "password", matches: (p) => p === "/app/more/password", limit: 10, windowSeconds: 10 * 60 },
 ];
 
 export function rateRuleFor(path: string): RateRule | null {

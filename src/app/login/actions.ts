@@ -7,6 +7,7 @@ import { isLanguage } from "@/lib/i18n";
 import { isRateLimited } from "@/lib/rate-limit-server";
 import { getVisitorI18n, rememberLanguage, type I18n } from "@/lib/i18n-server";
 import { safeDestination } from "@/lib/safe-redirect";
+import { madeByResetLink } from "@/lib/core";
 import { siteOrigin } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -93,6 +94,59 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
   // With email confirmation on, there is no session yet.
   if (!data.session) return { ok: m.auth.checkEmail };
   redirect(destination);
+}
+
+/**
+ * Email a link to choose a new password. The same answer whether or not an
+ * account uses the address, so the form cannot be used to find out who has one.
+ */
+export async function sendResetLink(_state: FormState, form: FormData): Promise<FormState> {
+  if (!isSupabaseConfigured()) redirect("/setup");
+  const { m } = await getVisitorI18n();
+  const e = m.auth.errors;
+  if (await isRateLimited()) return { error: m.errors.slowDown };
+  const parsed = credentials(m).shape.email.safeParse(form.get("email"));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const origin = await siteOrigin();
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+    redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent("/login/new-password")}`,
+  });
+  if (error) {
+    if (isUnreachable(error)) return { error: e.unreachable };
+    if (error.code === "over_email_send_rate_limit") return { error: e.tooMany };
+    // Anything else is not told: it could say whether the address has an account.
+    console.error("resetPasswordForEmail failed", error.code, error.message);
+  }
+  return { ok: m.account.forgot.sent };
+}
+
+/** The new password, chosen after following the emailed link (which signed the person in). */
+export async function setNewPassword(_state: FormState, form: FormData): Promise<FormState> {
+  if (!isSupabaseConfigured()) redirect("/setup");
+  const { m } = await getVisitorI18n();
+  const e = m.auth.errors;
+  const w = m.account.newPassword;
+  if (await isRateLimited()) return { error: m.errors.slowDown };
+  const parsed = credentials(m).shape.password.safeParse(form.get("password"));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  // Only a session made by the emailed link, within the hour: any other session changes its password under More,
+  // which asks for the current one.
+  if (!madeByResetLink(claims?.claims)) return { error: w.expired };
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (error) {
+    if (isUnreachable(error)) return { error: e.unreachable };
+    if (error.code === "same_password") return { error: m.account.change.same };
+    if (error.code === "weak_password") return { error: e.weakPassword };
+    if (error.code === "insufficient_aal") return { error: w.needsCode };
+    console.error("updateUser (reset) failed", error.code, error.message);
+    return { error: m.account.change.couldNot };
+  }
+  redirect("/app");
 }
 
 export async function signOut(): Promise<void> {

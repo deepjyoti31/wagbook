@@ -2,6 +2,8 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { en } from "../src/messages/en";
 import { hi } from "../src/messages/hi";
 import { kn } from "../src/messages/kn";
+import { execFileSync } from "node:child_process";
+import { IMPORT_COLUMNS } from "../src/lib/core/import";
 import { readZipStore } from "../src/lib/core/zip";
 
 /**
@@ -2352,4 +2354,245 @@ test("a kennel goes out of service from an earlier day, and back in", async ({ p
   await k12.locator("input[name=from]").fill(day(0));
   await k12.getByRole("button", { name: en.kennels.putBack }).click();
   await expect(page.getByText("K12 is back in service.")).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5 (M45 to M49): running for real.
+// ---------------------------------------------------------------------------
+
+/**
+ * A statement run straight in the local database, as its administrator. Only
+ * to arrange what the walk cannot (time passing) or to run the overnight jobs
+ * as pg_cron would; never to check what the app shows.
+ */
+function adminSql(query: string): string {
+  return execFileSync("docker", ["exec", "supabase_db_wagbook", "psql", "-U", "postgres", "-tAc", query], { encoding: "utf8" }).trim();
+}
+
+/** The newest email the local mail catcher holds for an address, as text. */
+async function lastEmailTo(address: string): Promise<string> {
+  const mailpit = process.env.E2E_MAILPIT_URL || "http://127.0.0.1:54324";
+  for (let i = 0; i < 20; i++) {
+    const found = (await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${address}"`)}`)).json()) as { messages: { ID: string }[] };
+    if (found.messages.length > 0) {
+      const message = (await (await fetch(`${mailpit}/api/v1/message/${found.messages[0].ID}`)).json()) as { Text: string };
+      return message.Text;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`No email to ${address}`);
+}
+
+/** A new account with a kennel of its own. */
+async function newOwner(page: Page, name: string): Promise<string> {
+  const email = `${name.toLowerCase()}-${Date.now()}@example.test`;
+  await page.goto("/login?mode=signup");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByLabel("Kennel name").fill(`${name} Kennel`);
+  await page.getByLabel("Link name").fill(`${name.toLowerCase()}-${Date.now() % 100000}`);
+  await page.getByLabel("Your name").fill(name);
+  await page.getByRole("button", { name: /Create/ }).click();
+  await page.waitForURL(/\/app\/more\/kennels/);
+  return email;
+}
+
+async function signOutHere(page: Page) {
+  await page.goto("/app/more");
+  await page.getByRole("button", { name: en.more.signOut }).click();
+  await page.waitForURL(/\/login/);
+}
+
+test("M45: a person who forgot their password chooses a new one from an emailed link, then changes it", async ({ page }) => {
+  test.setTimeout(150_000);
+  const email = await newOwner(page, "Nisha");
+  await signOutHere(page);
+
+  // The same answer for any address, so the form cannot tell who has an account.
+  await page.getByRole("link", { name: en.account.forgotLink }).click();
+  await page.waitForURL(/\/login\/forgot/);
+  await expect(page.getByRole("heading", { level: 1, name: en.account.forgot.title })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m45-forgot");
+  // The sign-in page stays in the document, hidden, after moving on: ask for the visible field.
+  await page.getByRole("textbox", { name: en.auth.email }).fill("nobody-here@example.test");
+  await page.getByRole("button", { name: en.account.forgot.send }).click();
+  await expect(page.getByText(en.account.forgot.sent)).toBeVisible();
+  await page.getByRole("textbox", { name: en.auth.email }).fill(email);
+  await page.getByRole("button", { name: en.account.forgot.send }).click();
+  await expect(page.getByText(en.account.forgot.sent)).toBeVisible();
+
+  const link = /https?:\/\/\S+\/auth\/v1\/verify\S+/.exec(await lastEmailTo(email))?.[0];
+  expect(link).toBeTruthy();
+  await page.goto(link!);
+  await page.waitForURL(/\/login\/new-password/);
+  await expect(page.getByRole("heading", { level: 1, name: en.account.newPassword.title })).toBeVisible();
+  await narrow(page);
+  await page.getByLabel(en.account.newPassword.label).fill("a-new-password-1");
+  await page.getByRole("button", { name: en.account.newPassword.save }).click();
+  await page.waitForURL(/\/app/);
+
+  // The old password no longer works; the new one does.
+  await signOutHere(page);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText(en.auth.errors.noMatch)).toBeVisible();
+  await signIn(page, email, "a-new-password-1");
+
+  // Changing it from More asks for the current one first.
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: en.account.passwordLink }).click();
+  await page.getByLabel(en.account.change.current).fill("not-the-password");
+  await page.getByLabel(en.account.change.next).fill("a-new-password-2");
+  await page.getByRole("button", { name: en.account.change.save }).click();
+  await expect(page.getByText(en.account.change.wrongCurrent)).toBeVisible();
+  await page.getByLabel(en.account.change.current).fill("a-new-password-1");
+  await page.getByLabel(en.account.change.next).fill("a-new-password-2");
+  await page.getByRole("button", { name: en.account.change.save }).click();
+  await expect(page.getByText(en.account.change.saved)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m45-change-password");
+  // Still signed in on this phone.
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/app$/);
+  // A session that did not come from a reset link cannot set a password without the current one.
+  await page.goto("/login/new-password");
+  await expect(page.getByText(en.account.newPassword.expired)).toBeVisible();
+  await signOutHere(page);
+  await signIn(page, email, "a-new-password-2");
+  await expect(page).toHaveURL(/\/app/);
+
+  // A link used once does not work twice.
+  await signOutHere(page);
+  await page.goto(link!);
+  await page.waitForURL(/\/login/);
+  await expect(page).not.toHaveURL(/new-password/);
+});
+
+test("M47: a manager brings in parents and pets from a spreadsheet; staff cannot", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.import.title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.importing.title })).toBeVisible();
+  const template = await page.request.get("/app/more/import/template");
+  expect(template.headers()["content-type"]).toContain("text/csv");
+  expect((await template.text()).replace(/^\uFEFF/, "").split("\r\n")[0]).toBe(IMPORT_COLUMNS.join(","));
+
+  const row = (cells: Record<string, string>) => IMPORT_COLUMNS.map((c) => cells[c] ?? "").join(",");
+  const csv = [
+    IMPORT_COLUMNS.join(","),
+    row({ parent_name: "Kavya Iyer", phone: "98450 11223", pet_name: "Rasmalai", species: "dog", sex: "female", weight_kg: "12.5", vaccine_1: "Rabies", given_on_1: "01/02/2026", valid_until_1: "01/02/2027" }),
+    row({ parent_name: "Kavya Iyer", phone: "9845011223", pet_name: "Barfi", species: "cat" }),
+    row({ parent_name: "Wrong Number", phone: "12345", pet_name: "Nobody" }),
+  ].join("\n");
+  await page.locator("input[name=file]").setInputFiles({ name: "pets.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await page.getByRole("button", { name: en.importing.check }).click();
+  const p = en.importing.preview;
+  await expect(page.getByText(p.parents.one)).toBeVisible();
+  await expect(page.getByText(p.pets.other.replace("{n}", "2"))).toBeVisible();
+  await expect(page.getByText(p.problems.one)).toBeVisible();
+  await expect(page.getByText(`Line 4: phone: ${en.importing.problems.phone}`)).toBeVisible();
+  await expect(page.getByRole("link", { name: p.downloadBad })).toBeVisible();
+  await narrow(page);
+  await shot(page, "m47-import-preview");
+  await page.getByRole("button", { name: en.importing.go.other.replace("{n}", "2") }).click();
+  await expect(page.getByText("Done: 1 new parent, 2 new pets and 1 vaccination added.")).toBeVisible();
+
+  await openPet(page, "Rasmalai");
+  await expect(page.getByRole("link", { name: "Kavya Iyer" })).toBeVisible();
+
+  // The same file again adds nothing: the parent is known by phone, the pets by name.
+  await page.goto("/app/more/import");
+  await page.locator("input[name=file]").setInputFiles({ name: "pets.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await page.getByRole("button", { name: en.importing.check }).click();
+  await expect(page.getByText(p.skipped.other.replace("{n}", "2"))).toBeVisible();
+
+  await signOutHere(page);
+  await signIn(page, "staff");
+  await page.goto("/app/more/import");
+  await page.waitForURL(/\/app\/more$/);
+  await expect(page.getByRole("link", { name: new RegExp(en.more.links.import.title) })).toHaveCount(0);
+});
+
+test("M46, M48: the health check answers, and owners see the overnight jobs and problems", async ({ page }) => {
+  const health = await page.request.get("/api/health");
+  expect(health.status()).toBe(200);
+  expect(await health.json()).toEqual({ status: "ok" });
+
+  await signIn(page, "owner");
+  await page.goto("/app/more/problems");
+  await expect(page.getByRole("heading", { level: 1, name: en.problems.title })).toBeVisible();
+  // As pg_cron would at night.
+  adminSql("select public.run_nightly_jobs()");
+  await page.reload();
+  await expect(page.getByText(en.problems.jobNames.plan_deliveries)).toBeVisible();
+  await expect(page.getByText(en.problems.jobNames.forget_old_rows)).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.problems.errorsTitle })).toBeVisible();
+
+  // A page that fails is written down for the owner, by the server's error hook.
+  adminSql("revoke select on public.photo_archives from authenticated");
+  try {
+    await page.goto("/app/more/photos");
+  } finally {
+    adminSql("grant select on public.photo_archives to authenticated");
+  }
+  await page.goto("/app/more/problems");
+  await expect(page.getByText("Could not load the photos.")).toBeVisible();
+  await expect(page.getByText(`${en.problems.kinds.render}: /app/more/photos`)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m48-problems");
+
+  // Managers see the jobs, not the errors; staff see neither.
+  await signOutHere(page);
+  await signIn(page, "manager");
+  await page.goto("/app/more/problems");
+  await expect(page.getByText(en.problems.errorsOwners)).toBeVisible();
+  await signOutHere(page);
+  await signIn(page, "staff");
+  await page.goto("/app/more/problems");
+  await page.waitForURL(/\/app\/more$/);
+});
+
+test("M49: a month of photos is downloaded as a ZIP, then removed by an owner, keeping the small copies", async ({ page }) => {
+  // The update photos taken earlier in the walk, as if taken 40 days ago.
+  const month = `${day(-40).slice(0, 7)}-01`;
+  adminSql("update storage.objects set created_at = now() - interval '40 days' where bucket_id = 'pet-media' and name like '%/updates/%'");
+  const updatePhotos = Number(adminSql("select count(*) from storage.objects where bucket_id = 'pet-media' and name like '%/updates/%' and name not like '%.small.jpg'"));
+  expect(updatePhotos).toBeGreaterThan(0);
+
+  await signIn(page, "manager");
+  await page.goto("/app/more/photos");
+  await expect(page.getByRole("heading", { level: 1, name: en.photoArchive.title })).toBeVisible();
+  const label = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}T00:00:00Z`));
+  const row = page.getByRole("listitem").filter({ hasText: label });
+  await expect(row.getByRole("link", { name: en.photoArchive.download })).toBeVisible();
+  await expect(row.getByText(en.photoArchive.remove)).toHaveCount(0);
+  await narrow(page);
+  await shot(page, "m49-photos");
+
+  const zip = await page.request.get(`/app/more/photos/download?month=${month}`);
+  expect(zip.headers()["content-type"]).toBe("application/zip");
+  const files = readZipStore(new Uint8Array(await zip.body()));
+  expect(files).toHaveLength(updatePhotos);
+  expect(files.some((f) => f.name.startsWith("Pepper/") && f.name.endsWith(".jpg"))).toBe(true);
+  expect(files.every((f) => f.bytes[0] === 0xff && f.bytes[1] === 0xd8)).toBe(true);
+
+  // Downloaded: an owner may now remove them; a manager may not.
+  await page.reload();
+  await expect(row.getByText(/^Downloaded /)).toBeVisible();
+  await expect(row.getByText(en.photoArchive.ownersRemove)).toBeVisible();
+  await signOutHere(page);
+  await signIn(page, "owner");
+  await page.goto("/app/more/photos");
+  await row.getByText(en.photoArchive.remove).click();
+  await row.getByRole("button", { name: en.photoArchive.removeYes }).click();
+  await expect(page.getByText(en.photoArchive.removedOk)).toBeVisible();
+  await page.reload();
+  await expect(row.getByText(/^Removed /)).toBeVisible();
+
+  expect(Number(adminSql("select count(*) from storage.objects where bucket_id = 'pet-media' and name like '%/updates/%' and name not like '%.small.jpg'"))).toBe(0);
+  expect(Number(adminSql("select count(*) from storage.objects where bucket_id = 'pet-media' and name like '%/updates/%.small.jpg'"))).toBeGreaterThan(0);
 });

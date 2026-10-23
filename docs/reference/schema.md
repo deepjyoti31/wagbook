@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 16. Tables: 68. Views: 6. Functions: 149.
+Migrations applied: 17. Tables: 71. Views: 6. Functions: 162.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [required_vaccines](#required_vaccines), [rota](#rota), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations)
+- Tables: [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [required_vaccines](#required_vaccines), [rota](#rota), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations)
 - Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stock_levels](#stock_levels)
 - [Functions](#functions)
 
@@ -64,6 +64,42 @@ Migrations applied: 16. Tables: 68. Views: 6. Functions: 149.
 | `waste_reason` | `spoiled`, `past_date`, `dropped`, `other` | Why stock was thrown away: spoiled, past its use-by date, dropped, or another reason in the note. |
 
 ## Tables
+
+### app_errors
+
+An error on the server while someone at this kennel was signed in (M48), for owners to see under More, Problems. Written only by log_app_error(), stripped of email addresses and phone numbers, and forgotten after 90 days (job_forget_old_rows).
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `happened_at` | `timestamp with time zone` | yes | `now()` |  |
+| `path` | `text` | yes |  | The page or address that failed, without its query string. |
+| `kind` | `text` | yes |  | Where it failed: render (a page), route (a download or other address), action (a form), proxy (before the page). |
+| `message` | `text` | yes |  | What went wrong, cut to 300 characters, with email addresses and long numbers replaced. |
+| `digest` | `text` |  |  | Next.js's short id for the error, which the server's own log also prints. |
+
+**Constraints**
+
+- Primary key `app_errors_pkey`: `PRIMARY KEY (id)`
+- Foreign key `app_errors_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `app_errors_digest_check`: `CHECK (((digest IS NULL) OR (char_length(digest) <= 40)))`
+- Check `app_errors_kind_check`: `CHECK ((kind = ANY (ARRAY['render'::text, 'route'::text, 'action'::text, 'proxy'::text])))`
+- Check `app_errors_message_check`: `CHECK (((char_length(message) >= 1) AND (char_length(message) <= 300)))`
+- Check `app_errors_path_check`: `CHECK (((char_length(path) >= 1) AND (char_length(path) <= 200)))`
+
+**Indexes**
+
+- `CREATE INDEX app_errors_org_happened_idx ON public.app_errors USING btree (org_id, happened_at DESC)`
+
+**Triggers**
+
+- `app_errors_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `app_errors_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
 
 ### appointment_items
 
@@ -1975,6 +2011,42 @@ END)`
 - `invoices_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `invoices_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
+### job_runs
+
+Each time an overnight job ran for a kennel (M46), whether it worked, and how much it did. Settings shows the latest. Written only by run_nightly_jobs(); kept 90 days.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `job` | `text` | yes |  | plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. |
+| `ran_at` | `timestamp with time zone` | yes | `now()` |  |
+| `ok` | `boolean` | yes |  |  |
+| `made` | `integer` | yes | `0` | How many rows the job made or removed. |
+| `problem` | `text` |  |  | Why it failed, when it did. The other jobs and kennels still ran. |
+
+**Constraints**
+
+- Primary key `job_runs_pkey`: `PRIMARY KEY (id)`
+- Foreign key `job_runs_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `job_runs_job_check`: `CHECK ((job = ANY (ARRAY['plan_deliveries'::text, 'forget_old_rows'::text])))`
+- Check `job_runs_made_check`: `CHECK ((made >= 0))`
+- Check `job_runs_problem_check`: `CHECK (((problem IS NULL) OR (char_length(problem) <= 300)))`
+- Check `job_runs_problem_when_failed`: `CHECK ((ok = (problem IS NULL)))`
+
+**Indexes**
+
+- `CREATE INDEX job_runs_org_ran_idx ON public.job_runs USING btree (org_id, ran_at DESC)`
+
+**Triggers**
+
+- `job_runs_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `job_runs_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
 ### kennel_service
 
 When each kennel went into or out of service (M44), one row a change, written only by the kennels_service trigger from kennels.is_active and kennels.service_from. A kennel counts on a day by its latest row on or before that day; before its first row it was not there. Nobody writes it directly.
@@ -2718,6 +2790,41 @@ An animal in the kennel's care. Belongs to one client.
 - `pets_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `pets_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### photo_archives
+
+A month of photos downloaded as a ZIP, and later removed from Wagbook by an owner (M49, D49). Written only by record_photo_download() and record_photo_removal().
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` | yes |  |  |
+| `month` | `date` | yes |  | The first day of the month the photos were taken in, at the kennel. |
+| `downloaded_at` | `timestamp with time zone` |  |  |  |
+| `downloaded_by` | `uuid` |  |  |  |
+| `removed_at` | `timestamp with time zone` |  |  |  |
+| `removed_by` | `uuid` |  |  |  |
+| `files` | `integer` | yes | `0` | How many photos the last download or the removal covered. |
+| `bytes` | `bigint` | yes | `0` | Their size in bytes. |
+
+**Constraints**
+
+- Primary key `photo_archives_pkey`: `PRIMARY KEY (org_id, month)`
+- Foreign key `photo_archives_downloaded_by_fkey`: `FOREIGN KEY (downloaded_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `photo_archives_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `photo_archives_removed_by_fkey`: `FOREIGN KEY (removed_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `photo_archives_bytes_check`: `CHECK ((bytes >= 0))`
+- Check `photo_archives_files_check`: `CHECK ((files >= 0))`
+- Check `photo_archives_month_check`: `CHECK ((EXTRACT(day FROM month) = (1)::numeric))`
+- Check `photo_archives_removed_after_download`: `CHECK (((removed_at IS NULL) OR (downloaded_at IS NOT NULL)))`
+
+**Triggers**
+
+- `photo_archives_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `photo_archives_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### play_sessions
 
@@ -3813,6 +3920,18 @@ appointments_check_health() returns trigger
 
 Trigger: while the kennel refuses at the door, a visitor's appointment that checks vaccinations is not marked done for a pet that lacks what the kennel requires, unless an owner or manager let it in (WB210). A boarder was checked at its check-in.
 
+### archivable_photo
+
+```
+archivable_photo(p_name text) returns boolean
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+True for a stored file that a photo archive covers: a photo (not its small copy) under updates, deliveries or care. Pets' own photos, certificates and receipts are never archived.
+
 ### attendance_check
 
 ```
@@ -4040,6 +4159,18 @@ check_bill_line(p_mode tax_mode, p_intra boolean, p_include boolean, p_quantity 
 - Volatility: immutable
 
 Raises WB037 when a line's taxable value and tax are not what its quantity, price, discount and rate give under the tax mode (within the state or across states, prices with or without tax). Used by issue_invoice and issue_credit_note.
+
+### check_photo_month
+
+```
+check_photo_month(p_org uuid, p_month date, p_roles member_role[]) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Raises unless the caller has one of the roles at the kennel (WB002, or WB242 for owners only) and the month is a first of the month before this one (WB241).
 
 ### check_privacy_access
 
@@ -4449,6 +4580,18 @@ guard_hiding() returns trigger
 
 Trigger on pets and clients: only owners and managers hide a row (deleted_at) or show it again; never while it has a stay requested, confirmed or in house (WB019); a pet is shown again only once its parent is.
 
+### import_parents_and_pets
+
+```
+import_parents_and_pets(p_org uuid, p_rows jsonb) returns jsonb
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Brings in rows from a spreadsheet (M47), each {parent, pet, vaccinations}, checked first by readImport() in src/lib/core/import.ts. A parent is matched by phone and left as they are; a pet already known by name for that parent is skipped. All of it or none of it. Owners and managers only, at most 2000 rows. Runs as the caller.
+
 ### incidents_guard_content
 
 ```
@@ -4605,6 +4748,30 @@ issue_invoice(p_invoice uuid) returns invoices
 
 Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, or its food deliveries) says. Takes in advances paid for those stays.
 
+### job_forget_old_rows
+
+```
+job_forget_old_rows(p_org uuid) returns integer
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Overnight job (M46): removes the kennel's problems (app_errors) and job runs older than 90 days. Returns how many it removed.
+
+### job_plan_deliveries
+
+```
+job_plan_deliveries(p_org uuid) returns integer
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Overnight job (M46): makes every running subscription's deliveries for the next 21 days, as the food screens do. Returns how many it made; a second run makes none.
+
 ### kennels_check_service
 
 ```
@@ -4664,6 +4831,18 @@ leave_requests_check() returns trigger
 - Volatility: volatile
 
 Trigger: only an owner or manager grants or refuses leave (WB223), and not their own unless an owner (WB224); only leave still asked for changes its days; refused and withdrawn leave is final (WB225). Stamps who answered and when.
+
+### log_app_error
+
+```
+log_app_error(p_path text, p_kind text, p_message text, p_org uuid, p_digest text) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Writes an error on the server for the kennel the caller is working in (or their first), scrubbed of contacts, at most 200 an hour. Does nothing for someone not signed in. SECURITY DEFINER because nobody writes app_errors directly.
 
 ### make_recovery_codes
 
@@ -4893,6 +5072,42 @@ pets_latest_weight() returns trigger
 
 Trigger: pets.weight_g is always the latest of the pet's weighings, whatever was written to it.
 
+### photo_month_files
+
+```
+photo_month_files(p_org uuid, p_month date) returns TABLE(path text, pet_name text, taken_at timestamp with time zone, bytes bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The photos of a month that has ended that an archive covers, with the pet each shows (by its update or delivery) and when it was taken. Owners and managers only. Runs as the caller.
+
+### photo_space
+
+```
+photo_space(p_org uuid) returns TABLE(month date, files bigint, bytes bigint, photos bigint, photo_bytes bigint)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The kennel's stored files by month (at the kennel): how many, their size, and how many of them are photos an archive covers. Owners and managers only. Runs as the caller.
+
+### photos_to_remove
+
+```
+photos_to_remove(p_org uuid, p_month date) returns SETOF text
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The photos of a downloaded month that an owner may remove from storage (M49). Refused for anyone but an owner (WB242), or before the month was downloaded (WB243). The small copies are not in it, so pages still show something.
+
 ### plan_subscription
 
 ```
@@ -4976,6 +5191,30 @@ record_batch(p_org uuid, p_version uuid, p_grams integer, p_packs integer, p_coo
 - Volatility: volatile
 
 Records a batch cooked from a recipe version and takes each ingredient out of stock: its quantity per kilo times the batch's kilos. Refused as a whole when any ingredient is short (WB130).
+
+### record_photo_download
+
+```
+record_photo_download(p_org uuid, p_month date, p_files integer, p_bytes bigint) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Notes that a month's photos were downloaded as a ZIP (M49), so an owner may then remove them. Owners and managers. SECURITY DEFINER: the archive's record is written only here and in record_photo_removal().
+
+### record_photo_removal
+
+```
+record_photo_removal(p_org uuid, p_month date, p_files integer, p_bytes bigint) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Notes that an owner removed a month's photos from Wagbook (M49), refused unless they were downloaded first (WB243). SECURITY DEFINER: see record_photo_download().
 
 ### record_purchase
 
@@ -5169,6 +5408,18 @@ rotation_recipe(p_org uuid, p_index integer) returns uuid
 
 The recipe at the n-th place of the rotation (0 the first), counting round again after the last. Recipes with no version yet are left out.
 
+### run_nightly_jobs
+
+```
+run_nightly_jobs() returns integer
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Runs every overnight job for every kennel (M46) and writes each run to job_runs. pg_cron calls it each night; it can also be run by hand in the SQL editor. Returns how many job runs it wrote. Not granted to the app.
+
 ### safe_date
 
 ```
@@ -5204,6 +5455,18 @@ save_recipe_version(p_recipe uuid, p_details jsonb, p_ingredients jsonb) returns
 - Volatility: volatile
 
 Makes the next version of a recipe with its ingredients ([{item_id, quantity_per_kg}]) and its details, in one step. Owners and managers only (WB142); at least one ingredient (WB143).
+
+### scrub_error_text
+
+```
+scrub_error_text(p_text text) returns text
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: immutable
+
+An error message with email addresses and phone numbers (nine or more digits) replaced, cut to 300 characters. Must match scrubErrorText() in src/lib/core/problems.ts.
 
 ### session_meets_mfa
 

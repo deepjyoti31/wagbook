@@ -90,6 +90,11 @@ In summary (deleting anything is for owners, D29):
 | Leave (M43) | Ask for and withdraw their own; read their own | Read everyone's; grant or refuse, never their own (`WB223`, `WB224`); put leave in for someone | Also answer their own; delete |
 | Attendance (M43) | Clock themselves in and out (the database stamps the time); read their own; see who is on now, names only (`who_is_on`) | Read everyone's; write or correct a time by hand with a note (`WB226`, `WB227`), in History of changes | Also delete |
 | When kennels went in or out of service (M44) | Read | Read; written only by the database from the kennel's own change | Same |
+| Bring in parents and pets from a spreadsheet (M47) | No (`WB002`) | Yes (`import_parents_and_pets`, runs as the caller, at most 2,000 rows, `WB240`) | Same |
+| Overnight job runs (M46) | Nothing | Read; written only by `run_nightly_jobs()`, which the app cannot call | Same |
+| Problems: errors on the server (M48) | Write their own through `log_app_error()`, never read | Same as staff | Also read |
+| Photo archive (M49): space by month, a month's photos as a ZIP | Nothing (`WB002`) | Read, download | Same |
+| Removing a downloaded month's photos (M49) | No | No (`WB242`); storage deletes are for owners | Yes, only after the month was downloaded (`WB243`); the small copies stay |
 | A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()` and their own pick-ups and drops through `rider_mark_trip()` (M39), a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 
@@ -97,6 +102,22 @@ In summary (deleting anything is for owners, D29):
 may know who else is clocked in. It checks the caller works at the kennel asked about and returns names only, no
 times. `kennels_keep_service()` is a `security definer` trigger: `kennel_service` has no grant to write, so it only
 ever says what `kennels.is_active` said, and when. Neither is granted to the anonymous role.
+
+Phase 5 (M46 to M49, D50) adds three `security definer` functions. `log_app_error()` writes a problem for the kennel
+the caller works at (or their first): nobody may insert into `app_errors` directly, so every row is scrubbed of email
+addresses and phone numbers (`scrub_error_text()`) and a kennel gets at most 200 an hour; it does nothing for someone not
+signed in. `record_photo_download()` and `record_photo_removal()` keep the photo archive's record (who downloaded, then
+who removed, in that order); each checks the caller's role itself. The overnight jobs (`run_nightly_jobs()` and the
+jobs it runs) are granted to nobody: pg_cron runs them as the database's owner, and each job filters by kennel itself.
+Importing a spreadsheet and reading the space photos take run as the caller, so row level security and storage's own
+policies apply. The health check (`/api/health`) calls `get_public_intake_form()` with a name no kennel can have, so it
+adds nothing to what a stranger can do: still twelve public functions.
+
+Changing a password (M45) checks the current one first, on a separate connection that keeps no session, so a stolen
+session alone cannot change the password; the page is rate limited (10 tries per ten minutes per address). Resetting a
+forgotten password gives the same answer whether or not the address has an account. With two-step sign-in on, Supabase
+Auth asks for the code before a reset password is saved. Sign in with Google (M45) is off unless whoever deploys
+Wagbook sets it up; it starts from a link, not a form, so the browser's `form-action` rule is never relaxed.
 
 Some columns are not writable by anyone through the API, whatever their role, because column-level grants leave them
 out: a booking's check-in and check-out stamps, its creator and its link token; an invoice's status, number, dates,
@@ -122,6 +143,11 @@ is changed on purpose.
 | `submit_food_request(token, payload)` | Nothing | A known parent's own link secret, as `submit_booking_request`; only their own subscriptions (`WB186`); dates from today to 120 days ahead (`WB187`); ten a day (`WB105`). Makes a request for staff, never a change by itself |
 | `stay_media_visible(name)` | True or false: may this request read this file? Called by the storage policy `pet_media_select_for_stay`, not by pages | The stay token must arrive in the `x-wagbook-stay` request header and belong to a live stay; the file must be the stay's pet photo or a photo on one of its updates shown to the parent (or the small copy of one) |
 | `intake_upload_allowed(name)` | True or false: may this request add this file? Called by the storage policy `pet_media_insert_for_intake`, not by pages | The form's upload secret must arrive in the `x-wagbook-intake` header; the form must be under an hour old and still waiting for staff; the name must be `{org}/intake/{form}/pet-N` (or `pet-N-2`, for a pet's second vaccine) for one of the form's pets. Adding only: one file per name, nothing can be read back, replaced or removed |
+
+**Pages without a function of their own (Phase 5).** `/api/health` (M48) calls `get_public_intake_form()` with a name
+no kennel can have and says only whether the database answered. `/login/forgot` and `/login/new-password` (M45) go to
+Supabase Auth, not to a function: the first gives the same answer for any address, and the second works only for the
+session the emailed link made. `/auth/google` only sends the browser to Google through Supabase Auth.
 
 **Certificates with the intake form (milestone M9).** `submit_intake` hands back a 64 character secret made for that
 form. The app sends each certificate to Storage as the anonymous role with the secret in the `x-wagbook-intake`
@@ -456,6 +482,8 @@ These are real. Do not describe Wagbook as free of them.
 | Posts to signed-in pages and the intake form may be 12 MB | Needed for photos and certificates | Everything else is capped at 1 MB at the edge |
 | A photo replaced by a new one, or a draft's update that failed, can leave a file nobody points at | Storage use grows a little; only owners delete files, by design (D29) | An owner's clean-up. A deleted expense now takes its receipt with it |
 | A photo sent without JavaScript is stored as taken (only its hidden data removed) | It may show sideways and is larger | Most phones run the page's JavaScript; the photo still works |
+| Errors on public pages (intake form, stay page, bills) are not written down for owners (M48) | Owners see only errors met while someone was signed in; the rest are in the server's own log | By design: writing them would need the service role key, which is never used |
+| An archived month's ZIP (M49) is the only full copy of its photos once removed | A ZIP lost by the owner cannot be recovered from Wagbook | The page says so before removing; the small copies stay |
 | Anyone holding a form's upload secret can add its certificates for an hour | Only the sender has it; the files can only be added, at most two per pet | By design |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
 | Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |

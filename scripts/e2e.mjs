@@ -28,6 +28,7 @@ supabase("db", "reset");
 
 const run = spawnSync("npx", ["playwright", "test", ...process.argv.slice(2)], {
   stdio: "inherit",
-  env: { ...process.env, E2E_SUPABASE_URL: url, E2E_SUPABASE_KEY: key },
+  // The mail catcher, where the walk reads the link to reset a password (M45).
+  env: { ...process.env, E2E_SUPABASE_URL: url, E2E_SUPABASE_KEY: key, E2E_MAILPIT_URL: status.MAILPIT_URL ?? status.INBUCKET_URL ?? "" },
 });
 process.exit(run.status ?? 1);

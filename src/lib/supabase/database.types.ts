@@ -6,6 +6,44 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      app_errors: {
+        Row: {
+          id: string;
+          org_id: string;
+          happened_at: string;
+          path: string;
+          kind: string;
+          message: string;
+          digest: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          happened_at?: string;
+          path: string;
+          kind: string;
+          message: string;
+          digest?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          happened_at?: string;
+          path?: string;
+          kind?: string;
+          message?: string;
+          digest?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "app_errors_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       appointment_items: {
         Row: {
           id: string;
@@ -2664,6 +2702,44 @@ export type Database = {
           },
         ];
       };
+      job_runs: {
+        Row: {
+          id: string;
+          org_id: string;
+          job: string;
+          ran_at: string;
+          ok: boolean;
+          made: number;
+          problem: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          job: string;
+          ran_at?: string;
+          ok: boolean;
+          made?: number;
+          problem?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          job?: string;
+          ran_at?: string;
+          ok?: boolean;
+          made?: number;
+          problem?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "job_runs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       kennel_service: {
         Row: {
           org_id: string;
@@ -3683,6 +3759,47 @@ export type Database = {
           },
           {
             foreignKeyName: "pets_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      photo_archives: {
+        Row: {
+          org_id: string;
+          month: string;
+          downloaded_at: string | null;
+          downloaded_by: string | null;
+          removed_at: string | null;
+          removed_by: string | null;
+          files: number;
+          bytes: number;
+        };
+        Insert: {
+          org_id: string;
+          month: string;
+          downloaded_at?: string | null;
+          downloaded_by?: string | null;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          files?: number;
+          bytes?: number;
+        };
+        Update: {
+          org_id?: string;
+          month?: string;
+          downloaded_at?: string | null;
+          downloaded_by?: string | null;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          files?: number;
+          bytes?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "photo_archives_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -4932,6 +5049,10 @@ export type Database = {
         Args: { p_org: string; p_service: string; p_pet: string };
         Returns: number;
       };
+      archivable_photo: {
+        Args: { p_name: string };
+        Returns: boolean;
+      };
       available_kennels: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["booking_kind"]; p_start: string; p_end: string; p_client?: string; p_pets?: number };
         Returns: Database["public"]["Tables"]["kennels"]["Row"][];
@@ -4946,6 +5067,10 @@ export type Database = {
       };
       check_bill_line: {
         Args: { p_mode: Database["public"]["Enums"]["tax_mode"]; p_intra: boolean; p_include: boolean; p_quantity: number; p_unit_price_minor: number; p_discount_minor: number; p_taxable_minor: number; p_tax_rate_bp: number; p_cgst_minor: number; p_sgst_minor: number; p_igst_minor: number; p_tax_minor: number };
+        Returns: undefined;
+      };
+      check_photo_month: {
+        Args: { p_org: string; p_month: string; p_roles: Database["public"]["Enums"]["member_role"][] };
         Returns: undefined;
       };
       check_privacy_access: {
@@ -5036,6 +5161,10 @@ export type Database = {
         Args: { p_token: string };
         Returns: Json;
       };
+      import_parents_and_pets: {
+        Args: { p_org: string; p_rows: Json };
+        Returns: Json;
+      };
       intake_upload_allowed: {
         Args: { p_name: string };
         Returns: boolean;
@@ -5060,9 +5189,21 @@ export type Database = {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
       };
+      job_forget_old_rows: {
+        Args: { p_org: string };
+        Returns: number;
+      };
+      job_plan_deliveries: {
+        Args: { p_org: string };
+        Returns: number;
+      };
       kennels_in_service: {
         Args: { p_org: string; p_day: string };
         Returns: number;
+      };
+      log_app_error: {
+        Args: { p_path: string; p_kind: string; p_message: string; p_org?: string; p_digest?: string };
+        Returns: undefined;
       };
       make_recovery_codes: {
         Args: Record<PropertyKey, never>;
@@ -5112,6 +5253,18 @@ export type Database = {
         Args: { p_org: string; p_pet: string; p_on: string };
         Returns: { problem: string; detail: string }[];
       };
+      photo_month_files: {
+        Args: { p_org: string; p_month: string };
+        Returns: { path: string; pet_name: string; taken_at: string; bytes: number }[];
+      };
+      photo_space: {
+        Args: { p_org: string };
+        Returns: { month: string; files: number; bytes: number; photos: number; photo_bytes: number }[];
+      };
+      photos_to_remove: {
+        Args: { p_org: string; p_month: string };
+        Returns: string[];
+      };
       plan_subscription: {
         Args: { p_subscription: string; p_until: string };
         Returns: number;
@@ -5123,6 +5276,14 @@ export type Database = {
       record_batch: {
         Args: { p_org: string; p_version: string; p_grams: number; p_packs: number; p_cooked_on: string; p_cook?: string; p_boarders_on?: string; p_note?: string };
         Returns: string;
+      };
+      record_photo_download: {
+        Args: { p_org: string; p_month: string; p_files: number; p_bytes: number };
+        Returns: undefined;
+      };
+      record_photo_removal: {
+        Args: { p_org: string; p_month: string; p_files: number; p_bytes: number };
+        Returns: undefined;
       };
       record_purchase: {
         Args: { p_org: string; p_item: string; p_quantity: number; p_cost_minor: number; p_on: string; p_supplier?: string; p_use_by?: string; p_bill_number?: string; p_bill_path?: string; p_expense_category?: string };
@@ -5184,6 +5345,10 @@ export type Database = {
         Args: { p_org: string; p_index: number };
         Returns: string;
       };
+      run_nightly_jobs: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       safe_date: {
         Args: { p_text: string };
         Returns: string;
@@ -5194,6 +5359,10 @@ export type Database = {
       };
       save_recipe_version: {
         Args: { p_recipe: string; p_details: Json; p_ingredients: Json };
+        Returns: string;
+      };
+      scrub_error_text: {
+        Args: { p_text: string };
         Returns: string;
       };
       session_meets_mfa: {

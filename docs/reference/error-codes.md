@@ -38,7 +38,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents<br>only an owner or manager can bring in parents and pets<br>only an owner or manager can download photos<br>only an owner or manager can see the space photos take | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql`<br>`20261008000750_operations.sql` |
 | `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>submission not found<br>parent not found<br>that order was not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
@@ -187,3 +187,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB228` | a clock time cannot be later than now | `20261008000470_team.sql` |
 | `WB230` | a kennel goes in or out of service today or on a day before | `20261008000300_kennels_and_bookings.sql` |
 | `WB231` | that is before the kennel's last change, on % | `20261008000300_kennels_and_bookings.sql` |
+| `WB240` | bring in at most 2000 rows at a time | `20261008000750_operations.sql` |
+| `WB241` | photos are archived a month at a time, for a month that has ended | `20261008000750_operations.sql` |
+| `WB242` | only an owner removes photos from Wagbook | `20261008000750_operations.sql` |
+| `WB243` | download this month's photos first, then remove them | `20261008000750_operations.sql` |

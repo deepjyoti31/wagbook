@@ -76,7 +76,8 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
     const small = (p: string) => p.replace(/\.jpg$/, ".small.jpg");
     const { data: signed } = await supabase.storage.from("pet-media").createSignedUrls([...paths, ...paths.map(small)], 3600);
     const byPath = new Map((signed ?? []).filter((x) => x.signedUrl && !x.error).map((x) => [x.path ?? "", x.signedUrl as string]));
-    for (const p of paths) links.set(p, { small: byPath.get(small(p)) ?? byPath.get(p), full: byPath.get(p) });
+    // Once a month's photos are archived (M49) only the small copy is left, and it serves for both.
+    for (const p of paths) links.set(p, { small: byPath.get(small(p)) ?? byPath.get(p), full: byPath.get(p) ?? byPath.get(small(p)) });
   }
   const statusKey = Object.hasOwn(w.status, stay.booking.status) ? (stay.booking.status as keyof typeof w.status) : "confirmed";
   const status = { label: w.status[statusKey], tone: TONE[statusKey] ?? "neutral" };

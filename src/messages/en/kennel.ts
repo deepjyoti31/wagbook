@@ -25,6 +25,9 @@ export const kennelArea = {
       rota: { title: "Rota", about: "Shifts, who works when, and who lives on site." },
       leave: { title: "Leave", about: "Ask for days off, and answer others' requests." },
       attendance: { title: "Attendance", about: "Clocking in and out, and the month's sheet for pay." },
+      import: { title: "Bring in parents and pets", about: "From a spreadsheet, when you move to Wagbook. Owners and managers." },
+      photos: { title: "Photos and space", about: "How much space photos take, and archiving old months. Owners and managers." },
+      problems: { title: "Problems and overnight jobs", about: "Whether the nightly jobs worked, and errors to tell someone about. Owners and managers." },
     },
     // {role} is one of roleInSentence, written as it sits in the middle of a sentence.
     signedInAs: "Signed in as {name} ({email}), {role} at {kennel}.",

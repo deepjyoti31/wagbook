@@ -28,9 +28,12 @@ describe("RateLimiter", () => {
 });
 
 describe("rateRuleFor", () => {
-  it("covers the forms strangers can post, and nothing signed in", () => {
+  it("covers the forms strangers can post, and nothing signed in but the password", () => {
     expect(rateRuleFor("/login")?.name).toBe("sign-in");
     expect(rateRuleFor("/login/code")?.name).toBe("sign-in");
+    expect(rateRuleFor("/login/forgot")?.name).toBe("sign-in");
+    expect(rateRuleFor("/login/new-password")?.name).toBe("sign-in");
+    expect(rateRuleFor("/app/more/password")?.name).toBe("password");
     expect(rateRuleFor("/i/happy-tails")?.name).toBe("intake");
     expect(rateRuleFor("/f/happy-tails")?.name).toBe("food");
     expect(rateRuleFor("/join/abc")?.name).toBe("join");
