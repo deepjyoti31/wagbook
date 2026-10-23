@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 22 October 2026, after Phase 5 (M45 to M49: passwords and Google, overnight jobs, import, problems, the photo archive).
+Last updated: 23 October 2026, after upgrading Next.js to 16.4.1 for three security advisories (D51).
 
 ## In one paragraph
 
@@ -174,6 +174,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 5 in a browser at 360 pixels: a new owner asks for a reset link (the same answer for an unknown address), opens it from the local mail catcher, chooses a new password, the old one refused, changes it again under More (a wrong current one refused), a normal session refused the reset page, the link refused a second time; a manager checks a CSV (a bad phone named by line), brings in a parent with two pets, the same file then finding them known, staff kept out; `/api/health` answering ok; owners seeing the overnight jobs after `run_nightly_jobs()`, a page made to fail on purpose listed under Problems by the error hook, managers seeing jobs only, staff kept out; a month of update photos downloaded as a ZIP with a folder for the pet, removed by the owner after the manager's download, the small copies left | `npm run test:e2e` against the local Supabase: the whole walk, 71 steps passing, 22 October 2026; screenshots taken | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
 | Lint, types, production build | `npm run check` | High |
+| Next.js 16.4.1 (D51): `npm audit --omit=dev` finds nothing; the build no longer stops with the "SecurityFatalError" notice; the whole app works on it | `npm run check` (665 tests and the build, after merging Phase 5), and `npm run test:e2e` against the local Supabase (71 passed after the merge), 23 October 2026 | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
 
 ## What is NOT verified
@@ -601,6 +602,12 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 23 October 2026. Next.js and `eslint-config-next` 16.4.0 to 16.4.1, the first release outside three advisories
+  (image optimization with SVG, Server Actions denial of service, `use cache` with typed arrays); D51 says how exposed
+  Wagbook was. `npm run check` (665 tests) and the 71-step e2e walk pass on it, with Phase 5 merged in. Before the
+  upgrade the build stopped with Next.js's "SecurityFatalError" notice. `npm audit` still lists `braces` through
+  `eslint-config-next` (lint time only, see D51). CI's walk once failed at "Switch to" after Join: the step went on
+  before Join's redirect; it now waits for `/app` after Join and after Switch.
 - 22 October 2026: Phase 5 built (M45 to M49, D50): passwords and Google, overnight jobs, import, problems, photo archive.
 - 22 October 2026: the owner chose what comes after M44; M45 to M65 written into the roadmap, `02` section L and D49.
 
