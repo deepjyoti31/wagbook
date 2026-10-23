@@ -30,6 +30,7 @@ create table public.invoices (
   period_end date,
   delivery_id uuid,
   appointment_id uuid,
+  sale_id uuid,
   status public.invoice_status not null default 'draft',
   number text,
   fiscal_year text,
@@ -67,9 +68,9 @@ create table public.invoices (
   foreign key (org_id, appointment_id) references public.appointments (org_id, id) on delete restrict,
   -- A bill is for one stay, for a family booked together, for a month of a
   -- repeating series, for a week or month of a food subscription, for one
-  -- food order, for a visitor's appointment, or for none of them (a one-off
-  -- bill). Never two.
-  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id, appointment_id) <= 1),
+  -- food order, for a visitor's appointment, for a sale over the counter, or
+  -- for none of them (a one-off bill). Never two.
+  constraint invoices_one_stay_or_one_family check (num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id, appointment_id, sale_id) <= 1),
   -- A subscription is billed for a period: a week or a month, ahead.
   constraint invoices_subscription_period check (
     (subscription_id is null) = (period_start is null)
@@ -110,6 +111,8 @@ comment on column public.invoices.period_end is 'With subscription_id: the last 
 comment on column public.invoices.delivery_id is 'The one-off food order this bill is for: a trial, food by the kilo or a made-to-order item (M29).';
 comment on column public.invoices.appointment_id is
   'The appointment of a visitor this bill is for (M34), with its add-ons. A boarder''s appointment is on its stay''s bill instead (WB200).';
+comment on column public.invoices.sale_id is
+  'The sale over the counter this bill is for (M62), to a parent or to the kennel''s walk-in buyer. A sale made on a stay is on the stay''s bill instead.';
 comment on column public.invoices.number is 'Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused.';
 comment on column public.invoices.fiscal_year is 'Financial year the number belongs to, e.g. 2027-28.';
 comment on column public.invoices.seq is 'Position in the year''s sequence: the 0001 in WB/27-28/0001.';
@@ -518,14 +521,18 @@ $$;
 comment on function public.stay_charges(uuid, uuid[]) is
   'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
 
+-- In plpgsql so that it may read the sales over the counter (M62), whose
+-- tables are made after this file.
 create function public.invoice_expected_lines(
   p_org uuid, p_booking uuid, p_group uuid, p_tax_mode public.tax_mode, p_series uuid default null, p_month date default null,
   p_appointment uuid default null)
 returns table (quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
-language sql
+language plpgsql
 stable
 set search_path = ''
 as $$
+begin
+  return query
   with stays as (
     select sc.quantity, sc.unit_price_minor, sc.discount_minor,
            case when p_tax_mode = 'none' then 0 else b.tax_rate_bp end as tax_rate_bp, b.sac_code
@@ -567,10 +574,18 @@ as $$
   select 1::numeric(10, 2), t.price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else t.tax_rate_bp end
   from public.trips t
   where t.org_id = p_org and t.status <> 'cancelled'
-    and t.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month));
+    and t.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month))
+  union all
+  -- Things sold over the counter on the stay (M62), not cancelled.
+  select sl.quantity::numeric(10, 2), sl.unit_price_minor, 0::bigint, case when p_tax_mode = 'none' then 0 else sl.tax_rate_bp end
+  from public.sale_lines sl
+  join public.sales sa on sa.org_id = sl.org_id and sa.id = sl.sale_id
+  where sl.org_id = p_org and sa.status = 'sold'
+    and sa.booking_id in (select public.invoice_bookings(p_org, p_booking, p_group, p_series, p_month));
+end;
 $$;
 comment on function public.invoice_expected_lines(uuid, uuid, uuid, public.tax_mode, uuid, date, uuid) is
-  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, and each pick-up and drop not cancelled; or a visitor''s appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.';
+  'The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, each pick-up and drop not cancelled, and each line of a sale over the counter on the stay that is not cancelled; or a visitor''s appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.';
 
 -- One line of a bill or credit note, checked against the same rules as
 -- src/lib/core/tax.ts. The app does the sums; the database refuses a document
@@ -740,6 +755,23 @@ begin
       raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
     end if;
   elsif v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
+        and v_inv.sale_id is not null then
+    -- A sale over the counter: exactly its lines, at the prices it was sold at (M62).
+    if not exists (select 1 from public.sale_bill_lines(v_inv.org_id, v_inv.sale_id, v_org.tax_mode))
+       or exists (
+         (select * from public.sale_bill_lines(v_inv.org_id, v_inv.sale_id, v_org.tax_mode))
+         except all
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+       )
+       or exists (
+         (select l.quantity, l.unit_price_minor, l.discount_minor, l.tax_rate_bp from public.invoice_lines l where l.invoice_id = v_inv.id)
+         except all
+         (select * from public.sale_bill_lines(v_inv.org_id, v_inv.sale_id, v_org.tax_mode))
+       )
+    then
+      raise exception 'WB050: only an owner or manager can issue a bill that differs from its booking' using errcode = '42501';
+    end if;
+  elsif v_inv.org_id not in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]))
         and v_inv.appointment_id is not null then
     -- A visitor's appointment: exactly the appointment and its add-ons (M34).
     if not exists (select 1 from public.invoice_expected_lines(v_inv.org_id, null, null, v_org.tax_mode, null, null, v_inv.appointment_id))
@@ -859,7 +891,7 @@ begin
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, its month of a series, or its food deliveries) says. Takes in advances paid for those stays.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -1494,7 +1526,8 @@ select
   (case when i.status = 'issued' then i.total_minor - coalesce(c.credited_minor, 0) - coalesce(p.paid_minor, 0) else 0 end)::bigint as due_minor,
   i.series_id,
   i.series_month,
-  i.appointment_id
+  i.appointment_id,
+  i.sale_id
 from public.invoices i
 left join lateral (
   select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end) as paid_minor
@@ -1531,6 +1564,8 @@ begin
   select * into v_merge from public.clients c where c.id = p_merge for update;
   if v_keep.id is null or v_merge.id is null or v_keep.id = v_merge.id or v_keep.org_id <> v_merge.org_id
      or v_keep.deleted_at is not null or v_merge.deleted_at is not null
+     -- The walk-in buyer of sales over the counter is nobody's record (M62).
+     or v_keep.is_walk_in or v_merge.is_walk_in
      or v_keep.org_id not in (select public.my_org_ids()) then
     raise exception 'WB018: choose two different parents of this kennel' using errcode = '22023';
   end if;
@@ -1551,6 +1586,8 @@ begin
   -- Credit, and the payments into and from it, go together (M38).
   update public.credits cr set client_id = v_keep.id where cr.org_id = v_keep.org_id and cr.client_id = v_merge.id;
   update public.payments p set client_id = v_keep.id where p.org_id = v_keep.org_id and p.client_id = v_merge.id;
+  -- Sales over the counter, with their bills (M62).
+  update public.sales s set client_id = v_keep.id where s.org_id = v_keep.org_id and s.client_id = v_merge.id;
   perform set_config('wagbook.merging', 'off', true);
   -- Play sessions copy their parent from the booking whenever they are written.
   update public.play_sessions ps set client_id = v_keep.id where ps.org_id = v_keep.org_id and ps.client_id = v_merge.id;

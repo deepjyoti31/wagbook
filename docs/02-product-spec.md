@@ -1058,9 +1058,9 @@ each is done.
 | Book an appointment and report a delivery problem from the parent's link | M59 | Built (L15) |
 | A rota that repeats each week, and forgotten clock-outs put right | M60 | Built (L16) |
 | Alerts on staff phones (web push) | M61 | Built (L17) |
-| Treats, toys and accessories sold over the counter, from stock | M62 | Planned |
-| Orders to suppliers, received into stock | M63 | Planned |
-| Export for Tally | M64 | Planned |
+| Treats, toys and accessories sold over the counter, from stock | M62 | Built (L18) |
+| Orders to suppliers, received into stock | M63 | Built (L19) |
+| Export for Tally | M64 | Built (L20) |
 | Several sites under one owner, with combined reports | M65 | Planned |
 
 ### L1. Passwords and Google. Built (M45, D50).
@@ -1216,6 +1216,39 @@ home with the bill unpaid. An alert names the kennel and the pet and opens the p
 number or address. The push itself carries nothing: the phone asks Wagbook, signed in, what happened. Alerts are off
 until an installation sets them up (`10-setup-and-deploy.md`, "Alerts on phones"); no paid service is used. On an
 iPhone, Wagbook must be added to the home screen first.
+
+### L18. Selling over the counter. Built (M62, D54).
+
+Switched on in Settings, What this kennel offers (**Treats, toys and other things sold over the counter**). Under
+More, **Shop**: owners and managers add things to sell (name, kind, price of one, tax rate, HSN code, reorder level,
+usual supplier) and change or stop a price; a sale already made keeps its own. They are stock like the kitchen's,
+bought in, counted and thrown away on the Stock page, sold by the piece. **Sell to a walk-in**: how many of each, and
+the bill opens at once, to "Walk-in", ready to issue (anyone may issue it as it was sold). On a parent's page, **Sell**
+puts it on a stay that is booked or in the kennel, or on a bill of its own; on a stay's page, on that stay's bill, which
+Make bill then includes. The database prices every line and takes the stock out in the same step, and refuses more
+than is in stock with its sentence (`WB130`). **To reorder** lists what is at or below its level, with what is already
+on order, and **Order more**. **Sold today** lists the day's sales with their bills; an owner or manager cancels one
+made by mistake, with a reason, before its bill goes out, and the stock comes back. A stay's bill that has gone out
+takes nothing more (`WB283`): sell on a bill of its own.
+
+### L19. Orders to suppliers. Built (M63, D54).
+
+Under More, **Orders to suppliers** (with the kitchen or the shop on). Owners and managers place an order to a
+supplier: how much of each thing in its own unit, the supplier's usual things first, a note; then **Send on WhatsApp**
+and **I have sent it**. The kitchen's shopping list leaves out what is still to come on an order, shows what is on
+order, and **Order from {supplier}** opens an order with its quantities filled in. Anyone puts in stock **What came**,
+in full or in part, with a use-by date (and a cost for recipe costs, owners and managers); never more than is still to
+come, and not on a closed order. Owners and managers write **The supplier's bill** down as an expense once, with its
+number and photo, and **Close the order** when the rest is not coming. Stock goes in on receiving, never on ordering.
+
+### L20. Export for Tally. Built (M64, D54).
+
+On Reports, **Download for Tally**: the month as a ZIP of two XML files Tally imports, the ledgers first (Import,
+Masters) and the vouchers after (Import, Transactions). Each issued bill is a Sales voucher, each credit note a Credit
+Note, money in or out by cash or bank a Receipt or Payment, credit kept or spent a Journal, and each expense a Payment
+from its kind's ledger. **Ledger names in Tally** (owners and managers) sets once the company and the names of the
+sales, tax, round off, cash, bank and credit ledgers and the groups for parents and expenses. Not yet imported into Tally
+by a person: an accountant checks one month first (`HANDOFF.md`).
 
 ---
 

@@ -773,7 +773,8 @@ async function todaysReminders(
         })),
       inHouse: inHouse.filter((b) => b.clients).map(stay),
       unpaid: oldBills
-        .filter((b) => b.clients && b.number && b.issued_on && due.has(b.id))
+        // The walk-in buyer of the shop, and an erased parent, have no phone to remind.
+        .filter((b) => b.clients?.phone && b.number && b.issued_on && due.has(b.id))
         .map((b) => ({
           id: b.id,
           number: b.number as string,

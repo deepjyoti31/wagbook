@@ -30,6 +30,7 @@ import { monthOf } from "@/lib/stay-bill";
 import { StayAppointments } from "@/components/stay-appointments";
 import { StayCancellation } from "@/components/stay-cancellation";
 import { HealthAtTheDoor } from "@/components/stay-health";
+import { StayShop } from "@/components/stay-shop";
 import { StayTrips } from "@/components/stay-trips";
 import { CleanQuestion, LastTrial, StayReportPanel, StaySupplies, SuppliesGoingHome, TrialPanel, VetVisits } from "@/components/stay-day";
 import { createClient } from "@/lib/supabase/server";
@@ -452,6 +453,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
       {org.offers_food_delivery && parent && b.status !== "no_show" ? (
         <StayTrips t={t} booking={{ ...b, client_id: parent.id, clients: parent }} open={b.status === "requested" || b.status === "confirmed" || b.status === "checked_in"} />
+      ) : null}
+
+      {org.offers_shop && b.status !== "requested" ? (
+        <StayShop t={t} org={org} bookingId={b.id} open={b.status === "confirmed" || b.status === "checked_in"} canManage={canManage} />
       ) : null}
 
       {pet && (b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") ? (

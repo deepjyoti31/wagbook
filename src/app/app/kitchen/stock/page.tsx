@@ -67,7 +67,7 @@ async function Stock() {
         </Link>
       </PageTitle>
       <p className="mb-4 text-slate">{s.about}</p>
-      {org.offers_kitchen ? null : <Notice tone="info">{m.kitchen.off}</Notice>}
+      {org.offers_kitchen || org.offers_shop ? null : <Notice tone="info">{m.kitchen.off}</Notice>}
 
       <Section title={s.useSoon} count={soon.length}>
         <p className="mb-2 text-sm text-slate">{s.useSoonAbout}</p>

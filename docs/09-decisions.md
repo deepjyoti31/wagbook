@@ -1251,3 +1251,53 @@ day misses alerts older than a day (Today still shows the requests).
 
 **Look again** if parents should see times their pet is free only, if alerts should be sent from the database itself
 (`pg_net`), or if a kennel asks for a message in the push for phones that cannot reach Wagbook.
+
+## D54. Phase 8: the shop is the kitchen's stock with a price, orders put stock in only when it comes, and Tally gets two files written by hand
+
+**Status:** Decided, 23 October 2026, building Phase 8 (M62 to M64).
+
+**Situation.** The owner's list (D49) asked for treats, toys and accessories sold over the counter from stock, orders to
+suppliers received into stock, and the month's books for Tally. Bills already have one live bill per stay and a parent
+on every bill; stock is already the sum of its movements (M26); and Wagbook has no accounting library on purpose.
+
+**Decision.**
+
+- **Things for sale are stock items with a price (M62).** `stock_items` gains a price over the counter, a tax rate and
+  an HSN code, set by owners and managers; one with a price is sold by the piece. There is one stock, so the Stock page
+  buys, counts and throws away shop things as it does chicken, and a kennel with no kitchen still uses it. A sale is a
+  movement of its own kind (`sale`), never below nothing (`WB130`).
+- **A sale is made only by `sell()`**, which prices each line from its item (nobody types a price at the counter,
+  `WB281`), takes the stock out in the same step, and is all or nothing. It is `security definer` because sales have no
+  grant to write, so a sale is never added to or changed after it is made; it checks the caller itself. `cancel_sale()`
+  (owners and managers, with a reason) puts the stock back, only while the bill has not gone out (`WB283`); after that
+  the bill is credited, as for anything else.
+- **Where a sale is billed.** On a stay booked or in the kennel, its lines join the stay's bill (`invoice_expected_lines`
+  now reads them, so staff issue the stay's bill only with them); once that bill is out, nothing more is sold on it
+  (`WB283`). Otherwise it has a bill of its own (`invoices.sale_id`), made and opened at once, which staff issue only as
+  it was sold (`sale_bill_lines()`).
+- **A walk-in is billed to the kennel's one "Walk-in" buyer**, a row in `clients` marked `is_walk_in`, with no phone and
+  no pets (`WB286`), made by `walk_in_client()` the first time. Every bill keeps a parent, so nothing that reads bills,
+  payments, reports or GSTR-1 changes; the walk-in is never merged (`WB018`) and gets no reminders.
+- **Orders (M63)** are placed by owners and managers and sent on WhatsApp. **Stock goes in only on receiving**, by
+  anyone, against an open order, an item on it and no more than is still to come (`WB290` to `WB292`); a cost may be
+  given then, for recipe costs. The supplier's bill is an expense, once per order (`WB293`). What is still to come
+  (`stock_on_order`) is taken off the kitchen's shopping list, which can now place the order with its quantities.
+- **Tally (M64)** gets a ZIP of two XML files, written by `src/lib/core/tally.ts` with no library: ledger masters (each
+  parent named with the last four digits of their phone, under the parents' group; each kind of expense under the
+  expenses' group; written without an action, so a ledger Tally has is left alone), and vouchers: Sales for issued
+  bills, Credit Note, Receipt and Payment for money by cash or bank, Journal for credit kept or spent, and Payment for
+  expenses. The fixed ledgers (sales, taxes, round off, cash, bank, credit) are named once by the kennel
+  (`tally_settings`) and made once in Tally by the accountant. Cancelled bills are left out, as in Reports.
+
+**Why.** One stock and one bill model keep every rule where it already is: the database refuses what would break money
+or stock, and the reports, GSTR-1 and the parent's export see sales without learning anything new. Two plain files
+match Tally's own two imports (masters, then transactions).
+
+**Cost.** Things sold over the counter go on the Sales ledger with the services; an accountant who wants goods apart
+splits them in Tally. A sale is by the piece only. A sale on a stay whose bill went out needs a bill of its own. The
+walk-in shows as a "parent" row that no list shows. **The Tally files have not been imported into Tally**: the XML
+follows Tally's published import format, and the accountant checks one month before it is relied on (`HANDOFF.md`).
+
+**Look again** when an accountant has imported a month (ledger names, the master import's behaviour with ledgers that
+exist, bill-by-bill references), if a kennel sells loose food by weight over the counter, or if goods should have a
+sales ledger of their own.

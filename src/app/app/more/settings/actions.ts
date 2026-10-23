@@ -170,6 +170,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     offers_appointments: checked(form, "offers_appointments"),
     offers_kitchen: checked(form, "offers_kitchen"),
     offers_food_delivery: checked(form, "offers_food_delivery"),
+    offers_shop: checked(form, "offers_shop"),
     // The team's rota, leave and attendance (M43).
     keeps_rota: checked(form, "keeps_rota"),
   };

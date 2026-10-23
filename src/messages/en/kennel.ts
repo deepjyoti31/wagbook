@@ -30,6 +30,8 @@ export const kennelArea = {
       photos: { title: "Photos and space", about: "How much space photos take, and archiving old months. Owners and managers." },
       problems: { title: "Problems and overnight jobs", about: "Whether the nightly jobs worked, and errors to tell someone about. Owners and managers." },
       house: { title: "Checklists and repairs", about: "Opening and closing checklists, cleaning that repeats, and things to fix." },
+      shop: { title: "Shop", about: "Sell treats, toys and other things from stock, and see what to reorder." },
+      orders: { title: "Orders to suppliers", about: "Order on WhatsApp, put in stock what came, and write the bill down." },
     },
     // {role} is one of roleInSentence, written as it sits in the middle of a sentence.
     signedInAs: "Signed in as {name} ({email}), {role} at {kennel}.",

@@ -28,7 +28,7 @@ export function Nav({ words, lang }: { words: Messages["nav"]; lang: string }) {
     ? "/app/bookings"
     : pathname.startsWith("/app/play")
       ? "/app/care"
-      : pathname.startsWith("/app/bills") || pathname.startsWith("/app/appointments")
+      : pathname.startsWith("/app/bills") || pathname.startsWith("/app/appointments") || pathname.startsWith("/app/shop")
         ? "/app/more"
         : pathname.startsWith("/app/clients")
           ? "/app/dogs"

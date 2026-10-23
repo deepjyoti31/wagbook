@@ -177,8 +177,27 @@ describe("the rotation and the cook plan", () => {
       ],
     );
     expect(list).toEqual([
-      { item_id: "chicken", name: "Chicken", unit: "g", supplier_id: "butcher", need: 7440, have: 2000, buy: 5440 },
-      { item_id: "rice", name: "Rice", unit: "g", supplier_id: null, need: 5920, have: 0, buy: 5920 },
+      { item_id: "chicken", name: "Chicken", unit: "g", supplier_id: "butcher", need: 7440, have: 2000, ordered: 0, buy: 5440 },
+      { item_id: "rice", name: "Rice", unit: "g", supplier_id: null, need: 5920, have: 0, ordered: 0, buy: 5920 },
     ]);
+  });
+
+  it("stops asking for what is on an order not yet received (M63)", () => {
+    const plan = [{ version_id: "v1", grams: 10_000 }];
+    const ingredients = [
+      { version_id: "v1", item_id: "chicken", quantity_per_kg: 600 },
+      { version_id: "v1", item_id: "rice", quantity_per_kg: 300 },
+    ];
+    const items = [
+      { item_id: "chicken", name: "Chicken", unit: "g" as const, supplier_id: "butcher", on_hand: 1000, on_order: 5000 },
+      { item_id: "rice", name: "Rice", unit: "g" as const, supplier_id: null, on_hand: 0, on_order: 1000 },
+    ];
+    // Chicken: 6 kg needed, 1 kg in stock and 5 kg on its way, so nothing to buy. Rice: 3 kg needed, 1 kg coming.
+    expect(shoppingList(plan, ingredients, items)).toEqual([
+      { item_id: "rice", name: "Rice", unit: "g", supplier_id: null, need: 3000, have: 0, ordered: 1000, buy: 2000 },
+    ]);
+    // Once received, the order is in stock instead, and the list is the same.
+    const received = items.map((i) => ({ ...i, on_hand: i.on_hand + i.on_order, on_order: 0 }));
+    expect(shoppingList(plan, ingredients, received).map((l) => [l.item_id, l.buy])).toEqual([["rice", 2000]]);
   });
 });

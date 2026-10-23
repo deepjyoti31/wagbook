@@ -365,6 +365,9 @@ export const moneyArea = {
         organizations: "Kennel settings",
         memberships: "Person",
         appointments: "Appointment",
+        sales: "Sale over the counter",
+        stock_items: "Stock item",
+        supplier_orders: "Order to a supplier",
       },
       // {what} is one of the tables above.
       added: "{what} added",

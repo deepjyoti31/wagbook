@@ -183,6 +183,7 @@ create table public.organizations (
   offers_appointments boolean not null default false,
   offers_kitchen boolean not null default false,
   offers_food_delivery boolean not null default false,
+  offers_shop boolean not null default false,
   portion_small_bp integer not null default 300 check (portion_small_bp between 50 and 1000),
   portion_medium_bp integer not null default 250 check (portion_medium_bp between 50 and 1000),
   portion_large_bp integer not null default 200 check (portion_large_bp between 50 and 1000),
@@ -256,6 +257,8 @@ comment on column public.organizations.offers_kitchen is
   'Whether the kennel cooks food in its own kitchen, for boarders and to sell (D44). Off: none of it is shown.';
 comment on column public.organizations.offers_food_delivery is
   'Whether the kennel delivers its food to parents at home (D44). Needs offers_kitchen. Turns on parents'' addresses and the areas served.';
+comment on column public.organizations.offers_shop is
+  'Whether the kennel sells treats, toys and other things over the counter, from stock (M62). Off: none of it is shown and nothing can be sold.';
 comment on column public.organizations.portion_small_bp is
   'A small dog''s day of food as a share of its body weight, in basis points: 300 is 3% (M28). Medium and large have their own.';
 comment on column public.organizations.portion_medium_bp is 'A medium dog''s day of food as a share of its body weight, in basis points: 250 is 2.5%.';

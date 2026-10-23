@@ -308,18 +308,21 @@ export interface ShoppingLine {
   supplier_id: string | null;
   need: number;
   have: number;
+  /** Still to come on orders to suppliers (M63). */
+  ordered: number;
   buy: number;
 }
 
 /**
  * What to buy for a cook plan: each ingredient's quantity per kilo times the
- * kilos to cook, added up over the recipes, less what is in stock. Only what
- * is short is listed, grouped by supplier (no supplier last), by name.
+ * kilos to cook, added up over the recipes, less what is in stock and what is
+ * still to come on orders to suppliers (M63). Only what is short is listed,
+ * grouped by supplier (no supplier last), by name.
  */
 export function shoppingList(
   plan: readonly { version_id: string; grams: number }[],
   ingredients: readonly { version_id: string; item_id: string; quantity_per_kg: number }[],
-  items: readonly { item_id: string; name: string; unit: "g" | "ml" | "piece"; supplier_id: string | null; on_hand: number }[],
+  items: readonly { item_id: string; name: string; unit: "g" | "ml" | "piece"; supplier_id: string | null; on_hand: number; on_order?: number }[],
 ): ShoppingLine[] {
   const need = new Map<string, number>();
   for (const p of plan) {
@@ -331,7 +334,8 @@ export function shoppingList(
     .map(([id, n]) => {
       const item = items.find((i) => i.item_id === id);
       const have = Math.max(item?.on_hand ?? 0, 0);
-      return { item_id: id, name: item?.name ?? "", unit: item?.unit ?? "g", supplier_id: item?.supplier_id ?? null, need: n, have, buy: Math.max(n - have, 0) };
+      const ordered = Math.max(item?.on_order ?? 0, 0);
+      return { item_id: id, name: item?.name ?? "", unit: item?.unit ?? "g", supplier_id: item?.supplier_id ?? null, need: n, have, ordered, buy: Math.max(n - have - ordered, 0) };
     })
     .filter((l) => l.buy > 0)
     .sort((a, b) => Number(a.supplier_id === null) - Number(b.supplier_id === null) || (a.supplier_id ?? "").localeCompare(b.supplier_id ?? "") || a.name.localeCompare(b.name));

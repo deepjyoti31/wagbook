@@ -20,6 +20,8 @@ const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; mana
   { href: "/app/appointments", key: "appointments", when: (o) => o.offers_appointments },
   { href: "/app/kitchen", key: "kitchen", when: (o) => o.offers_kitchen },
   { href: "/app/food", key: "food", when: (o) => o.offers_food_delivery },
+  { href: "/app/shop", key: "shop", when: (o) => o.offers_shop },
+  { href: "/app/more/orders", key: "orders", when: (o) => o.offers_kitchen || o.offers_shop },
   { href: "/app/more/rota", key: "rota", when: (o) => o.keeps_rota },
   { href: "/app/more/leave", key: "leave", when: (o) => o.keeps_rota },
   { href: "/app/more/attendance", key: "attendance", when: (o) => o.keeps_rota },

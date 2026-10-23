@@ -41,8 +41,8 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents<br>only an owner or manager writes a repair's cost as an expense<br>only an owner or manager writes an expense<br>only an owner or manager can bring in parents and pets<br>only an owner or manager can download photos<br>only an owner or manager can see the space photos take | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql`<br>`20261008000570_the_day.sql`<br>`20261008000750_operations.sql` |
-| `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>that could not be found<br>that stay could not be found<br>submission not found<br>parent not found<br>that order was not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000570_the_day.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents<br>only an owner or manager writes a repair's cost as an expense<br>only an owner or manager writes an expense<br>only an owner or manager cancels a sale<br>only an owner or manager can bring in parents and pets<br>only an owner or manager can download photos<br>only an owner or manager can see the space photos take | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql`<br>`20261008000570_the_day.sql`<br>`20261008000580_shop_and_orders.sql`<br>`20261008000750_operations.sql` |
+| `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>that could not be found<br>that stay could not be found<br>that kennel was not found<br>that stay was not found<br>that parent was not found<br>that sale was not found<br>that order was not found<br>submission not found<br>parent not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000570_the_day.sql`<br>`20261008000580_shop_and_orders.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
 | `WB006` | turn on two-step sign-in first | `20261008000100_foundation.sql` |
@@ -212,3 +212,17 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB276` | the push secret is at least 32 characters | `20261008000650_alerts.sql` |
 | `WB277` | alerts are not set up here | `20261008000650_alerts.sql` |
 | `WB278` | choose one of your deliveries | `20261008000600_intake_and_public_pages.sql` |
+| `WB280` | this kennel does not sell over the counter. Switch it on in Settings first. | `20261008000580_shop_and_orders.sql` |
+| `WB281` | % is not for sale. An owner or manager gives it a price first. | `20261008000580_shop_and_orders.sql` |
+| `WB282` | things are sold on a stay that is booked or in the kennel | `20261008000580_shop_and_orders.sql` |
+| `WB283` | this stay's bill has gone out. Sell on a bill of its own.<br>this sale's bill has gone out. Make a credit note on the bill instead. | `20261008000580_shop_and_orders.sql` |
+| `WB284` | this sale was cancelled already | `20261008000580_shop_and_orders.sql` |
+| `WB285` | say why the sale is cancelled | `20261008000580_shop_and_orders.sql` |
+| `WB286` | the walk-in buyer has no pets. Add the pet to its own parent. | `20261008000580_shop_and_orders.sql` |
+| `WB287` | choose at least one thing to sell<br>sell at most 50 different things at a time<br>say how many of each, from 1 to 1000 | `20261008000580_shop_and_orders.sql` |
+| `WB288` | a sale on a stay goes on the stay's bill, and a bill of its own names a sale of this buyer | `20261008000580_shop_and_orders.sql` |
+| `WB289` | put 1 to 100 things on an order<br>say how much of something came | `20261008000580_shop_and_orders.sql` |
+| `WB290` | this order is closed. Record what came as bought in. | `20261008000580_shop_and_orders.sql` |
+| `WB291` | that is not on this order | `20261008000580_shop_and_orders.sql` |
+| `WB292` | that is more than is still to come on this order (%). Record the rest as bought in. | `20261008000580_shop_and_orders.sql` |
+| `WB293` | this order's bill is written down already | `20261008000580_shop_and_orders.sql` |

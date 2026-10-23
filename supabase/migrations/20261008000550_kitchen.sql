@@ -25,12 +25,14 @@ create type public.stock_unit as enum ('g', 'ml', 'piece');
 comment on type public.stock_unit is 'How an item is counted: grams, millilitres or pieces. Quantities are whole numbers of this unit.';
 
 create type public.stock_kind as enum (
-  'meat', 'organ', 'egg', 'grain', 'vegetable', 'oil', 'supplement', 'packaging', 'fuel', 'grooming', 'medicine', 'other');
-comment on type public.stock_kind is 'What sort of thing an item is, for sorting the stock page and the shopping list.';
+  'meat', 'organ', 'egg', 'grain', 'vegetable', 'oil', 'supplement', 'packaging', 'fuel', 'grooming', 'medicine',
+  'treat', 'toy', 'accessory', 'other');
+comment on type public.stock_kind is
+  'What sort of thing an item is, for sorting the stock page and the shopping list. Treats, toys and accessories are usually sold over the counter (M62).';
 
-create type public.stock_move_kind as enum ('purchase', 'used', 'waste', 'count');
+create type public.stock_move_kind as enum ('purchase', 'used', 'waste', 'count', 'sale');
 comment on type public.stock_move_kind is
-  'purchase: bought in (owners and managers). used: taken out by a batch of cooking (M30), never by hand. waste: thrown away with a reason. count: a stock take, which sets the counted quantity and records the difference.';
+  'purchase: bought in (owners and managers), or received against an order to a supplier (M63, anyone). used: taken out by a batch of cooking (M30), never by hand. waste: thrown away with a reason. count: a stock take, which sets the counted quantity and records the difference. sale: sold over the counter (M62), out when sold and back in when the sale is cancelled, written only by the database.';
 
 create type public.waste_reason as enum ('spoiled', 'past_date', 'dropped', 'other');
 comment on type public.waste_reason is 'Why stock was thrown away: spoiled, past its use-by date, dropped, or another reason in the note.';
@@ -67,11 +69,16 @@ create table public.stock_items (
   low_level bigint check (low_level is null or low_level >= 0),
   never_in_recipe boolean not null default false,
   is_active boolean not null default true,
+  sell_price_minor bigint check (sell_price_minor is null or sell_price_minor > 0),
+  sell_tax_rate_bp integer not null default 0 check (sell_tax_rate_bp between 0 and 10000),
+  hsn_code text check (hsn_code is null or hsn_code ~ '^[0-9]{4,8}$'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, id),
   unique (org_id, name),
-  foreign key (org_id, supplier_id) references public.suppliers (org_id, id) on delete set null (supplier_id)
+  foreign key (org_id, supplier_id) references public.suppliers (org_id, id) on delete set null (supplier_id),
+  -- Things sold over the counter are sold by the piece (M62).
+  constraint stock_items_sold_by_the_piece check (sell_price_minor is null or unit = 'piece')
 );
 
 comment on table public.stock_items is 'A thing the kennel keeps in stock: chicken, rice, carrots, pouches, gas, shampoo.';
@@ -81,6 +88,10 @@ comment on column public.stock_items.low_level is 'At or below this quantity the
 comment on column public.stock_items.never_in_recipe is
   'True for food a dog must never eat (onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar): the database refuses a recipe that uses it (M27).';
 comment on column public.stock_items.is_active is 'False once the kennel stops keeping it. Its movements stay.';
+comment on column public.stock_items.sell_price_minor is
+  'The price of one piece sold over the counter, in minor units (M62). Set by owners and managers. Empty: not for sale.';
+comment on column public.stock_items.sell_tax_rate_bp is 'The tax rate on a sale of it, in basis points: 1800 is 18%. Left off when the kennel charges no tax.';
+comment on column public.stock_items.hsn_code is 'The HSN code printed on the bill for a sale of it, 4 to 8 digits.';
 
 create trigger stock_items_set_updated_at
   before update on public.stock_items
@@ -98,6 +109,8 @@ create table public.stock_moves (
   reason public.waste_reason,
   counted bigint check (counted is null or counted >= 0),
   batch_id uuid,
+  sale_line_id uuid,
+  supplier_order_id uuid,
   note text check (note is null or char_length(note) <= 300),
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
@@ -106,11 +119,14 @@ create table public.stock_moves (
   foreign key (org_id, supplier_id) references public.suppliers (org_id, id) on delete set null (supplier_id),
   -- Each kind carries what it needs and nothing else.
   constraint stock_moves_shape check (
-    case kind
+    (kind = 'sale') = (sale_line_id is not null)
+    and (kind = 'purchase' or supplier_order_id is null)
+    and case kind
       when 'purchase' then quantity > 0 and reason is null and counted is null and batch_id is null
       when 'used' then quantity < 0 and reason is null and counted is null and batch_id is not null and use_by is null
       when 'waste' then quantity < 0 and reason is not null and counted is null and batch_id is null and use_by is null
       when 'count' then counted is not null and reason is null and batch_id is null and use_by is null
+      when 'sale' then quantity <> 0 and reason is null and counted is null and batch_id is null and use_by is null
     end
   )
 );
@@ -124,6 +140,8 @@ comment on column public.stock_moves.use_by is 'Purchases only: the use-by date 
 comment on column public.stock_moves.reason is 'Waste only: why it was thrown away.';
 comment on column public.stock_moves.counted is 'Stock takes only: the quantity counted on the shelf.';
 comment on column public.stock_moves.batch_id is 'Used only: the batch of cooking that took it (M30).';
+comment on column public.stock_moves.sale_line_id is 'Sales only: the line of the sale over the counter that took it out, or put it back when the sale was cancelled (M62).';
+comment on column public.stock_moves.supplier_order_id is 'Purchases only: the order to a supplier it was received against (M63).';
 comment on column public.stock_moves.created_by is 'Who wrote it down. Set by the database.';
 
 create index stock_moves_org_item_idx on public.stock_moves (org_id, item_id, happened_on);
@@ -202,12 +220,15 @@ select
   i.low_level,
   i.never_in_recipe,
   i.is_active,
-  coalesce(sum(m.quantity), 0)::bigint as on_hand
+  coalesce(sum(m.quantity), 0)::bigint as on_hand,
+  i.sell_price_minor,
+  i.sell_tax_rate_bp,
+  i.hsn_code
 from public.stock_items i
 left join public.stock_moves m on m.org_id = i.org_id and m.item_id = i.id
 group by i.id;
 
-comment on view public.stock_levels is 'Each item with what is in stock now: the sum of its movements.';
+comment on view public.stock_levels is 'Each item with what is in stock now: the sum of its movements. With its price over the counter when it is for sale (M62).';
 
 -- Buying something in, with what it cost and, if asked, as an expense too,
 -- in one step. Runs as the caller: row level security lets only owners and

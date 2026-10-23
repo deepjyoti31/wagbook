@@ -127,6 +127,10 @@ async function Settings() {
             </span>
           </label>
           <label className="flex min-h-12 items-start gap-3">
+            <input type="checkbox" name="offers_shop" defaultChecked={org.offers_shop} className="mt-1 size-5" />
+            <span>{m.offers.shop}</span>
+          </label>
+          <label className="flex min-h-12 items-start gap-3">
             <input type="checkbox" name="keeps_rota" defaultChecked={org.keeps_rota} className="mt-1 size-5" />
             <span>{m.offers.rota}</span>
           </label>

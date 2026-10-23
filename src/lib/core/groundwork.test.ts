@@ -51,7 +51,7 @@ describe("postal codes and areas", () => {
 });
 
 describe("what the kennel offers", () => {
-  const none = { offers_appointments: false, offers_kitchen: false, offers_food_delivery: false };
+  const none = { offers_appointments: false, offers_kitchen: false, offers_food_delivery: false, offers_shop: false };
   it("asks about the skills for what is switched on", () => {
     expect(skillsOffered(none)).toEqual([]);
     expect(skillsOffered({ ...none, offers_kitchen: true })).toEqual(["cook"]);

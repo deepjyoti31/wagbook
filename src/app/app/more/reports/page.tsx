@@ -227,6 +227,18 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         </Section>
       ) : null}
 
+      <Section title={m.tally.title}>
+        <p className="mb-3 text-slate">{m.tally.about}</p>
+        <p className="flex flex-col gap-1">
+          <a href={`/app/more/reports/tally?month=${month}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {fill(m.tally.download, { month: name })}
+          </a>
+          <Link href="/app/more/tally" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {m.tally.ledgers}
+          </Link>
+        </p>
+      </Section>
+
       <Section title={r.downloadTitle}>
         <form action="/app/more/reports/download" method="get" className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <Field label={r.what}>

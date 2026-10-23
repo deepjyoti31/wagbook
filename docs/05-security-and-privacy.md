@@ -105,6 +105,9 @@ In summary (deleting anything is for owners, D29):
 | Food and medicines from home (M55) | Read, add | Same | Also delete |
 | Trial days (M56) | Mark one, note how it went | Same | Same |
 | Vet visits (M57) | Record one with its bill line and medicines (`record_vet_visit`, as the caller) | Also the expense, in the same step or later | Also delete |
+| Selling over the counter (M62) | Sell through `sell()`, priced by the database; read sales | Also set prices; cancel a sale before its bill goes out (`cancel_sale`) | Same |
+| Orders to suppliers (M63) | Read; put in stock what came (no cost) | Also place, send, close, record a cost and the supplier's bill (an expense) | Also delete an order nothing came against |
+| Ledger names in Tally, and the month's file (M64) | Nothing | Read, set, download | Also delete |
 | A rider (D45) | No table at all: their own runs for today through `my_runs()`, marking their own stops through `rider_mark_stop()` and their own pick-ups and drops through `rider_mark_trip()` (M39), a photo at the door of their own stop | | |
 | Audit log (History of changes) | Nothing | Read | Read |
 
@@ -112,6 +115,17 @@ In summary (deleting anything is for owners, D29):
 may know who else is clocked in. It checks the caller works at the kennel asked about and returns names only, no
 times. `kennels_keep_service()` is a `security definer` trigger: `kennel_service` has no grant to write, so it only
 ever says what `kennels.is_active` said, and when. Neither is granted to the anonymous role.
+
+Phase 8 (M62 to M64, D54) adds three `security definer` functions, none granted to the anonymous role. `sell()`:
+sales and their lines have no grant to write, so a sale is made only here, priced from its items, its stock taken out
+in the same step and never added to afterwards; it checks the caller is an owner, manager or staff member of the
+kennel (riders sell nothing) and that the kennel sells over the counter (`WB280`). `cancel_sale()` is the only change
+to a sale, for owners and managers, and only while its bill has not gone out. `walk_in_client()` makes the kennel's one
+walk-in buyer: `clients.is_walk_in` is not writable through the API, so a real parent can never be turned into it. A
+sale is never stock moved by hand: the stock movement policy refuses the `sale` kind. Receiving against an order is
+open to staff because it moves no money: a cost is still for owners and managers (`stock_costs`), and the database caps
+what comes at what is still to come. The parent's export carries their sales; erasure keeps them, as it keeps bills.
+The file for Tally holds the same as the bills, payments and expenses downloads, for owners and managers only.
 
 Phase 6 (M50 to M57, D52) adds one `security definer` trigger, `bookings_leave_kennel_to_clean()`: nobody may add to
 `kennel_cleans`, so a kennel is to clean only because its last pet was checked out (the check-out itself passed the

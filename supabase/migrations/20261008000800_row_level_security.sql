@@ -118,6 +118,11 @@ alter table public.push_secret enable row level security;
 alter table public.stay_reports enable row level security;
 alter table public.stay_supplies enable row level security;
 alter table public.vet_visits enable row level security;
+alter table public.sales enable row level security;
+alter table public.sale_lines enable row level security;
+alter table public.supplier_orders enable row level security;
+alter table public.supplier_order_lines enable row level security;
+alter table public.tally_settings enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -450,8 +455,10 @@ create policy client_addresses_delete on public.client_addresses for delete to a
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- Stock (M26): any member reads what is in stock and records what was thrown
--- away or counted; only owners and managers record a purchase. Batches write
--- what cooking used (M30). Nobody changes or deletes a movement: there are no
+-- away or counted; only owners and managers record a purchase, but anyone
+-- receives what came of an order to a supplier (M63). Batches write what
+-- cooking used (M30); sales over the counter are written only by sell() and
+-- cancel_sale() (M62). Nobody changes or deletes a movement: there are no
 -- grants for it, and a stock take corrects the count.
 grant select, insert on public.stock_moves to authenticated;
 create policy stock_moves_select on public.stock_moves for select to authenticated
@@ -459,9 +466,52 @@ create policy stock_moves_select on public.stock_moves for select to authenticat
 create policy stock_moves_insert on public.stock_moves for insert to authenticated
   with check (
     org_id in (select public.my_org_ids())
-    and (kind <> 'purchase' or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+    and kind <> 'sale'
+    and (kind <> 'purchase' or supplier_order_id is not null
+         or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
   );
 grant select on public.stock_levels to authenticated;
+
+-- Sales over the counter (M62): any member reads them; they are made only by
+-- sell() and cancelled only by cancel_sale(), so there is no grant to write.
+grant select on public.sales, public.sale_lines to authenticated;
+create policy sales_select on public.sales for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy sale_lines_select on public.sale_lines for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+
+-- Orders to suppliers (M63): any member reads them (to receive what came);
+-- owners and managers place, send, close and record the bill; owners delete
+-- one that nothing was received against. Lines are never changed.
+grant select, insert, delete on public.supplier_orders to authenticated;
+grant update (status, note, sent_at, bill_number, bill_path, expense_id) on public.supplier_orders to authenticated;
+create policy supplier_orders_select on public.supplier_orders for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy supplier_orders_insert on public.supplier_orders for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy supplier_orders_update on public.supplier_orders for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy supplier_orders_delete on public.supplier_orders for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+grant select, insert on public.supplier_order_lines to authenticated;
+create policy supplier_order_lines_select on public.supplier_order_lines for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy supplier_order_lines_insert on public.supplier_order_lines for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+grant select on public.supplier_order_progress, public.stock_on_order to authenticated;
+
+-- Ledger names for Tally (M64): owners and managers, like the reports.
+grant select, insert, update, delete on public.tally_settings to authenticated;
+create policy tally_settings_select on public.tally_settings for select to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy tally_settings_insert on public.tally_settings for insert to authenticated
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy tally_settings_update on public.tally_settings for update to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])))
+  with check (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+create policy tally_settings_delete on public.tally_settings for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- What things cost is for owners and managers only; it is never changed.
 grant select, insert on public.stock_costs to authenticated;
@@ -514,10 +564,10 @@ create policy reminders_sent_delete on public.reminders_sent for delete to authe
 -- dates, the frozen seller and buyer, the void fields, the creator and the
 -- secret link token belong to the database.
 grant select, delete on public.invoices to authenticated;
-grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant insert (org_id, client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, sale_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
-grant update (client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
+grant update (client_id, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, sale_id, place_of_supply_state_code, subtotal_minor, discount_minor, taxable_minor,
               cgst_minor, sgst_minor, igst_minor, tax_minor, round_off_minor, total_minor, notes)
   on public.invoices to authenticated;
 grant select, insert, update, delete on public.invoice_lines to authenticated;
@@ -761,6 +811,14 @@ grant execute on function public.photos_to_remove(uuid, date) to authenticated;
 -- Phase 6 (M50 to M57): the day, smoother.
 grant execute on function public.cost_to_expense(uuid, text, uuid, text) to authenticated;
 grant execute on function public.record_vet_visit(uuid, uuid, date, text, text, text, bigint, text, text, jsonb) to authenticated;
+
+-- Phase 8 (M62 to M64): money and stock.
+grant execute on function public.sell(uuid, jsonb, uuid, uuid) to authenticated;
+grant execute on function public.cancel_sale(uuid, text) to authenticated;
+grant execute on function public.stay_bill_issued(uuid, uuid) to authenticated;
+grant execute on function public.place_supplier_order(uuid, uuid, jsonb, text) to authenticated;
+grant execute on function public.receive_supplier_order(uuid, date, jsonb) to authenticated;
+grant execute on function public.record_supplier_bill(uuid, bigint, date, text, text, text) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.
