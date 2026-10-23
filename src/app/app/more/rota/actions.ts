@@ -140,3 +140,48 @@ export async function saveOnSite(_state: FormState, form: FormData): Promise<For
   revalidatePath("/app", "layout");
   return { ok: t.m.rota.onSite.saved };
 }
+
+const Weekday = z.coerce.number().int().min(1).max(7);
+
+/**
+ * A person's usual week (M60): one shift on each chosen weekday, which then
+ * fills the rota four weeks ahead (fill_rota), and on, week after week. A
+ * weekday they already have that shift on is left as it is.
+ */
+export async function addPattern(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, t, refused } = await planner();
+  if (refused) return refused;
+  const e = t.m.rota.errors;
+  const person = Id.safeParse(form.get("userId"));
+  if (!person.success) return { error: e.person };
+  const shift = Id.safeParse(form.get("shiftId"));
+  if (!shift.success) return { error: e.shift };
+  const days = form.getAll("weekday").map((d) => Weekday.safeParse(d));
+  if (days.length === 0 || days.some((d) => !d.success)) return { error: t.m.rota.pattern.errors.days };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("rota_patterns")
+    .upsert(
+      days.map((d) => ({ org_id: org.id, user_id: person.data, shift_id: shift.data, weekday: d.data! })),
+      { onConflict: "org_id,user_id,shift_id,weekday", ignoreDuplicates: true },
+    );
+  if (error) return { error: friendlyError(error, t) };
+  const filled = await supabase.rpc("fill_rota", { p_org: org.id });
+  if (filled.error) return { error: friendlyError(filled.error, t) };
+  revalidatePath("/app", "layout");
+  return { ok: plural(t.language, filled.data, t.m.rota.pattern.added) };
+}
+
+/** Take one weekday of a person's usual week away: its days still to come leave the rota with it; the days worked stay. */
+export async function removePattern(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, t, refused } = await planner();
+  if (refused) return refused;
+  const id = Id.safeParse(form.get("patternId"));
+  if (!id.success) return { error: t.m.rota.errors.notFound };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("rota_patterns").delete().eq("org_id", org.id).eq("id", id.data).select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.rota.errors.notFound };
+  revalidatePath("/app", "layout");
+  redirect("/app/more/rota?done=pattern");
+}

@@ -4433,6 +4433,7 @@ export type Database = {
           work_date: string;
           starts_at: string | null;
           ends_at: string | null;
+          pattern_id: string | null;
           created_by: string | null;
           created_at: string;
         };
@@ -4444,6 +4445,7 @@ export type Database = {
           work_date: string;
           starts_at?: string | null;
           ends_at?: string | null;
+          pattern_id?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -4455,6 +4457,7 @@ export type Database = {
           work_date?: string;
           starts_at?: string | null;
           ends_at?: string | null;
+          pattern_id?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -4475,6 +4478,71 @@ export type Database = {
           },
           {
             foreignKeyName: "rota_org_id_user_id_fkey";
+            columns: ["org_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "memberships";
+            referencedColumns: ["org_id", "user_id"];
+          },
+          {
+            foreignKeyName: "rota_pattern_fkey";
+            columns: ["org_id", "pattern_id"];
+            isOneToOne: false;
+            referencedRelation: "rota_patterns";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      rota_patterns: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          shift_id: string;
+          weekday: number;
+          starts_on: string | null;
+          filled_until: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id: string;
+          shift_id: string;
+          weekday: number;
+          starts_on?: string | null;
+          filled_until?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string;
+          shift_id?: string;
+          weekday?: number;
+          starts_on?: string | null;
+          filled_until?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rota_patterns_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rota_patterns_org_id_shift_id_fkey";
+            columns: ["org_id", "shift_id"];
+            isOneToOne: false;
+            referencedRelation: "shifts";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "rota_patterns_org_id_user_id_fkey";
             columns: ["org_id", "user_id"];
             isOneToOne: false;
             referencedRelation: "memberships";
@@ -5584,6 +5652,10 @@ export type Database = {
         Args: { p_client: string };
         Returns: Json;
       };
+      fill_rota: {
+        Args: { p_org: string; p_until?: string };
+        Returns: number;
+      };
       first_delivery_day: {
         Args: { p_org: string; p_weekdays?: number[] };
         Returns: string;
@@ -5603,6 +5675,10 @@ export type Database = {
       food_order_paid: {
         Args: { p_token: string };
         Returns: string;
+      };
+      forgotten_clock_outs: {
+        Args: { p_org: string; p_grace_minutes?: number };
+        Returns: { attendance_id: string; user_id: string; display_name: string; clocked_in_at: string; shift_name: string; shift_ended_at: string }[];
       };
       free_starts: {
         Args: { p_org: string; p_place: string; p_pet: string; p_day: string; p_minutes: number; p_cleanup: number; p_latest_end?: string };

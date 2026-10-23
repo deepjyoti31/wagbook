@@ -1,7 +1,7 @@
 import type { Messages } from "../en";
 
 /** Kannada words for the team (Phase 4, M43, D48): a first draft, to be checked by a native speaker. Part of kn.ts. */
-export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow"> = {
+export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "forgotClockOut" | "onNow"> = {
   rota: {
     title: "ಪಾಳಿ ಪಟ್ಟಿ",
     off: "ಪಾಳಿ ಪಟ್ಟಿ ಆಫ್ ಆಗಿದೆ. ಮಾಲೀಕರು ಅಥವಾ ಮ್ಯಾನೇಜರ್ ಇದನ್ನು ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ, ಈ ಕೆನೆಲ್ ಏನು ನೀಡುತ್ತದೆ ಎಂಬಲ್ಲಿ ಆನ್ ಮಾಡುತ್ತಾರೆ.",
@@ -52,6 +52,19 @@ export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow">
       about: "ಕೆನೆಲ್‌ನಲ್ಲೇ ವಾಸಿಸುವ ಆರೈಕೆದಾರರು, ಹಗಲು ರಾತ್ರಿ ಅಲ್ಲೇ ಇರುವವರು. ಇಂದಿನ ಪುಟ ಅವರನ್ನು ಈಗ ಕೆಲಸದಲ್ಲಿರುವವರ ಜೊತೆ ತೋರಿಸುತ್ತದೆ.",
       save: "ಉಳಿಸಿ",
       saved: "ಇಲ್ಲೇ ವಾಸಿಸುವವರನ್ನು ಉಳಿಸಲಾಗಿದೆ.",
+    },
+    // A person's usual week, which fills the rota (M60).
+    pattern: {
+      title: "ಸಾಮಾನ್ಯ ವಾರ",
+      about: "ಪ್ರತಿಯೊಬ್ಬರ ಸಾಮಾನ್ಯ ಶಿಫ್ಟ್‌ಗಳು. ಬದಲಿಸುವವರೆಗೆ ಇವು ಪ್ರತಿ ವಾರ ರೋಟಾವನ್ನು ನಾಲ್ಕು ವಾರ ಮುಂದಕ್ಕೆ ತುಂಬಿಸುತ್ತವೆ. ರಜೆಯ ದಿನ ಬಿಡಲಾಗುತ್ತದೆ, ಮತ್ತು ಮೇಲೆ ಯಾವುದೇ ವಾರವನ್ನು ಕೈಯಿಂದ ಬದಲಿಸಬಹುದು.",
+      none: "ಇನ್ನೂ ಯಾವುದೇ ಸಾಮಾನ್ಯ ವಾರ ಇಲ್ಲ.",
+      line: "{day}: {shift}",
+      removeLabel: "{name} ಅವರ ಸಾಮಾನ್ಯ ವಾರದಿಂದ {what} ತೆಗೆಯಿರಿ",
+      days: "ಈ ದಿನಗಳಲ್ಲಿ",
+      button: "ಸಾಮಾನ್ಯ ವಾರಕ್ಕೆ ಸೇರಿಸಿ",
+      added: { one: "ಸೇರಿಸಲಾಗಿದೆ. {n} ಶಿಫ್ಟ್ ರೋಟಾದಲ್ಲಿ ಹಾಕಲಾಗಿದೆ.", other: "ಸೇರಿಸಲಾಗಿದೆ. {n} ಶಿಫ್ಟ್‌ಗಳು ರೋಟಾದಲ್ಲಿ ಹಾಕಲಾಗಿದೆ." },
+      removed: "ತೆಗೆಯಲಾಗಿದೆ. ಇದರ ಮುಂದಿನ ದಿನಗಳು ರೋಟಾದಿಂದ ಹೋಗಿವೆ.",
+      errors: { days: "ಒಂದು ಅಥವಾ ಹೆಚ್ಚು ದಿನಗಳನ್ನು ಆರಿಸಿ." },
     },
     links: { leave: "ರಜೆ", attendance: "ಹಾಜರಿ" },
     errors: {
@@ -152,6 +165,15 @@ export const teamArea: Pick<Messages, "rota" | "leave" | "attendance" | "onNow">
     },
   },
 
+  // A stretch still open well after its shift ended, on Today for owners and managers (M60).
+  forgotClockOut: {
+    line: "{name} ಕ್ಲಾಕ್ ಔಟ್ ಮಾಡಿಲ್ಲ",
+    since: "{date} ರಂದು {time} ಕ್ಕೆ {shift} ಶಿಫ್ಟ್‌ಗೆ ಕ್ಲಾಕ್ ಇನ್ ಮಾಡಿದ್ದಾರೆ.",
+    button: "ಶಿಫ್ಟ್ ಮುಗಿದಾಗ ಕ್ಲಾಕ್ ಔಟ್ ({time})",
+    // Written on the stretch as the note for the time by hand.
+    note: "ಕ್ಲಾಕ್ ಔಟ್ ಮಾಡಿಲ್ಲ. {shift} ಶಿಫ್ಟ್ ಮುಗಿಯುವ ಸಮಯ ಹಾಕಲಾಗಿದೆ.",
+    gone: "ಇದನ್ನು ಈಗಾಗಲೇ ನೋಡಲಾಗಿದೆ.",
+  },
   onNow: {
     title: "ಈಗ ಕೆಲಸದಲ್ಲಿ",
     clockedIn: "ಹಾಜರಿ ಹಾಕಿದವರು",

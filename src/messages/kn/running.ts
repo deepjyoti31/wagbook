@@ -97,7 +97,7 @@ export const runningArea: Pick<Messages, "account" | "importing" | "problems" | 
     title: "ಸಮಸ್ಯೆಗಳು ಮತ್ತು ರಾತ್ರಿಯ ಕೆಲಸಗಳು",
     intro: "ಪ್ರತಿ ರಾತ್ರಿ ನಡೆಯುವ ಕೆಲಸಗಳು ಆದವೇ, ಮತ್ತು ನಿಮ್ಮ ತಂಡ ಬಳಸುವಾಗ Wagbook ಗೆ ಎದುರಾದ ದೋಷಗಳು. ಇಲ್ಲಿ ಏನಾದರೂ ಮತ್ತೆ ಮತ್ತೆ ಆದರೆ, ನಿಮ್ಮ Wagbook ನೋಡಿಕೊಳ್ಳುವವರಿಗೆ ತಿಳಿಸಿ.",
     jobsTitle: "ರಾತ್ರಿಯ ಕೆಲಸಗಳು",
-    jobNames: { plan_deliveries: "ಊಟದ ಡೆಲಿವರಿಗಳನ್ನು ಮುಂಚಿತವಾಗಿ ಮಾಡಿ", forget_old_rows: "90 ದಿನಕ್ಕಿಂತ ಹಳೆಯ ಸಮಸ್ಯೆಗಳನ್ನು ತೆಗೆಯಿರಿ" },
+    jobNames: { plan_deliveries: "ಊಟದ ಡೆಲಿವರಿಗಳನ್ನು ಮುಂಚಿತವಾಗಿ ಮಾಡಿ", forget_old_rows: "90 ದಿನಕ್ಕಿಂತ ಹಳೆಯ ಸಮಸ್ಯೆಗಳನ್ನು ತೆಗೆಯಿರಿ", fill_rota: "ಪ್ರತಿಯೊಬ್ಬರ ಸಾಮಾನ್ಯ ವಾರದಿಂದ ರೋಟಾ ತುಂಬಿಸಿ" },
     jobOk: "{when} ಆಯಿತು",
     jobMade: { one: "1 ಮಾಡಲಾಗಿದೆ ಅಥವಾ ತೆಗೆಯಲಾಗಿದೆ", other: "{n} ಮಾಡಲಾಗಿದೆ ಅಥವಾ ತೆಗೆಯಲಾಗಿದೆ" },
     jobFailed: "{when} ಆಗಲಿಲ್ಲ: {problem}",

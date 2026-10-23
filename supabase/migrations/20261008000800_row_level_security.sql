@@ -102,6 +102,7 @@ alter table public.shifts enable row level security;
 alter table public.rota enable row level security;
 alter table public.leave_requests enable row level security;
 alter table public.attendance enable row level security;
+alter table public.rota_patterns enable row level security;
 alter table public.app_errors enable row level security;
 alter table public.job_runs enable row level security;
 alter table public.photo_archives enable row level security;
@@ -241,7 +242,7 @@ begin
   foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
                           'suppliers', 'stock_items', 'recipes', 'food_products',
                           'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts',
-                          'required_vaccines', 'shifts', 'rota', 'house_jobs'] loop
+                          'required_vaccines', 'shifts', 'rota', 'rota_patterns', 'house_jobs'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -348,6 +349,9 @@ create policy kennel_service_select on public.kennel_service for select to authe
 -- managers see and write everyone's (the triggers decide who answers leave
 -- and who writes a time by hand), owners delete.
 create policy rota_delete_by_managers on public.rota for delete to authenticated
+  using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
+-- A weekly pattern (M60) is planning too: managers take one away.
+create policy rota_patterns_delete_by_managers on public.rota_patterns for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 
 grant select, delete on public.leave_requests to authenticated;
@@ -710,6 +714,9 @@ grant execute on function public.rider_mark_trip(uuid, public.trip_status) to au
 -- Phase 4 (M43, M44).
 grant execute on function public.who_is_on(uuid) to authenticated;
 grant execute on function public.kennels_in_service(uuid, date) to authenticated;
+-- Phase 7 (M58 to M61).
+grant execute on function public.fill_rota(uuid, date) to authenticated;
+grant execute on function public.forgotten_clock_outs(uuid, integer) to authenticated;
 
 -- Phase 5 (M45 to M49): running for real.
 grant execute on function public.import_parents_and_pets(uuid, jsonb) to authenticated;

@@ -208,3 +208,4 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB272` | choose one of the kennel's appointments | `20261008000600_intake_and_public_pages.sql` |
 | `WB273` | that time is not free. Pick one of the free times. | `20261008000600_intake_and_public_pages.sql` |
 | `WB274` | the kennel already knows about a problem with that delivery | `20261008000600_intake_and_public_pages.sql` |
+| `WB275` | a pattern is not changed. Take it away and add the new one. | `20261008000470_team.sql` |

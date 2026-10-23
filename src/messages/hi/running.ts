@@ -97,7 +97,7 @@ export const runningArea: Pick<Messages, "account" | "importing" | "problems" | 
     title: "समस्याएं और रात के काम",
     intro: "हर रात चलने वाले काम हुए या नहीं, और आपकी टीम के इस्तेमाल के दौरान Wagbook को मिली गड़बड़ियां। अगर यहां कुछ बार-बार हो, तो जो आपका Wagbook संभालता है उसे बताएं।",
     jobsTitle: "रात के काम",
-    jobNames: { plan_deliveries: "खाने की डिलीवरी पहले से बनाएं", forget_old_rows: "90 दिन से पुरानी समस्याएं हटाएं" },
+    jobNames: { plan_deliveries: "खाने की डिलीवरी पहले से बनाएं", forget_old_rows: "90 दिन से पुरानी समस्याएं हटाएं", fill_rota: "हर किसी के आम हफ़्ते से रोटा भरें" },
     jobOk: "{when} को हुआ",
     jobMade: { one: "1 बनाया या हटाया", other: "{n} बनाए या हटाए" },
     jobFailed: "{when} को नहीं हुआ: {problem}",

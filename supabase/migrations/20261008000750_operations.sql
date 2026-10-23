@@ -108,7 +108,7 @@ revoke all on function public.log_app_error(text, text, text, uuid, text) from p
 create table public.job_runs (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations (id) on delete cascade,
-  job text not null check (job in ('plan_deliveries', 'forget_old_rows')),
+  job text not null check (job in ('plan_deliveries', 'forget_old_rows', 'fill_rota')),
   ran_at timestamptz not null default now(),
   ok boolean not null,
   made integer not null default 0 check (made >= 0),
@@ -117,7 +117,7 @@ create table public.job_runs (
 );
 comment on table public.job_runs is
   'Each time an overnight job ran for a kennel (M46), whether it worked, and how much it did. Settings shows the latest. Written only by run_nightly_jobs(); kept 90 days.';
-comment on column public.job_runs.job is 'plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed.';
+comment on column public.job_runs.job is 'plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. fill_rota: each weekly pattern put on the rota four weeks ahead (M60).';
 comment on column public.job_runs.made is 'How many rows the job made or removed.';
 comment on column public.job_runs.problem is 'Why it failed, when it did. The other jobs and kennels still ran.';
 
@@ -186,11 +186,12 @@ declare
   v_runs integer := 0;
 begin
   for v_org in select o.id from public.organizations o order by o.id loop
-    foreach v_job in array array['plan_deliveries', 'forget_old_rows'] loop
+    foreach v_job in array array['plan_deliveries', 'forget_old_rows', 'fill_rota'] loop
       begin
         v_made := case v_job
           when 'plan_deliveries' then public.job_plan_deliveries(v_org)
           when 'forget_old_rows' then public.job_forget_old_rows(v_org)
+          when 'fill_rota' then public.fill_rota(v_org)
         end;
         insert into public.job_runs (org_id, job, ok, made) values (v_org, v_job, true, coalesce(v_made, 0));
       exception when others then

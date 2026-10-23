@@ -328,6 +328,7 @@ export const core = {
       WB272: "Choose one of the kennel's appointments.",
       WB273: "That time is not free. Pick one of the free times.",
       WB274: "The kennel already knows about a problem with that delivery.",
+      WB275: "A usual week is not changed. Take the day away and add the new one.",
     },
   },
   labels: {
@@ -393,6 +394,7 @@ export const core = {
     newBooking: "New booking",
     done: {
       checked_in: "Checked in.",
+      clockedOut: "Clocked out at the end of the shift, with a note.",
       checked_out: "Checked out. The kennel is free for the next pet.",
       extended: "Stay extended to today.",
       cleaned: "Cleaned. The kennel is ready for the next pet.",

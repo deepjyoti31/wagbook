@@ -8,7 +8,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { workers } from "@/lib/team";
-import { addShift, addUsualShifts, changeShift, putOnRota, saveOnSite, setShiftActive, takeOffRota } from "./actions";
+import { addPattern, addShift, addUsualShifts, changeShift, putOnRota, removePattern, saveOnSite, setShiftActive, takeOffRota } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.rota.title);
 
@@ -48,13 +48,19 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
   const monday = weekStart(isISODate(query.week) ? query.week : today);
   const days = weekDays(monday);
   const supabase = await createClient();
-  const [shiftsRes, rotaRes, names, people] = await Promise.all([
+  // Each usual week fills the rota four weeks ahead (M60), here as overnight.
+  if (canManage) await supabase.rpc("fill_rota", { p_org: org.id });
+  const [shiftsRes, rotaRes, names, people, patternsRes] = await Promise.all([
     supabase.from("shifts").select("id, name, starts_at, ends_at, is_active").eq("org_id", org.id).order("sort_order").order("starts_at"),
     supabase.from("rota").select("id, shift_id, user_id, work_date").eq("org_id", org.id).gte("work_date", monday).lte("work_date", days[6]).order("created_at"),
     supabase.from("memberships").select("user_id, display_name").eq("org_id", org.id),
     workers(supabase, org.id),
+    supabase.from("rota_patterns").select("id, user_id, shift_id, weekday").eq("org_id", org.id).order("weekday"),
   ]);
-  if (shiftsRes.error || rotaRes.error) throw new Error("Could not load the rota.");
+  if (shiftsRes.error || rotaRes.error || patternsRes.error) throw new Error("Could not load the rota.");
+  const patterns = patternsRes.data;
+  // Weekday names, Monday (1) to Sunday (7), from this week's days.
+  const weekdayName = (n: number) => new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(new Date(`${days[n - 1]}T00:00:00Z`));
   const shifts = shiftsRes.data;
   const rota = rotaRes.data;
   const nameOf = new Map((names.data ?? []).map((n) => [n.user_id, n.display_name]));
@@ -82,6 +88,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
         </Link>
       </nav>
       {query.done === "shifts" ? <Notice tone="ok">{w.shifts.addedUsual}</Notice> : null}
+      {query.done === "pattern" ? <Notice tone="ok">{w.pattern.removed}</Notice> : null}
       {onSite.length > 0 ? <p className="mb-4 text-slate">{fill(w.livesOnSite, { names: onSite.map((p) => p.display_name).join(", ") })}</p> : null}
       {canManage ? null : <Notice tone="info">{w.viewOnly}</Notice>}
 
@@ -167,6 +174,86 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
             </Field>
             <SubmitButton pendingLabel={m.common.saving}>{w.put.button}</SubmitButton>
           </ActionForm>
+        </Section>
+      ) : null}
+
+      {active.length > 0 && people.length > 0 ? (
+        <Section title={w.pattern.title}>
+          <p className="mb-3 text-slate">{w.pattern.about}</p>
+          {patterns.length === 0 ? (
+            <Empty>{w.pattern.none}</Empty>
+          ) : (
+            <ul className="mb-4 space-y-2">
+              {people
+                .filter((p) => patterns.some((x) => x.user_id === p.user_id))
+                .map((p) => (
+                  <li key={p.user_id} className="rounded-xl border border-rule bg-paper px-4 py-3">
+                    <p className="mb-1 font-bold">{p.display_name}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {patterns
+                        .filter((x) => x.user_id === p.user_id)
+                        .map((x) => {
+                          const label = fill(w.pattern.line, { day: weekdayName(x.weekday), shift: shifts.find((s) => s.id === x.shift_id)?.name ?? "" });
+                          return canManage ? (
+                            <ActionForm key={x.id} action={removePattern} className="contents">
+                              <input type="hidden" name="patternId" value={x.id} />
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-ground pl-3">
+                                <span>{label}</span>
+                                <SubmitButton variant="quiet" pendingLabel={m.common.removing}>
+                                  <span aria-hidden="true">{w.takeOff}</span>
+                                  <span className="sr-only">{fill(w.pattern.removeLabel, { name: p.display_name, what: label })}</span>
+                                </SubmitButton>
+                              </span>
+                            </ActionForm>
+                          ) : (
+                            <Badge key={x.id}>{label}</Badge>
+                          );
+                        })}
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          )}
+          {canManage ? (
+            <ActionForm action={addPattern} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+              <Field label={w.put.person}>
+                <Select name="userId" required defaultValue="">
+                  <option value="" disabled>
+                    {w.choose}
+                  </option>
+                  {people.map((p) => (
+                    <option key={p.user_id} value={p.user_id}>
+                      {p.display_name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={w.put.shift}>
+                <Select name="shiftId" required defaultValue="">
+                  <option value="" disabled>
+                    {w.choose}
+                  </option>
+                  {active.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}, {hours(s)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <fieldset className="sm:col-span-2">
+                <legend className="mb-1 font-semibold">{w.pattern.days}</legend>
+                <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <label key={n} className="flex min-h-12 items-center gap-3">
+                      <input type="checkbox" name="weekday" value={n} className="size-5" />
+                      <span>{weekdayName(n)}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <SubmitButton pendingLabel={m.common.saving}>{w.pattern.button}</SubmitButton>
+            </ActionForm>
+          ) : null}
         </Section>
       ) : null}
 

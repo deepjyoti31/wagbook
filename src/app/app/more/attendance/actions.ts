@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { clockTime, localClock, stretchFrom } from "@/lib/core";
@@ -96,4 +97,33 @@ export async function changeStretch(_state: FormState, form: FormData): Promise<
   if (data.length === 0) return { error: e.notFound };
   revalidatePath("/app", "layout");
   return { ok: t.m.attendance.byHand.saved };
+}
+
+/**
+ * Close a stretch someone forgot to clock out of (M60): at the end of the
+ * shift it began in, with a note. Owners and managers; the database lists only
+ * the stretches open well after their shift (forgotten_clock_outs) and checks
+ * who writes a time by hand.
+ */
+export async function closeAtShiftEnd(_state: FormState, form: FormData): Promise<FormState> {
+  const { org, canManage } = await requireOrg();
+  const t = await getAppI18n();
+  const w = t.m.forgotClockOut;
+  if (!canManage) return { error: t.m.rota.errors.managersOnly };
+  const id = Id.safeParse(form.get("attendanceId"));
+  if (!id.success) return { error: w.gone };
+  const supabase = await createClient();
+  const open = await supabase.rpc("forgotten_clock_outs", { p_org: org.id });
+  if (open.error) return { error: friendlyError(open.error, t) };
+  const stretch = open.data.find((s) => s.attendance_id === id.data);
+  if (!stretch) return { error: w.gone };
+  const { error } = await supabase
+    .from("attendance")
+    .update({ clocked_out_at: stretch.shift_ended_at, note: fill(w.note, { shift: stretch.shift_name }) })
+    .eq("org_id", org.id)
+    .eq("id", id.data);
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  // The row goes once it is closed, so Today says so instead.
+  redirect("/app?done=clockedOut");
 }

@@ -95,7 +95,7 @@ export const runningArea = {
     title: "Problems and overnight jobs",
     intro: "Whether the jobs that run each night worked, and errors Wagbook met while your team was using it. If something here keeps happening, tell whoever looks after your Wagbook.",
     jobsTitle: "Overnight jobs",
-    jobNames: { plan_deliveries: "Make food deliveries ahead", forget_old_rows: "Clear problems older than 90 days" },
+    jobNames: { plan_deliveries: "Make food deliveries ahead", forget_old_rows: "Clear problems older than 90 days", fill_rota: "Fill the rota from each usual week" },
     jobOk: "Worked {when}",
     jobMade: { one: "made or cleared 1", other: "made or cleared {n}" },
     jobFailed: "Did not work {when}: {problem}",

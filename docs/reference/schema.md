@@ -6,12 +6,12 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 18. Tables: 78. Views: 7. Functions: 173.
+Migrations applied: 18. Tables: 79. Views: 7. Functions: 177.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
+- Tables: [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [rota_patterns](#rota_patterns), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
 - Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stay_supply_left](#stay_supply_left), [stock_levels](#stock_levels)
 - [Functions](#functions)
 
@@ -2118,7 +2118,7 @@ Each time an overnight job ran for a kennel (M46), whether it worked, and how mu
 | --- | --- | --- | --- | --- |
 | `id` | `uuid` | yes | `gen_random_uuid()` |  |
 | `org_id` | `uuid` | yes |  |  |
-| `job` | `text` | yes |  | plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. |
+| `job` | `text` | yes |  | plan_deliveries: food deliveries made ahead for every subscription. forget_old_rows: problems and job runs older than 90 days removed. fill_rota: each weekly pattern put on the rota four weeks ahead (M60). |
 | `ran_at` | `timestamp with time zone` | yes | `now()` |  |
 | `ok` | `boolean` | yes |  |  |
 | `made` | `integer` | yes | `0` | How many rows the job made or removed. |
@@ -2128,7 +2128,7 @@ Each time an overnight job ran for a kennel (M46), whether it worked, and how mu
 
 - Primary key `job_runs_pkey`: `PRIMARY KEY (id)`
 - Foreign key `job_runs_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
-- Check `job_runs_job_check`: `CHECK ((job = ANY (ARRAY['plan_deliveries'::text, 'forget_old_rows'::text])))`
+- Check `job_runs_job_check`: `CHECK ((job = ANY (ARRAY['plan_deliveries'::text, 'forget_old_rows'::text, 'fill_rota'::text])))`
 - Check `job_runs_made_check`: `CHECK ((made >= 0))`
 - Check `job_runs_problem_check`: `CHECK (((problem IS NULL) OR (char_length(problem) <= 300)))`
 - Check `job_runs_problem_when_failed`: `CHECK ((ok = (problem IS NULL)))`
@@ -3348,6 +3348,7 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 | `work_date` | `date` | yes |  | The day the shift starts, kennel date. A night shift ends the next morning. |
 | `starts_at` | `timestamp without time zone` |  |  | When it starts, kennel clock, copied from the shift. Moves with the shift's hours from today on. |
 | `ends_at` | `timestamp without time zone` |  |  | When it ends, kennel clock, the next day for a night shift. |
+| `pattern_id` | `uuid` |  |  | The weekly pattern that put it there (M60), or empty when it was put there by hand. Its days still to come go when the pattern goes. |
 | `created_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -3359,6 +3360,7 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 - Foreign key `rota_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `rota_org_id_shift_id_fkey`: `FOREIGN KEY (org_id, shift_id) REFERENCES shifts(org_id, id) ON DELETE CASCADE`
 - Foreign key `rota_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Foreign key `rota_pattern_fkey`: `FOREIGN KEY (org_id, pattern_id) REFERENCES rota_patterns(org_id, id) ON DELETE SET NULL (pattern_id)`
 - Exclusion `rota_one_shift_at_a_time`: `EXCLUDE USING gist (org_id WITH =, user_id WITH =, tsrange(starts_at, ends_at) WITH &&)`
 - Check `rota_timed`: `CHECK (((starts_at IS NOT NULL) AND (ends_at IS NOT NULL) AND (ends_at > starts_at)))`
 
@@ -3380,6 +3382,50 @@ Who works which shift on which day (M43). A person is never on two shifts that o
 - `rota_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `rota_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `rota_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### rota_patterns
+
+A person's usual week (M60): one shift on one weekday, which fill_rota() puts on the rota four weeks ahead, week after week, until the pattern is taken away. A week can still be changed by hand: a day taken off is not put back, because each pattern remembers how far it has filled. Owners and managers plan it; everyone reads it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `user_id` | `uuid` | yes |  |  |
+| `shift_id` | `uuid` | yes |  |  |
+| `weekday` | `smallint` | yes |  | The day of the week: 1 is Monday, 7 is Sunday. |
+| `starts_on` | `date` |  |  | The first day it fills, kennel date: the day it was made. Set by the database. |
+| `filled_until` | `date` |  |  | The last day fill_rota() has put it on the rota, kennel date. Empty: not filled yet. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `rota_patterns_pkey`: `PRIMARY KEY (id)`
+- Unique `rota_patterns_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `rota_patterns_org_id_user_id_shift_id_weekday_key`: `UNIQUE (org_id, user_id, shift_id, weekday)`
+- Foreign key `rota_patterns_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `rota_patterns_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `rota_patterns_org_id_shift_id_fkey`: `FOREIGN KEY (org_id, shift_id) REFERENCES shifts(org_id, id) ON DELETE CASCADE`
+- Foreign key `rota_patterns_org_id_user_id_fkey`: `FOREIGN KEY (org_id, user_id) REFERENCES memberships(org_id, user_id) ON DELETE CASCADE`
+- Check `rota_patterns_dated`: `CHECK ((starts_on IS NOT NULL))`
+- Check `rota_patterns_weekday_check`: `CHECK (((weekday >= 1) AND (weekday <= 7)))`
+
+**Triggers**
+
+- `rota_patterns_check` (before insert or update) runs `rota_patterns_check()`
+- `rota_patterns_clear` (before delete) runs `rota_patterns_clear()`
+- `rota_patterns_forbid_org_change` (before update) runs `forbid_org_change()`
+- `rota_patterns_stamp_actor` (before insert or update) runs `stamp_actor()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `rota_patterns_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_delete_by_managers` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `rota_patterns_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `rota_patterns_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### service_areas
 
@@ -4801,6 +4847,18 @@ export_client(p_client uuid) returns jsonb
 
 Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, appointments with their add-ons and training courses, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
+### fill_rota
+
+```
+fill_rota(p_org uuid, p_until date) returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Puts each weekly pattern (M60) on the rota up to p_until (four weeks from today unless given, at most 62 days): every matching weekday after the last day it filled, skipping granted leave and days the person is already on a shift at that time. A day is filled once, so one taken off by hand stays off. Runs as the caller, an owner or manager, and overnight. Returns how many rota days it made.
+
 ### first_delivery_day
 
 ```
@@ -4884,6 +4942,18 @@ forbid_org_change() returns trigger
 - Volatility: volatile
 
 Trigger: a row never changes organisation. Without this, a member of two organisations could make a row vanish from one by moving it to the other.
+
+### forgotten_clock_outs
+
+```
+forgotten_clock_outs(p_org uuid, p_grace_minutes integer) returns TABLE(attendance_id uuid, user_id uuid, display_name text, clocked_in_at timestamp with time zone, shift_name text, shift_ended_at timestamp with time zone)
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Stretches of attendance still open more than p_grace_minutes (two hours) after the end of the shift they began in (M60), with the shift's end as an instant: for Today, where an owner or manager closes one at the end of the shift with a note. Runs with the caller's rights.
 
 ### free_starts
 
@@ -5880,6 +5950,30 @@ rota_check() returns trigger
 - Volatility: volatile
 
 Trigger: a rota row takes its shift's hours on its day (the next morning for a night shift); never a shift off the list (WB220), a person not working here or a rider (WB221), or a day of their granted leave (WB222).
+
+### rota_patterns_check
+
+```
+rota_patterns_check() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pattern starts on the day it is made, filled from then on; its person, shift and weekday never change (WB275): take it away and add another.
+
+### rota_patterns_clear
+
+```
+rota_patterns_clear() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pattern taken away takes its rota days after today with it.
 
 ### rotation_recipe
 
