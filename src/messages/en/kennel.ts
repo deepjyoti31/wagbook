@@ -383,6 +383,23 @@ export const kennelArea = {
     noPets: "There are no pets on your record yet. Message the kennel on WhatsApp.",
     status: { requested: "Asked for", confirmed: "Booked", checked_in: "Here now" },
   },
+  // Asking for an appointment from the parent's own link (M59).
+  appointmentLink: {
+    title: "Book an appointment",
+    about: "Choose what, for which pet and the day, then one of the free times. The kennel confirms on WhatsApp. Nothing is booked until they do.",
+    service: "What",
+    serviceOption: "{name} ({minutes} minutes)",
+    pet: "Which pet",
+    day: "Day",
+    showTimes: "Show free times",
+    times: "Free times on {date}",
+    noTimes: "No free time that day. Try another day.",
+    send: "Ask for this time",
+    sent: "Sent. The kennel will confirm on WhatsApp. Nothing is booked until they do.",
+    yours: "Your appointments",
+    line: "{pet}: {service}, {date} at {time}",
+    status: { requested: "Asked for", confirmed: "Booked" },
+  },
   intakeForm: {
     title: "Tell us about your pet",
     intro: "Tell us about your pet before the stay, so we can look after them the way you do. It takes about three minutes.",

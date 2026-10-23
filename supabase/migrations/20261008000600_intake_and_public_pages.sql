@@ -630,7 +630,7 @@ comment on function public.get_public_invoice(text) is
 -- from anyone. Priced from the kennel's usual prices; staff adjust as usual.
 -- ---------------------------------------------------------------------------
 
-create function public.get_public_booking_form(p_token text)
+create function public.get_public_booking_form(p_token text, p_service uuid default null, p_day date default null)
 returns jsonb
 language sql
 stable
@@ -670,7 +670,34 @@ as $$
         and b.status in ('requested', 'confirmed', 'checked_in')
         and b.end_date >= (now() at time zone o.time_zone)::date
     ), '[]'::jsonb),
+    -- Appointments they may ask for (M59): the services, and with p_service
+    -- and p_day the free times that day, from today to 60 days ahead.
+    'appointment_services', case when o.offers_appointments then coalesce((
+      select jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name, 'kind', s.kind, 'minutes', s.minutes) order by s.kind, s.sort_order, s.name)
+      from public.appointment_services s
+      join public.appointment_places pl on pl.org_id = s.org_id and pl.id = s.place_id and pl.is_active
+      where s.org_id = o.id and s.is_active and not s.is_addon
+    ), '[]'::jsonb) end,
+    'free_times', case when o.offers_appointments and p_service is not null and p_day is not null
+                            and p_day between (now() at time zone o.time_zone)::date and (now() at time zone o.time_zone)::date + 60 then coalesce((
+      select jsonb_agg(to_char(f.t at time zone o.time_zone, 'HH24:MI') order by f.t)
+      from public.appointment_services s
+      cross join lateral public.free_starts(s.org_id, s.place_id, null, p_day, s.minutes, s.cleanup_minutes) as f(t)
+      where s.org_id = o.id and s.id = p_service and s.is_active and not s.is_addon
+    ), '[]'::jsonb) end,
+    -- Their appointments still to come, asked for or booked (day, time, status only).
+    'appointments', case when o.offers_appointments then coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'pet', p.name, 'service', s.name, 'status', a.status,
+        'date', (a.starts_at at time zone o.time_zone)::date, 'time', to_char(a.starts_at at time zone o.time_zone, 'HH24:MI'))
+        order by a.starts_at)
+      from public.appointments a
+      join public.pets p on p.org_id = a.org_id and p.id = a.pet_id
+      join public.appointment_services s on s.org_id = a.org_id and s.id = a.service_id
+      where a.org_id = c.org_id and a.client_id = c.id and a.status in ('requested', 'confirmed') and a.starts_at > now()
+    ), '[]'::jsonb) end,
     'food_cutoff_hours', o.food_cutoff_hours,
+    'problem_window_hours', o.problem_window_hours,
     -- Their food, when the kennel delivers: what they may pause, skip or add to (M32).
     'food', case when o.offers_food_delivery then coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -680,7 +707,15 @@ as $$
                  from (select d2.delivery_date, d2.status from public.deliveries d2
                        where d2.org_id = s.org_id and d2.subscription_id = s.id and d2.status <> 'cancelled'
                          and d2.delivery_date >= (now() at time zone o.time_zone)::date
-                       order by d2.delivery_date limit 6) d)
+                       order by d2.delivery_date limit 6) d),
+        -- Deliveries handed over within the kennel's window, to say one went wrong (M59).
+        'recent', (select jsonb_agg(jsonb_build_object(
+                     'id', d3.id, 'date', d3.delivery_date,
+                     'reported', exists (select 1 from public.delivery_problems dp where dp.org_id = d3.org_id and dp.delivery_id = d3.id))
+                     order by d3.delivery_date desc)
+                   from public.deliveries d3
+                   where d3.org_id = s.org_id and d3.subscription_id = s.id and d3.status = 'delivered'
+                     and d3.delivered_at > now() - make_interval(hours => o.problem_window_hours))
       ) order by p.name)
       from public.subscriptions s
       join public.pets p on p.org_id = s.org_id and p.id = s.pet_id
@@ -694,8 +729,8 @@ as $$
     and c.deleted_at is null
     and c.erased_at is null;
 $$;
-comment on function public.get_public_booking_form(text) is
-  'PUBLIC. The parent''s own booking link: the kennel''s name, WhatsApp number and usual times, the parent''s first name, their pets'' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only), and, when the kennel delivers food, their subscriptions with the next deliveries. Nothing for a hidden or erased parent.';
+comment on function public.get_public_booking_form(text, uuid, date) is
+  'PUBLIC. The parent''s own booking link: the kennel''s name, WhatsApp number and usual times, the parent''s first name, their pets'' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only); when the kennel offers appointments, the services they may ask for, their appointments still to come (day, time, status), and with p_service and p_day the free times that day (M59); and, when the kennel delivers food, their subscriptions with the next deliveries and those handed over within the problem window. Nothing for a hidden or erased parent.';
 
 create function public.submit_booking_request(p_token text, p_payload jsonb)
 returns integer
@@ -714,6 +749,11 @@ declare
   v_pets uuid[];
   v_service public.services;
   v_group uuid;
+  v_asked jsonb;
+  v_pet public.pets;
+  v_offered public.appointment_services;
+  v_day date;
+  v_at timestamptz;
 begin
   -- SECURITY DEFINER: the anonymous role has no access to any table. The
   -- secret link is the parent's key; everything they send is checked here.
@@ -726,12 +766,61 @@ begin
   if not v_org.requests_enabled then
     raise exception 'WB100: this link is not taking requests' using errcode = 'P0002';
   end if;
+  v_today := (now() at time zone v_org.time_zone)::date;
+
+  -- An appointment (M59): one pet, one service, at one of the free times
+  -- offered, from today to 60 days ahead. It is a request: it holds nothing
+  -- until staff confirm it, priced as the kennel would price it.
+  if jsonb_typeof(p_payload) = 'object' and jsonb_typeof(p_payload -> 'appointment') = 'object' then
+    if not v_org.offers_appointments then
+      raise exception 'WB100: this link is not taking requests' using errcode = 'P0002';
+    end if;
+    v_asked := p_payload -> 'appointment';
+    if octet_length(p_payload::text) > 3000 then
+      raise exception 'WB101: the request could not be read' using errcode = '22023';
+    end if;
+    select * into v_pet from public.pets p
+    where p.org_id = v_client.org_id and p.client_id = v_client.id and p.deleted_at is null and p.passed_away_on is null
+      and p.id::text = v_asked ->> 'pet_id';
+    if v_pet.id is null then
+      raise exception 'WB102: choose one or more of your pets' using errcode = '22023';
+    end if;
+    select s.* into v_offered from public.appointment_services s
+    join public.appointment_places pl on pl.org_id = s.org_id and pl.id = s.place_id and pl.is_active
+    where s.org_id = v_org.id and s.id::text = v_asked ->> 'service_id' and s.is_active and not s.is_addon;
+    if v_offered.id is null then
+      raise exception 'WB272: choose one of the kennel''s appointments' using errcode = '22023';
+    end if;
+    v_day := public.safe_date(v_asked ->> 'date');
+    if v_day is null or v_day < v_today or v_day > v_today + 60 or coalesce(v_asked ->> 'time', '') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then
+      raise exception 'WB273: that time is not free. Pick one of the free times.' using errcode = '22023';
+    end if;
+    v_at := (v_day + (v_asked ->> 'time')::time) at time zone v_org.time_zone;
+    if v_at not in (select f.t from public.free_starts(v_org.id, v_offered.place_id, v_pet.id, v_day, v_offered.minutes, v_offered.cleanup_minutes) as f(t)) then
+      raise exception 'WB273: that time is not free. Pick one of the free times.' using errcode = '22023';
+    end if;
+    if (select count(*) from public.appointments a
+        where a.org_id = v_org.id and a.client_id = v_client.id and a.source = 'parent' and a.created_at > now() - interval '1 day') >= 6 then
+      raise exception 'WB105: that is a lot of requests for one day. The kennel will be in touch.' using errcode = '54000';
+    end if;
+    perform set_config('wagbook.from_parent', 'on', true);
+    insert into public.appointments (org_id, client_id, pet_id, service_id, booking_id, status, starts_at, ends_at, notes)
+    values (v_org.id, v_client.id, v_pet.id, v_offered.id,
+            (select b.id from public.bookings b
+             where b.org_id = v_org.id and b.pet_id = v_pet.id and b.status in ('requested', 'confirmed', 'checked_in')
+               and b.start_date <= v_day and b.end_date >= v_day
+             order by b.start_date limit 1),
+            'requested', v_at, v_at + make_interval(mins => v_offered.minutes),
+            nullif(left(btrim(coalesce(v_asked ->> 'note', '')), 500), ''));
+    perform set_config('wagbook.from_parent', 'off', true);
+    return 1;
+  end if;
+
   if p_payload is null or jsonb_typeof(p_payload) <> 'object' or octet_length(p_payload::text) > 5000
      or jsonb_typeof(p_payload -> 'pet_ids') is distinct from 'array' then
     raise exception 'WB101: the request could not be read' using errcode = '22023';
   end if;
 
-  v_today := (now() at time zone v_org.time_zone)::date;
   v_kind := case p_payload ->> 'kind' when 'daycare' then 'daycare'::public.booking_kind else 'boarding'::public.booking_kind end;
   v_start := public.safe_date(p_payload ->> 'start_date');
   v_end := coalesce(public.safe_date(p_payload ->> 'end_date'), case when v_kind = 'daycare' then v_start end);
@@ -774,7 +863,7 @@ begin
 end;
 $$;
 comment on function public.submit_booking_request(text, jsonb) is
-  'PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel''s usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).';
+  'PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel''s usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105). With an appointment in the payload (M59), one pet of theirs (WB102), a service the kennel offers (WB272) at one of its free times from today to 60 days ahead (WB273, free_starts()) becomes an appointment requested from the parent, on the pet''s stay if it is staying that day, holding nothing until staff confirm it; six a day at most (WB105).';
 
 -- A new link for a parent: the old one stops working. Any member may do it.
 create function public.renew_request_link(p_client uuid)
@@ -1075,7 +1164,7 @@ comment on function public.food_order_paid(text) is
   'PUBLIC. The parent says they have paid for their order: an unpaid order becomes paid (claimed), for staff to check. Returns the order''s status.';
 
 create function public.submit_food_request(p_token text, p_payload jsonb)
-returns void
+returns text
 language plpgsql
 security definer
 set search_path = ''
@@ -1089,6 +1178,9 @@ declare
   v_until date;
   v_grams integer;
   v_today date;
+  v_delivery public.deliveries;
+  v_problem uuid := gen_random_uuid();
+  v_photo text;
 begin
   -- SECURITY DEFINER: as submit_booking_request, the parent's own link is
   -- their key. A change is a request for staff, never a change by itself.
@@ -1099,8 +1191,40 @@ begin
     raise exception 'WB100: this link is not taking requests' using errcode = 'P0002';
   end if;
   if p_payload is null or jsonb_typeof(p_payload) <> 'object' or octet_length(p_payload::text) > 3000
-     or coalesce(p_payload ->> 'kind', '') not in ('pause', 'skip', 'more') then
+     or coalesce(p_payload ->> 'kind', '') not in ('pause', 'skip', 'more', 'problem') then
     raise exception 'WB181: the order could not be read' using errcode = '22023';
+  end if;
+
+  -- A problem with a delivery (M59): one of their own subscription's, handed
+  -- over within the kennel's window (WB174, checked by delivery_problems),
+  -- told once. With a photo, the path it goes to is made here and given back;
+  -- intake_upload_allowed() lets that one file in, within the hour.
+  if p_payload ->> 'kind' = 'problem' then
+    select d.* into v_delivery from public.deliveries d
+    join public.subscriptions s on s.org_id = d.org_id and s.id = d.subscription_id
+    where d.org_id = v_client.org_id and s.client_id = v_client.id and d.id::text = p_payload ->> 'delivery_id';
+    if v_delivery.id is null then
+      raise exception 'WB186: choose one of your food subscriptions' using errcode = '22023';
+    end if;
+    if coalesce(p_payload ->> 'problem', '') not in ('damaged', 'late', 'wrong') then
+      raise exception 'WB181: the order could not be read' using errcode = '22023';
+    end if;
+    if exists (select 1 from public.delivery_problems dp where dp.org_id = v_delivery.org_id and dp.delivery_id = v_delivery.id) then
+      raise exception 'WB274: the kennel already knows about a problem with that delivery' using errcode = '23505';
+    end if;
+    if (select count(*) from public.delivery_problems dp
+        join public.deliveries d on d.org_id = dp.org_id and d.id = dp.delivery_id
+        where dp.org_id = v_org.id and d.client_id = v_client.id and dp.from_parent and dp.reported_at > now() - interval '1 day') >= 5 then
+      raise exception 'WB105: that is a lot of requests for one day. The kennel will be in touch.' using errcode = '54000';
+    end if;
+    v_photo := case when (p_payload ->> 'photo') = 'true'
+                    then v_delivery.org_id::text || '/deliveries/' || v_delivery.id::text || '/problem-' || v_problem::text || '.jpg' end;
+    perform set_config('wagbook.from_parent', 'on', true);
+    insert into public.delivery_problems (id, org_id, delivery_id, kind, note, photo_path)
+    values (v_problem, v_delivery.org_id, v_delivery.id, (p_payload ->> 'problem')::public.problem_kind,
+            nullif(left(btrim(coalesce(p_payload ->> 'note', '')), 500), ''), v_photo);
+    perform set_config('wagbook.from_parent', 'off', true);
+    return v_photo;
   end if;
   v_kind := (p_payload ->> 'kind')::public.food_order_kind;
   select * into v_sub from public.subscriptions s
@@ -1122,10 +1246,11 @@ begin
   insert into public.food_orders (org_id, kind, status, client_id, subscription_id, starts_on, until_date, grams, note)
   values (v_org.id, v_kind, 'requested', v_client.id, v_sub.id, v_from, case when v_kind = 'pause' then v_until end,
           case when v_kind = 'more' then v_grams end, nullif(left(btrim(coalesce(p_payload ->> 'note', '')), 1000), ''));
+  return null;
 end;
 $$;
 comment on function public.submit_food_request(text, jsonb) is
-  'PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105).';
+  'PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105). A problem with one of their deliveries (kind problem, M59) is written down for staff as the kennel''s own report is (delivery_problems, WB174), once per delivery (WB274), five a day at most (WB105); with a photo, returns the path the photo may be added at (intake_upload_allowed()). Returns nothing otherwise.';
 
 -- Staff confirm an order: a website order makes or matches the parent (by
 -- phone), the pet (by name, with its weight), the address, and the trial or

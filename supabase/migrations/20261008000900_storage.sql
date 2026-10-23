@@ -10,6 +10,7 @@
 --     {org_id}/expenses/{expense_id}.jpg     (owners and managers only)
 --     {org_id}/intake/{submission_id}/pet-1    (a certificate sent with an intake form)
 --     {org_id}/intake/{submission_id}/pet-1-2  (the certificate for that pet's second vaccine)
+--     {org_id}/deliveries/{delivery_id}/problem-{id}.jpg  (a photo of a delivery problem, from staff or the parent's link)
 -- The first folder decides who can see the file. Nothing is public; pages
 -- that show a photo ask for a short-lived signed link.
 -- =============================================================================
@@ -204,6 +205,11 @@ create policy pet_media_select_for_stay on storage.objects for select to anon
 -- adding: anon has no select, update or delete policy, so a file cannot be
 -- read back, replaced (the name is unique) or removed. The bucket limits size
 -- and type (10 MB; photos and PDF).
+-- The same function lets a parent add the photo of a delivery problem they
+-- told from their own link (M59), with that link's secret in the
+-- x-wagbook-link header: the one path submit_food_request() gave back, within
+-- the hour. The anonymous role can call only twelve functions, so this one
+-- does both jobs.
 -- ---------------------------------------------------------------------------
 
 create function public.intake_upload_allowed(p_name text)
@@ -215,13 +221,37 @@ set search_path = ''
 as $$
 declare
   v_token text;
+  v_link text;
   v_parts text[];
 begin
   begin
     v_token := nullif(current_setting('request.headers', true), '')::json ->> 'x-wagbook-intake';
+    v_link := nullif(current_setting('request.headers', true), '')::json ->> 'x-wagbook-link';
   exception when others then
     return false;
   end;
+
+  -- A photo of a delivery problem a parent told from their own link (M59):
+  -- the one path submit_food_request() gave back, within the hour, with the
+  -- parent's link secret.
+  if v_link is not null then
+    if char_length(v_link) <> 64 then
+      return false;
+    end if;
+    return exists (
+      select 1
+      from public.delivery_problems dp
+      join public.deliveries d on d.org_id = dp.org_id and d.id = dp.delivery_id
+      join public.clients c on c.org_id = d.org_id and c.id = d.client_id
+      where dp.photo_path = p_name
+        and dp.from_parent
+        and dp.reported_at > now() - interval '1 hour'
+        and c.request_token = v_link
+        and c.deleted_at is null and c.erased_at is null
+        and public.storage_org_id(p_name) = dp.org_id
+    );
+  end if;
+
   if v_token is null or char_length(v_token) <> 64 then
     return false;
   end if;
@@ -245,7 +275,7 @@ begin
 end;
 $$;
 comment on function public.intake_upload_allowed(text) is
-  'PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form''s pets. SECURITY DEFINER because the anonymous role can read no table.';
+  'PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form''s pets; or when it carries a parent''s own link secret (x-wagbook-link header) and the file is the photo path of a delivery problem that parent told from their link less than an hour ago (M59). SECURITY DEFINER because the anonymous role can read no table.';
 revoke all on function public.intake_upload_allowed(text) from public, anon;
 grant execute on function public.intake_upload_allowed(text) to anon;
 

@@ -26,7 +26,7 @@ async function Food() {
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
   await planAhead(supabase, org);
-  const [orders, subs, deliveries] = await Promise.all([
+  const [orders, subs, deliveries, problems] = await Promise.all([
     supabase.from("food_orders").select("id, kind, status, parent_name, pet_name, clients(full_name)").eq("org_id", org.id).in("status", ["unpaid", "paid", "requested"]).order("created_at"),
     supabase
       .from("subscriptions")
@@ -43,8 +43,15 @@ async function Food() {
       .neq("status", "cancelled")
       .order("delivery_date")
       .order("slot"),
+    // Problems told by parents or written down by staff, not dealt with yet (M59).
+    supabase
+      .from("delivery_problems")
+      .select("id, kind, from_parent, reported_at, deliveries!delivery_problems_org_id_delivery_id_fkey(delivery_date, subscription_id, pets(name))")
+      .eq("org_id", org.id)
+      .is("outcome", null)
+      .order("reported_at"),
   ]);
-  if (orders.error || subs.error || deliveries.error) throw new Error("Could not load food.");
+  if (orders.error || subs.error || deliveries.error || problems.error) throw new Error("Could not load food.");
   const paused = (s: (typeof subs.data)[number]) => s.paused_from !== null && s.paused_from <= today && (s.paused_until === null || s.paused_until >= today);
 
   return (
@@ -69,6 +76,26 @@ async function Food() {
           {f.links.kitchen}
         </Link>
       </nav>
+
+      {problems.data.length > 0 ? (
+        <Section title={f.problems} count={problems.data.length}>
+          <Ledger>
+            {problems.data.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={p.deliveries?.subscription_id ? `/app/food/subscriptions/${p.deliveries.subscription_id}` : "/app/food"}
+                  className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-3 hover:bg-ground"
+                >
+                  <span className="flex-1 font-semibold">
+                    {fill(f.problemLine, { date: formatDate(p.deliveries?.delivery_date ?? today, locale), pet: p.deliveries?.pets?.name ?? "", kind: m.problemKinds[p.kind] })}
+                  </span>
+                  {p.from_parent ? <Badge tone="attention">{m.subscription.fromParent}</Badge> : null}
+                </Link>
+              </li>
+            ))}
+          </Ledger>
+        </Section>
+      ) : null}
 
       <Section title={f.orders} count={orders.data.length}>
         {orders.data.length === 0 ? (

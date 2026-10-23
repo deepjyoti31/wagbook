@@ -339,6 +339,7 @@ create table public.appointments (
   cancelled_at timestamptz,
   done_at timestamptz,
   done_by uuid references auth.users (id) on delete set null,
+  source text not null default 'staff' check (source in ('staff', 'parent')),
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -402,6 +403,7 @@ comment on column public.appointments.notes is 'For whoever does it ("the usual 
 comment on column public.appointments.after_notes is 'What happened: for training, the session''s notes, sent to the parent.';
 comment on column public.appointments.homework is 'For training: what the parent should practise before the next session.';
 comment on column public.appointments.done_at is 'When it was marked done. Stamped by the database.';
+comment on column public.appointments.source is 'staff: booked by the kennel. parent: asked for by the parent through their own link (M59), as a request for staff to confirm.';
 
 create index appointments_org_starts_idx on public.appointments (org_id, starts_at);
 create index appointments_org_booking_idx on public.appointments (org_id, booking_id) where booking_id is not null;
@@ -466,6 +468,14 @@ begin
   end if;
   new.held_until := new.ends_at + make_interval(mins => new.cleanup_minutes);
 
+  -- Who asked for it: only the parent's own link (submit_booking_request)
+  -- writes 'parent' (M59), and it never changes.
+  if tg_op = 'INSERT' then
+    new.source := case when coalesce(current_setting('wagbook.from_parent', true), '') = 'on' then 'parent' else 'staff' end;
+  else
+    new.source := old.source;
+  end if;
+
   -- A cancelled appointment stays cancelled; done and cancelled are stamped.
   if tg_op = 'UPDATE' and old.status = 'cancelled' and new.status <> 'cancelled' then
     raise exception 'WB198: a cancelled appointment stays cancelled. Book a new one.' using errcode = '23514';
@@ -478,6 +488,20 @@ begin
     new.cancelled_at := case when new.status = 'cancelled' then now() end;
     new.done_at := case when new.status = 'done' then now() end;
     new.done_by := case when new.status = 'done' then (select auth.uid()) end;
+  end if;
+
+  -- A move (M58): only an appointment still to come changes its time or
+  -- place, and only to a time still to come. The rules below check the new
+  -- time as they check a new appointment, and the constraints hold the place,
+  -- the pet and the person. History of changes keeps the old time.
+  if tg_op = 'UPDATE' and (new.starts_at is distinct from old.starts_at or new.ends_at is distinct from old.ends_at
+                           or new.place_id is distinct from old.place_id) then
+    if old.status not in ('requested', 'confirmed') then
+      raise exception 'WB270: only an appointment still to come can be moved' using errcode = '23514';
+    end if;
+    if new.starts_at is distinct from old.starts_at and new.starts_at <= now() then
+      raise exception 'WB271: move it to a time still to come' using errcode = '23514';
+    end if;
   end if;
 
   -- The price, tax and code: from the service, unless an owner or manager
@@ -596,7 +620,7 @@ begin
 end;
 $$;
 comment on function public.appointments_check() is
-  'Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party''s people (WB197). Done needs the certificates seen (WB194), a swim''s supervisor and life jacket (WB195) and a guest''s certificates (WB196). A cancelled one stays cancelled (WB198).';
+  'Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party''s people (WB197). Done needs the certificates seen (WB194), a swim''s supervisor and life jacket (WB195) and a guest''s certificates (WB196). A cancelled one stays cancelled (WB198). Only one still to come (requested or confirmed) changes its time or place, and only to a time still to come (WB270, WB271: a move, M58). Only the parent''s own link marks one as asked for by the parent (source, M59).';
 
 create trigger appointments_check
   before insert or update on public.appointments
@@ -702,15 +726,14 @@ comment on view public.course_balances is 'Each training course with the session
 -- Free times, and booking a package's parts (M37)
 -- ---------------------------------------------------------------------------
 
--- The first free start, every 30 minutes inside a place's hours on a day,
--- where the place (with clean-up) and the pet are free, not in the past and,
--- if given, ending by p_latest_end. p_latest takes the latest such start
--- instead (a groom finished just before pick-up). Must agree with freeTimes()
--- in src/lib/core/appointments.ts.
-create function public.first_free_start(
+-- Every free start, every 30 minutes inside a place's hours on a day, where
+-- the place (with clean-up) and, if given, the pet are free, not in the past
+-- and, if given, ending by p_latest_end. Must agree with freeTimes() in
+-- src/lib/core/appointments.ts.
+create function public.free_starts(
   p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes integer, p_cleanup integer,
-  p_latest_end time default null, p_latest boolean default false)
-returns timestamptz
+  p_latest_end time default null)
+returns setof timestamptz
 language sql
 stable
 set search_path = ''
@@ -732,15 +755,30 @@ as $$
       select 1 from public.appointments a
       where a.org_id = p_org and a.place_id = p_place and a.status in ('confirmed', 'done')
         and tstzrange(a.starts_at, a.held_until, '[)') && tstzrange(x.t, x.t + make_interval(mins => p_minutes + p_cleanup), '[)'))
-    and not exists (
+    and (p_pet is null or not exists (
       select 1 from public.appointments a
       where a.org_id = p_org and a.pet_id = p_pet and a.status in ('confirmed', 'done')
-        and tstzrange(a.starts_at, a.ends_at, '[)') && tstzrange(x.t, x.t + make_interval(mins => p_minutes), '[)'))
-  order by case when p_latest then -x.g else x.g end
-  limit 1;
+        and tstzrange(a.starts_at, a.ends_at, '[)') && tstzrange(x.t, x.t + make_interval(mins => p_minutes), '[)')))
+  order by x.g;
+$$;
+comment on function public.free_starts(uuid, uuid, uuid, date, integer, integer, time) is
+  'Every start, every 30 minutes inside a place''s hours on a day, where the place, with clean-up, and the pet (when given) are free, in the future and ending by p_latest_end if given, earliest first. Must agree with freeTimes() in src/lib/core/appointments.ts.';
+
+-- The first free start (or with p_latest, the last): a groom finished just
+-- before pick-up takes the last.
+create function public.first_free_start(
+  p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes integer, p_cleanup integer,
+  p_latest_end time default null, p_latest boolean default false)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select case when p_latest then max(f.t) else min(f.t) end
+  from public.free_starts(p_org, p_place, p_pet, p_day, p_minutes, p_cleanup, p_latest_end) as f(t);
 $$;
 comment on function public.first_free_start(uuid, uuid, uuid, date, integer, integer, time, boolean) is
-  'The first (or with p_latest, the last) start every 30 minutes inside a place''s hours on a day where the place, with clean-up, and the pet are free, in the future and ending by p_latest_end if given. Empty when there is none. Must agree with freeTimes() in src/lib/core/appointments.ts.';
+  'The first (or with p_latest, the last) of free_starts(). Empty when there is none.';
 
 -- Put a package on a stay: the stay is then billed as the package, and its
 -- parts are booked in the same step: its extras, and each appointment at the

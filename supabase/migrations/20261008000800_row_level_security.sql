@@ -701,6 +701,7 @@ grant execute on function public.safe_date(text) to authenticated;
 grant execute on function public.fiscal_year_label(date, integer) to authenticated;
 -- Appointments (M34 to M37).
 grant execute on function public.appointment_price(uuid, uuid, uuid) to authenticated;
+grant execute on function public.free_starts(uuid, uuid, uuid, date, integer, integer, time) to authenticated;
 grant execute on function public.first_free_start(uuid, uuid, uuid, date, integer, integer, time, boolean) to authenticated;
 grant execute on function public.apply_package(uuid, uuid, bigint) to authenticated;
 -- Phase 3 (M38 to M42).
@@ -731,7 +732,7 @@ grant execute on function public.get_public_intake_form(text) to anon, authentic
 grant execute on function public.submit_intake(text, jsonb) to anon, authenticated;
 grant execute on function public.get_public_stay(text) to anon, authenticated;
 grant execute on function public.get_public_invoice(text) to anon, authenticated;
-grant execute on function public.get_public_booking_form(text) to anon, authenticated;
+grant execute on function public.get_public_booking_form(text, uuid, date) to anon, authenticated;
 grant execute on function public.submit_booking_request(text, jsonb) to anon, authenticated;
 -- Food (M32): the order page, saying an order was paid, and a known parent's
 -- changes to their food from their own link.

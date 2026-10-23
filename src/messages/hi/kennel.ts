@@ -383,6 +383,23 @@ export const kennelArea: typeof English = {
     noPets: "आपके रिकॉर्ड में अभी कोई पालतू नहीं है। केनेल को WhatsApp पर संदेश भेजें।",
     status: { requested: "पूछा गया", confirmed: "बुक है", checked_in: "अभी यहीं है" },
   },
+  // Asking for an appointment from the parent's own link (M59).
+  appointmentLink: {
+    title: "अपॉइंटमेंट बुक करें",
+    about: "क्या, किस पालतू के लिए और कौन सा दिन चुनें, फिर कोई खाली समय। केनल WhatsApp पर पक्का करेगा। तब तक कुछ बुक नहीं है।",
+    service: "क्या",
+    serviceOption: "{name} ({minutes} मिनट)",
+    pet: "कौन सा पालतू",
+    day: "दिन",
+    showTimes: "खाली समय दिखाएँ",
+    times: "{date} को खाली समय",
+    noTimes: "उस दिन कोई खाली समय नहीं। कोई और दिन आज़माएँ।",
+    send: "यह समय माँगें",
+    sent: "भेज दिया। केनल WhatsApp पर पक्का करेगा। तब तक कुछ बुक नहीं है।",
+    yours: "आपके अपॉइंटमेंट",
+    line: "{pet}: {service}, {date} को {time} बजे",
+    status: { requested: "माँगा गया", confirmed: "बुक है" },
+  },
   intakeForm: {
     title: "अपने पालतू के बारे में बताएं",
     intro: "ठहराव से पहले अपने पालतू के बारे में बताएं, ताकि हम उनकी देखभाल वैसे ही कर सकें जैसे आप करते हैं। इसमें करीब तीन मिनट लगते हैं।",

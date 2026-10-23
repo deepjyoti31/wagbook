@@ -9,6 +9,7 @@ import { addDays, billPeriod, deliveryCutoff, formatDate, formatKg, todayIn } fr
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { PROBLEM_KINDS, requestTime, weekdayList, WEEKDAYS } from "@/lib/kitchen";
+import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { cancelDelivery, changeSubscription, makeFoodBill, reportProblem, resolveProblem } from "../../actions";
 
@@ -45,7 +46,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
   const [deliveries, addresses, bills, recipes] = await Promise.all([
     supabase
       .from("deliveries")
-      .select("id, delivery_date, slot, status, covers_days, packs, grams, recipe_id, cancel_reason, delivered_at, delivery_problems!delivery_problems_org_id_delivery_id_fkey(id, kind, note, outcome, reported_at)")
+      .select("id, delivery_date, slot, status, covers_days, packs, grams, recipe_id, cancel_reason, delivered_at, delivery_problems!delivery_problems_org_id_delivery_id_fkey(id, kind, note, outcome, reported_at, from_parent, photo_path)")
       .eq("org_id", org.id)
       .eq("subscription_id", id)
       .gte("delivery_date", addDays(today, -14))
@@ -66,6 +67,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
   const billed = new Set(bills.data.map((b) => b.period_start));
   const delivered = deliveries.data.filter((d) => d.status === "delivered" && d.delivered_at && now - new Date(d.delivered_at).getTime() < org.problem_window_hours * 3_600_000);
   const problems = deliveries.data.flatMap((d) => d.delivery_problems.map((p) => ({ ...p, delivery: d })));
+  const problemPhotos = await signedUrls(supabase, problems.map((p) => p.photo_path));
   const pausedNow = s.paused_from !== null && (s.paused_until === null || s.paused_until >= today);
 
   return (
@@ -180,7 +182,18 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                 <p className="font-semibold">
                   {formatDate(p.delivery.delivery_date, locale)}: {m.problemKinds[p.kind]}
                 </p>
+                {p.from_parent ? <Badge tone="attention">{w.fromParent}</Badge> : null}
                 {p.note ? <p className="text-slate">{p.note}</p> : null}
+                {p.photo_path ? (
+                  problemPhotos.get(p.photo_path) ? (
+                    <a href={problemPhotos.get(p.photo_path)} target="_blank" rel="noreferrer" className="mt-2 block w-40">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link, not an optimisable image */}
+                      <img src={problemPhotos.get(p.photo_path)} alt={w.problemPhoto} className="aspect-square w-40 rounded-lg object-cover" />
+                    </a>
+                  ) : (
+                    <p className="text-sm text-slate">{w.photoMissing}</p>
+                  )
+                ) : null}
                 {p.outcome ? (
                   <Badge tone="good">{fill(w.closed, { outcome: w.outcomes[p.outcome] })}</Badge>
                 ) : (

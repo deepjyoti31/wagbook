@@ -323,6 +323,11 @@ export const core = {
       WB256: "A vet visit is written on its day or after.",
       WB260: "A stay report is for a pet in the kennel or gone home.",
       WB261: "Pick the report's photos from this stay's updates to the parent.",
+      WB270: "Only an appointment still to come can be moved.",
+      WB271: "Move it to a time still to come.",
+      WB272: "Choose one of the kennel's appointments.",
+      WB273: "That time is not free. Pick one of the free times.",
+      WB274: "The kennel already knows about a problem with that delivery.",
     },
   },
   labels: {

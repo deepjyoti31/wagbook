@@ -97,7 +97,7 @@ export async function bookAppointment(_state: FormState, form: FormData): Promis
 const STATUS_INTENTS = ["confirmed", "done", "no_show", "cancelled"] as const;
 
 /** Confirm, mark done (with the certificates, and a swim's life jacket and supervisor), did not come, or cancel with a reason. */
-export async function moveAppointment(_state: FormState, form: FormData): Promise<FormState> {
+export async function setAppointmentStatus(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
   const t = await getAppI18n();
   const e = t.m.appointment.errors;
@@ -124,6 +124,47 @@ export async function moveAppointment(_state: FormState, form: FormData): Promis
   if (data.length === 0) return { error: e.notFound };
   revalidatePath("/app", "layout");
   redirect(`/app/appointments/${id.data}?done=${to.data}`);
+}
+
+/**
+ * Move an appointment (M58): a new day and time from the free times, and the
+ * place and person if they change. It keeps its length, add-ons and bill. The
+ * database checks the new time as it checks a new one (WB270, WB271 and the
+ * rest), and History of changes keeps the old time.
+ */
+export async function moveAppointment(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const e = t.m.newAppointment.errors;
+  const id = Id.safeParse(form.get("appointmentId"));
+  if (!id.success) return { error: t.m.appointment.errors.notFound };
+  const day = text(form, "date");
+  if (!day || !isISODate(day)) return { error: e.date };
+  const time = Clock.safeParse(text(form, "time"));
+  if (!time.success) return { error: e.time };
+  const place = Id.safeParse(form.get("placeId"));
+  if (!place.success) return { error: t.m.moveAppointment.errors.place };
+  const staffText = text(form, "staffId");
+  const staff = staffText ? Id.safeParse(staffText) : null;
+  if (staff && !staff.success) return { error: e.person };
+  const supabase = await createClient();
+  const appt = await supabase.from("appointments").select("starts_at, ends_at").eq("org_id", org.id).eq("id", id.data).maybeSingle();
+  if (!appt.data) return { error: t.m.appointment.errors.notFound };
+  const length = new Date(appt.data.ends_at).getTime() - new Date(appt.data.starts_at).getTime();
+  const starts = zonedInstant(day, time.data, org.time_zone);
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      starts_at: starts.toISOString(),
+      ends_at: new Date(starts.getTime() + length).toISOString(),
+      place_id: place.data,
+      staff_id: staff ? staff.data : null,
+    })
+    .eq("org_id", org.id)
+    .eq("id", id.data);
+  if (error) return { error: friendlyError(error, t) };
+  revalidatePath("/app", "layout");
+  redirect(`/app/appointments/${id.data}?done=moved`);
 }
 
 /** Who does it. */

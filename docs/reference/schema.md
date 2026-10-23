@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 18. Tables: 78. Views: 7. Functions: 172.
+Migrations applied: 18. Tables: 78. Views: 7. Functions: 173.
 
 ## Contents
 
@@ -327,6 +327,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 | `cancelled_at` | `timestamp with time zone` |  |  |  |
 | `done_at` | `timestamp with time zone` |  |  | When it was marked done. Stamped by the database. |
 | `done_by` | `uuid` |  |  |  |
+| `source` | `text` | yes | `'staff'::text` | staff: booked by the kennel. parent: asked for by the parent through their own link (M59), as a request for staff to confirm. |
 | `created_by` | `uuid` |  | `auth.uid()` |  |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -365,6 +366,7 @@ One pet's appointment: a service in a place, with a person, at a time. A pet sta
 - Check `appointments_place_named`: `CHECK ((place_id IS NOT NULL))`
 - Check `appointments_price_minor_check`: `CHECK (((price_minor IS NULL) OR (price_minor >= 0)))`
 - Check `appointments_sac_code_check`: `CHECK (((sac_code IS NULL) OR (sac_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `appointments_source_check`: `CHECK ((source = ANY (ARRAY['staff'::text, 'parent'::text])))`
 - Check `appointments_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
 - Check `appointments_times_in_order`: `CHECK (((ends_at > starts_at) AND ((ends_at - starts_at) <= '12:00:00'::interval)))`
 
@@ -1400,6 +1402,7 @@ A parent said a delivery was damaged, late or wrong, within problem_window_hours
 | `replacement_id` | `uuid` |  |  | The delivery made again, when it was replaced. |
 | `resolved_at` | `timestamp with time zone` |  |  |  |
 | `resolved_by` | `uuid` |  |  |  |
+| `from_parent` | `boolean` | yes | `false` | Told by the parent from their own link (M59), rather than written down by staff. Set only by submit_food_request(). |
 
 **Constraints**
 
@@ -1416,7 +1419,7 @@ A parent said a delivery was damaged, late or wrong, within problem_window_hours
 
 **Triggers**
 
-- `delivery_problems_check` (before insert) runs `delivery_problems_check()`
+- `delivery_problems_check` (before insert or update) runs `delivery_problems_check()`
 - `delivery_problems_forbid_org_change` (before update) runs `forbid_org_change()`
 - `delivery_problems_stamp_actor` (before insert or update) runs `stamp_actor()`
 - `delivery_problems_stamp_resolved` (before insert or update of resolved_at) runs `stamp_when_set()`
@@ -4268,7 +4271,7 @@ appointments_check() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party's people (WB197). Done needs the certificates seen (WB194), a swim's supervisor and life jacket (WB195) and a guest's certificates (WB196). A cancelled one stays cancelled (WB198).
+Trigger: an appointment takes its kind and clean-up from its service (WB190 for a service that cannot be booked) and its price, tax and code (only owners and managers give another, WB022; a course or package session is free; a quote must be priced before it holds anything, WB199). It must be in a place in service (WB191), inside its hours (WB192), on a day of its stay for a boarder (WB193), within its package (WB207) or course (WB201, WB202), and within a party's people (WB197). Done needs the certificates seen (WB194), a swim's supervisor and life jacket (WB195) and a guest's certificates (WB196). A cancelled one stays cancelled (WB198). Only one still to come (requested or confirmed) changes its time or place, and only to a time still to come (WB270, WB271: a move, M58). Only the parent's own link marks one as asked for by the parent (source, M59).
 
 ### appointments_check_health
 
@@ -4760,7 +4763,7 @@ delivery_problems_check() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: a problem is reported about a delivery that was handed over, within the kennel's problem_window_hours of it (WB174).
+Trigger: a problem is reported about a delivery that was handed over, within the kennel's problem_window_hours of it (WB174). Whether the parent told it (from_parent) is set by submit_food_request() alone and never changed.
 
 ### delivery_runs_check_rider
 
@@ -4820,7 +4823,7 @@ first_free_start(p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes int
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The first (or with p_latest, the last) start every 30 minutes inside a place's hours on a day where the place, with clean-up, and the pet are free, in the future and ending by p_latest_end if given. Empty when there is none. Must agree with freeTimes() in src/lib/core/appointments.ts.
+The first (or with p_latest, the last) of free_starts(). Empty when there is none.
 
 ### fiscal_year_label
 
@@ -4882,6 +4885,18 @@ forbid_org_change() returns trigger
 
 Trigger: a row never changes organisation. Without this, a member of two organisations could make a row vanish from one by moving it to the other.
 
+### free_starts
+
+```
+free_starts(p_org uuid, p_place uuid, p_pet uuid, p_day date, p_minutes integer, p_cleanup integer, p_latest_end time without time zone) returns SETOF timestamp with time zone
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+Every start, every 30 minutes inside a place's hours on a day, where the place, with clean-up, and the pet (when given) are free, in the future and ending by p_latest_end if given, earliest first. Must agree with freeTimes() in src/lib/core/appointments.ts.
+
 ### generate_care_tasks
 
 ```
@@ -4909,14 +4924,14 @@ What an invitation link is for (kennel name, role, name), for a signed-in person
 ### get_public_booking_form
 
 ```
-get_public_booking_form(p_token text) returns jsonb
+get_public_booking_form(p_token text, p_service uuid, p_day date) returns jsonb
 ```
 
 - Who may call: public
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only), and, when the kennel delivers food, their subscriptions with the next deliveries. Nothing for a hidden or erased parent.
+PUBLIC. The parent's own booking link: the kennel's name, WhatsApp number and usual times, the parent's first name, their pets' names, which kinds of stay can be asked for, their stays already asked for or booked (dates and status only); when the kennel offers appointments, the services they may ask for, their appointments still to come (day, time, status), and with p_service and p_day the free times that day (M59); and, when the kennel delivers food, their subscriptions with the next deliveries and those handed over within the problem window. Nothing for a hidden or erased parent.
 
 ### get_public_food_form
 
@@ -5024,7 +5039,7 @@ intake_upload_allowed(p_name text) returns boolean
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets. SECURITY DEFINER because the anonymous role can read no table.
+PUBLIC, through Storage only. True when the request carries the upload token of an intake form (x-wagbook-intake header) sent less than an hour ago and still waiting, and the file is named {org_id}/intake/{submission_id}/pet-N (or pet-N-2, for a second vaccine) for one of the form's pets; or when it carries a parent's own link secret (x-wagbook-link header) and the file is the photo path of a delivery problem that parent told from their link less than an hour ago (M59). SECURITY DEFINER because the anonymous role can read no table.
 
 ### invite_member_by_email
 
@@ -6128,7 +6143,7 @@ submit_booking_request(p_token text, p_payload jsonb) returns integer
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105).
+PUBLIC. A parent asks for a stay through their booking link: each chosen pet becomes a booking requested at the kennel's usual price, holding no kennel until staff confirm it. Refused when requests are off or the link is unknown (WB100), for a malformed request (WB101), pets not theirs (WB102), dates in the past, more than a year ahead or over 90 days long (WB103), a kind of stay with no usual price (WB104), and more than 12 requested pets in a day (WB105). With an appointment in the payload (M59), one pet of theirs (WB102), a service the kennel offers (WB272) at one of its free times from today to 60 days ahead (WB273, free_starts()) becomes an appointment requested from the parent, on the pet's stay if it is staying that day, holding nothing until staff confirm it; six a day at most (WB105).
 
 ### submit_food_order
 
@@ -6145,14 +6160,14 @@ PUBLIC. An order from the kennel's food order page: a trial, or a subscription w
 ### submit_food_request
 
 ```
-submit_food_request(p_token text, p_payload jsonb) returns void
+submit_food_request(p_token text, p_payload jsonb) returns text
 ```
 
 - Who may call: public
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105).
+PUBLIC. A known parent asks, through their own link, to pause a subscription (from a day, until a day or until they say), skip a delivery, or have more food on a day. Kept for staff to confirm. Refused when the link takes no requests (WB100), for a malformed request (WB181), a subscription not theirs (WB186), dates in the past or too far ahead (WB187), and more than ten in a day (WB105). A problem with one of their deliveries (kind problem, M59) is written down for staff as the kennel's own report is (delivery_problems, WB174), once per delivery (WB274), five a day at most (WB105); with a photo, returns the path the photo may be added at (intake_upload_allowed()). Returns nothing otherwise.
 
 ### submit_intake
 

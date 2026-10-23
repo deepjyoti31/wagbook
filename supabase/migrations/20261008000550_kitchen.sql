@@ -1588,6 +1588,7 @@ create table public.delivery_problems (
   replacement_id uuid,
   resolved_at timestamptz,
   resolved_by uuid references auth.users (id) on delete set null,
+  from_parent boolean not null default false,
   unique (org_id, id),
   foreign key (org_id, delivery_id) references public.deliveries (org_id, id) on delete cascade,
   foreign key (org_id, replacement_id) references public.deliveries (org_id, id) on delete set null (replacement_id),
@@ -1599,6 +1600,7 @@ comment on table public.delivery_problems is
 comment on column public.delivery_problems.photo_path is 'The parent''s photo, under {org_id}/deliveries/{delivery_id}/.';
 comment on column public.delivery_problems.outcome is 'What was done about it. Empty: not dealt with yet.';
 comment on column public.delivery_problems.replacement_id is 'The delivery made again, when it was replaced.';
+comment on column public.delivery_problems.from_parent is 'Told by the parent from their own link (M59), rather than written down by staff. Set only by submit_food_request().';
 
 create trigger delivery_problems_stamp_actor
   before insert or update on public.delivery_problems
@@ -1617,6 +1619,12 @@ declare
   v_delivery public.deliveries;
   v_hours smallint;
 begin
+  -- Only the parent's own link (submit_food_request) says a parent told it.
+  if tg_op = 'UPDATE' then
+    new.from_parent := old.from_parent;
+    return new;
+  end if;
+  new.from_parent := coalesce(current_setting('wagbook.from_parent', true), '') = 'on';
   select * into v_delivery from public.deliveries d where d.org_id = new.org_id and d.id = new.delivery_id;
   select o.problem_window_hours into v_hours from public.organizations o where o.id = new.org_id;
   new.reported_at := now();
@@ -1628,8 +1636,8 @@ begin
 end;
 $$;
 comment on function public.delivery_problems_check() is
-  'Trigger: a problem is reported about a delivery that was handed over, within the kennel''s problem_window_hours of it (WB174).';
+  'Trigger: a problem is reported about a delivery that was handed over, within the kennel''s problem_window_hours of it (WB174). Whether the parent told it (from_parent) is set by submit_food_request() alone and never changed.';
 
 create trigger delivery_problems_check
-  before insert on public.delivery_problems
+  before insert or update on public.delivery_problems
   for each row execute function public.delivery_problems_check();

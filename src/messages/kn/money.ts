@@ -340,6 +340,7 @@ export const moneyArea: typeof English = {
         incidents: "ಘಟನೆ",
         organizations: "ಕೆನೆಲ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
         memberships: "ವ್ಯಕ್ತಿ",
+        appointments: "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್",
       },
       added: "{what} ಸೇರಿಸಲಾಗಿದೆ",
       changed: "{what} ಬದಲಾಗಿದೆ",

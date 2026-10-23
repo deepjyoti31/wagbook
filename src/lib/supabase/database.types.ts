@@ -316,6 +316,7 @@ export type Database = {
           cancelled_at: string | null;
           done_at: string | null;
           done_by: string | null;
+          source: string;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -354,6 +355,7 @@ export type Database = {
           cancelled_at?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          source?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -392,6 +394,7 @@ export type Database = {
           cancelled_at?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          source?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1860,6 +1863,7 @@ export type Database = {
           replacement_id: string | null;
           resolved_at: string | null;
           resolved_by: string | null;
+          from_parent: boolean;
         };
         Insert: {
           id?: string;
@@ -1874,6 +1878,7 @@ export type Database = {
           replacement_id?: string | null;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          from_parent?: boolean;
         };
         Update: {
           id?: string;
@@ -1888,6 +1893,7 @@ export type Database = {
           replacement_id?: string | null;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          from_parent?: boolean;
         };
         Relationships: [
           {
@@ -5598,6 +5604,10 @@ export type Database = {
         Args: { p_token: string };
         Returns: string;
       };
+      free_starts: {
+        Args: { p_org: string; p_place: string; p_pet: string; p_day: string; p_minutes: number; p_cleanup: number; p_latest_end?: string };
+        Returns: string[];
+      };
       generate_care_tasks: {
         Args: { p_org: string; p_date: string };
         Returns: number;
@@ -5607,7 +5617,7 @@ export type Database = {
         Returns: { org_name: string; role: Database["public"]["Enums"]["member_role"]; display_name: string; usable: boolean; already_member: boolean }[];
       };
       get_public_booking_form: {
-        Args: { p_token: string };
+        Args: { p_token: string; p_service?: string; p_day?: string };
         Returns: Json;
       };
       get_public_food_form: {
@@ -5868,7 +5878,7 @@ export type Database = {
       };
       submit_food_request: {
         Args: { p_token: string; p_payload: Json };
-        Returns: undefined;
+        Returns: string;
       };
       submit_intake: {
         Args: { p_slug: string; p_payload: Json };

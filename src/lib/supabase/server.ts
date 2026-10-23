@@ -40,12 +40,15 @@ export async function createClient() {
  * stay_media_visible() lets that one stay's shared photos be read.
  * With `intakeToken`, the secret of an intake form just sent goes in the
  * x-wagbook-intake header, and intake_upload_allowed() lets its certificates
- * be added.
+ * be added. With `linkToken`, a parent's own link secret goes in the
+ * x-wagbook-link header, and intake_upload_allowed() lets the photo of a
+ * delivery problem they just told be added (M59).
  */
-export function createAnonClient(opts: { stayToken?: string; intakeToken?: string } = {}) {
+export function createAnonClient(opts: { stayToken?: string; intakeToken?: string; linkToken?: string } = {}) {
   const headers: Record<string, string> = {};
   if (opts.stayToken) headers["x-wagbook-stay"] = opts.stayToken;
   if (opts.intakeToken) headers["x-wagbook-intake"] = opts.intakeToken;
+  if (opts.linkToken) headers["x-wagbook-link"] = opts.linkToken;
   return createPlainClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: Object.keys(headers).length > 0 ? { headers } : undefined,
