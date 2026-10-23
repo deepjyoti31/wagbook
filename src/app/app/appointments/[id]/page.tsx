@@ -46,7 +46,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
     supabase.from("appointment_services").select("id, name, price_minor, pricing").eq("org_id", org.id).eq("is_addon", true).eq("is_active", true).order("name"),
     workingPeople(supabase, org.id),
     supabase.from("invoice_balances").select("invoice_id, status, number, total_minor, due_minor").eq("org_id", org.id).eq("appointment_id", a.id).neq("status", "void").maybeSingle(),
-    a.kind === "party" ? supabase.from("pets").select("id, name, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).neq("id", a.pet_id).order("name").limit(500) : Promise.resolve({ data: [], error: null }),
+    a.kind === "party" ? supabase.from("pets").select("id, name, clients(full_name)").eq("org_id", org.id).is("deleted_at", null).is("passed_away_on", null).neq("id", a.pet_id).order("name").limit(500) : Promise.resolve({ data: [], error: null }),
     a.kind === "party" && org.offers_kitchen
       ? supabase.from("food_products").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "item").eq("is_active", true).order("name")
       : Promise.resolve({ data: [], error: null }),

@@ -506,7 +506,29 @@ as $$
         where ct.booking_id = b.id
         group by ct.task_date, ct.kind
       ) t
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    -- The stay report (M53), once the pet has gone home: what staff added, and
+    -- the records it is worked out from (stayReport() in src/lib/core).
+    'report', case when b.status = 'checked_out' then jsonb_build_object(
+      'words', (select r.words from public.stay_reports r where r.booking_id = b.id),
+      'photos', coalesce((select to_jsonb(r.photo_paths) from public.stay_reports r where r.booking_id = b.id), '[]'::jsonb),
+      'tasks', coalesce((
+        select jsonb_agg(jsonb_build_object('kind', ct.kind, 'label', ct.label, 'status', ct.status) order by ct.task_date, ct.due_time)
+        from public.care_tasks ct
+        where ct.booking_id = b.id and ct.kind in ('meal', 'medication')
+      ), '[]'::jsonb),
+      'play', (select count(*) from public.play_sessions ps where ps.booking_id = b.id and ps.status = 'done'),
+      'weights', coalesce((
+        select jsonb_agg(jsonb_build_object('on', w.weighed_on, 'grams', w.weight_g) order by w.weighed_on, w.created_at)
+        from public.pet_weights w
+        where w.org_id = b.org_id and w.pet_id = b.pet_id and w.weighed_on between b.start_date - 30 and b.end_date
+      ), '[]'::jsonb),
+      'incidents', coalesce((
+        select jsonb_agg(jsonb_build_object('on', (i.occurred_at at time zone o.time_zone)::date, 'category', i.category) order by i.occurred_at)
+        from public.incidents i
+        where i.booking_id = b.id and i.parent_notified_at is not null
+      ), '[]'::jsonb)
+    ) end
   )
   from public.bookings b
   join public.organizations o on o.id = b.org_id
@@ -519,7 +541,7 @@ as $$
     and (b.status <> 'checked_out' or b.checked_out_at > now() - interval '30 days');
 $$;
 comment on function public.get_public_stay(text) is
-  'PUBLIC. The parent''s stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, and a count of care done. No notes, prices, medical details or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).';
+  'PUBLIC. The parent''s stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, a count of care done, and once the pet has gone home the stay report (M53): the kennel''s words and picked photos, meals and medicines by label and whether done, play sessions done, weighings around the stay, and the kinds of incident the parent was told of. No notes, prices, incident accounts or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).';
 
 create function public.get_public_invoice(p_token text)
 returns jsonb
@@ -630,7 +652,7 @@ as $$
     'pets', coalesce((
       select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name) order by p.name)
       from public.pets p
-      where p.org_id = c.org_id and p.client_id = c.id and p.deleted_at is null
+      where p.org_id = c.org_id and p.client_id = c.id and p.deleted_at is null and p.passed_away_on is null
     ), '[]'::jsonb),
     -- Kinds of stay the kennel has a usual price for, so a request can be priced.
     'kinds', coalesce((
@@ -721,7 +743,7 @@ begin
   -- Only this parent's own pets, shown in lists, at most six.
   select coalesce(array_agg(distinct p.id), '{}') into v_pets
   from public.pets p
-  where p.org_id = v_client.org_id and p.client_id = v_client.id and p.deleted_at is null
+  where p.org_id = v_client.org_id and p.client_id = v_client.id and p.deleted_at is null and p.passed_away_on is null
     and p.id::text in (select jsonb_array_elements_text(p_payload -> 'pet_ids'));
   if cardinality(v_pets) = 0 or cardinality(v_pets) > 6
      or cardinality(v_pets) <> jsonb_array_length(p_payload -> 'pet_ids') then

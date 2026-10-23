@@ -21,6 +21,9 @@ const Id = z.uuid();
  * From the booking page the form also carries the check-in checklist:
  * belongings, what the parent said at the gate, and whether the vaccination
  * certificates were seen. From Today it does not, and those are left alone.
+ *
+ * A kennel still to clean (M50) is asked about on the booking page first,
+ * unless the form says to check in anyway.
  */
 export async function checkIn(_state: FormState, form: FormData): Promise<FormState> {
   const { org } = await requireOrg();
@@ -39,6 +42,28 @@ export async function checkIn(_state: FormState, form: FormData): Promise<FormSt
   }
 
   const supabase = await createClient();
+
+  // A kennel still to clean since its last pet left (M50) is asked about
+  // first. The checklist typed so far is kept, and the booking page asks.
+  if (kennelId && form.get("anyway") !== "1") {
+    const dirty = await supabase
+      .from("kennel_cleans")
+      .select("id, kennels!inner(is_active)")
+      .eq("org_id", org.id)
+      .eq("kennel_id", kennelId.data)
+      .is("cleaned_at", null)
+      .eq("kennels.is_active", true)
+      .limit(1);
+    if (dirty.error) return { error: friendlyError(dirty.error, t) };
+    if (dirty.data.length > 0) {
+      if (Object.keys(checklist).length > 0) {
+        const kept = await supabase.from("bookings").update(checklist).eq("org_id", org.id).eq("id", bookingId.data).eq("status", "confirmed");
+        if (kept.error) return { error: friendlyError(kept.error, t) };
+      }
+      redirect(`/app/bookings/${bookingId.data}?ask=clean&kennel=${kennelId.data}`);
+    }
+  }
+
   const { data, error } = await supabase
     .from("bookings")
     .update({ status: "checked_in", ...(kennelId ? { kennel_id: kennelId.data } : {}), ...checklist })

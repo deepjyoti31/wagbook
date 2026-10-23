@@ -81,6 +81,7 @@ export async function addRoutine(_state: FormState, form: FormData): Promise<For
     label: r.label,
     details: r.details,
     due_time: r.dueTime,
+    needs_photo: form.get("needsPhoto") === "on",
   });
   if (error) return { error: friendlyError(error, t) };
 

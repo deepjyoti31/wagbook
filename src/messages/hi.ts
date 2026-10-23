@@ -16,6 +16,7 @@ import { appointmentsArea } from "./hi/appointments";
 import { rulesArea } from "./hi/rules";
 import { teamArea } from "./hi/team";
 import { runningArea } from "./hi/running";
+import { dayArea } from "./hi/day";
 
 export const hi: Messages = {
   ...core,
@@ -30,4 +31,5 @@ export const hi: Messages = {
   ...rulesArea,
   ...teamArea,
   ...runningArea,
+  ...dayArea,
 };

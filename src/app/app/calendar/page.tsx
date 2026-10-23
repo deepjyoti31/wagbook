@@ -40,7 +40,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
   const last = days[days.length - 1];
 
   const supabase = await createClient();
-  const [kennels, stays, occupancy, requests] = await Promise.all([
+  const [kennels, stays, occupancy, requests, dirty] = await Promise.all([
     supabase.from("kennels").select("id, name, is_active").eq("org_id", org.id).order("sort_order").order("name"),
     supabase
       .from("bookings")
@@ -62,6 +62,8 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
       .order("waitlisted_at", { nullsFirst: false })
       .order("start_date")
       .limit(MAX_REQUESTS + 1),
+    // Kennels a pet has left, still to clean (M50).
+    supabase.from("kennel_cleans").select("kennel_id").eq("org_id", org.id).is("cleaned_at", null),
   ]);
   if (kennels.error || stays.error || occupancy.error || requests.error) throw new Error("Could not load the calendar.");
   const requestRows = requests.data
@@ -70,6 +72,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
     .filter((r) => r.covered.some(Boolean));
 
   const held = new Set(stays.data.map((s) => s.kennel_id));
+  const toClean = new Set((dirty.data ?? []).map((c) => c.kennel_id));
   // Kennels out of service are shown only while a stay still sits in one.
   const rows = kennels.data.filter((k) => k.is_active || held.has(k.id));
   const grid = calendarGrid(
@@ -157,6 +160,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                 <tr key={k.id}>
                   <th scope="row" className="sticky left-0 z-10 border-b border-r border-rule bg-paper px-2 text-left">
                     <span className="door-tag">{k.name}</span>
+                    {k.is_active && toClean.has(k.id) ? <span className="mt-1 block text-xs font-semibold text-alert">{m.cleaning.badge}</span> : null}
                   </th>
                   {grid.byKennel.get(k.id)!.map((cell, i) => {
                     const day = days[i];

@@ -427,6 +427,8 @@ begin
             where su.org_id = p_org and su.id::text = split_part(o.name, '/', 3) and split_part(o.name, '/', 2) = 'updates'),
            (select p.name from public.deliveries d join public.pets p on p.org_id = d.org_id and p.id = d.pet_id
             where d.org_id = p_org and d.id::text = split_part(o.name, '/', 3) and split_part(o.name, '/', 2) = 'deliveries'),
+           (select p.name from public.care_tasks ct join public.pets p on p.org_id = ct.org_id and p.id = ct.pet_id
+            where ct.org_id = p_org and ct.id::text = split_part(o.name, '/', 3) and split_part(o.name, '/', 2) = 'care'),
            ''),
          o.created_at,
          coalesce((o.metadata ->> 'size')::bigint, 0)
@@ -439,7 +441,7 @@ begin
 end;
 $$;
 comment on function public.photo_month_files(uuid, date) is
-  'The photos of a month that has ended that an archive covers, with the pet each shows (by its update or delivery) and when it was taken. Owners and managers only. Runs as the caller.';
+  'The photos of a month that has ended that an archive covers, with the pet each shows (by its update, delivery or care task) and when it was taken. Owners and managers only. Runs as the caller.';
 revoke all on function public.photo_month_files(uuid, date) from public, anon;
 
 -- SECURITY DEFINER for the two below: an archive's record is written only

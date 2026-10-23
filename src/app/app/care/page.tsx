@@ -16,6 +16,10 @@ import { signedUrls } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import { PetAvatar } from "@/components/pet-avatar";
 import { TickButton } from "@/components/tick-button";
+import { PhotoInput } from "@/components/photo-input";
+import { HouseJobs } from "@/components/today-day";
+import { completeWithPhoto, shareProof } from "@/app/app/media/actions";
+import type { I18n } from "@/lib/i18n-server";
 import { markDone, skipTask, undoTask } from "./actions";
 
 export const generateMetadata = () => appTitle((m) => m.care.title);
@@ -29,7 +33,7 @@ export default function CarePage({ searchParams }: PageProps<"/app/care">) {
 }
 
 const TASK =
-  "id, kind, label, details, due_time, status, note, done_at, bookings(id, pet_id, kennels(name, sort_order), pets(name, flags, photo_path, weight_g))" as const;
+  "id, kind, label, details, due_time, status, note, done_at, needs_photo, photo_path, bookings(id, pet_id, kennels(name, sort_order), pets(name, flags, photo_path, weight_g))" as const;
 
 async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams">) {
   const params = await searchParams;
@@ -39,6 +43,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
 
   const { org } = await requireOrg();
   const t = await getAppI18n();
+  const i18n = t;
   const { m, language, locale } = t;
   const supabase = await createClient();
   const today = todayIn(org.time_zone);
@@ -62,7 +67,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
       (a.bookings?.pets?.name ?? "").localeCompare(b.bookings?.pets?.name ?? ""),
   );
   const shown = pendingOnly ? tasks.filter((t) => t.status === "pending") : tasks;
-  const photos = await signedUrls(supabase, shown.map((t) => t.bookings?.pets?.photo_path), { small: true });
+  const photos = await signedUrls(supabase, [...shown.map((t) => t.bookings?.pets?.photo_path), ...shown.map((t) => t.photo_path)], { small: true });
   const pending = tasks.filter((t) => t.status === "pending").length;
 
   // What each pet eats, on its meals, while the kennel has a kitchen (M28): the care round follows it.
@@ -137,6 +142,12 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
         ))}
       </nav>
 
+      {kind === null || kind === "cleaning" ? (
+        <Suspense fallback={null}>
+          <HouseJobs t={t} today={today} lists={["cleaning"]} />
+        </Suspense>
+      ) : null}
+
       {tasks.length === 0 ? (
         <Empty>
           <Rich
@@ -159,9 +170,10 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
               {list.map((t) => (
                 <TaskRow
                   key={t.id}
-                  m={m}
+                  i18n={i18n}
                   task={t}
                   photo={t.bookings?.pets?.photo_path ? photos.get(t.bookings.pets.photo_path) : null}
+                  proof={t.photo_path ? photos.get(t.photo_path) : null}
                   food={t.kind === "meal" && t.bookings?.pet_id ? foodOf.get(t.bookings.pet_id) : undefined}
                 />
               ))}
@@ -180,10 +192,13 @@ type Task = {
   details: string | null;
   status: Enums<"task_status">;
   note: string | null;
+  needs_photo: boolean;
+  photo_path: string | null;
   bookings: { id: string; kennels: { name: string } | null; pets: { name: string; flags: string[]; photo_path: string | null } | null } | null;
 };
 
-function TaskRow({ m, task: t, photo, food }: { m: Messages; task: Task; photo?: string | null; food?: string }) {
+function TaskRow({ i18n, task: t, photo, proof, food }: { i18n: I18n; task: Task; photo?: string | null; proof?: string | null; food?: string }) {
+  const m: Messages = i18n.m;
   const medicine = t.kind === "medication";
   const pet = t.bookings?.pets;
   return (
@@ -196,6 +211,7 @@ function TaskRow({ m, task: t, photo, food }: { m: Messages; task: Task; photo?:
             <span className="text-lg font-bold">{pet?.name ?? m.care.pet}</span>
             <span className={medicine ? "font-bold text-alert" : "font-semibold"}>{t.label}</span>
             {medicine ? <Badge tone="alert">{m.labels.careKind.medication}</Badge> : null}
+            {t.needs_photo ? <Badge>{m.proof.needsPhoto}</Badge> : null}
             {t.status === "done" ? <Badge tone="good">{m.labels.taskStatus.done}</Badge> : null}
             {t.status === "skipped" ? <Badge tone="attention">{m.labels.taskStatus.skipped}</Badge> : null}
             {(pet?.flags ?? []).map((f) => (
@@ -208,7 +224,7 @@ function TaskRow({ m, task: t, photo, food }: { m: Messages; task: Task; photo?:
           {t.details ? <p className="mt-1">{t.details}</p> : null}
           {t.note ? <p className="mt-1 text-slate">{fill(m.care.note, { note: t.note })}</p> : null}
         </div>
-        {t.status === "pending" ? (
+        {t.status === "pending" && t.needs_photo ? null : t.status === "pending" ? (
           // Saved on the phone when offline, and sent when the connection is back (D22).
           <TickButton taskId={t.id} action={markDone} words={m.offline} label={m.care.markDone} pendingLabel={m.common.saving} />
         ) : (
@@ -220,6 +236,26 @@ function TaskRow({ m, task: t, photo, food }: { m: Messages; task: Task; photo?:
           </ActionForm>
         )}
       </div>
+      {t.status === "pending" && t.needs_photo ? (
+        // A task that asks for a photo is done with it (M54); it needs the connection.
+        <ActionForm action={completeWithPhoto} className="mt-3 space-y-2">
+          <input type="hidden" name="taskId" value={t.id} />
+          <PhotoInput name="photo" label={m.proof.addPhoto} words={m.photos} />
+          <SubmitButton pendingLabel={m.proof.saving}>{m.proof.doneWithPhoto}</SubmitButton>
+        </ActionForm>
+      ) : null}
+      {proof ? (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
+          <img src={proof} alt={fill(m.proof.photoAlt, { task: t.label })} loading="lazy" className="size-20 rounded-lg object-cover" />
+          <ActionForm action={shareProof} className="contents">
+            <input type="hidden" name="taskId" value={t.id} />
+            <SubmitButton variant="quiet" pendingLabel={m.proof.sharing}>
+              {m.proof.share}
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      ) : null}
       {t.status === "pending" ? (
         <details className="mt-2">
           <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">{m.care.skip}</summary>

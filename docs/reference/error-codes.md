@@ -34,12 +34,15 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB210 to WB219 | Health at the door, credit, pick-up and drop |
 | WB220 to WB229 | The team: rota, leave and attendance |
 | WB230 to WB239 | Kennels in and out of service |
+| WB240 to WB249 | Running for real: import and the photo archive |
+| WB250 to WB259 | The day: cleaning, house jobs, a pet that passed away, costs as expenses, vet visits |
+| WB260 to WB269 | Stay reports |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
 | `WB001` | sign in first | `20261008000100_foundation.sql` |
-| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents<br>only an owner or manager can bring in parents and pets<br>only an owner or manager can download photos<br>only an owner or manager can see the space photos take | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql`<br>`20261008000750_operations.sql` |
-| `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>submission not found<br>parent not found<br>that order was not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
+| `WB002` | only an owner or manager can invite people<br>only an owner can invite another owner<br>only an owner can change an owner<br>only an owner or manager can change a parent's phone number<br>only an owner or manager can hide a pet or parent, or show one again<br>only an owner or manager can void an invoice<br>only an owner or manager can make a credit note<br>only an owner or manager can merge parents<br>only an owner or manager writes a repair's cost as an expense<br>only an owner or manager writes an expense<br>only an owner or manager can bring in parents and pets<br>only an owner or manager can download photos<br>only an owner or manager can see the space photos take | `20261008000100_foundation.sql`<br>`20261008000200_clients_and_pets.sql`<br>`20261008000300_kennels_and_bookings.sql`<br>`20261008000500_billing.sql`<br>`20261008000570_the_day.sql`<br>`20261008000750_operations.sql` |
+| `WB003` | booking not found<br>package not found<br>invoice not found<br>that item was not found<br>that subscription was not found<br>that recipe was not found<br>that stop was not found<br>that could not be found<br>that stay could not be found<br>submission not found<br>parent not found<br>that order was not found | `20261008000450_appointments.sql`<br>`20261008000500_billing.sql`<br>`20261008000550_kitchen.sql`<br>`20261008000570_the_day.sql`<br>`20261008000600_intake_and_public_pages.sql`<br>`20261008001100_privacy.sql` |
 | `WB004` | this cannot be moved to another kennel | `20261008000100_foundation.sql` |
 | `WB005` | enter the code from your authenticator app first | `20261008000100_foundation.sql` |
 | `WB006` | turn on two-step sign-in first | `20261008000100_foundation.sql` |
@@ -191,3 +194,12 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB241` | photos are archived a month at a time, for a month that has ended | `20261008000750_operations.sql` |
 | `WB242` | only an owner removes photos from Wagbook | `20261008000750_operations.sql` |
 | `WB243` | download this month's photos first, then remove them | `20261008000750_operations.sql` |
+| `WB250` | this kennel was cleaned already | `20261008000570_the_day.sql` |
+| `WB251` | only an owner or manager marks a pet as passed away | `20261008000570_the_day.sql` |
+| `WB252` | the day a pet passed away is today or a day before | `20261008000570_the_day.sql` |
+| `WB253` | a pet's passing is undone or changed only within a week of marking it | `20261008000570_the_day.sql` |
+| `WB254` | % has passed away | `20261008000570_the_day.sql` |
+| `WB255` | write what it cost first<br>the cost is nothing or more | `20261008000570_the_day.sql` |
+| `WB256` | a vet visit is written on its day or after | `20261008000570_the_day.sql` |
+| `WB260` | a stay report is for a pet in the kennel or gone home | `20261008000570_the_day.sql` |
+| `WB261` | pick the report's photos from this stay's updates to the parent | `20261008000570_the_day.sql` |

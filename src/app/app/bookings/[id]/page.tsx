@@ -31,6 +31,7 @@ import { StayAppointments } from "@/components/stay-appointments";
 import { StayCancellation } from "@/components/stay-cancellation";
 import { HealthAtTheDoor } from "@/components/stay-health";
 import { StayTrips } from "@/components/stay-trips";
+import { CleanQuestion, LastTrial, StayReportPanel, StaySupplies, SuppliesGoingHome, TrialPanel, VetVisits } from "@/components/stay-day";
 import { createClient } from "@/lib/supabase/server";
 import { addExtra, cancelBooking, cancelSeriesRest, confirmRequest, extendToToday, markNoShow, payFromPack, removeExtra, setWaitlist, switchToBoarding, updateBooking } from "../actions";
 
@@ -45,7 +46,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, packages(name), pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, is_trial, trial_outcome, trial_note, packages(name), pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -78,7 +79,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
     supabase.rpc("available_kennels", { p_org: org.id, p_kind: b.kind, p_start: b.start_date, p_end: b.end_date, p_client: parent?.id }),
     parent ? familyHolds(supabase, org.id, [parent.id], b.start_date, b.end_date) : Promise.resolve({ data: [], error: null }),
     supabase.from("vaccinations").select("id, vaccine, valid_until, certificate_path").eq("org_id", org.id).eq("pet_id", b.pet_id).order("vaccine"),
-    supabase.from("care_items").select("id, kind, label, details, due_time").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
+    supabase.from("care_items").select("id, kind, label, details, due_time, needs_photo").eq("org_id", org.id).eq("pet_id", b.pet_id).eq("is_active", true).order("due_time"),
     // A pet booked with others is billed with them, on the family's bill; a day of a series, on its month's bill (D41).
     b.series_id
       ? supabase
@@ -297,6 +298,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       ) : null}
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
+      {query.ask === "clean" && b.status === "confirmed" && typeof query.kennel === "string" && /^[0-9a-f-]{36}$/.test(query.kennel) ? (
+        <CleanQuestion t={t} bookingId={b.id} kennelId={query.kennel} />
+      ) : null}
+      {b.status === "confirmed" && pet ? <LastTrial t={t} petId={pet.id} exceptBooking={b.id} /> : null}
       {b.status === "requested" || b.status === "confirmed" ? (
         <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
       ) : null}
@@ -353,6 +358,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         </Section>
       ) : null}
 
+      <div id="extras" />
       <Section title={w.costs.title}>
         <Ledger>
           {quote.lines.map((l, i) => (
@@ -446,6 +452,20 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
       {org.offers_food_delivery && parent && b.status !== "no_show" ? (
         <StayTrips t={t} booking={{ ...b, client_id: parent.id, clients: parent }} open={b.status === "requested" || b.status === "confirmed" || b.status === "checked_in"} />
+      ) : null}
+
+      {pet && (b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") ? (
+        <StaySupplies t={t} bookingId={b.id} petId={pet.id} status={b.status} />
+      ) : null}
+
+      <TrialPanel t={t} booking={b} />
+
+      {pet && (b.status === "checked_in" || b.status === "checked_out") ? (
+        <VetVisits t={t} bookingId={b.id} petName={pet.name} parent={parent} open={b.status === "checked_in"} />
+      ) : null}
+
+      {pet && b.status === "checked_out" ? (
+        <StayReportPanel t={t} booking={b} petName={pet.name} parent={parent} stayUrl={stayUrl} />
       ) : null}
 
       {b.status === "cancelled" && !bill.data ? (
@@ -684,6 +704,12 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                         <Badge tone="alert">{m.labels.careKind.medication}</Badge>
                       </>
                     ) : null}
+                    {r.needs_photo ? (
+                      <>
+                        {" "}
+                        <Badge>{m.proof.needsPhoto}</Badge>
+                      </>
+                    ) : null}
                     {r.details ? <span className="block text-slate">{r.details}</span> : null}
                   </span>
                   <ActionForm action={stopRoutine} className="contents">
@@ -882,6 +908,7 @@ function NextStep({
   if (b.status === "checked_in") {
     return (
       <div className="flex flex-wrap gap-2">
+        <SuppliesGoingHome t={t} bookingId={b.id} />
         {overstay ? (
           <ActionForm action={extendToToday} className="w-full">
             <input type="hidden" name="bookingId" value={b.id} />

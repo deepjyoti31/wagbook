@@ -106,6 +106,31 @@ Today's **To send** list has the messages due: a vaccination card to ask for, se
 and bills still unpaid. **Send** opens WhatsApp with the message written. Send it there, come back, and answer **Did
 the message go?**: **Yes, it went** takes it off the list; **Not yet** keeps it for later.
 
+### Between guests, and around the house
+
+When the last pet leaves a kennel, Today shows it under **To clean** until someone taps **Cleaned**. If you check a
+pet into a kennel that was not cleaned, Wagbook asks first. **More, Checklists and repairs** holds your opening and
+closing checklists (Today shows how many are done), cleaning that repeats (on Care), and **Repairs**: anyone writes
+down what is broken and marks it fixed with what it cost; an owner or manager turns the cost into an expense.
+
+A routine can say **Needs a photo** (a wound cleaned, a medicine given): its task is done only with the photo, which
+stays on the pet's record unless you **Share with the parent**.
+
+### During the stay, and going home
+
+On a booking, **Brought from home** keeps the parent's own food and medicines. They count down as meals and doses are
+ticked, Today warns under **Running out** when they will not last, and the booking says what goes home. A **Vet visit**
+on a stay puts the cost on the bill and in your expenses, and the medicines on the pet's routine, in one step; **Tell
+the parent** writes the WhatsApp message. Once a pet has gone home, its **Stay report** (nights, meals, medicines, play,
+weight) is on the parent's stay page; add a few words and the best photos, then **Send the stay report**.
+
+New dogs can come for a **Trial day** first: mark the day boarding as one, and note how it went. The result shows on
+the pet's page and when it next arrives.
+
+When a pet passes away, an owner or manager marks it on the pet's page. Stays, appointments and food still to come
+are cancelled with no charge, nothing more is sent about the pet, and Today reminds you to send flowers to the family.
+It can be undone for a week if it was a mistake.
+
 ## Pets and parents
 
 <img src="guide/06-pets.jpg" alt="Pets: search by name, parent or phone" width="270">

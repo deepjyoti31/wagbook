@@ -105,6 +105,13 @@ alter table public.attendance enable row level security;
 alter table public.app_errors enable row level security;
 alter table public.job_runs enable row level security;
 alter table public.photo_archives enable row level security;
+alter table public.kennel_cleans enable row level security;
+alter table public.house_jobs enable row level security;
+alter table public.house_job_days enable row level security;
+alter table public.repairs enable row level security;
+alter table public.stay_reports enable row level security;
+alter table public.stay_supplies enable row level security;
+alter table public.vet_visits enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- organizations
@@ -176,7 +183,8 @@ begin
     'clients', 'pets', 'vaccinations', 'bookings', 'booking_items',
     'care_tasks', 'play_sessions', 'stay_updates', 'incidents',
     'pet_food', 'subscriptions', 'deliveries', 'delivery_runs', 'delivery_problems',
-    'appointments', 'appointment_items', 'pet_grooming', 'trips'
+    'appointments', 'appointment_items', 'pet_grooming', 'trips',
+    'house_job_days', 'repairs', 'stay_reports', 'stay_supplies', 'vet_visits'
   ] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
@@ -212,11 +220,12 @@ grant update (org_id, created_by, full_name, phone, alt_phone, email, address, c
 revoke insert, update on public.bookings from authenticated;
 grant insert (org_id, client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, notes, source, group_id,
-              waitlisted_at, cancel_asked_at, cancelled_by_kennel)
+              waitlisted_at, cancel_asked_at, cancelled_by_kennel, is_trial)
   on public.bookings to authenticated;
 grant update (client_id, pet_id, kind, status, start_date, end_date, kennel_id, rate_minor, alone_rate_minor,
               boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes,
-              vaccinations_checked_at, notes, group_id, waitlisted_at, package_id, package_price_minor, cancel_asked_at, cancelled_by_kennel)
+              vaccinations_checked_at, notes, group_id, waitlisted_at, package_id, package_price_minor, cancel_asked_at, cancelled_by_kennel,
+              is_trial, trial_outcome, trial_note)
   on public.bookings to authenticated;
 -- A package is put on a stay only through apply_package() (bookings_check_package).
 -- Who may change a price is decided by a trigger, not here: owners, managers
@@ -232,7 +241,7 @@ begin
   foreach t in array array['kennels', 'services', 'peak_periods', 'care_items', 'play_yards', 'day_packs', 'service_areas',
                           'suppliers', 'stock_items', 'recipes', 'food_products',
                           'appointment_places', 'appointment_services', 'appointment_service_prices', 'packages', 'package_parts',
-                          'required_vaccines', 'shifts', 'rota'] loop
+                          'required_vaccines', 'shifts', 'rota', 'house_jobs'] loop
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format(
       'create policy %I on public.%I for select to authenticated using (org_id in (select public.my_org_ids()))',
@@ -374,6 +383,21 @@ create policy attendance_update on public.attendance for update to authenticated
               or org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[])));
 create policy attendance_delete on public.attendance for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
+
+-- The day, smoother (Phase 6, M50 to M57). A kennel to clean is written only
+-- by the database when its last pet leaves (bookings_leave_kennel_to_clean);
+-- any member reads the list and marks one cleaned, which the database stamps.
+-- House jobs are set up by owners and managers (the setup list above); their
+-- ticks, repairs, stay reports, a parent's supplies and vet visits are daily
+-- operations (the list above). What is left of each supply is a view.
+grant select on public.kennel_cleans to authenticated;
+grant update (cleaned_at) on public.kennel_cleans to authenticated;
+create policy kennel_cleans_select on public.kennel_cleans for select to authenticated
+  using (org_id in (select public.my_org_ids()));
+create policy kennel_cleans_update on public.kennel_cleans for update to authenticated
+  using (org_id in (select public.my_org_ids()))
+  with check (org_id in (select public.my_org_ids()));
+grant select on public.stay_supply_left to authenticated;
 
 -- Running for real (Phase 5, M46 to M49). Problems are read by owners
 -- (M48); overnight job runs and photo archives by owners and managers (M46,
@@ -696,6 +720,10 @@ grant execute on function public.photo_month_files(uuid, date) to authenticated;
 grant execute on function public.record_photo_download(uuid, date, integer, bigint) to authenticated;
 grant execute on function public.record_photo_removal(uuid, date, integer, bigint) to authenticated;
 grant execute on function public.photos_to_remove(uuid, date) to authenticated;
+
+-- Phase 6 (M50 to M57): the day, smoother.
+grant execute on function public.cost_to_expense(uuid, text, uuid, text) to authenticated;
+grant execute on function public.record_vet_visit(uuid, uuid, date, text, text, text, bigint, text, text, jsonb) to authenticated;
 
 -- PUBLIC surface: the complete list of what someone who is not signed in can
 -- do. Keep it short. tests/db/security.test.ts pins this list.

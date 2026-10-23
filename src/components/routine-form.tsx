@@ -35,6 +35,13 @@ export async function RoutineForm({ petId }: { petId?: string }) {
       <Field label={r.how} hint={r.howHint}>
         <Input name="details" maxLength={500} />
       </Field>
+      <label className="flex min-h-12 items-start gap-3">
+        <input type="checkbox" name="needsPhoto" className="mt-1 size-5 shrink-0" />
+        <span>
+          <span className="block font-semibold">{m.proof.needsPhoto}</span>
+          <span className="block text-sm text-slate">{m.proof.needsPhotoHint}</span>
+        </span>
+      </label>
       <SubmitButton variant="secondary" pendingLabel={m.common.adding}>
         {r.add}
       </SubmitButton>

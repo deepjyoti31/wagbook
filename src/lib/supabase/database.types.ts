@@ -747,6 +747,9 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          is_trial: boolean;
+          trial_outcome: Database["public"]["Enums"]["trial_outcome"] | null;
+          trial_note: string | null;
         };
         Insert: {
           id?: string;
@@ -791,6 +794,9 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          is_trial?: boolean;
+          trial_outcome?: Database["public"]["Enums"]["trial_outcome"] | null;
+          trial_note?: string | null;
         };
         Update: {
           id?: string;
@@ -835,6 +841,9 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          is_trial?: boolean;
+          trial_outcome?: Database["public"]["Enums"]["trial_outcome"] | null;
+          trial_note?: string | null;
         };
         Relationships: [
           {
@@ -931,6 +940,7 @@ export type Database = {
           label: string;
           details: string | null;
           due_time: string;
+          needs_photo: boolean;
           is_active: boolean;
           sort_order: number;
           created_at: string;
@@ -944,6 +954,7 @@ export type Database = {
           label: string;
           details?: string | null;
           due_time: string;
+          needs_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -957,6 +968,7 @@ export type Database = {
           label?: string;
           details?: string | null;
           due_time?: string;
+          needs_photo?: boolean;
           is_active?: boolean;
           sort_order?: number;
           created_at?: string;
@@ -995,6 +1007,7 @@ export type Database = {
           done_at: string | null;
           done_by: string | null;
           note: string | null;
+          needs_photo: boolean;
           photo_path: string | null;
           created_at: string;
           updated_at: string;
@@ -1014,6 +1027,7 @@ export type Database = {
           done_at?: string | null;
           done_by?: string | null;
           note?: string | null;
+          needs_photo?: boolean;
           photo_path?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1033,6 +1047,7 @@ export type Database = {
           done_at?: string | null;
           done_by?: string | null;
           note?: string | null;
+          needs_photo?: boolean;
           photo_path?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -2222,6 +2237,107 @@ export type Database = {
           },
         ];
       };
+      house_job_days: {
+        Row: {
+          id: string;
+          org_id: string;
+          job_id: string;
+          job_date: string;
+          status: Database["public"]["Enums"]["task_status"];
+          done_at: string | null;
+          done_by: string | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          job_id: string;
+          job_date: string;
+          status?: Database["public"]["Enums"]["task_status"];
+          done_at?: string | null;
+          done_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          job_id?: string;
+          job_date?: string;
+          status?: Database["public"]["Enums"]["task_status"];
+          done_at?: string | null;
+          done_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "house_job_days_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "house_job_days_org_id_job_id_fkey";
+            columns: ["org_id", "job_id"];
+            isOneToOne: false;
+            referencedRelation: "house_jobs";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      house_jobs: {
+        Row: {
+          id: string;
+          org_id: string;
+          list: Database["public"]["Enums"]["house_list"];
+          label: string;
+          weekday: number | null;
+          due_time: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          list: Database["public"]["Enums"]["house_list"];
+          label: string;
+          weekday?: number | null;
+          due_time?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          list?: Database["public"]["Enums"]["house_list"];
+          label?: string;
+          weekday?: number | null;
+          due_time?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "house_jobs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       incidents: {
         Row: {
           id: string;
@@ -2737,6 +2853,58 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      kennel_cleans: {
+        Row: {
+          id: string;
+          org_id: string;
+          kennel_id: string;
+          booking_id: string | null;
+          left_at: string;
+          cleaned_at: string | null;
+          cleaned_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          kennel_id: string;
+          booking_id?: string | null;
+          left_at?: string;
+          cleaned_at?: string | null;
+          cleaned_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          kennel_id?: string;
+          booking_id?: string | null;
+          left_at?: string;
+          cleaned_at?: string | null;
+          cleaned_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "kennel_cleans_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "kennel_cleans_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "kennel_cleans_org_id_kennel_id_fkey";
+            columns: ["org_id", "kennel_id"];
+            isOneToOne: false;
+            referencedRelation: "kennels";
+            referencedColumns: ["org_id", "id"];
           },
         ];
       };
@@ -3690,6 +3858,11 @@ export type Database = {
           deleted_at: string | null;
           created_at: string;
           updated_at: string;
+          passed_away_on: string | null;
+          passed_away_at: string | null;
+          passed_away_by: string | null;
+          flowers_sent_at: string | null;
+          flowers_sent_by: string | null;
         };
         Insert: {
           id?: string;
@@ -3719,6 +3892,11 @@ export type Database = {
           deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          passed_away_on?: string | null;
+          passed_away_at?: string | null;
+          passed_away_by?: string | null;
+          flowers_sent_at?: string | null;
+          flowers_sent_by?: string | null;
         };
         Update: {
           id?: string;
@@ -3748,6 +3926,11 @@ export type Database = {
           deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          passed_away_on?: string | null;
+          passed_away_at?: string | null;
+          passed_away_by?: string | null;
+          flowers_sent_at?: string | null;
+          flowers_sent_by?: string | null;
         };
         Relationships: [
           {
@@ -4140,6 +4323,69 @@ export type Database = {
           },
         ];
       };
+      repairs: {
+        Row: {
+          id: string;
+          org_id: string;
+          what: string;
+          details: string | null;
+          reported_at: string;
+          reported_by: string | null;
+          fixed_at: string | null;
+          fixed_by: string | null;
+          fixed_note: string | null;
+          cost_minor: number | null;
+          expense_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          what: string;
+          details?: string | null;
+          reported_at?: string;
+          reported_by?: string | null;
+          fixed_at?: string | null;
+          fixed_by?: string | null;
+          fixed_note?: string | null;
+          cost_minor?: number | null;
+          expense_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          what?: string;
+          details?: string | null;
+          reported_at?: string;
+          reported_by?: string | null;
+          fixed_at?: string | null;
+          fixed_by?: string | null;
+          fixed_note?: string | null;
+          cost_minor?: number | null;
+          expense_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "repairs_org_id_expense_id_fkey";
+            columns: ["org_id", "expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "repairs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       required_vaccines: {
         Row: {
           id: string;
@@ -4364,6 +4610,121 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "shifts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stay_reports: {
+        Row: {
+          id: string;
+          org_id: string;
+          booking_id: string;
+          words: string | null;
+          photo_paths: string[];
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          booking_id: string;
+          words?: string | null;
+          photo_paths?: string[];
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          booking_id?: string;
+          words?: string | null;
+          photo_paths?: string[];
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stay_reports_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: true;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stay_reports_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stay_supplies: {
+        Row: {
+          id: string;
+          org_id: string;
+          booking_id: string;
+          pet_id: string;
+          kind: Database["public"]["Enums"]["supply_kind"];
+          label: string;
+          brought: number;
+          per_task: number;
+          care_item_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          booking_id: string;
+          pet_id: string;
+          kind: Database["public"]["Enums"]["supply_kind"];
+          label: string;
+          brought: number;
+          per_task: number;
+          care_item_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          booking_id?: string;
+          pet_id?: string;
+          kind?: Database["public"]["Enums"]["supply_kind"];
+          label?: string;
+          brought?: number;
+          per_task?: number;
+          care_item_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stay_supplies_org_id_booking_id_pet_id_fkey";
+            columns: ["org_id", "booking_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id", "pet_id"];
+          },
+          {
+            foreignKeyName: "stay_supplies_org_id_care_item_id_fkey";
+            columns: ["org_id", "care_item_id"];
+            isOneToOne: false;
+            referencedRelation: "care_items";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stay_supplies_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -4937,6 +5298,86 @@ export type Database = {
           },
         ];
       };
+      vet_visits: {
+        Row: {
+          id: string;
+          org_id: string;
+          pet_id: string;
+          booking_id: string | null;
+          visited_on: string;
+          reason: string;
+          vet: string | null;
+          findings: string | null;
+          cost_minor: number;
+          booking_item_id: string | null;
+          expense_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          pet_id: string;
+          booking_id?: string | null;
+          visited_on: string;
+          reason: string;
+          vet?: string | null;
+          findings?: string | null;
+          cost_minor?: number;
+          booking_item_id?: string | null;
+          expense_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          pet_id?: string;
+          booking_id?: string | null;
+          visited_on?: string;
+          reason?: string;
+          vet?: string | null;
+          findings?: string | null;
+          cost_minor?: number;
+          booking_item_id?: string | null;
+          expense_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "vet_visits_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "vet_visits_org_id_expense_id_fkey";
+            columns: ["org_id", "expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "vet_visits_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vet_visits_org_id_pet_id_fkey";
+            columns: ["org_id", "pet_id"];
+            isOneToOne: false;
+            referencedRelation: "pets";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
     };
     Views: {
       course_balances: {
@@ -5016,6 +5457,26 @@ export type Database = {
         };
         Relationships: [];
       };
+      stay_supply_left: {
+        Row: {
+          org_id: string | null;
+          supply_id: string | null;
+          booking_id: string | null;
+          pet_id: string | null;
+          kind: Database["public"]["Enums"]["supply_kind"] | null;
+          label: string | null;
+          brought: number | null;
+          per_task: number | null;
+          used_tasks: number | null;
+          used: number | null;
+          left_amount: number | null;
+          tasks_a_day: number | null;
+          days_left: number | null;
+          days_to_go: number | null;
+          runs_short: boolean | null;
+        };
+        Relationships: [];
+      };
       stock_levels: {
         Row: {
           item_id: string | null;
@@ -5087,6 +5548,10 @@ export type Database = {
       };
       confirm_food_order: {
         Args: { p_order: string };
+        Returns: string;
+      };
+      cost_to_expense: {
+        Args: { p_org: string; p_kind: string; p_id: string; p_category: string };
         Returns: string;
       };
       create_invitation_link: {
@@ -5289,6 +5754,10 @@ export type Database = {
         Args: { p_org: string; p_item: string; p_quantity: number; p_cost_minor: number; p_on: string; p_supplier?: string; p_use_by?: string; p_bill_number?: string; p_bill_path?: string; p_expense_category?: string };
         Returns: string;
       };
+      record_vet_visit: {
+        Args: { p_org: string; p_booking: string; p_visited_on: string; p_reason: string; p_vet: string; p_findings: string; p_cost_minor: number; p_line: string; p_category: string; p_medicines: Json };
+        Returns: string;
+      };
       recovery_codes_left: {
         Args: Record<PropertyKey, never>;
         Returns: number;
@@ -5443,6 +5912,7 @@ export type Database = {
       food_order_status: "waiting_area" | "unpaid" | "paid" | "requested" | "confirmed" | "declined";
       food_plan: "full" | "topper";
       food_product_kind: "trial" | "subscription" | "by_kilo" | "item";
+      house_list: "opening" | "closing" | "cleaning";
       incident_severity: "low" | "medium" | "high";
       intake_status: "new" | "accepted" | "rejected" | "spam";
       invoice_status: "draft" | "issued" | "void";
@@ -5461,8 +5931,10 @@ export type Database = {
       stock_kind: "meat" | "organ" | "egg" | "grain" | "vegetable" | "oil" | "supplement" | "packaging" | "fuel" | "grooming" | "medicine" | "other";
       stock_move_kind: "purchase" | "used" | "waste" | "count";
       stock_unit: "g" | "ml" | "piece";
+      supply_kind: "food" | "medicine";
       task_status: "pending" | "done" | "skipped";
       tax_mode: "none" | "simple" | "gst_india";
+      trial_outcome: "settled" | "anxious" | "reactive";
       trip_kind: "pickup" | "drop";
       trip_status: "planned" | "out" | "done" | "not_home" | "cancelled";
       waste_reason: "spoiled" | "past_date" | "dropped" | "other";

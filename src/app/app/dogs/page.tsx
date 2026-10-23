@@ -30,7 +30,7 @@ async function Pets({ searchParams }: Pick<PageProps<"/app/dogs">, "searchParams
 
   const PET = "id, name, breed, species, weight_g, flags, photo_path, clients(id, full_name, phone)" as const;
   if (params.hidden === "1") return <HiddenPets orgId={org.id} />;
-  const pets = () => supabase.from("pets").select(PET).eq("org_id", org.id).is("deleted_at", null).order("name").limit(200);
+  const pets = () => supabase.from("pets").select(PET).eq("org_id", org.id).is("deleted_at", null).is("passed_away_on", null).order("name").limit(200);
   // % and _ are wildcards in a LIKE pattern; strip them so a search is always literal.
   const literal = q.replace(/[%_\\,()]/g, "");
   let data: QueryData<ReturnType<typeof pets>>;

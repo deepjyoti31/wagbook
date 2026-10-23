@@ -1102,12 +1102,12 @@ and messaging many parents at once (not needed).
 
 ## M50. Kennel cleaning between guests
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L6 in `02`, D52). Checking into a kennel still to clean is asked, not refused; a sibling still in the kennel keeps it off the list until the last pet leaves.
 
 **Build**
 
-1. After check-out, the kennel shows "To clean" on Today and the calendar until someone taps "Cleaned".
-2. Checking a pet into a kennel still to clean asks "This kennel was not cleaned. Check in anyway?".
+1. [x] After check-out, the kennel shows "To clean" on Today and the calendar until someone taps "Cleaned".
+2. [x] Checking a pet into a kennel still to clean asks "This kennel was not cleaned. Check in anyway?".
 
 **Rules**
 
@@ -1122,13 +1122,13 @@ and messaging many parents at once (not needed).
 
 ## M51. Jobs that are not about a pet
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L7 in `02`, D52). The checklists and the cleaning are on More, Checklists and repairs; Today shows the opening and closing lists, Care the cleaning.
 
 **Build**
 
-1. Checklists for the day: opening and closing (lights, water, gates locked), each item ticked by whoever did it.
-2. Cleaning jobs that repeat (yard daily, deep clean weekly), on Care alongside the pets' tasks.
-3. Repairs: something broken (pump, fan, fencing), who reported it, who fixed it, and what it cost, which can become an
+1. [x] Checklists for the day: opening and closing (lights, water, gates locked), each item ticked by whoever did it.
+2. [x] Cleaning jobs that repeat (yard daily, deep clean weekly), on Care alongside the pets' tasks.
+3. [x] Repairs: something broken (pump, fan, fencing), who reported it, who fixed it, and what it cost, which can become an
    expense.
 
 **Rules**
@@ -1143,17 +1143,17 @@ and messaging many parents at once (not needed).
 
 ## M52. A pet that has passed away
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L8 in `02`, D52). The reminders stop because what they come from is cancelled; the three read from history (grooms, reviews, food trials) leave the pet out in their queries.
 
 **Build**
 
-1. On the pet page, for owners and managers: "Passed away", with the date.
-2. From that day, nothing is sent or made for the pet: no vaccination, groom, health paper or review reminder, no food
+1. [x] On the pet page, for owners and managers: "Passed away", with the date.
+2. [x] From that day, nothing is sent or made for the pet: no vaccination, groom, health paper or review reminder, no food
    delivery (subscriptions end), no booking requests, and future bookings and appointments are cancelled with no
    charge.
-3. Today shows "Send flowers to {parent}", with the parent's address, until someone marks it done. The cost can be
+3. [x] Today shows "Send flowers to {parent}", with the parent's address, until someone marks it done. The cost can be
    written as an expense.
-4. The pet's page keeps everything, marked "Passed away", and the pet leaves the lists.
+4. [x] The pet's page keeps everything, marked "Passed away", and the pet leaves the lists.
 
 **Rules**
 
@@ -1168,14 +1168,14 @@ and messaging many parents at once (not needed).
 
 ## M53. A stay report at check-out
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L9 in `02`, D52). The report is worked out when read; only the words and the picked photos are stored.
 
 **Build**
 
-1. At check-out, a report for the parent on the stay page: nights, meals eaten (of those offered), play sessions,
+1. [x] At check-out, a report for the parent on the stay page: nights, meals eaten (of those offered), play sessions,
    weight in and out, any medicine given, incidents (as told to the parent), and the photos staff pick.
-2. "Send the stay report" opens WhatsApp with the link, alongside the bill.
-3. Staff can add a few words before sending.
+2. [x] "Send the stay report" opens WhatsApp with the link, alongside the bill.
+3. [x] Staff can add a few words before sending.
 
 **Rules**
 
@@ -1190,14 +1190,14 @@ and messaging many parents at once (not needed).
 
 ## M54. Photo proof on care tasks, and "Pack all"
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L10 in `02`, D52). A task that wants a photo is not ticked offline. Pack all is walked in the browser after its count (the walk gives the recipe a week's use-by first).
 
 **Build**
 
-1. A care task can ask for a photo (a medicine given, a wound cleaned). The task is done when the photo is added.
-2. The routine says which tasks want a photo; the photo goes on the pet's record, not the parent's page, unless staff
+1. [x] A care task can ask for a photo (a medicine given, a wound cleaned). The task is done when the photo is added.
+2. [x] The routine says which tasks want a photo; the photo goes on the pet's record, not the parent's page, unless staff
    share it.
-3. Kitchen, packing: "Pack all" marks every pack of the day packed in one tap, with a count first.
+3. [x] Kitchen, packing: "Pack all" marks every pack of the day packed in one tap, with a count first.
 
 **Rules**
 
@@ -1211,15 +1211,15 @@ and messaging many parents at once (not needed).
 
 ## M55. A parent's own food and medicines
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L11 in `02`, D52). The days left are tested in the database (`stay_supply_left`); a medicine can be tied to its routine.
 
 **Build**
 
-1. At check-in, what the parent brought: food (packs and grams) and medicines (count), with the daily amount.
-2. Care counts it down as meals and doses are ticked; the booking shows "4 days left".
-3. A reminder on Today when it will run out before the stay ends: ask the parent, or switch to the kennel's food at
+1. [x] At check-in, what the parent brought: food (packs and grams) and medicines (count), with the daily amount.
+2. [x] Care counts it down as meals and doses are ticked; the booking shows "4 days left".
+3. [x] A reminder on Today when it will run out before the stay ends: ask the parent, or switch to the kennel's food at
    its price (an extra on the bill).
-4. At check-out, what is left goes home: it is listed with the belongings.
+4. [x] At check-out, what is left goes home: it is listed with the belongings.
 
 **Rules**
 
@@ -1233,13 +1233,13 @@ and messaging many parents at once (not needed).
 
 ## M56. Trial day for new dogs
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L12 in `02`, D52). A trial is marked on the booking page of day boarding, not on New booking.
 
 **Build**
 
-1. A trial visit, booked like day boarding, for a pet before its first stay. Optional: a kennel offers it if it wants;
+1. [x] A trial visit, booked like day boarding, for a pet before its first stay. Optional: a kennel offers it if it wants;
    nothing requires it.
-2. After it, staff note how the pet settled (settled, anxious, reactive with other dogs) and a sentence. It shows on the
+2. [x] After it, staff note how the pet settled (settled, anxious, reactive with other dogs) and a sentence. It shows on the
    pet page and at check-in.
 
 **Rules**
@@ -1254,14 +1254,14 @@ and messaging many parents at once (not needed).
 
 ## M57. Vet visits during a stay
 
-- [ ] Not started.
+- [x] Finished 23 October 2026 (L13 in `02`, D52). Staff record a visit and its bill line; the expense is an owner's or manager's, one tap.
 
 **Build**
 
-1. On a stay: "Vet visit", with the reason, the vet, what the vet said, medicines prescribed (which become care tasks)
+1. [x] On a stay: "Vet visit", with the reason, the vet, what the vet said, medicines prescribed (which become care tasks)
    and the cost.
-2. The cost goes on the stay's bill as a line, and the kennel's spend as an expense, in one step.
-3. "Tell the parent" opens WhatsApp with a short message.
+2. [x] The cost goes on the stay's bill as a line, and the kennel's spend as an expense, in one step.
+3. [x] "Tell the parent" opens WhatsApp with a short message.
 
 **Rules**
 
