@@ -113,3 +113,10 @@ create trigger leave_requests_audit after insert or update or delete on public.l
   for each row execute function public.audit_row();
 create trigger attendance_audit after insert or update or delete on public.attendance
   for each row execute function public.audit_row();
+-- Phase 8 (M62, M63): sales over the counter, prices of what is sold, and orders to suppliers.
+create trigger sales_audit after insert or update or delete on public.sales
+  for each row execute function public.audit_row();
+create trigger stock_items_audit after insert or update or delete on public.stock_items
+  for each row execute function public.audit_row();
+create trigger supplier_orders_audit after insert or update or delete on public.supplier_orders
+  for each row execute function public.audit_row();

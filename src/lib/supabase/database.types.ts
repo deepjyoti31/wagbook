@@ -1233,6 +1233,7 @@ export type Database = {
           created_by: string | null;
           deleted_at: string | null;
           erased_at: string | null;
+          is_walk_in: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -1258,6 +1259,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
+          is_walk_in?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -1283,6 +1285,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           erased_at?: string | null;
+          is_walk_in?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -2734,6 +2737,7 @@ export type Database = {
           period_end: string | null;
           delivery_id: string | null;
           appointment_id: string | null;
+          sale_id: string | null;
           status: Database["public"]["Enums"]["invoice_status"];
           number: string | null;
           fiscal_year: string | null;
@@ -2777,6 +2781,7 @@ export type Database = {
           period_end?: string | null;
           delivery_id?: string | null;
           appointment_id?: string | null;
+          sale_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -2820,6 +2825,7 @@ export type Database = {
           period_end?: string | null;
           delivery_id?: string | null;
           appointment_id?: string | null;
+          sale_id?: string | null;
           status?: Database["public"]["Enums"]["invoice_status"];
           number?: string | null;
           fiscal_year?: string | null;
@@ -2885,6 +2891,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_sale_fkey";
+            columns: ["org_id", "sale_id"];
+            isOneToOne: false;
+            referencedRelation: "sales";
+            referencedColumns: ["org_id", "id"];
           },
           {
             foreignKeyName: "invoices_subscription_fkey";
@@ -3239,6 +3252,7 @@ export type Database = {
           offers_appointments: boolean;
           offers_kitchen: boolean;
           offers_food_delivery: boolean;
+          offers_shop: boolean;
           portion_small_bp: number;
           portion_medium_bp: number;
           portion_large_bp: number;
@@ -3309,6 +3323,7 @@ export type Database = {
           offers_appointments?: boolean;
           offers_kitchen?: boolean;
           offers_food_delivery?: boolean;
+          offers_shop?: boolean;
           portion_small_bp?: number;
           portion_medium_bp?: number;
           portion_large_bp?: number;
@@ -3379,6 +3394,7 @@ export type Database = {
           offers_appointments?: boolean;
           offers_kitchen?: boolean;
           offers_food_delivery?: boolean;
+          offers_shop?: boolean;
           portion_small_bp?: number;
           portion_medium_bp?: number;
           portion_large_bp?: number;
@@ -4728,6 +4744,131 @@ export type Database = {
           },
         ];
       };
+      sale_lines: {
+        Row: {
+          id: string;
+          org_id: string;
+          sale_id: string;
+          item_id: string;
+          quantity: number;
+          description: string;
+          unit_price_minor: number;
+          tax_rate_bp: number;
+          hsn_code: string | null;
+          sort_order: number;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          sale_id: string;
+          item_id: string;
+          quantity: number;
+          description: string;
+          unit_price_minor: number;
+          tax_rate_bp: number;
+          hsn_code?: string | null;
+          sort_order?: number;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          sale_id?: string;
+          item_id?: string;
+          quantity?: number;
+          description?: string;
+          unit_price_minor?: number;
+          tax_rate_bp?: number;
+          hsn_code?: string | null;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sale_lines_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sale_lines_org_id_item_id_fkey";
+            columns: ["org_id", "item_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_items";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "sale_lines_org_id_sale_id_fkey";
+            columns: ["org_id", "sale_id"];
+            isOneToOne: false;
+            referencedRelation: "sales";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      sales: {
+        Row: {
+          id: string;
+          org_id: string;
+          client_id: string;
+          booking_id: string | null;
+          sold_on: string;
+          status: Database["public"]["Enums"]["sale_status"];
+          cancel_reason: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          client_id: string;
+          booking_id?: string | null;
+          sold_on: string;
+          status?: Database["public"]["Enums"]["sale_status"];
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          client_id?: string;
+          booking_id?: string | null;
+          sold_on?: string;
+          status?: Database["public"]["Enums"]["sale_status"];
+          cancel_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sales_org_id_booking_id_fkey";
+            columns: ["org_id", "booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "sales_org_id_client_id_fkey";
+            columns: ["org_id", "client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "sales_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       service_areas: {
         Row: {
           id: string;
@@ -5104,6 +5245,9 @@ export type Database = {
           low_level: number | null;
           never_in_recipe: boolean;
           is_active: boolean;
+          sell_price_minor: number | null;
+          sell_tax_rate_bp: number;
+          hsn_code: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -5117,6 +5261,9 @@ export type Database = {
           low_level?: number | null;
           never_in_recipe?: boolean;
           is_active?: boolean;
+          sell_price_minor?: number | null;
+          sell_tax_rate_bp?: number;
+          hsn_code?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -5130,6 +5277,9 @@ export type Database = {
           low_level?: number | null;
           never_in_recipe?: boolean;
           is_active?: boolean;
+          sell_price_minor?: number | null;
+          sell_tax_rate_bp?: number;
+          hsn_code?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -5163,6 +5313,8 @@ export type Database = {
           reason: Database["public"]["Enums"]["waste_reason"] | null;
           counted: number | null;
           batch_id: string | null;
+          sale_line_id: string | null;
+          supplier_order_id: string | null;
           note: string | null;
           created_by: string | null;
           created_at: string;
@@ -5179,6 +5331,8 @@ export type Database = {
           reason?: Database["public"]["Enums"]["waste_reason"] | null;
           counted?: number | null;
           batch_id?: string | null;
+          sale_line_id?: string | null;
+          supplier_order_id?: string | null;
           note?: string | null;
           created_by?: string | null;
           created_at?: string;
@@ -5195,6 +5349,8 @@ export type Database = {
           reason?: Database["public"]["Enums"]["waste_reason"] | null;
           counted?: number | null;
           batch_id?: string | null;
+          sale_line_id?: string | null;
+          supplier_order_id?: string | null;
           note?: string | null;
           created_by?: string | null;
           created_at?: string;
@@ -5226,6 +5382,20 @@ export type Database = {
             columns: ["org_id", "supplier_id"];
             isOneToOne: false;
             referencedRelation: "suppliers";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stock_moves_sale_line_fkey";
+            columns: ["org_id", "sale_line_id"];
+            isOneToOne: false;
+            referencedRelation: "sale_lines";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "stock_moves_supplier_order_fkey";
+            columns: ["org_id", "supplier_order_id"];
+            isOneToOne: false;
+            referencedRelation: "supplier_orders";
             referencedColumns: ["org_id", "id"];
           },
         ];
@@ -5338,6 +5508,122 @@ export type Database = {
           },
         ];
       };
+      supplier_order_lines: {
+        Row: {
+          id: string;
+          org_id: string;
+          order_id: string;
+          item_id: string;
+          quantity: number;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          order_id: string;
+          item_id: string;
+          quantity: number;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          order_id?: string;
+          item_id?: string;
+          quantity?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "supplier_order_lines_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "supplier_order_lines_org_id_item_id_fkey";
+            columns: ["org_id", "item_id"];
+            isOneToOne: false;
+            referencedRelation: "stock_items";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "supplier_order_lines_org_id_order_id_fkey";
+            columns: ["org_id", "order_id"];
+            isOneToOne: false;
+            referencedRelation: "supplier_orders";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      supplier_orders: {
+        Row: {
+          id: string;
+          org_id: string;
+          supplier_id: string;
+          ordered_on: string;
+          status: Database["public"]["Enums"]["supplier_order_status"];
+          note: string | null;
+          sent_at: string | null;
+          bill_number: string | null;
+          bill_path: string | null;
+          expense_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          supplier_id: string;
+          ordered_on: string;
+          status?: Database["public"]["Enums"]["supplier_order_status"];
+          note?: string | null;
+          sent_at?: string | null;
+          bill_number?: string | null;
+          bill_path?: string | null;
+          expense_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          supplier_id?: string;
+          ordered_on?: string;
+          status?: Database["public"]["Enums"]["supplier_order_status"];
+          note?: string | null;
+          sent_at?: string | null;
+          bill_number?: string | null;
+          bill_path?: string | null;
+          expense_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "supplier_orders_org_id_expense_id_fkey";
+            columns: ["org_id", "expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
+            foreignKeyName: "supplier_orders_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "supplier_orders_org_id_supplier_id_fkey";
+            columns: ["org_id", "supplier_id"];
+            isOneToOne: false;
+            referencedRelation: "suppliers";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
       suppliers: {
         Row: {
           id: string;
@@ -5374,6 +5660,65 @@ export type Database = {
             foreignKeyName: "suppliers_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tally_settings: {
+        Row: {
+          org_id: string;
+          company: string | null;
+          sales_ledger: string;
+          cgst_ledger: string;
+          sgst_ledger: string;
+          igst_ledger: string;
+          tax_ledger: string;
+          round_off_ledger: string;
+          cash_ledger: string;
+          bank_ledger: string;
+          credit_ledger: string;
+          parents_group: string;
+          expenses_group: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          company?: string | null;
+          sales_ledger?: string;
+          cgst_ledger?: string;
+          sgst_ledger?: string;
+          igst_ledger?: string;
+          tax_ledger?: string;
+          round_off_ledger?: string;
+          cash_ledger?: string;
+          bank_ledger?: string;
+          credit_ledger?: string;
+          parents_group?: string;
+          expenses_group?: string;
+          updated_at?: string;
+        };
+        Update: {
+          org_id?: string;
+          company?: string | null;
+          sales_ledger?: string;
+          cgst_ledger?: string;
+          sgst_ledger?: string;
+          igst_ledger?: string;
+          tax_ledger?: string;
+          round_off_ledger?: string;
+          cash_ledger?: string;
+          bank_ledger?: string;
+          credit_ledger?: string;
+          parents_group?: string;
+          expenses_group?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tally_settings_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: true;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
@@ -5678,6 +6023,7 @@ export type Database = {
           series_id: string | null;
           series_month: string | null;
           appointment_id: string | null;
+          sale_id: string | null;
         };
         Relationships: [];
       };
@@ -5741,6 +6087,30 @@ export type Database = {
           never_in_recipe: boolean | null;
           is_active: boolean | null;
           on_hand: number | null;
+          sell_price_minor: number | null;
+          sell_tax_rate_bp: number | null;
+          hsn_code: string | null;
+        };
+        Relationships: [];
+      };
+      stock_on_order: {
+        Row: {
+          org_id: string | null;
+          item_id: string | null;
+          on_order: number | null;
+        };
+        Relationships: [];
+      };
+      supplier_order_progress: {
+        Row: {
+          org_id: string | null;
+          order_id: string | null;
+          item_id: string | null;
+          ordered: number | null;
+          received: number | null;
+          still_to_come: number | null;
+          status: Database["public"]["Enums"]["supplier_order_status"] | null;
+          supplier_id: string | null;
         };
         Relationships: [];
       };
@@ -5777,6 +6147,10 @@ export type Database = {
       batch_recipients: {
         Args: { p_org: string; p_batch: string };
         Returns: { kind: string; on_date: string; pet_id: string; pet_name: string; client_id: string; client_name: string; phone: string; delivery_id: string }[];
+      };
+      cancel_sale: {
+        Args: { p_sale: string; p_reason: string };
+        Returns: undefined;
       };
       check_bill_line: {
         Args: { p_mode: Database["public"]["Enums"]["tax_mode"]; p_intra: boolean; p_include: boolean; p_quantity: number; p_unit_price_minor: number; p_discount_minor: number; p_taxable_minor: number; p_tax_rate_bp: number; p_cgst_minor: number; p_sgst_minor: number; p_igst_minor: number; p_tax_minor: number };
@@ -5998,6 +6372,10 @@ export type Database = {
         Args: { p_org: string; p_month: string };
         Returns: string[];
       };
+      place_supplier_order: {
+        Args: { p_org: string; p_supplier: string; p_lines: Json; p_note?: string };
+        Returns: string;
+      };
       plan_subscription: {
         Args: { p_subscription: string; p_until: string };
         Returns: number;
@@ -6005,6 +6383,10 @@ export type Database = {
       raise_alert: {
         Args: { p_org: string; p_kind: Database["public"]["Enums"]["alert_kind"]; p_pet_name: string; p_link: string };
         Returns: undefined;
+      };
+      receive_supplier_order: {
+        Args: { p_order: string; p_on: string; p_lines: Json };
+        Returns: number;
       };
       recipe_cost_per_kg: {
         Args: { p_org: string; p_version: string; p_on?: string };
@@ -6024,6 +6406,10 @@ export type Database = {
       };
       record_purchase: {
         Args: { p_org: string; p_item: string; p_quantity: number; p_cost_minor: number; p_on: string; p_supplier?: string; p_use_by?: string; p_bill_number?: string; p_bill_path?: string; p_expense_category?: string };
+        Returns: string;
+      };
+      record_supplier_bill: {
+        Args: { p_order: string; p_amount_minor: number; p_on: string; p_category: string; p_bill_number?: string; p_bill_path?: string };
         Returns: string;
       };
       record_vet_visit: {
@@ -6094,6 +6480,10 @@ export type Database = {
         Args: { p_text: string };
         Returns: string;
       };
+      sale_bill_lines: {
+        Args: { p_org: string; p_sale: string; p_tax_mode: Database["public"]["Enums"]["tax_mode"] };
+        Returns: { quantity: number; unit_price_minor: number; discount_minor: number; tax_rate_bp: number }[];
+      };
       save_invoice_draft: {
         Args: { p_invoice: string; p_totals: Json; p_lines: Json };
         Returns: undefined;
@@ -6104,6 +6494,10 @@ export type Database = {
       };
       scrub_error_text: {
         Args: { p_text: string };
+        Returns: string;
+      };
+      sell: {
+        Args: { p_org: string; p_lines: Json; p_client?: string; p_booking?: string };
         Returns: string;
       };
       session_meets_mfa: {
@@ -6117,6 +6511,10 @@ export type Database = {
       set_push_secret: {
         Args: { p_secret: string };
         Returns: undefined;
+      };
+      stay_bill_issued: {
+        Args: { p_org: string; p_booking: string };
+        Returns: boolean;
       };
       stay_charges: {
         Args: { p_org: string; p_bookings: string[] };
@@ -6166,6 +6564,10 @@ export type Database = {
         Args: { p_org: string };
         Returns: { booking_id: string; waitlisted_at: string; has_space: boolean }[];
       };
+      walk_in_client: {
+        Args: { p_org: string };
+        Returns: string;
+      };
       who_is_on: {
         Args: { p_org: string };
         Returns: { user_id: string; display_name: string }[];
@@ -6206,12 +6608,14 @@ export type Database = {
       pet_sex: "male" | "female" | "unknown";
       problem_kind: "damaged" | "late" | "wrong";
       problem_outcome: "replaced" | "refunded" | "none";
+      sale_status: "sold" | "cancelled";
       service_kind: "boarding" | "daycare" | "addon";
       size_band: "small" | "medium" | "large";
       staff_skill: "cook" | "groomer" | "trainer" | "swim_supervisor" | "rider";
-      stock_kind: "meat" | "organ" | "egg" | "grain" | "vegetable" | "oil" | "supplement" | "packaging" | "fuel" | "grooming" | "medicine" | "other";
-      stock_move_kind: "purchase" | "used" | "waste" | "count";
+      stock_kind: "meat" | "organ" | "egg" | "grain" | "vegetable" | "oil" | "supplement" | "packaging" | "fuel" | "grooming" | "medicine" | "treat" | "toy" | "accessory" | "other";
+      stock_move_kind: "purchase" | "used" | "waste" | "count" | "sale";
       stock_unit: "g" | "ml" | "piece";
+      supplier_order_status: "open" | "closed";
       supply_kind: "food" | "medicine";
       task_status: "pending" | "done" | "skipped";
       tax_mode: "none" | "simple" | "gst_india";

@@ -33,7 +33,7 @@ export default function KitchenPage({ searchParams }: PageProps<"/app/kitchen">)
 
 async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "searchParams">) {
   const asked = (await searchParams).date;
-  const { org } = await requireOrg();
+  const { org, canManage } = await requireOrg();
   const t = await getAppI18n();
   const { m, locale, language } = t;
   const k = m.kitchen;
@@ -97,11 +97,16 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
     versions.length > 0
       ? await supabase.from("recipe_ingredients").select("version_id, item_id, quantity_per_kg").eq("org_id", org.id).in("version_id", versions.map((v) => v.version_id))
       : { data: [], error: null };
-  const suppliers = await supabase.from("suppliers").select("id, name, phone").eq("org_id", org.id);
+  const [suppliers, onOrder] = await Promise.all([
+    supabase.from("suppliers").select("id, name, phone").eq("org_id", org.id),
+    // Still to come on orders to suppliers (M63): not asked for again.
+    supabase.from("stock_on_order").select("item_id, on_order").eq("org_id", org.id),
+  ]);
+  const coming = new Map((onOrder.data ?? []).map((o) => [o.item_id!, o.on_order ?? 0]));
   const list = shoppingList(
     versions,
     ingredients.data ?? [],
-    levels.data.map((l) => ({ item_id: l.item_id!, name: l.name!, unit: l.unit!, supplier_id: l.supplier_id, on_hand: l.on_hand ?? 0 })),
+    levels.data.map((l) => ({ item_id: l.item_id!, name: l.name!, unit: l.unit!, supplier_id: l.supplier_id, on_hand: l.on_hand ?? 0, on_order: coming.get(l.item_id!) ?? 0 })),
   );
   const bySupplier = new Map<string | null, typeof list>();
   for (const line of list) bySupplier.set(line.supplier_id, [...(bySupplier.get(line.supplier_id) ?? []), line]);
@@ -183,21 +188,38 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
             {[...bySupplier.entries()].map(([supplierId, lines]) => {
               const supplier = supplierId ? supplierOf.get(supplierId) : null;
               const text = lines
-                .map((l) => fill(k.shoppingLine, { item: l.name, buy: quantityText(l.buy, l.unit, locale), need: quantityText(l.need, l.unit, locale), have: quantityText(l.have, l.unit, locale) }))
+                .map((l) =>
+                  fill(l.ordered > 0 ? k.shoppingLineOrdered : k.shoppingLine, {
+                    item: l.name,
+                    buy: quantityText(l.buy, l.unit, locale),
+                    need: quantityText(l.need, l.unit, locale),
+                    have: quantityText(l.have, l.unit, locale),
+                    ordered: quantityText(l.ordered, l.unit, locale),
+                  }),
+                )
                 .join("\n");
+              // An order to the supplier with these quantities filled in (M63).
+              const orderLink = supplier ? `/app/more/orders/new?supplier=${supplier.id}&${lines.map((l) => `q-${l.item_id}=${l.buy}`).join("&")}` : null;
               return (
                 <div key={supplierId ?? "none"} className="rounded-xl border border-rule bg-paper p-4">
                   <p className="mb-1 font-bold">{supplier?.name ?? k.noSupplier}</p>
                   <p className="mb-2 whitespace-pre-line">{text}</p>
                   {supplier ? (
-                    <a
-                      href={whatsappLink(fill(k.shoppingMessage, { supplier: supplier.name, kennel: org.name, items: text }), supplier.phone)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={buttonStyles.whatsapp}
-                    >
-                      {fill(k.sendList, { supplier: supplier.name })}
-                    </a>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={whatsappLink(fill(k.shoppingMessage, { supplier: supplier.name, kennel: org.name, items: text }), supplier.phone)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={buttonStyles.whatsapp}
+                      >
+                        {fill(k.sendList, { supplier: supplier.name })}
+                      </a>
+                      {orderLink && canManage ? (
+                        <Link href={orderLink} className={buttonStyles.secondary}>
+                          {fill(k.orderThis, { supplier: supplier.name })}
+                        </Link>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               );

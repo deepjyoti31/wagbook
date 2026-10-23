@@ -22,6 +22,9 @@ export const HISTORY_TABLES = [
   "services",
   "incidents",
   "appointments",
+  "sales",
+  "stock_items",
+  "supplier_orders",
   "organizations",
   "memberships",
 ] as const satisfies readonly (keyof HistoryWords["tables"])[];
@@ -138,6 +141,12 @@ export function historyLink(entry: HistoryEntry): string | null {
       return id(data.pet_id) ? `/app/dogs/${data.pet_id}` : null;
     case "appointments":
       return entry.action === "delete" || !id(entry.row_id) ? null : `/app/appointments/${entry.row_id}`;
+    case "sales":
+      return id(data.booking_id) ? `/app/bookings/${data.booking_id}` : "/app/shop";
+    case "stock_items":
+      return "/app/kitchen/stock";
+    case "supplier_orders":
+      return entry.action === "delete" || !id(entry.row_id) ? null : `/app/more/orders/${entry.row_id}`;
     default:
       return null;
   }

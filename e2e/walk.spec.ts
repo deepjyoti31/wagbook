@@ -3026,3 +3026,180 @@ test("M61: a person chooses alerts, and a push wakes the phone with what happene
   // No parent's phone number in what the phone shows.
   expect(shown).not.toMatch(/\+91|98000/);
 });
+
+// ---------------------------------------------------------------------------
+// Phase 8: money and stock (M62 to M64).
+// ---------------------------------------------------------------------------
+
+test("M62: a walk-in buys the last chew bones, more than is left is refused, and a toy goes on a stay's bill", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/settings");
+  await page.getByLabel(en.offers.shop).check();
+  await page.getByRole("button", { name: en.settings.save }).click();
+  await expect(page.getByText(en.settings.saved)).toBeVisible();
+
+  await page.goto("/app/more");
+  await page.getByRole("link", { name: new RegExp(en.more.links.shop.title) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: en.shop.title })).toBeVisible();
+  const add = page.locator("form").filter({ has: page.getByRole("button", { name: en.shop.addButton }) });
+  for (const [name, kind, price] of [["Chew bone", "treat", "250"], ["Rope toy", "toy", "400"]]) {
+    await add.getByLabel(en.shop.name).fill(name);
+    await add.getByLabel(en.shop.kind).selectOption(kind);
+    await add.getByLabel(en.shop.price).fill(price);
+    await add.getByLabel(en.shop.hsnCode).fill("42010000");
+    await add.getByLabel(en.shop.lowLevel).fill("1");
+    await add.getByRole("button", { name: en.shop.addButton }).click();
+    await expect(page.getByText(en.shop.added.replace("{name}", name))).toBeVisible();
+  }
+
+  // Bought in on the Stock page, so there is something to sell.
+  await page.getByRole("link", { name: en.shop.links.stock }).click();
+  const buy = page.locator("form").filter({ has: page.getByRole("button", { name: en.stock.recordBuy }) });
+  for (const [item, quantity, cost] of [["Chew bone (pieces)", "2", "300"], ["Rope toy (pieces)", "3", "720"]]) {
+    await buy.locator("select[name=itemId]").selectOption({ label: item });
+    await buy.getByLabel(en.stock.quantity).fill(quantity);
+    await buy.getByLabel(en.stock.cost).fill(cost);
+    await buy.getByRole("button", { name: en.stock.recordBuy }).click();
+    await expect(page.getByText(new RegExp(`of ${item.split(" (")[0]} recorded`))).toBeVisible();
+  }
+
+  // A walk-in buys both chew bones: a bill of its own, to the walk-in, issued by staff.
+  await signIn(page, "staff");
+  await page.goto("/app/shop");
+  await page.getByLabel(`${en.sell.howMany}: Chew bone`).fill("2");
+  await narrow(page);
+  await shot(page, "m62-shop");
+  await page.getByRole("button", { name: en.sell.button, exact: true }).click();
+  await page.waitForURL(/\/app\/bills\//);
+  await expect(page.getByText(en.shop.walkIn, { exact: true })).toBeVisible();
+  await expect(page.getByText("Chew bone").first()).toBeVisible();
+  await page.getByRole("button", { name: en.bill.issue }).click();
+  await expect(page.getByText(/^Issued\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.bill.send })).toHaveCount(0);
+  await narrow(page);
+  await shot(page, "m62-walk-in-bill");
+
+  // None left: it cannot be typed in, it is on the list to reorder, and four rope toys of three are refused.
+  await page.goto("/app/shop");
+  await expect(page.getByLabel(`${en.sell.howMany}: Chew bone`)).toBeDisabled();
+  await expect(page.getByText("Chew bone: 0 left, reorder at 1")).toBeVisible();
+  await page.getByLabel(`${en.sell.howMany}: Rope toy`).fill("4");
+  await page.getByRole("button", { name: en.sell.button, exact: true }).click();
+  await expect(page.getByText(/There is not enough Rope toy in stock \(3 left\)/)).toBeVisible();
+  await expect(page.getByText("Chew bone x 2")).toBeVisible();
+
+  // A rope toy for a pet in house goes on its stay's bill, from the stay.
+  const pet = adminSql(`select p.name from public.bookings b join public.pets p on p.id = b.pet_id
+    where b.status = 'checked_in' and b.group_id is null and b.series_id is null
+      and not exists (select 1 from public.invoices i where i.booking_id = b.id and i.status = 'issued')
+    order by p.name limit 1`);
+  expect(pet).not.toBe("");
+  await openBooking(page, pet, "In house");
+  await page.getByLabel(`${en.sell.howMany}: Rope toy`).fill("1");
+  await page.getByRole("button", { name: en.sell.button, exact: true }).click();
+  await expect(page.getByText(en.sell.onStay)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(en.sell.soldOnStay)).toBeVisible();
+  await expect(page.getByText("Rope toy x 1")).toBeVisible();
+  await narrow(page);
+  await shot(page, "m62-stay");
+
+  // A manager cancels it, made by mistake: the stock comes back.
+  await signIn(page, "manager");
+  await openBooking(page, pet, "In house");
+  await page.locator("summary", { hasText: en.shop.cancel }).click();
+  const cancel = page.locator("form").filter({ has: page.getByRole("button", { name: en.shop.cancelButton }) });
+  await cancel.getByLabel(en.shop.cancelReason).fill("Wrong pet");
+  await cancel.getByRole("button", { name: en.shop.cancelButton }).click();
+  await expect(page.getByText(en.shop.cancelledOk)).toBeVisible();
+  await page.goto("/app/shop");
+  await expect(page.getByText(en.shop.inStock.replace("{n}", "3")).first()).toBeVisible();
+  await narrow(page);
+});
+
+test("M63: an order to a supplier, received in part by staff, the bill as an expense, then closed", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/orders");
+  await page.getByRole("link", { name: en.orders.newOrderTo.replace("{supplier}", "Ali Meats") }).click();
+  // Ali Meats has no usual things yet, so everything else is open already.
+  await expect(page.locator("details").filter({ hasText: en.orderPage.others })).toHaveAttribute("open", "");
+  const chicken = adminSql("select id from public.stock_items where name = 'Chicken'");
+  await page.locator(`input[name=q-${chicken}]`).fill("50 kg");
+  await page.getByLabel(en.orderPage.note).fill("Boneless, please");
+  await narrow(page);
+  await shot(page, "m63-new-order");
+  await page.getByRole("button", { name: en.orderPage.place }).click();
+  await page.waitForURL(/\/app\/more\/orders\/[0-9a-f-]{36}$/);
+  const send = page.getByRole("link", { name: en.orderPage.send });
+  expect(decodeURIComponent((await send.getAttribute("href"))!)).toMatch(/wa\.me\/919845011111\?text=[\s\S]*Chicken: 50 kg[\s\S]*Boneless, please/);
+  await page.getByRole("button", { name: en.orderPage.markSent }).click();
+  await expect(page.getByText(en.orderPage.marked)).toBeVisible();
+  const order = page.url().split("?")[0];
+
+  // The kitchen does not ask for chicken while 50 kg are on their way.
+  const date = adminSql("select coalesce(min(delivery_date)::text, current_date::text) from public.deliveries where status = 'planned' and delivery_date >= current_date");
+  await page.goto(`/app/kitchen?date=${date}`);
+  await expect(page.getByText(/^Chicken: buy/)).toHaveCount(0);
+
+  // Staff take in what came: 30 kg of the 50.
+  await signIn(page, "staff");
+  await page.goto(order);
+  await expect(page.getByLabel(en.orderPage.cost)).toHaveCount(0);
+  await page.getByLabel(`${en.orderPage.came}: Chicken`).fill("30 kg");
+  await page.getByRole("button", { name: en.orderPage.putInStock }).click();
+  await expect(page.getByText(en.orderPage.received)).toBeVisible();
+  await expect(page.getByText("Chicken: 50 kg ordered, 30 kg came, 20 kg to come").first()).toBeVisible();
+  await narrow(page);
+  await shot(page, "m63-received");
+
+  // The manager writes the supplier's bill down as an expense, then closes the order.
+  await signIn(page, "manager");
+  await page.goto(order);
+  await page.getByLabel(en.orderPage.amount).fill("6600");
+  await page.getByLabel(en.orderPage.billNumber).fill("AM-204");
+  await page.getByRole("button", { name: en.orderPage.recordBill }).click();
+  await expect(page.getByText(en.orderPage.billRecorded)).toBeVisible();
+  await expect(page.getByText(en.orderPage.billDone.replace("{amount}", "₹6,600"))).toBeVisible();
+  await page.getByRole("button", { name: en.orderPage.closeButton }).click();
+  await expect(page.getByText(en.orderPage.closedOk)).toBeVisible();
+  await page.goto("/app/more/expenses");
+  await expect(page.getByText(/Ali Meats/).first()).toBeVisible();
+  await page.goto("/app/more/orders");
+  await expect(page.getByText(en.orders.closed).first()).toBeVisible();
+  await narrow(page);
+  await shot(page, "m63-orders");
+});
+
+test("M64: ledger names are set once, and a month downloads as two files for Tally", async ({ page }) => {
+  await signIn(page, "manager");
+  await page.goto("/app/more/reports");
+  await page.getByRole("link", { name: en.tally.ledgers }).click();
+  await page.getByLabel(en.tally.company).fill("Demo Kennel Books");
+  await page.getByLabel(en.tally.names.bank).fill("HDFC Bank");
+  await page.getByRole("button", { name: en.tally.save }).click();
+  await expect(page.getByText(en.tally.saved)).toBeVisible();
+  await narrow(page);
+  await shot(page, "m64-ledgers");
+
+  await page.goto("/app/more/reports");
+  const month = day(0).slice(0, 7);
+  const link = page.getByRole("link", { name: /for Tally \(ZIP\)$/ });
+  const [download] = await Promise.all([page.waitForEvent("download"), link.click()]);
+  expect(download.suggestedFilename()).toBe(`tally-${month}.zip`);
+  const files = readZipStore(new Uint8Array(Buffer.concat(await (await download.createReadStream()).toArray())));
+  expect(files.map((f) => f.name)).toEqual([`1-ledgers-${month}.xml`, `2-vouchers-${month}.xml`]);
+  const [ledgers, vouchers] = files.map((f) => new TextDecoder().decode(f.bytes));
+  expect(ledgers).toContain("<SVCURRENTCOMPANY>Demo Kennel Books</SVCURRENTCOMPANY>");
+  expect(ledgers).toContain('<LEDGER NAME="Walk-in">');
+  // The walk-in's chew bones, the supplier's bill and money in by UPI or card through the bank.
+  expect(vouchers).toMatch(/<VOUCHER VCHTYPE="Sales" ACTION="Create">[\s\S]*?<PARTYLEDGERNAME>Walk-in<\/PARTYLEDGERNAME>/);
+  expect(vouchers).toContain("<AMOUNT>-500.00</AMOUNT>");
+  expect(vouchers).toContain("Ali Meats, Order of");
+  // Every voucher in the file adds up to nothing.
+  for (const voucher of vouchers.split("<VOUCHER ").slice(1)) {
+    const amounts = [...voucher.matchAll(/<AMOUNT>(-?)(\d+)\.(\d{2})<\/AMOUNT>/g)].map((m) => (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number(m[3])));
+    expect(amounts.reduce((a, b) => a + b, 0)).toBe(0);
+  }
+  await narrow(page);
+  await shot(page, "m64-reports");
+});

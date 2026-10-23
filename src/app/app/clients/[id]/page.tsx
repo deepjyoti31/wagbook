@@ -8,6 +8,7 @@ import { HidePanel } from "@/components/hide-panel";
 import { ParentCredit } from "@/components/parent-credit";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
+import { SellForm } from "@/components/sell-form";
 import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
@@ -15,11 +16,20 @@ import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, normalizePho
 import { fill, LANGUAGE_NAMES } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
+import { shopItems } from "@/lib/shop";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { addAddress, changeAddress, eraseClient, mergeClient, removeAddress, renewRequestLink, sellPack, setParentHidden, updateClient } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.parent.title);
+
+/** Sell over the counter to this parent (M62): on a stay's bill, or a bill of its own. */
+async function SellToParent({ t, org, clientId, stays }: { t: Awaited<ReturnType<typeof getAppI18n>>; org: { id: string; currency: string }; clientId: string; stays: { id: string; label: string }[] }) {
+  const items = await shopItems(await createClient(), org.id);
+  if (!items) throw new Error("Could not load the shop.");
+  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true });
+  return <SellForm items={items} m={t.m} money={money} clientId={clientId} stays={stays} />;
+}
 
 export default function ParentPage({ params, searchParams }: PageProps<"/app/clients/[id]">) {
   return (
@@ -41,7 +51,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
   const res = await supabase
     .from("clients")
-    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, request_token, deleted_at, erased_at")
+    .select("id, full_name, phone, alt_phone, email, address, city, postal_code, gst_state_code, tax_id, emergency_name, emergency_phone, notes, consent_at, consent_source, bill_translation, request_token, deleted_at, erased_at, is_walk_in")
     .eq("org_id", org.id)
     .eq("id", id)
     .maybeSingle();
@@ -165,6 +175,26 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           </ul>
         )}
       </Section>
+
+      {org.offers_shop && !hidden ? (
+        <Section title={m.sell.title}>
+          <Suspense fallback={<Loading />}>
+            <SellToParent
+              t={t}
+              org={org}
+              clientId={c.id}
+              stays={
+                // The walk-in buyer has no stays; a parent's sale may go on a stay booked or in the kennel.
+                c.is_walk_in
+                  ? []
+                  : stays.data
+                      .filter((s) => s.status === "confirmed" || s.status === "checked_in")
+                      .map((s) => ({ id: s.id, label: `${fill(m.sell.stayBill, { pet: s.pets?.name ?? "" })}, ${stayText(t, s.kind, s.start_date, s.end_date)}` }))
+              }
+            />
+          </Suspense>
+        </Section>
+      ) : null}
 
       {org.offers_food_delivery ? <Addresses t={t} org={org} clientId={c.id} canManage={canManage} canDelete={canDelete} /> : null}
 

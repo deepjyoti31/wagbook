@@ -199,6 +199,25 @@ downloaded for your accountant.
 
 **More, History of changes** shows who changed a booking, a price, a bill or a setting, and when.
 
+### Selling treats and toys, and ordering from suppliers
+
+Switch on **Treats, toys and other things sold over the counter** in Settings. Under **More, Shop**, add each thing
+with its price and how many should be left before you reorder; record what you bought on the **Stock** page. To sell
+to someone who is not a parent, type how many of each under **Sell to a walk-in**: the bill opens, ready to issue and
+pay. To sell to a parent, use **Sell** on their page or on the stay: it goes on the stay's bill. Wagbook never sells
+more than you have; to correct stock, count it. A sale made by mistake is cancelled by an owner or manager before its
+bill goes out.
+
+**More, Orders to suppliers**: place an order, send it on WhatsApp, and when it comes, anyone types what came. Only
+then is it in stock. Write the supplier's bill down on the order, and close the order if the rest is not coming. The
+kitchen's shopping list leaves out what is already on order, and **Order from** fills an order in for you.
+
+### Tally
+
+If your accountant uses Tally, give them the names of your ledgers once under **Reports, Ledger names in Tally**.
+Each month, **Download for Tally** gives a ZIP of two files: they import the ledgers first, then the vouchers. Ask them
+to check the first month carefully before relying on it.
+
 ## The team: rota, leave and attendance
 
 Switch on **A rota for the team** in Settings, under What this kennel offers.

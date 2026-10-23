@@ -298,6 +298,23 @@ in `20261008000650_alerts.sql`: **alerts** (a kind, a pet's name and a page, wri
 secret, sealed). `take_pushes()` hands the app the phones to wake, for the secret only; `my_alerts()` is what a woken
 phone shows.
 
+## Money and stock
+
+Phase 8 (M62 to M64, D54), in `20261008000580_shop_and_orders.sql`. A thing for sale is a **stock_items** row with a
+price over the counter (`sell_price_minor`), a tax rate (`sell_tax_rate_bp`) and an HSN code, sold by the piece
+(`stock_items_sold_by_the_piece`). **sales** is one sale, to a parent or to the kennel's walk-in buyer
+(`clients.is_walk_in`, one per kennel, no phone, no pets, made by `walk_in_client()`), on a stay (`booking_id`) or not;
+**sale_lines** holds each thing with the price, rate and code it was sold at, copied from the item by
+`sale_lines_price`. Both are written only by `sell()` and changed only by `cancel_sale()`; each line takes its stock out
+as a `stock_moves` row of kind `sale` (`sale_line_id`), and a cancellation puts it back as another. A sale on a stay is
+in `invoice_expected_lines()` (now plpgsql, so it may read these later tables); one not on a stay has a bill of its own
+(`invoices.sale_id`, one live bill per sale), checked by `sale_bill_lines()`. **supplier_orders** and
+**supplier_order_lines** are an order to a supplier and its lines, never changed; what came is a `purchase` movement
+with `supplier_order_id`, checked by `stock_moves_check_order` (open order, item on it, no more than still to come).
+**supplier_order_progress** gives ordered, received and still to come per line, and **stock_on_order** what is still
+to come per item on open orders. `record_supplier_bill()` writes the supplier's bill as an expense and keeps it on the
+order (`expense_id`). **tally_settings** holds the kennel's ledger names in Tally, one row or none (the defaults).
+
 ## Intake
 
 **intake_submissions** hold what a parent sent through the public form: a few extracted columns (name, phone,

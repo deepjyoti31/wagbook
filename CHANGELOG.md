@@ -105,6 +105,13 @@ The first release will be 0.1.0. Everything below is in it.
   end of the shift from Today.
 - Alerts on staff phones for requests from parents, new forms, incidents and pets gone home unpaid, chosen by each
   person; nothing paid for, and no parent's contact in an alert.
+- A shop: treats, toys and other things sold over the counter from stock, to a walk-in on a bill of their own, or to a
+  parent on their stay's bill or a bill of its own. More than is in stock is refused, and what runs low is listed to
+  reorder.
+- Orders to suppliers on WhatsApp, put in stock as they come (in full or in part), with the supplier's bill as an
+  expense. The kitchen's shopping list leaves out what is already on order.
+- The month's bills, credit notes, payments and expenses as two files for Tally, with the ledger names your
+  accountant uses. Have your accountant check one month before relying on it.
 
 ### For whoever runs it
 

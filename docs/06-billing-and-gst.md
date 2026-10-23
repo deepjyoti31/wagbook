@@ -318,6 +318,10 @@ Write the answers in your own records, not in this repository.
     on the pack label (M30)? (Not strictly tax; ask whom the accountant suggests.)
 15. When a parent keeps the value of a cancelled stay as credit for 12 months (M38), is that an advance I hold, and is
     there tax when it is kept, when it is spent, or when it runs out unspent?
+16. Treats, toys and accessories sold over the counter (M62): which HSN codes and rates, may goods and boarding share
+    one bill, and should goods have a sales ledger of their own in Tally?
+17. Please import one month of Wagbook's file for Tally (M64) into a copy of the company and say whether the ledgers,
+    vouchers and amounts are as you would enter them.
 
 ## Food bills (M29)
 
@@ -389,11 +393,35 @@ A pick-up from home or a drop back home is a line of its stay's bill: "Pick-up f
 is the area's trip charge, or its delivery charge when none is set, copied when the trip is added; an owner or manager
 may give another. A cancelled trip is not billed. It takes the stay's tax rate and code.
 
+## Sales over the counter (M62)
+
+Things sold over the counter are goods, with an HSN code and a tax rate per thing, set by an owner or manager. A sale
+on a stay that is booked or in the kennel goes on that stay's bill, a line per thing at the price it was sold at, after
+the stay's other lines; once the stay's bill is issued, nothing more is sold on it. Any other sale has a bill of its
+own, made as it is sold, to the parent or to the kennel's one "Walk-in" buyer, which has no phone, address or GSTIN, so
+its tax invoice is a B2C one (b2cs in the GSTR-1 files). Staff issue either bill only as the database prices it. A sale
+is cancelled only before its bill is issued; after that, a credit note.
+
+**Question for the accountant (16, below):** goods and services on one bill: the line's HSN or SAC code says which, and both go
+on the Sales ledger in the Tally file. Does the kennel want goods on a ledger of their own?
+
+## The file for Tally (M64)
+
+Reports, Download for Tally gives a month as two XML files (`src/lib/core/tally.ts`, D54): ledger masters, then
+vouchers. An issued bill is a Sales voucher (the parent's ledger debited with the total, Sales credited with the
+taxable value, each tax and the round off on their own ledgers), a credit note the same turned round, money in a
+Receipt and out a Payment (cash, or the bank for UPI, card and transfers), credit kept or spent a Journal against the
+credit ledger, and an expense a Payment from its kind's ledger. Cancelled bills are left out, as in Reports, so their
+numbers are missing from the voucher series; the GSTR-1 docs sheet lists them. **It has not been imported into Tally by
+a person**: before relying on it, the accountant imports one month into a copy of the company and compares the ledgers
+with Reports.
+
 ## Not built
 
 - Debit notes.
 - E-invoicing and e-way bills.
-- GST return exports. Reports gives tax by rate for a month and a CSV of bills, for the accountant to work from.
+- GST returns filed from Wagbook. Reports gives tax by rate for a month, the GSTR-1 files and the file for Tally, for the
+  accountant to work from.
 - Multiple tax rates on one stay line.
 - Currencies other than the kennel's own on a single invoice.
 

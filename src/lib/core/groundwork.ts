@@ -75,6 +75,7 @@ export interface Offers {
   offers_appointments: boolean;
   offers_kitchen: boolean;
   offers_food_delivery: boolean;
+  offers_shop: boolean;
 }
 
 /** The skills worth asking about for what the kennel offers: a kennel with no kitchen has no cooks. */
@@ -89,5 +90,5 @@ export function skillsOffered(o: Offers): StaffSkill[] {
 
 /** Whether anything beyond boarding is switched on. */
 export function offersMore(o: Offers): boolean {
-  return o.offers_appointments || o.offers_kitchen || o.offers_food_delivery;
+  return o.offers_appointments || o.offers_kitchen || o.offers_food_delivery || o.offers_shop;
 }

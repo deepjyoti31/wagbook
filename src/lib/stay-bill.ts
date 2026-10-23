@@ -1,5 +1,5 @@
 import { BILLABLE_IN_FAMILY, bookingLines, creditContext, differenceCredit, familyLines, moneyLines, seriesLines, staysChanged, type CreditableBill } from "./billing";
-import { appointmentLines, computeInvoice, toStayCharges, tripLines, unpricedAppointments, type BillableAddOn, type BillableAppointment, type InvoiceTotals, type LineInput } from "./core";
+import { appointmentLines, computeInvoice, saleLines, toStayCharges, tripLines, unpricedAppointments, type BillableAddOn, type BillableAppointment, type InvoiceTotals, type LineInput } from "./core";
 import { foodLines } from "./food-bill";
 import type { createClient } from "./supabase/server";
 
@@ -8,8 +8,9 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 /**
  * What a bill covers: one stay, a family booked together, one month of a
  * repeating day boarding series (D41), a week or month of a food
- * subscription, or one food order (M29). Must match invoice_bookings() and
- * food_bill_lines() in the database.
+ * subscription, one food order (M29), a visitor's appointment (M34), or a
+ * sale over the counter (M62). Must match invoice_bookings(),
+ * food_bill_lines() and sale_bill_lines() in the database.
  */
 export type BillScope =
   | { booking: string }
@@ -17,7 +18,8 @@ export type BillScope =
   | { series: string; month: string }
   | { subscription: string; from: string; to: string }
   | { delivery: string }
-  | { appointment: string };
+  | { appointment: string }
+  | { sale: string };
 
 interface ScopeColumns {
   booking_id: string | null;
@@ -29,6 +31,7 @@ interface ScopeColumns {
   period_end?: string | null;
   delivery_id?: string | null;
   appointment_id?: string | null;
+  sale_id?: string | null;
 }
 
 /** The scope of a bill, from its row. Null for a one-off bill that covers no stay. */
@@ -36,6 +39,7 @@ export function scopeOf(inv: ScopeColumns): BillScope | null {
   if (inv.subscription_id && inv.period_start && inv.period_end) return { subscription: inv.subscription_id, from: inv.period_start, to: inv.period_end };
   if (inv.delivery_id) return { delivery: inv.delivery_id };
   if (inv.appointment_id) return { appointment: inv.appointment_id };
+  if (inv.sale_id) return { sale: inv.sale_id };
   if (inv.group_id) return { group: inv.group_id };
   if (inv.series_id && inv.series_month) return { series: inv.series_id, month: inv.series_month };
   if (inv.booking_id) return { booking: inv.booking_id };
@@ -48,6 +52,9 @@ export function monthOf(date: string): string {
 }
 
 const STAY = "id, client_id, kind, start_date, end_date, boarding_from, pass_id, rate_minor, discount_minor, tax_rate_bp, sac_code, status, created_at, pets(name), packages(name)" as const;
+
+/** A line sold over the counter, with its sale, inner-joined so that a filter on the sale leaves the line out. */
+const SALE_LINE = "description, quantity, unit_price_minor, tax_rate_bp, hsn_code, sort_order, sales!inner(booking_id, status, created_at)" as const;
 
 const APPOINTMENT = "id, booking_id, status, starts_at, price_minor, tax_rate_bp, sac_code, course_id, in_package, appointment_services(name), pets!appointments_org_id_client_id_pet_id_fkey(name)" as const;
 
@@ -83,6 +90,12 @@ export const UNPRICED = { code: "unpriced", message: "An appointment on quote ha
  */
 export async function stayBillLines(supabase: Supabase, orgId: string, scope: BillScope) {
   if ("subscription" in scope || "delivery" in scope) return foodBillLines(supabase, orgId, scope);
+  if ("sale" in scope) {
+    // A sale over the counter on a bill of its own (M62). Cancelled, it comes to nothing.
+    const sold = await supabase.from("sale_lines").select(SALE_LINE).eq("org_id", orgId).eq("sale_id", scope.sale).eq("sales.status", "sold").order("sort_order");
+    if (sold.error) return { error: sold.error };
+    return { stays: [] as { id: string }[], lines: saleLines(sold.data.filter((l) => l.sales)) };
+  }
   const tz = await supabase.from("organizations").select("time_zone").eq("id", orgId).single();
   if (tz.error) return { error: tz.error };
   const timeZone = tz.data.time_zone;
@@ -103,7 +116,7 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
   if (stays.data.length === 0) return { stays: stays.data, lines: [] as LineInput[] };
 
   const ids = stays.data.map((b) => b.id);
-  const [items, charges, appts, trips] = await Promise.all([
+  const [items, charges, appts, trips, sold] = await Promise.all([
     // A package's own extras are in its price, not lines of their own (M37).
     supabase.from("booking_items").select("booking_id, description, quantity, unit_price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).eq("in_package", false).order("created_at"),
     // What each stay costs: split where a pet had its shared kennel to itself, or turned from day boarding into boarding.
@@ -111,18 +124,25 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
     billableAppointments(supabase, orgId, { bookings: ids }),
     // Pick-ups and drops (M39), after the appointments.
     supabase.from("trips").select("booking_id, kind, status, trip_date, at_time, price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).in("booking_id", ids).neq("status", "cancelled"),
+    // Things sold over the counter on the stays (M62), last.
+    supabase.from("sale_lines").select(SALE_LINE).eq("org_id", orgId).in("sales.booking_id", ids).eq("sales.status", "sold").order("sort_order"),
   ]);
-  if (items.error || charges.error || trips.error) return { error: items.error ?? charges.error ?? trips.error };
+  if (items.error || charges.error || trips.error || sold.error) return { error: items.error ?? charges.error ?? trips.error ?? sold.error };
   if ("error" in appts) return { error: appts.error };
   if (unpricedAppointments(appts.appointments).length) return { error: UNPRICED };
   const billable = stays.data.map((b) => ({ ...b, package_name: b.packages?.name ?? null, charges: toStayCharges(charges.data.filter((c) => c.booking_id === b.id)) }));
   const itemsOf = (id: string) => items.data.filter((i) => i.booking_id === id);
-  // Each stay's appointments (M34) and trips (M39), after its stay and extras.
+  // Each stay's appointments (M34), trips (M39) and things sold on it (M62), after its stay and extras.
+  const soldOn = (id: string) =>
+    sold.data
+      .filter((l) => l.sales?.booking_id === id)
+      .sort((a, b) => (a.sales?.created_at ?? "").localeCompare(b.sales?.created_at ?? "") || a.sort_order - b.sort_order);
   const appointmentsOf = (id: string, petName: string) => {
     const mine = appts.appointments.filter((a) => a.booking_id === id);
     return [
       ...appointmentLines(petName, mine, appts.addOns.filter((x) => mine.some((a) => a.id === x.appointment_id)), timeZone),
       ...tripLines(petName, trips.data.filter((t) => t.booking_id === id)),
+      ...saleLines(soldOn(id)),
     ];
   };
   // The pet's name goes into the stored line description; a booking always has a pet, so the fallback is never seen.

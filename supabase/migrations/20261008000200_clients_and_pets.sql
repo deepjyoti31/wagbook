@@ -24,11 +24,13 @@ create table public.clients (
   created_by uuid references auth.users (id) on delete set null,
   deleted_at timestamptz,
   erased_at timestamptz,
+  is_walk_in boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, id),
-  -- An erased parent keeps no phone number (erase_client).
-  constraint clients_phone_check check (phone ~ '^\+[1-9][0-9]{7,14}$' or (erased_at is not null and phone = '')),
+  -- An erased parent keeps no phone number (erase_client), and the walk-in
+  -- buyer of over-the-counter sales has none (M62).
+  constraint clients_phone_check check (phone ~ '^\+[1-9][0-9]{7,14}$' or ((erased_at is not null or is_walk_in) and phone = '')),
   -- An erased parent stays hidden: nobody can bring the empty record back to the lists.
   constraint clients_erased_stay_hidden check (erased_at is null or deleted_at is not null)
 );
@@ -46,11 +48,16 @@ comment on column public.clients.bill_translation is
 comment on column public.clients.request_token is
   'Secret in the parent''s own booking link (/b/{token}), where they ask for a stay. renew_request_link() replaces it, so an old link stops working; erasing the parent clears it.';
 comment on column public.clients.deleted_at is 'Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense.';
+comment on column public.clients.is_walk_in is
+  'True for the one "Walk-in" buyer each kennel has, made by walk_in_client() for over-the-counter sales to someone who is not a parent (M62). It has no phone and no pets, and only the database sets it.';
 comment on column public.clients.erased_at is
   'When the parent''s details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it.';
 
 -- One live client per phone number per organisation.
 create unique index clients_org_phone_key on public.clients (org_id, phone) where deleted_at is null;
+-- One walk-in buyer per organisation (M62).
+create unique index clients_one_walk_in on public.clients (org_id) where is_walk_in;
+comment on index public.clients_one_walk_in is 'A kennel has one "Walk-in" buyer, for sales to people who are not parents.';
 create index clients_org_name_idx on public.clients (org_id, lower(full_name));
 
 create trigger clients_set_updated_at

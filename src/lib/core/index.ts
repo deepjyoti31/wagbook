@@ -36,3 +36,5 @@ export * from "./problems";
 export * from "./sizes";
 export * from "./sign-in";
 export * from "./the-day";
+export * from "./shop";
+export * from "./tally";

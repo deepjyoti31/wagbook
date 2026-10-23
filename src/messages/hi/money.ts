@@ -363,6 +363,9 @@ export const moneyArea: typeof English = {
         organizations: "केनेल की सेटिंग",
         memberships: "व्यक्ति",
         appointments: "अपॉइंटमेंट",
+        sales: "काउंटर पर बिक्री",
+        stock_items: "स्टॉक की चीज़",
+        supplier_orders: "सप्लायर को ऑर्डर",
       },
       // {what} is one of the tables above.
       added: "जोड़ा गया: {what}",

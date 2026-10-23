@@ -2,11 +2,21 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 23 October 2026, after building Phase 7 (M58 to M61, D53).
+Last updated: 23 October 2026, after building Phase 8 (M62 to M64, D54).
 
 ## In one paragraph
 
-Every milestone from M2 to M61 is built, and the launch work in M1 waits for the owner. Phase 7 (M58 to M61, `02`
+Every milestone from M2 to M64 is built, and the launch work in M1 waits for the owner. Phase 8 (M62 to M64, `02`
+sections L18 to L20, D54) is built: treats, toys and accessories sold over the counter from the same stock as the
+kitchen's (switched on in Settings), each line priced by the database from its item and its stock taken out in the same
+step, all or nothing, more than is in stock refused (`WB130`); a sale goes on a stay's bill (until that bill is out,
+`WB283`) or on a bill of its own, to a parent or to the kennel's one "Walk-in" buyer (`clients.is_walk_in`: no phone,
+no pets, never merged); a manager cancels one made by mistake before its bill goes out and the stock comes back; what
+runs low is listed to reorder. Orders to suppliers are placed by managers and sent on WhatsApp, put in stock by anyone
+as they come, never more than is still to come (`WB290` to `WB292`), with the supplier's bill an expense once
+(`WB293`); the kitchen's shopping list leaves out what is on order and can place the order. Reports downloads a month
+as two XML files for Tally (ledgers, then vouchers) with the ledger names the kennel sets once; **not yet imported into
+Tally by a person**. Next is Phase 9, M65. Phase 7 (M58 to M61, `02`
 sections L14 to L17, D53) is built: an appointment moves to another day, time, place or person from the free times,
 checked by the database like a new one (`WB270`, `WB271`), with the new time sent to the parent on WhatsApp and the old
 one in History of changes; from their own link a parent asks for an appointment at a free time (a request, on
@@ -17,7 +27,7 @@ shift shows on Today for owners and managers, closed at the shift's end with a n
 (chosen by each person under More) for requests, new forms, food orders, incidents and pets gone home unpaid, where the
 push carries nothing and the phone asks Wagbook what happened, signed in. Alerts are off until an installation sets
 four settings (`node scripts/push-keys.mjs`); `take_pushes()`, guarded by the installation's push secret, is the
-thirteenth function the anonymous role may call. Next is Phase 8, from M62. Phase 6 (M50 to M57, `02`
+thirteenth function the anonymous role may call. Phase 6 (M50 to M57, `02`
 sections L6 to L13, D52) is built: a kennel left by its last pet is "To clean" on Today and the calendar until someone
 taps Cleaned, and checking into one asks first; opening and closing checklists on Today, cleaning that repeats on
 Care, and repairs whose cost becomes an expense; a pet marked as passed away has its stays, appointments and food
@@ -72,8 +82,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (`npm run check`: 719 tests in all on 23 October 2026), and the whole day is
-walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 78 steps).
+database rules are tested in-process (`npm run check`: 754 tests in all on 23 October 2026), and the whole day is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 81 steps).
 
 ## What is verified, and how
 
@@ -198,6 +208,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | VAPID signing, alert sentences in every language | `src/lib/vapid.test.ts` (a token the public key verifies, keys that are not a pair refused), `src/lib/alerts.test.ts` | High |
 | Phase 7 in a browser at 360 pixels: a swim booked and moved to another day and time from the free times, the WhatsApp link with the new time, History of changes showing the appointment's old start; a parent asking for a swim from their own link in a private window, staff seeing it under "Asked for by parents" and on Today; a parent telling a trial delivery came damaged with a photo (the photo reached the local Storage through the policy), staff seeing it on Food with the photo and on Today, and dealing with it; a usual week of mornings filling 23 days (28, less two of leave and three already on by hand), the rota listing it; a manager left clocked in from yesterday's shift shown on Today and clocked out at 15:00 with one tap; alerts chosen under More, a parent's booking request, then a push handed to the phone's service worker (through the browser's DevTools protocol) showing "Wagbook Demo Kennel: A parent asked for a stay for Rocky." with no phone number | `npm run test:e2e` against the local Supabase: the whole walk, 78 steps passing, 23 October 2026; screenshots taken. The walk found the problem form's sentence vanishing with the form (the delivery moves to "Already told"): it now goes back to the page with `?told=`; and PostgREST seeing two ways from memberships to organizations once `alert_choices` and `rota_patterns` existed: the one embed now names its key | High for the local stack |
 | `npm run setup:local` writes `.env.local` for the local Supabase | Run by hand, 19 October 2026 | High |
+| Phase 8 in the database: selling the last piece and refused the next (`WB130`), nothing of a refused sale left; refused while the kennel does not sell (`WB280`), for what has no price (`WB281`), by weight (`stock_items_sold_by_the_piece`), with no lines (`WB287`), by riders and other kennels; priced from the item whatever is sent, a later price change leaving a sale as it was, staff unable to change a price; nobody writing a sale, its lines or a sale's stock by hand; the walk-in buyer one per kennel, no phone, no pets (`WB286`), never merged (`WB018`), not made by hand; a bill of its own issued by staff only as sold (`WB050`), once (`invoices_one_live_per_sale`), only to its buyer (`WB288`); a sale on a stay on that stay's bill (staff refused without it), nothing more once it is out (`WB283`), not on a cancelled stay (`WB282`); cancelled by owners and managers with a reason (`WB002`, `WB285`), once (`WB284`), its stock back and its draft bill gone, in the history; in the parent's export. Orders: placed by managers only, nothing in stock until it comes, lines never changed, received in part by staff (no cost) and in full by a manager with a cost, never more than still to come (`WB292`), only what is on it (`WB291`), not once closed (`WB290`); the bill an expense once (`WB293`); the shopping list leaving out what is on order; an order with receipts never deleted | `tests/db/shop.test.ts` (10), `tests/db/supplier-orders.test.ts` (8); the cap on what comes, the issued stay bill check and the price from the item each removed once to see the tests fail | High |
+| Sale bill lines, the counter's quantities, what to reorder, quantities typed back; the shopping list less what is on order; the Tally files: party ledgers, XML escaping, every voucher balanced, bills, credit notes, receipts, refunds, credit journals, expenses, one tax and IGST, masters once each | `src/lib/core/shop.test.ts`, `food.test.ts`, `tally.test.ts` | High for the arithmetic; none for Tally accepting the file (see below) |
+| Phase 8 in a browser at 360 pixels: the shop switched on, a chew bone and a rope toy added with prices and bought in on the Stock page; staff sell both chew bones to a walk-in, the bill opens to "Walk-in" and is issued (no WhatsApp button, no phone); the chew bone's box then disabled and on the list to reorder; four rope toys of three refused with the database's sentence; a rope toy sold on a stay in house, listed under "Sold on this stay", then cancelled by a manager with its stock back; an order to Ali Meats for 50 kg of chicken with a note, the WhatsApp link to the supplier's number with the lines, marked sent; the kitchen not asking for chicken while it is on order; staff (no cost box) putting 30 kg in stock, "20 kg to come"; the manager writing the bill (₹6,600) as an expense and closing the order; ledger names saved, and the month's ZIP holding the two XML files, the walk-in's ledger and Sales voucher, the supplier's bill, every voucher balanced | `npm run test:e2e` against the local Supabase: the whole walk, 81 steps passing, 23 October 2026; screenshots taken. The walk found the "sale cancelled" sentence vanishing with its form: it now goes back to the page with `?done=sale-cancelled` | High for the local stack; the Tally files not imported into Tally |
 | Lint, types, production build | `npm run check` | High |
 | Next.js 16.4.1 (D51): `npm audit --omit=dev` finds nothing; the build no longer stops with the "SecurityFatalError" notice; the whole app works on it | `npm run check` (665 tests and the build, after merging Phase 5), and `npm run test:e2e` against the local Supabase (71 passed after the merge), 23 October 2026 | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -245,6 +258,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Alerts reaching a real phone through a real push service | No push service is reachable here, and Playwright's Chromium has no keys for one: "Allow alerts on this phone" was not walked, and the walk hands the push to the service worker directly. The VAPID header is unit tested against RFC 8292's shape, not against FCM, Mozilla or Apple | Medium: set alerts up on a hosted install and allow them on an Android phone and an iPhone added to the home screen (`10`, "Alerts on phones") before telling staff to rely on them |
 | Phase 7 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The usual week's weekday list and the alert sentences may wrap in Kannada |
 | The overnight `fill_rota` job on a hosted project | Run inside `run_nightly_jobs()` in the database tests and when the rota opens in the walk; pg_cron not watched at night | Low |
+| The Tally files imported into Tally | No Tally here. The XML follows Tally's published import format (ENVELOPE, Import Data, LEDGER and VOUCHER messages, debits negative with ISDEEMEDPOSITIVE Yes), and every voucher is checked to balance; nobody has imported one | Medium: ask the accountant to import one month into a copy of the company (question 17 in `06`) and fix `src/lib/core/tally.ts` where Tally objects. Ledgers that already exist in Tally are written without an action so they should be left alone; that is not proven |
+| Phase 8 screens in Hindi and Kannada | Words drafted and checked for completeness by the message test; not screenshotted | The counter's form and the order lines may wrap in Kannada |
+| HSN codes and rates for things sold over the counter | The kennel types them; nobody has checked them | Question 16 in `06` |
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
@@ -272,8 +288,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: M62 to M65 are next**, in order, starting with M62 (selling over the counter). The owner chose them on 22
-October 2026 (D49); `02` section L lists them. Phases 5 to 7 (M45 to M61) are built. Alongside, steps 1 to 9 above still
+**Building: M65 is next** (several sites under one owner). The owner chose it on 22 October 2026 (D49); `02` section
+L lists it. Phases 5 to 8 (M45 to M64) are built. Before a kennel relies on the file for Tally, the accountant imports
+one month (`06`, questions 16 and 17). Alongside, steps 1 to 9 above still
 need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
 template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
 check `cron.job` has `wagbook-nightly`, point an uptime service at `/api/health`, and if the kennel wants alerts on
@@ -672,7 +689,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 719 tests, build
+npm run check        # dash check, lint, typecheck, 754 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -682,6 +699,11 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 23 October 2026: Phase 8 built (M62 to M64, D54): selling over the counter from stock (a walk-in buyer, sales on a
+  stay's bill or a bill of their own), orders to suppliers received into stock with the bill as an expense, and the
+  month's file for Tally. 18 database tests (the cap on what comes, the issued stay bill check and the price from the
+  item each removed once to see a test fail), 17 unit tests, 3 browser steps (81 in all, passing against the local
+  Supabase). `npm run check`: 754 tests. No new public function. The Tally files are not yet imported into Tally.
 - 23 October 2026: Phase 7 built (M58 to M61, D53): moving appointments, appointment requests and delivery problems from
   the parent's link, the usual week and forgotten clock-outs, alerts on staff phones (pushes that carry nothing).
   28 database tests (each new rule removed once to see its test fail), 4 unit tests, 4 browser steps (78 in all,

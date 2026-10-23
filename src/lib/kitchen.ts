@@ -11,7 +11,9 @@ import type { createClient } from "./supabase/server";
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 export const STOCK_UNITS = ["g", "ml", "piece"] as const;
-export const STOCK_KINDS = ["meat", "organ", "egg", "grain", "vegetable", "oil", "supplement", "packaging", "fuel", "grooming", "medicine", "other"] as const;
+export const STOCK_KINDS = ["meat", "organ", "egg", "grain", "vegetable", "oil", "supplement", "packaging", "fuel", "grooming", "medicine", "treat", "toy", "accessory", "other"] as const;
+/** The kinds offered for something sold over the counter (M62). */
+export const SHOP_KINDS = ["treat", "toy", "accessory", "grooming", "medicine", "other"] as const;
 export const WASTE_REASONS = ["spoiled", "past_date", "dropped", "other"] as const;
 export const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 export const FOOD_PRODUCT_KINDS = ["trial", "subscription", "by_kilo", "item"] as const;

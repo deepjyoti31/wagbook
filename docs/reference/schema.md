@@ -6,13 +6,13 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 19. Tables: 84. Views: 7. Functions: 186.
+Migrations applied: 20. Tables: 89. Views: 9. Functions: 199.
 
 ## Contents
 
 - [Enumerated types](#enumerated-types)
-- Tables: [alert_choices](#alert_choices), [alerts](#alerts), [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [push_outbox](#push_outbox), [push_secret](#push_secret), [push_subscriptions](#push_subscriptions), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [rota_patterns](#rota_patterns), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [suppliers](#suppliers), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
-- Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stay_supply_left](#stay_supply_left), [stock_levels](#stock_levels)
+- Tables: [alert_choices](#alert_choices), [alerts](#alerts), [app_errors](#app_errors), [appointment_items](#appointment_items), [appointment_places](#appointment_places), [appointment_service_prices](#appointment_service_prices), [appointment_services](#appointment_services), [appointments](#appointments), [attendance](#attendance), [audit_log](#audit_log), [batches](#batches), [booking_items](#booking_items), [bookings](#bookings), [cancellation_rules](#cancellation_rules), [care_items](#care_items), [care_tasks](#care_tasks), [client_addresses](#client_addresses), [clients](#clients), [courses](#courses), [credit_note_lines](#credit_note_lines), [credit_notes](#credit_notes), [credit_uses](#credit_uses), [credits](#credits), [day_packs](#day_packs), [deliveries](#deliveries), [delivery_problems](#delivery_problems), [delivery_runs](#delivery_runs), [expenses](#expenses), [food_orders](#food_orders), [food_products](#food_products), [health_overrides](#health_overrides), [house_job_days](#house_job_days), [house_jobs](#house_jobs), [incidents](#incidents), [intake_submissions](#intake_submissions), [invitation_links](#invitation_links), [invoice_counters](#invoice_counters), [invoice_lines](#invoice_lines), [invoices](#invoices), [job_runs](#job_runs), [kennel_cleans](#kennel_cleans), [kennel_service](#kennel_service), [kennels](#kennels), [leave_requests](#leave_requests), [memberships](#memberships), [organizations](#organizations), [package_parts](#package_parts), [packages](#packages), [passes](#passes), [payments](#payments), [peak_periods](#peak_periods), [pet_food](#pet_food), [pet_grooming](#pet_grooming), [pet_weights](#pet_weights), [pets](#pets), [photo_archives](#photo_archives), [play_sessions](#play_sessions), [play_yards](#play_yards), [push_outbox](#push_outbox), [push_secret](#push_secret), [push_subscriptions](#push_subscriptions), [recipe_ingredients](#recipe_ingredients), [recipe_versions](#recipe_versions), [recipes](#recipes), [recovery_codes](#recovery_codes), [reminders_sent](#reminders_sent), [repairs](#repairs), [required_vaccines](#required_vaccines), [rota](#rota), [rota_patterns](#rota_patterns), [sale_lines](#sale_lines), [sales](#sales), [service_areas](#service_areas), [services](#services), [shifts](#shifts), [stay_reports](#stay_reports), [stay_supplies](#stay_supplies), [stay_updates](#stay_updates), [stock_costs](#stock_costs), [stock_items](#stock_items), [stock_moves](#stock_moves), [subscriptions](#subscriptions), [supplier_order_lines](#supplier_order_lines), [supplier_orders](#supplier_orders), [suppliers](#suppliers), [tally_settings](#tally_settings), [trips](#trips), [vaccinations](#vaccinations), [vet_visits](#vet_visits)
+- Views: [course_balances](#course_balances), [credit_balances](#credit_balances), [invoice_balances](#invoice_balances), [pass_balances](#pass_balances), [recipe_current](#recipe_current), [stay_supply_left](#stay_supply_left), [stock_levels](#stock_levels), [stock_on_order](#stock_on_order), [supplier_order_progress](#supplier_order_progress)
 - [Functions](#functions)
 
 ## Enumerated types
@@ -53,12 +53,14 @@ Migrations applied: 19. Tables: 84. Views: 7. Functions: 186.
 | `pet_sex` | `male`, `female`, `unknown` | unknown is the honest default when nobody has said. |
 | `problem_kind` | `damaged`, `late`, `wrong` | What a parent said was wrong with a delivery: damaged, late or wrong. |
 | `problem_outcome` | `replaced`, `refunded`, `none` | What the kennel did: made it again at no charge, gave the money back (a credit note and a refund), or nothing. |
+| `sale_status` | `sold`, `cancelled` | sold: the things went out and are billed. cancelled: undone by an owner or manager before its bill went out; the stock came back. |
 | `service_kind` | `boarding`, `daycare`, `addon` | boarding: an overnight stay, priced per night. daycare: day boarding, priced per day. addon: an extra such as grooming. |
 | `size_band` | `small`, `medium`, `large` | A dog's size from its latest weight, using the kennel's bands (organizations.small_dog_max_g and medium_dog_max_g). Must match sizeBand() in src/lib/core/food.ts. |
 | `staff_skill` | `cook`, `groomer`, `trainer`, `swim_supervisor`, `rider` | What a person can be given to do, beyond their role: cook (the kitchen), groomer, trainer and swim_supervisor (appointments), rider (deliveries and pick-ups). Skills choose who is offered a job; access stays with the role. |
-| `stock_kind` | `meat`, `organ`, `egg`, `grain`, `vegetable`, `oil`, `supplement`, `packaging`, `fuel`, `grooming`, `medicine`, `other` | What sort of thing an item is, for sorting the stock page and the shopping list. |
-| `stock_move_kind` | `purchase`, `used`, `waste`, `count` | purchase: bought in (owners and managers). used: taken out by a batch of cooking (M30), never by hand. waste: thrown away with a reason. count: a stock take, which sets the counted quantity and records the difference. |
+| `stock_kind` | `meat`, `organ`, `egg`, `grain`, `vegetable`, `oil`, `supplement`, `packaging`, `fuel`, `grooming`, `medicine`, `treat`, `toy`, `accessory`, `other` | What sort of thing an item is, for sorting the stock page and the shopping list. Treats, toys and accessories are usually sold over the counter (M62). |
+| `stock_move_kind` | `purchase`, `used`, `waste`, `count`, `sale` | purchase: bought in (owners and managers), or received against an order to a supplier (M63, anyone). used: taken out by a batch of cooking (M30), never by hand. waste: thrown away with a reason. count: a stock take, which sets the counted quantity and records the difference. sale: sold over the counter (M62), out when sold and back in when the sale is cancelled, written only by the database. |
 | `stock_unit` | `g`, `ml`, `piece` | How an item is counted: grams, millilitres or pieces. Quantities are whole numbers of this unit. |
+| `supplier_order_status` | `open`, `closed` | open: waiting for what was ordered. closed: an owner or manager said the rest is not coming. An open order with nothing left to come is received in full. |
 | `supply_kind` | `food`, `medicine` | food: the parent's own food, in grams, eaten at each meal. medicine: the parent's own medicine, in doses, given at each dose. |
 | `task_status` | `pending`, `done`, `skipped` | pending: still to do. done: completed (who and when are stamped). skipped: deliberately not done, with a note saying why. |
 | `tax_mode` | `none`, `simple`, `gst_india` | none: no tax charged. simple: one tax at one rate (VAT, sales tax). gst_india: CGST+SGST within a state, IGST across states. |
@@ -997,6 +999,7 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 | `created_by` | `uuid` |  |  |  |
 | `deleted_at` | `timestamp with time zone` |  |  | Soft delete. Hidden from lists but kept so that past bookings and invoices still make sense. |
 | `erased_at` | `timestamp with time zone` |  |  | When the parent's details were erased on their request (erase_client). The row stays, empty, because issued bills and past stays point at it. |
+| `is_walk_in` | `boolean` | yes | `false` | True for the one "Walk-in" buyer each kennel has, made by walk_in_client() for over-the-counter sales to someone who is not a parent (M62). It has no phone and no pets, and only the database sets it. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -1013,10 +1016,11 @@ A pet parent: the person who books and pays. Personal data under India's DPDP Ac
 - Check `clients_erased_stay_hidden`: `CHECK (((erased_at IS NULL) OR (deleted_at IS NOT NULL)))`
 - Check `clients_full_name_check`: `CHECK (((char_length(full_name) >= 1) AND (char_length(full_name) <= 120)))`
 - Check `clients_gst_state_code_check`: `CHECK (((gst_state_code IS NULL) OR (gst_state_code ~ '^[0-9]{2}$'::text)))`
-- Check `clients_phone_check`: `CHECK (((phone ~ '^\+[1-9][0-9]{7,14}$'::text) OR ((erased_at IS NOT NULL) AND (phone = ''::text))))`
+- Check `clients_phone_check`: `CHECK (((phone ~ '^\+[1-9][0-9]{7,14}$'::text) OR (((erased_at IS NOT NULL) OR is_walk_in) AND (phone = ''::text))))`
 
 **Indexes**
 
+- `CREATE UNIQUE INDEX clients_one_walk_in ON public.clients USING btree (org_id) WHERE is_walk_in`
 - `CREATE INDEX clients_org_name_idx ON public.clients USING btree (org_id, lower(full_name))`
 - `CREATE UNIQUE INDEX clients_org_phone_key ON public.clients USING btree (org_id, phone) WHERE (deleted_at IS NULL)`
 
@@ -2079,6 +2083,7 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 | `period_end` | `date` |  |  | With subscription_id: the last day whose deliveries this bill covers (a week or a month after period_start). |
 | `delivery_id` | `uuid` |  |  | The one-off food order this bill is for: a trial, food by the kilo or a made-to-order item (M29). |
 | `appointment_id` | `uuid` |  |  | The appointment of a visitor this bill is for (M34), with its add-ons. A boarder's appointment is on its stay's bill instead (WB200). |
+| `sale_id` | `uuid` |  |  | The sale over the counter this bill is for (M62), to a parent or to the kennel's walk-in buyer. A sale made on a stay is on the stay's bill instead. |
 | `status` | `invoice_status` | yes | `'draft'::invoice_status` |  |
 | `number` | `text` |  |  | Printed invoice number, e.g. WB/27-28/0001. Empty until issued. Consecutive within a financial year, never reused. |
 | `fiscal_year` | `text` |  |  | Financial year the number belongs to, e.g. 2027-28. |
@@ -2123,6 +2128,7 @@ A bill. Editable while a draft; frozen for ever once issued. A tax invoice when 
 - Foreign key `invoices_org_id_booking_id_fkey`: `FOREIGN KEY (org_id, booking_id) REFERENCES bookings(org_id, id) ON DELETE SET NULL (booking_id)`
 - Foreign key `invoices_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE RESTRICT`
 - Foreign key `invoices_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `invoices_sale_fkey`: `FOREIGN KEY (org_id, sale_id) REFERENCES sales(org_id, id)`
 - Foreign key `invoices_subscription_fkey`: `FOREIGN KEY (org_id, subscription_id) REFERENCES subscriptions(org_id, id) ON DELETE RESTRICT`
 - Foreign key `invoices_voided_by_fkey`: `FOREIGN KEY (voided_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Check `invoices_cgst_minor_check`: `CHECK ((cgst_minor >= 0))`
@@ -2135,7 +2141,7 @@ CASE
     WHEN (status = 'draft'::invoice_status) THEN ((number IS NULL) AND (seq IS NULL) AND (fiscal_year IS NULL) AND (issued_on IS NULL) AND (issued_by IS NULL))
     ELSE ((number IS NOT NULL) AND (seq IS NOT NULL) AND (fiscal_year IS NOT NULL) AND (issued_on IS NOT NULL))
 END)`
-- Check `invoices_one_stay_or_one_family`: `CHECK ((num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id, appointment_id) <= 1))`
+- Check `invoices_one_stay_or_one_family`: `CHECK ((num_nonnulls(booking_id, group_id, series_id, subscription_id, delivery_id, appointment_id, sale_id) <= 1))`
 - Check `invoices_place_of_supply_state_code_check`: `CHECK (((place_of_supply_state_code IS NULL) OR (place_of_supply_state_code ~ '^[0-9]{2}$'::text)))`
 - Check `invoices_round_off_minor_check`: `CHECK (((round_off_minor >= '-99'::integer) AND (round_off_minor <= 99)))`
 - Check `invoices_series_month`: `CHECK ((((series_id IS NULL) = (series_month IS NULL)) AND ((series_month IS NULL) OR (EXTRACT(day FROM series_month) = (1)::numeric))))`
@@ -2153,6 +2159,7 @@ END)`
 - `CREATE UNIQUE INDEX invoices_one_live_per_booking ON public.invoices USING btree (org_id, booking_id) WHERE ((booking_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE UNIQUE INDEX invoices_one_live_per_delivery ON public.invoices USING btree (org_id, delivery_id) WHERE ((delivery_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE UNIQUE INDEX invoices_one_live_per_family ON public.invoices USING btree (org_id, group_id) WHERE ((group_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
+- `CREATE UNIQUE INDEX invoices_one_live_per_sale ON public.invoices USING btree (org_id, sale_id) WHERE ((sale_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE UNIQUE INDEX invoices_one_live_per_series_month ON public.invoices USING btree (org_id, series_id, series_month) WHERE ((series_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE UNIQUE INDEX invoices_one_live_per_subscription_period ON public.invoices USING btree (org_id, subscription_id, period_start) WHERE ((subscription_id IS NOT NULL) AND (status <> 'void'::invoice_status))`
 - `CREATE INDEX invoices_org_booking_idx ON public.invoices USING btree (org_id, booking_id)`
@@ -2163,6 +2170,7 @@ END)`
 
 - `invoices_audit` (after insert or delete or update) runs `audit_row()`
 - `invoices_check_food` (before insert or update of subscription_id, period_start, period_end, delivery_id, client_id) runs `invoices_check_food()`
+- `invoices_check_sale` (before insert or update of sale_id, client_id) runs `invoices_check_sale()`
 - `invoices_check_stay` (before insert or update of booking_id, group_id, series_id, client_id, appointment_id) runs `invoices_check_stay()`
 - `invoices_forbid_org_change` (before update) runs `forbid_org_change()`
 - `invoices_guard` (before delete or update) runs `invoices_guard()`
@@ -2476,6 +2484,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `offers_appointments` | `boolean` | yes | `false` | Whether the kennel books services by the hour: grooming, swimming, training, parties (D44). Off: none of it is shown. |
 | `offers_kitchen` | `boolean` | yes | `false` | Whether the kennel cooks food in its own kitchen, for boarders and to sell (D44). Off: none of it is shown. |
 | `offers_food_delivery` | `boolean` | yes | `false` | Whether the kennel delivers its food to parents at home (D44). Needs offers_kitchen. Turns on parents' addresses and the areas served. |
+| `offers_shop` | `boolean` | yes | `false` | Whether the kennel sells treats, toys and other things over the counter, from stock (M62). Off: none of it is shown and nothing can be sold. |
 | `portion_small_bp` | `integer` | yes | `300` | A small dog's day of food as a share of its body weight, in basis points: 300 is 3% (M28). Medium and large have their own. |
 | `portion_medium_bp` | `integer` | yes | `250` | A medium dog's day of food as a share of its body weight, in basis points: 250 is 2.5%. |
 | `portion_large_bp` | `integer` | yes | `200` | A large dog's day of food as a share of its body weight, in basis points: 200 is 2%. |
@@ -2995,6 +3004,7 @@ An animal in the kennel's care. Belongs to one client.
 - `pets_forbid_org_change` (before update) runs `forbid_org_change()`
 - `pets_guard_hiding` (before update of deleted_at) runs `guard_hiding()`
 - `pets_latest_weight` (before insert or update) runs `pets_latest_weight()`
+- `pets_not_walk_in` (before insert or update of client_id) runs `pets_not_walk_in()`
 - `pets_set_updated_at` (before update) runs `set_updated_at()`
 - `pets_stamp_flowers` (before insert or update) runs `stamp_when_set()`
 
@@ -3581,6 +3591,98 @@ A person's usual week (M60): one shift on one weekday, which fill_rota() puts on
 - `rota_patterns_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `rota_patterns_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
+### sale_lines
+
+One thing sold, with how many and the price, tax rate and HSN code it was sold at, copied from the item by the database when sold. Never changed.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `sale_id` | `uuid` | yes |  |  |
+| `item_id` | `uuid` | yes |  |  |
+| `quantity` | `integer` | yes |  | How many pieces. |
+| `description` | `text` | yes |  | The item's name when it was sold, for the bill. |
+| `unit_price_minor` | `bigint` | yes |  | The price of one piece when it was sold (stock_items.sell_price_minor), in minor units. |
+| `tax_rate_bp` | `integer` | yes |  | The item's tax rate when it was sold. A kennel that charges no tax bills it at 0. |
+| `hsn_code` | `text` |  |  |  |
+| `sort_order` | `integer` | yes | `0` |  |
+
+**Constraints**
+
+- Primary key `sale_lines_pkey`: `PRIMARY KEY (id)`
+- Unique `sale_lines_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `sale_lines_org_id_sale_id_item_id_key`: `UNIQUE (org_id, sale_id, item_id)`
+- Foreign key `sale_lines_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `sale_lines_org_id_item_id_fkey`: `FOREIGN KEY (org_id, item_id) REFERENCES stock_items(org_id, id)`
+- Foreign key `sale_lines_org_id_sale_id_fkey`: `FOREIGN KEY (org_id, sale_id) REFERENCES sales(org_id, id) ON DELETE CASCADE`
+- Check `sale_lines_description_check`: `CHECK (((char_length(description) >= 1) AND (char_length(description) <= 300)))`
+- Check `sale_lines_hsn_code_check`: `CHECK (((hsn_code IS NULL) OR (hsn_code ~ '^[0-9]{4,8}$'::text)))`
+- Check `sale_lines_quantity_check`: `CHECK (((quantity >= 1) AND (quantity <= 1000)))`
+- Check `sale_lines_tax_rate_bp_check`: `CHECK (((tax_rate_bp >= 0) AND (tax_rate_bp <= 10000)))`
+- Check `sale_lines_unit_price_minor_check`: `CHECK ((unit_price_minor > 0))`
+
+**Indexes**
+
+- `CREATE INDEX sale_lines_org_sale_idx ON public.sale_lines USING btree (org_id, sale_id, sort_order)`
+
+**Triggers**
+
+- `sale_lines_forbid_org_change` (before update) runs `forbid_org_change()`
+- `sale_lines_price` (before insert) runs `sale_lines_price()`
+- `sale_lines_take_stock` (after insert) runs `sale_lines_take_stock()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `sale_lines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### sales
+
+Things sold over the counter (M62): to a parent, on a stay or on a bill of its own, or to the kennel's walk-in buyer. Made only by sell(), which takes the stock out in the same step; never changed but to cancel it.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `client_id` | `uuid` | yes |  | Who bought: a parent, or the kennel's walk-in buyer (clients.is_walk_in). |
+| `booking_id` | `uuid` |  |  | The stay it was sold on: it goes on that stay's bill. Empty: it has a bill of its own (invoices.sale_id). |
+| `sold_on` | `date` | yes |  | The day it was sold, in the kennel's time zone. |
+| `status` | `sale_status` | yes | `'sold'::sale_status` |  |
+| `cancel_reason` | `text` |  |  | Why it was cancelled (cancel_sale). The stock came back. |
+| `cancelled_at` | `timestamp with time zone` |  |  |  |
+| `cancelled_by` | `uuid` |  |  |  |
+| `created_by` | `uuid` |  | `auth.uid()` | Who sold it. Set by the database. |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `sales_pkey`: `PRIMARY KEY (id)`
+- Unique `sales_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `sales_cancelled_by_fkey`: `FOREIGN KEY (cancelled_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `sales_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `sales_org_id_booking_id_fkey`: `FOREIGN KEY (org_id, booking_id) REFERENCES bookings(org_id, id)`
+- Foreign key `sales_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id)`
+- Foreign key `sales_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `sales_cancel_reason_check`: `CHECK (((cancel_reason IS NULL) OR ((char_length(cancel_reason) >= 1) AND (char_length(cancel_reason) <= 300))))`
+- Check `sales_cancelled_with_reason`: `CHECK ((((status = 'cancelled'::sale_status) = (cancelled_at IS NOT NULL)) AND ((status = 'cancelled'::sale_status) = (cancel_reason IS NOT NULL))))`
+
+**Indexes**
+
+- `CREATE INDEX sales_org_booking_idx ON public.sales USING btree (org_id, booking_id) WHERE (booking_id IS NOT NULL)`
+- `CREATE INDEX sales_org_client_idx ON public.sales USING btree (org_id, client_id)`
+- `CREATE INDEX sales_org_day_idx ON public.sales USING btree (org_id, sold_on DESC)`
+
+**Triggers**
+
+- `sales_audit` (after insert or delete or update) runs `audit_row()`
+- `sales_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select (then narrowed by the policies below). Anonymous visitors: nothing.
+- `sales_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
 ### service_areas
 
 A PIN code the kennel delivers to and picks up from, with its name and charge. A code not listed is not served.
@@ -3898,6 +4000,9 @@ A thing the kennel keeps in stock: chicken, rice, carrots, pouches, gas, shampoo
 | `low_level` | `bigint` |  |  | At or below this quantity the stock page shows the item as low. Empty: never low. |
 | `never_in_recipe` | `boolean` | yes | `false` | True for food a dog must never eat (onion, garlic, grapes, raisins, chocolate, cooked bones, added sugar): the database refuses a recipe that uses it (M27). |
 | `is_active` | `boolean` | yes | `true` | False once the kennel stops keeping it. Its movements stay. |
+| `sell_price_minor` | `bigint` |  |  | The price of one piece sold over the counter, in minor units (M62). Set by owners and managers. Empty: not for sale. |
+| `sell_tax_rate_bp` | `integer` | yes | `0` | The tax rate on a sale of it, in basis points: 1800 is 18%. Left off when the kennel charges no tax. |
+| `hsn_code` | `text` |  |  | The HSN code printed on the bill for a sale of it, 4 to 8 digits. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -3908,11 +4013,16 @@ A thing the kennel keeps in stock: chicken, rice, carrots, pouches, gas, shampoo
 - Unique `stock_items_org_id_name_key`: `UNIQUE (org_id, name)`
 - Foreign key `stock_items_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `stock_items_org_id_supplier_id_fkey`: `FOREIGN KEY (org_id, supplier_id) REFERENCES suppliers(org_id, id) ON DELETE SET NULL (supplier_id)`
+- Check `stock_items_hsn_code_check`: `CHECK (((hsn_code IS NULL) OR (hsn_code ~ '^[0-9]{4,8}$'::text)))`
 - Check `stock_items_low_level_check`: `CHECK (((low_level IS NULL) OR (low_level >= 0)))`
 - Check `stock_items_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
+- Check `stock_items_sell_price_minor_check`: `CHECK (((sell_price_minor IS NULL) OR (sell_price_minor > 0)))`
+- Check `stock_items_sell_tax_rate_bp_check`: `CHECK (((sell_tax_rate_bp >= 0) AND (sell_tax_rate_bp <= 10000)))`
+- Check `stock_items_sold_by_the_piece`: `CHECK (((sell_price_minor IS NULL) OR (unit = 'piece'::stock_unit)))`
 
 **Triggers**
 
+- `stock_items_audit` (after insert or delete or update) runs `audit_row()`
 - `stock_items_check_never` (before update of never_in_recipe) runs `stock_items_check_never()`
 - `stock_items_forbid_org_change` (before update) runs `forbid_org_change()`
 - `stock_items_set_updated_at` (before update) runs `set_updated_at()`
@@ -3942,6 +4052,8 @@ Every change to stock: bought in, used in cooking, thrown away, or counted. Neve
 | `reason` | `waste_reason` |  |  | Waste only: why it was thrown away. |
 | `counted` | `bigint` |  |  | Stock takes only: the quantity counted on the shelf. |
 | `batch_id` | `uuid` |  |  | Used only: the batch of cooking that took it (M30). |
+| `sale_line_id` | `uuid` |  |  | Sales only: the line of the sale over the counter that took it out, or put it back when the sale was cancelled (M62). |
+| `supplier_order_id` | `uuid` |  |  | Purchases only: the order to a supplier it was received against (M63). |
 | `note` | `text` |  |  |  |
 | `created_by` | `uuid` |  | `auth.uid()` | Who wrote it down. Set by the database. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
@@ -3955,31 +4067,36 @@ Every change to stock: bought in, used in cooking, thrown away, or counted. Neve
 - Foreign key `stock_moves_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `stock_moves_org_id_item_id_fkey`: `FOREIGN KEY (org_id, item_id) REFERENCES stock_items(org_id, id) ON DELETE RESTRICT`
 - Foreign key `stock_moves_org_id_supplier_id_fkey`: `FOREIGN KEY (org_id, supplier_id) REFERENCES suppliers(org_id, id) ON DELETE SET NULL (supplier_id)`
+- Foreign key `stock_moves_sale_line_fkey`: `FOREIGN KEY (org_id, sale_line_id) REFERENCES sale_lines(org_id, id)`
+- Foreign key `stock_moves_supplier_order_fkey`: `FOREIGN KEY (org_id, supplier_order_id) REFERENCES supplier_orders(org_id, id)`
 - Check `stock_moves_counted_check`: `CHECK (((counted IS NULL) OR (counted >= 0)))`
 - Check `stock_moves_note_check`: `CHECK (((note IS NULL) OR (char_length(note) <= 300)))`
-- Check `stock_moves_shape`: `CHECK (
+- Check `stock_moves_shape`: `CHECK ((((kind = 'sale'::stock_move_kind) = (sale_line_id IS NOT NULL)) AND ((kind = 'purchase'::stock_move_kind) OR (supplier_order_id IS NULL)) AND
 CASE kind
     WHEN 'purchase'::stock_move_kind THEN ((quantity > 0) AND (reason IS NULL) AND (counted IS NULL) AND (batch_id IS NULL))
     WHEN 'used'::stock_move_kind THEN ((quantity < 0) AND (reason IS NULL) AND (counted IS NULL) AND (batch_id IS NOT NULL) AND (use_by IS NULL))
     WHEN 'waste'::stock_move_kind THEN ((quantity < 0) AND (reason IS NOT NULL) AND (counted IS NULL) AND (batch_id IS NULL) AND (use_by IS NULL))
     WHEN 'count'::stock_move_kind THEN ((counted IS NOT NULL) AND (reason IS NULL) AND (batch_id IS NULL) AND (use_by IS NULL))
+    WHEN 'sale'::stock_move_kind THEN ((quantity <> 0) AND (reason IS NULL) AND (counted IS NULL) AND (batch_id IS NULL) AND (use_by IS NULL))
     ELSE NULL::boolean
-END)`
+END))`
 
 **Indexes**
 
 - `CREATE INDEX stock_moves_org_item_idx ON public.stock_moves USING btree (org_id, item_id, happened_on)`
+- `CREATE INDEX stock_moves_org_order_idx ON public.stock_moves USING btree (org_id, supplier_order_id) WHERE (supplier_order_id IS NOT NULL)`
 
 **Triggers**
 
 - `stock_moves_apply` (before insert) runs `stock_moves_apply()`
+- `stock_moves_check_order` (before insert) runs `stock_moves_check_order()`
 - `stock_moves_forbid_org_change` (before update) runs `forbid_org_change()`
 - `stock_moves_stamp_actor` (before insert) runs `stamp_actor()`
 
 **Access**
 
 - Signed-in users may: select, insert (then narrowed by the policies below). Anonymous visitors: nothing.
-- `stock_moves_insert` (insert): new values must satisfy `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) AND ((kind <> 'purchase'::stock_move_kind) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))))`
+- `stock_moves_insert` (insert): new values must satisfy `((org_id IN ( SELECT my_org_ids() AS my_org_ids)) AND (kind <> 'sale'::stock_move_kind) AND ((kind <> 'purchase'::stock_move_kind) OR (supplier_order_id IS NOT NULL) OR (org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))))`
 - `stock_moves_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
 ### subscriptions
@@ -4047,6 +4164,87 @@ Food delivered to a pet at home on set weekdays (two a week by default), paid a 
 - `subscriptions_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `subscriptions_update` (update): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`; new values must satisfy `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 
+### supplier_order_lines
+
+One thing on an order to a supplier, and how much, in the item's unit. Written with the order and never changed.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `order_id` | `uuid` | yes |  |  |
+| `item_id` | `uuid` | yes |  |  |
+| `quantity` | `bigint` | yes |  |  |
+
+**Constraints**
+
+- Primary key `supplier_order_lines_pkey`: `PRIMARY KEY (id)`
+- Unique `supplier_order_lines_org_id_id_key`: `UNIQUE (org_id, id)`
+- Unique `supplier_order_lines_org_id_order_id_item_id_key`: `UNIQUE (org_id, order_id, item_id)`
+- Foreign key `supplier_order_lines_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `supplier_order_lines_org_id_item_id_fkey`: `FOREIGN KEY (org_id, item_id) REFERENCES stock_items(org_id, id)`
+- Foreign key `supplier_order_lines_org_id_order_id_fkey`: `FOREIGN KEY (org_id, order_id) REFERENCES supplier_orders(org_id, id) ON DELETE CASCADE`
+- Check `supplier_order_lines_quantity_check`: `CHECK ((quantity > 0))`
+
+**Triggers**
+
+- `supplier_order_lines_forbid_org_change` (before update) runs `forbid_org_change()`
+
+**Access**
+
+- Signed-in users may: select, insert (then narrowed by the policies below). Anonymous visitors: nothing.
+- `supplier_order_lines_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `supplier_order_lines_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+
+### supplier_orders
+
+An order to a supplier (M63): what was asked for, sent on WhatsApp. Stock goes in only as it is received (stock_moves with supplier_order_id), in full or in part. Placed by owners and managers.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | yes | `gen_random_uuid()` |  |
+| `org_id` | `uuid` | yes |  |  |
+| `supplier_id` | `uuid` | yes |  |  |
+| `ordered_on` | `date` | yes |  | The day it was ordered, in the kennel's time zone. |
+| `status` | `supplier_order_status` | yes | `'open'::supplier_order_status` |  |
+| `note` | `text` |  |  | A note for the supplier, sent with the order. |
+| `sent_at` | `timestamp with time zone` |  |  | When it was sent to the supplier on WhatsApp, as far as Wagbook knows. |
+| `bill_number` | `text` |  |  | The number on the supplier's bill for this order. |
+| `bill_path` | `text` |  |  | Photo of the supplier's bill in storage, under {org_id}/expenses/, so only owners and managers open it. |
+| `expense_id` | `uuid` |  |  | The supplier's bill, written down as an expense (record_supplier_bill). Empty until it is. |
+| `created_by` | `uuid` |  | `auth.uid()` |  |
+| `created_at` | `timestamp with time zone` | yes | `now()` |  |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `supplier_orders_pkey`: `PRIMARY KEY (id)`
+- Unique `supplier_orders_org_id_id_key`: `UNIQUE (org_id, id)`
+- Foreign key `supplier_orders_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Foreign key `supplier_orders_org_id_expense_id_fkey`: `FOREIGN KEY (org_id, expense_id) REFERENCES expenses(org_id, id) ON DELETE SET NULL (expense_id)`
+- Foreign key `supplier_orders_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `supplier_orders_org_id_supplier_id_fkey`: `FOREIGN KEY (org_id, supplier_id) REFERENCES suppliers(org_id, id)`
+- Check `supplier_orders_bill_number_check`: `CHECK (((bill_number IS NULL) OR (char_length(bill_number) <= 40)))`
+- Check `supplier_orders_note_check`: `CHECK (((note IS NULL) OR (char_length(note) <= 300)))`
+
+**Indexes**
+
+- `CREATE INDEX supplier_orders_org_idx ON public.supplier_orders USING btree (org_id, ordered_on DESC)`
+
+**Triggers**
+
+- `supplier_orders_audit` (after insert or delete or update) runs `audit_row()`
+- `supplier_orders_forbid_org_change` (before update) runs `forbid_org_change()`
+- `supplier_orders_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `supplier_orders_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `supplier_orders_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `supplier_orders_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
+- `supplier_orders_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
 ### suppliers
 
 Who the kennel buys from: a butcher, a vegetable seller, a packaging shop.
@@ -4084,6 +4282,47 @@ Who the kennel buys from: a butcher, a vegetable seller, a packaging shop.
 - `suppliers_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 - `suppliers_select` (select): rows where `(org_id IN ( SELECT my_org_ids() AS my_org_ids))`
 - `suppliers_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+
+### tally_settings
+
+The ledger names the kennel's books in Tally use, set once by an owner or manager, for the month's file for Tally (M64). No row: the defaults.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` | yes |  |  |
+| `company` | `text` |  |  | The company's name in Tally, so the file goes into the right one. Empty: whichever company is open. |
+| `sales_ledger` | `text` | yes | `'Sales'::text` | Where what bills come to before tax goes, and what credit notes take back. |
+| `cgst_ledger` | `text` | yes | `'Output CGST'::text` | Output CGST, for India GST within the state. |
+| `sgst_ledger` | `text` | yes | `'Output SGST'::text` | Output SGST, for India GST within the state. |
+| `igst_ledger` | `text` | yes | `'Output IGST'::text` | Output IGST, for India GST to another state. |
+| `tax_ledger` | `text` | yes | `'Output Tax'::text` | The tax ledger when the kennel charges one tax that is not India GST. |
+| `round_off_ledger` | `text` | yes | `'Round Off'::text` | Where a bill's round off goes. |
+| `cash_ledger` | `text` | yes | `'Cash'::text` | Money paid or spent in cash, and expenses with no way of paying written down. |
+| `bank_ledger` | `text` | yes | `'Bank'::text` | Money paid or spent by UPI, card, bank transfer or another way. |
+| `credit_ledger` | `text` | yes | `'Credit held for parents'::text` | Credit kept for parents (M38): kept from a refund, and spent on a bill. |
+| `parents_group` | `text` | yes | `'Sundry Debtors'::text` | The Tally group each parent's own ledger is made under, named "{name} ({last four digits})". |
+| `expenses_group` | `text` | yes | `'Indirect Expenses'::text` | The Tally group each kind of expense's ledger is made under, named as the kind of expense. |
+| `updated_at` | `timestamp with time zone` | yes | `now()` |  |
+
+**Constraints**
+
+- Primary key `tally_settings_pkey`: `PRIMARY KEY (org_id)`
+- Foreign key `tally_settings_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Check `tally_settings_company_check`: `CHECK (((company IS NULL) OR ((char_length(company) >= 1) AND (char_length(company) <= 100))))`
+- Check `tally_settings_names`: `CHECK ((((char_length(sales_ledger) >= 1) AND (char_length(sales_ledger) <= 100)) AND ((char_length(cgst_ledger) >= 1) AND (char_length(cgst_ledger) <= 100)) AND ((char_length(sgst_ledger) >= 1) AND (char_length(sgst_ledger) <= 100)) AND ((char_length(igst_ledger) >= 1) AND (char_length(igst_ledger) <= 100)) AND ((char_length(tax_ledger) >= 1) AND (char_length(tax_ledger) <= 100)) AND ((char_length(round_off_ledger) >= 1) AND (char_length(round_off_ledger) <= 100)) AND ((char_length(cash_ledger) >= 1) AND (char_length(cash_ledger) <= 100)) AND ((char_length(bank_ledger) >= 1) AND (char_length(bank_ledger) <= 100)) AND ((char_length(credit_ledger) >= 1) AND (char_length(credit_ledger) <= 100)) AND ((char_length(parents_group) >= 1) AND (char_length(parents_group) <= 100)) AND ((char_length(expenses_group) >= 1) AND (char_length(expenses_group) <= 100))))`
+
+**Triggers**
+
+- `tally_settings_forbid_org_change` (before update) runs `forbid_org_change()`
+- `tally_settings_set_updated_at` (before update) runs `set_updated_at()`
+
+**Access**
+
+- Signed-in users may: select, insert, update, delete (then narrowed by the policies below). Anonymous visitors: nothing.
+- `tally_settings_delete` (delete): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role]) AS my_org_ids_with_role))`
+- `tally_settings_insert` (insert): new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `tally_settings_select` (select): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
+- `tally_settings_update` (update): rows where `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`; new values must satisfy `(org_id IN ( SELECT my_org_ids_with_role(ARRAY['owner'::member_role, 'manager'::member_role]) AS my_org_ids_with_role))`
 
 ### trips
 
@@ -4315,6 +4554,7 @@ Each invoice with what has been paid against it, what credit notes took off it, 
 | `series_id` | `uuid` |  |  |  |
 | `series_month` | `date` |  |  |  |
 | `appointment_id` | `uuid` |  |  |  |
+| `sale_id` | `uuid` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -4380,7 +4620,7 @@ Each supply a parent brought (M55) counted down: meals or doses ticked done, wha
 
 ### stock_levels
 
-Each item with what is in stock now: the sum of its movements.
+Each item with what is in stock now: the sum of its movements. With its price over the counter when it is for sale (M62).
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -4394,6 +4634,38 @@ Each item with what is in stock now: the sum of its movements.
 | `never_in_recipe` | `boolean` |  |  |  |
 | `is_active` | `boolean` |  |  |  |
 | `on_hand` | `bigint` |  |  |  |
+| `sell_price_minor` | `bigint` |  |  |  |
+| `sell_tax_rate_bp` | `integer` |  |  |  |
+| `hsn_code` | `text` |  |  |  |
+
+**Access**: signed-in users may select. Runs with the caller's row level security.
+
+### stock_on_order
+
+Each item still to come on open orders to suppliers, added up.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` |  |  |  |
+| `item_id` | `uuid` |  |  |  |
+| `on_order` | `bigint` |  |  |  |
+
+**Access**: signed-in users may select. Runs with the caller's row level security.
+
+### supplier_order_progress
+
+Each line of each order to a supplier: ordered, received so far and still to come, with the order's status.
+
+| Column | Type | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `org_id` | `uuid` |  |  |  |
+| `order_id` | `uuid` |  |  |  |
+| `item_id` | `uuid` |  |  |  |
+| `ordered` | `bigint` |  |  |  |
+| `received` | `bigint` |  |  |  |
+| `still_to_come` | `bigint` |  |  |  |
+| `status` | `supplier_order_status` |  |  |  |
+| `supplier_id` | `uuid` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -4785,6 +5057,18 @@ bookings_stamp_status() returns trigger
 
 Trigger: records who and when as a booking is created, checked in, checked out or cancelled, and when a request joined the waiting list (its place in line, which never moves). Client-supplied values for these columns are ignored.
 
+### cancel_sale
+
+```
+cancel_sale(p_sale uuid, p_reason text) returns void
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Cancels a sale over the counter with a reason (WB285) before its bill has gone out (WB283): its stock comes back and a draft bill of its own is removed. Owners and managers (WB002).
+
 ### care_tasks_keep_photo_rule
 
 ```
@@ -5059,7 +5343,7 @@ export_client(p_client uuid) returns jsonb
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, appointments with their add-ons and training courses, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
+Everything held about one parent, for a request under the DPDP Act: their details and consent, their addresses, their pets with vaccinations, weights, food, routines and incidents, every stay with its extras, updates, care and play, appointments with their add-ons and training courses, food subscriptions, deliveries with their problems and food orders, bills with their lines and credit notes, things bought over the counter, payments, the intake forms they sent, and the paths of the files. Owner or manager (WB070).
 
 ### fill_rota
 
@@ -5359,7 +5643,7 @@ invoice_expected_lines(p_org uuid, p_booking uuid, p_group uuid, p_tax_mode tax_
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, and each pick-up and drop not cancelled; or a visitor's appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.
+The lines a bill should have, as quantity, unit price, discount and tax rate: for each stay it covers (invoice_bookings), its stay lines (stay_charges()), each extra not in its package, and each appointment that is confirmed, done or a no-show (not a course or package session) with its add-ons, each pick-up and drop not cancelled, and each line of a sale over the counter on the stay that is not cancelled; or a visitor's appointment (p_appointment) and its add-ons. A month of a series has one stay line for each price, tax rate and code, with its days added up (seriesLines() in src/lib/billing.ts). Must match stayBillLines() in src/lib/stay-bill.ts.
 
 ### invoice_lines_guard
 
@@ -5384,6 +5668,18 @@ invoices_check_food() returns trigger
 - Volatility: volatile
 
 Trigger: a food bill names an order of its parent, never a subscription's delivery (WB154), or a subscription of its parent for days no other live bill of it covers (WB155).
+
+### invoices_check_sale
+
+```
+invoices_check_sale() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a bill for a sale names a sale of its buyer that is not on a stay and not cancelled (WB288).
 
 ### invoices_check_stay
 
@@ -5443,7 +5739,7 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, or its food deliveries) says. Takes in advances paid for those stays.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays.
 
 ### job_forget_old_rows
 
@@ -5817,6 +6113,18 @@ pets_latest_weight() returns trigger
 
 Trigger: pets.weight_g is always the latest of the pet's weighings, whatever was written to it.
 
+### pets_not_walk_in
+
+```
+pets_not_walk_in() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a pet never belongs to the walk-in buyer of sales over the counter (WB286).
+
 ### photo_month_files
 
 ```
@@ -5852,6 +6160,18 @@ photos_to_remove(p_org uuid, p_month date) returns SETOF text
 - Volatility: stable
 
 The photos of a downloaded month that an owner may remove from storage (M49). Refused for anyone but an owner (WB242), or before the month was downloaded (WB243). The small copies are not in it, so pages still show something.
+
+### place_supplier_order
+
+```
+place_supplier_order(p_org uuid, p_supplier uuid, p_lines jsonb, p_note text) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Places an order to a supplier with its lines, [{item_id, quantity}] in each item's unit, in one step (WB289). Owners and managers.
 
 ### plan_subscription
 
@@ -5900,6 +6220,18 @@ raise_alert(p_org uuid, p_kind alert_kind, p_pet_name text, p_link text) returns
 - Volatility: volatile
 
 Writes an alert (M61) and an outbox row for each phone of each active member who chose its kind. SECURITY DEFINER because alerts and the outbox are written by no one else; called only by the alert triggers, granted to no role.
+
+### receive_supplier_order
+
+```
+receive_supplier_order(p_order uuid, p_on date, p_lines jsonb) returns integer
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Receives what came of an order, [{item_id, quantity, cost_minor, use_by}], putting it in stock (WB290 to WB292). Any member; a cost only by owners and managers.
 
 ### recipe_cost_per_kg
 
@@ -5984,6 +6316,18 @@ record_purchase(p_org uuid, p_item uuid, p_quantity bigint, p_cost_minor bigint,
 - Volatility: volatile
 
 Records stock bought in with its cost, bill number and bill photo, and, when an expense category is given, the same money as an expense (E4), all in one step. Owners and managers only (WB131).
+
+### record_supplier_bill
+
+```
+record_supplier_bill(p_order uuid, p_amount_minor bigint, p_on date, p_category text, p_bill_number text, p_bill_path text) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Writes the supplier's bill for an order down as an expense (E4) and keeps it on the order, once (WB293). Owners and managers.
 
 ### record_vet_visit
 
@@ -6249,6 +6593,42 @@ safe_date(p_text text) returns date
 
 Reads a YYYY-MM-DD string as a date, or returns null if it is anything else. For text that arrived from the public internet.
 
+### sale_bill_lines
+
+```
+sale_bill_lines(p_org uuid, p_sale uuid, p_tax_mode tax_mode) returns TABLE(quantity numeric, unit_price_minor bigint, discount_minor bigint, tax_rate_bp integer)
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The lines a sale's bill of its own should have: each thing at the price it was sold at, with no tax when the kennel charges none. Nothing for a cancelled sale or one on a stay. Must match saleLines() in src/lib/core/shop.ts; issue_invoice() checks staff bills against it.
+
+### sale_lines_price
+
+```
+sale_lines_price() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a line of a sale takes its name, price, tax rate and HSN code from its item; an item with no price or no longer kept is refused (WB281).
+
+### sale_lines_take_stock
+
+```
+sale_lines_take_stock() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a line sold takes its pieces out of stock on the day of the sale; refused when there are not enough (WB130).
+
 ### save_invoice_draft
 
 ```
@@ -6284,6 +6664,18 @@ scrub_error_text(p_text text) returns text
 - Volatility: immutable
 
 An error message with email addresses and phone numbers (nine or more digits) replaced, cut to 300 characters. Must match scrubErrorText() in src/lib/core/problems.ts.
+
+### sell
+
+```
+sell(p_org uuid, p_lines jsonb, p_client uuid, p_booking uuid) returns uuid
+```
+
+- Who may call: signed-in
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Sells things over the counter (M62): p_lines is [{item_id, quantity}]. On a stay (p_booking, booked or in the kennel, its bill not out yet: WB282, WB283), to a parent (p_client) for a bill of its own, or with neither to the kennel's walk-in buyer. Each line is priced from its item (WB281) and its stock taken out (WB130). Owners, managers and staff, while the kennel sells over the counter (WB280).
 
 ### session_meets_mfa
 
@@ -6381,6 +6773,18 @@ stamp_when_set() returns trigger
 
 Trigger for a pair of "when" and "who" columns (named in the two trigger arguments) that record a one-off confirmation, such as a certificate being checked. Sending any time marks it; the database then records the real time and the signed-in user, and later edits cannot change them. Sending null clears both.
 
+### stay_bill_issued
+
+```
+stay_bill_issued(p_org uuid, p_booking uuid) returns boolean
+```
+
+- Who may call: signed-in
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+True when the bill covering a stay (its own, its family's, or its month of a series) has been issued.
+
 ### stay_charges
 
 ```
@@ -6464,6 +6868,18 @@ stock_moves_apply() returns trigger
 - Volatility: volatile
 
 Trigger: movements of one item queue; one that would take stock below nothing is refused (WB130); a stock take records the difference between what was counted and what the movements add up to.
+
+### stock_moves_check_order
+
+```
+stock_moves_check_order() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: stock received against an order needs the order open (WB290), the item on it (WB291) and no more than is still to come (WB292); it comes from the order's supplier.
 
 ### storage_org_id
 
@@ -6620,6 +7036,18 @@ waiting_list(p_org uuid) returns TABLE(booking_id uuid, waitlisted_at timestamp 
 - Volatility: stable
 
 The kennel's waiting list, first in line first: each request waiting for a kennel, when it joined, and whether it would fit now (a kennel free on every day, and no other stay for the pet). Stays already over are left out. Must agree with bookings_check_capacity().
+
+### walk_in_client
+
+```
+walk_in_client(p_org uuid) returns uuid
+```
+
+- Who may call: internal
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+The kennel's "Walk-in" buyer for sales over the counter to someone who is not a parent (M62), made the first time it is needed. Any member of the kennel.
 
 ### who_is_on
 
