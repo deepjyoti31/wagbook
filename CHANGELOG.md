@@ -112,6 +112,8 @@ The first release will be 0.1.0. Everything below is in it.
   expense. The kitchen's shopping list leaves out what is already on order.
 - The month's bills, credit notes, payments and expenses as two files for Tally, with the ledger names your
   accountant uses. Have your accountant check one month before relying on it.
+- Several sites under one owner: each is a kennel of its own, added from More, and an owner of two or more sees all
+  their sites side by side and added up under Reports. An owner may now have up to ten kennels.
 
 ### For whoever runs it
 

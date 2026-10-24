@@ -184,9 +184,11 @@ gives back only what was paid and is not owed (`payments_check_refund`, D40).
 
 ## Reports
 
-No tables. Seven functions, `report_occupancy`, `report_money`, `report_tax`, `report_extras` and the food reports
-`report_food`, `report_food_riders` and `report_food_sources`, each taking a kennel
-and a period of up to 400 days, run as the caller and refuse anyone who is not an owner or manager (D20). What each
+No tables. Eight functions: `report_occupancy`, `report_money`, `report_tax`, `report_extras` and the food reports
+`report_food`, `report_food_riders` and `report_food_sources` each take a kennel and a period of up to 400 days, run as
+the caller and refuse anyone who is not an owner or manager (D20). `report_sites` (M65, D55) takes only the period and
+gives one row for each kennel the caller owns, worked out from that kennel's own `report_occupancy` and
+`report_money`, with what is owed today; it refuses a caller who owns none (`WB062`). What each
 counts is in its comment, and so in [reference/schema.md](reference/schema.md).
 
 ## The kitchen and food

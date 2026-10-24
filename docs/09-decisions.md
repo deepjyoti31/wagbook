@@ -1301,3 +1301,47 @@ follows Tally's published import format, and the accountant checks one month bef
 **Look again** when an accountant has imported a month (ledger names, the master import's behaviour with ledgers that
 exist, bill-by-bill references), if a kennel sells loose food by weight over the counter, or if goods should have a
 sales ledger of their own.
+
+## D55. Phase 9: several sites are separate kennels, added up only for the person who owns them all
+
+**Status:** Decided, 23 October 2026, building Phase 9 (M65).
+
+**Situation.** The owner's list (D49) asked for several sites under one owner, with combined reports, and decided that
+each site stays a kennel of its own: its own parents, pets, prices and bills, with no parent shared across sites. A
+person could own five kennels at most (`WB012`), a limit set against one account filling a shared installation.
+Reports are functions that run as the caller and refuse anyone who is not an owner or manager of the kennel asked
+about (`WB060`).
+
+**Decision.**
+
+- **One more report function, built from the ones there are.** `report_sites(from, to)` takes no kennel: it reads the
+  kennels the caller owns (`my_org_ids_with_role(owner)`, so a session that owes its two-step code reads none) and, for
+  each, sums that kennel's own `report_occupancy` and `report_money` over the period, with what is owed on its issued
+  bills today. Each kennel's report still checks the caller and the period for that kennel. The function runs as the
+  caller, adds rows of one kennel only, and never joins a row of one kennel to another's. It refuses a caller who owns
+  no kennel (`WB062`).
+- **Only kennels the reader owns.** A person who owns one site and manages another sees only the one they own in All
+  sites; the other has its own Reports, as before. Managers and staff are refused. The page is offered only to an owner
+  of two or more.
+- **Adding up is the app's, per currency** (`combineSites()` in `src/lib/core/sites.ts`). Sites that bill in different
+  currencies get a total each. How full is every site's kennels used over every site's kennels available, never an
+  average of percentages, so a large site weighs as much as its kennels.
+- **Switching stays where it was** (More, You also work at). The cookie that remembers the kennel is unchanged, and the
+  people of each site are invited to it, so a person who works at two sees each in turn and never both on one screen.
+- **Adding a site** is the first kennel's form again (`create_organization()`), reached from More, **Add another site**,
+  for owners.
+- **The limit is ten kennels per owner**, not five. Five was set before several sites were planned; ten covers a chain
+  of the size the reference market has, and still stops one account filling a shared installation. A self-hosted
+  owner who needs more changes one number in `create_organization()`.
+
+**Why.** The owner's question is "how are all my sites doing?", and it is answered without widening who sees what: the
+access model stays as it is, every figure is one a site's own report already shows, and a bug in adding up could at
+worst show a wrong total to the owner of all the sites, never one site's data to another's people.
+
+**Cost.** An owner cannot see one parent across sites, move a booking or a pet between sites, or share prices, routines
+or stock: each is set up in each site. There is no CSV of all sites; each site's downloads stay its own. Sites in
+different time zones are reported for the same calendar month, read in each site's own dates.
+
+**Look again** if parents regularly use more than one site and want one link for all of them (D49), if an owner asks
+for a manager over several sites (an "area manager") to see the combined report, or if a chain needs more than ten
+sites on one account.

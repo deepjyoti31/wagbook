@@ -6448,6 +6448,10 @@ export type Database = {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { day: string; boarding: number; day_boarding: number; capacity: number; kennels_used: number }[];
       };
+      report_sites: {
+        Args: { p_from: string; p_to: string };
+        Returns: { org_id: string; name: string; currency: string; nights: number; day_boarding_days: number; kennel_days: number; kennels_used: number; billed_minor: number; credited_minor: number; received_minor: number; refunded_minor: number; spent_minor: number; owed_minor: number; bills_owed: number }[];
+      };
       report_tax: {
         Args: { p_org: string; p_from: string; p_to: string };
         Returns: { tax_rate_bp: number; bills: number; credit_notes: number; taxable_minor: number; cgst_minor: number; sgst_minor: number; igst_minor: number; tax_minor: number }[];

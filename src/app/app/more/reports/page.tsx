@@ -1,11 +1,10 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { MonthPicker } from "@/components/month-picker";
 import { OccupancyChart } from "@/components/occupancy-chart";
 import { Rich } from "@/components/rich";
-import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
-import { requireOrg } from "@/lib/auth";
+import { buttonStyles, Empty, Field, Figure, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
+import { getMemberships, requireOrg } from "@/lib/auth";
 import { taxLabel } from "@/lib/billing";
 import { formatDate, formatMoney, GSTR1_PARTS, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
@@ -20,16 +19,6 @@ export default function ReportsPage({ searchParams }: PageProps<"/app/more/repor
     <Suspense fallback={<Loading />}>
       <Reports searchParams={searchParams} />
     </Suspense>
-  );
-}
-
-function Figure({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
-  return (
-    <div className="rounded-xl border border-rule bg-paper p-3">
-      <p className="text-sm text-slate">{label}</p>
-      <p className="text-xl font-extrabold tabular-nums">{children}</p>
-      {hint ? <p className="text-sm text-slate">{hint}</p> : null}
-    </div>
   );
 }
 
@@ -75,9 +64,19 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
   const net = thisMonth ? thisMonth.received_minor - thisMonth.refunded_minor - thisMonth.spent_minor : 0;
   const name = monthName(month, locale);
 
+  // An owner of several kennels also sees them side by side (M65).
+  const ownsSeveral = (await getMemberships()).filter((x) => x.role === "owner").length > 1;
+
   return (
     <>
       {title}
+      {ownsSeveral ? (
+        <p className="mb-4">
+          <Link href={`/app/more/reports/sites?month=${month}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {r.sites.link}
+          </Link>
+        </p>
+      ) : null}
       <MonthPicker month={month} href={(x) => `/app/more/reports?month=${x}`} locale={locale} words={m.common} />
 
       <Section title={r.howFull}>

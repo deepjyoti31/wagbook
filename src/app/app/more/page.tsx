@@ -119,6 +119,14 @@ async function Account() {
           </div>
         </div>
       ) : null}
+      {role === "owner" ? (
+        <div className="mt-4">
+          <Link href="/onboarding" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {m.more.addSite}
+          </Link>
+          <p className="text-sm text-slate">{m.more.addSiteHint}</p>
+        </div>
+      ) : null}
       {role === "owner" && !twoStepOn ? (
         <div className="mt-4">
           <Notice tone="info">{m.more.ownerNudge}</Notice>

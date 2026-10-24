@@ -40,6 +40,8 @@ export const kennelArea = {
     invitations: { one: "You have an invitation to another kennel", other: "You have {n} invitations to another kennel" },
     alsoWorkAt: "You also work at",
     switchTo: "Switch to {kennel}",
+    addSite: "Add another site",
+    addSiteHint: "A new site is a kennel of its own in Wagbook, with its own parents, prices and bills. You can own up to ten.",
     signOut: "Sign out",
     twoStepLink: "Two-step sign-in",
     twoStepOn: "on",
@@ -546,6 +548,7 @@ export const kennelArea = {
     create: "Create kennel",
     creating: "Creating",
     declined: "Invitation declined.",
+    backToApp: "Back to Wagbook",
     errors: {
       kennelName: "Enter your kennel's name.",
       linkName: "The link name can use lower case letters, numbers and hyphens, 3 to 40 characters.",

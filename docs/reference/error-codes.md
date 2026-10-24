@@ -95,6 +95,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB057` | this day is on its month's bill. Cancel it and book the new day instead. | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
+| `WB062` | The report for all sites is for owners. | `20261008001000_reports.sql` |
 | `WB070` | only an owner or manager can export or erase a parent's details | `20261008001100_privacy.sql` |
 | `WB071` | a pet of this parent is in the kennel now. Check it out first. | `20261008001100_privacy.sql` |
 | `WB072` | this parent has stays still to come. Cancel them first. | `20261008001100_privacy.sql` |

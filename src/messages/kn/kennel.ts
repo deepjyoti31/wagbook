@@ -41,6 +41,8 @@ export const kennelArea: typeof English = {
     invitations: { one: "ಇನ್ನೊಂದು ಕೆನೆಲ್‌ನಿಂದ ನಿಮಗೆ ಆಹ್ವಾನ ಬಂದಿದೆ", other: "ಬೇರೆ ಕೆನೆಲ್‌ಗಳಿಂದ ನಿಮಗೆ {n} ಆಹ್ವಾನಗಳು ಬಂದಿವೆ" },
     alsoWorkAt: "ನೀವು ಇಲ್ಲೂ ಕೆಲಸ ಮಾಡುತ್ತೀರಿ",
     switchTo: "{kennel} ಗೆ ಬದಲಿಸಿ",
+    addSite: "ಇನ್ನೊಂದು ಶಾಖೆ ಸೇರಿಸಿ",
+    addSiteHint: "ಹೊಸ ಶಾಖೆ Wagbook ನಲ್ಲಿ ತನ್ನದೇ ಕೆನೆಲ್, ತನ್ನದೇ ಪೋಷಕರು, ಬೆಲೆಗಳು ಮತ್ತು ಬಿಲ್‌ಗಳೊಂದಿಗೆ. ನೀವು ಹತ್ತರವರೆಗೆ ಮಾಲೀಕರಾಗಬಹುದು.",
     signOut: "ಸೈನ್ ಔಟ್",
     twoStepLink: "ಎರಡು ಹಂತದ ಸೈನ್ ಇನ್",
     twoStepOn: "ಆನ್",
@@ -539,6 +541,7 @@ export const kennelArea: typeof English = {
     create: "ಕೆನೆಲ್ ಮಾಡಿ",
     creating: "ಮಾಡಲಾಗುತ್ತಿದೆ",
     declined: "ಆಹ್ವಾನ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ.",
+    backToApp: "Wagbook ಗೆ ಹಿಂತಿರುಗಿ",
     errors: {
       kennelName: "ನಿಮ್ಮ ಕೆನೆಲ್ ಹೆಸರು ಬರೆಯಿರಿ.",
       linkName: "ಲಿಂಕ್ ಹೆಸರಿನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಸಂಖ್ಯೆಗಳು ಮತ್ತು ಹೈಫನ್‌ಗಳು ಮಾತ್ರ, 3 ರಿಂದ 40 ಅಕ್ಷರಗಳು.",

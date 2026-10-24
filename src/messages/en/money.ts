@@ -270,6 +270,21 @@ export const moneyArea = {
     downloadNote: "A CSV file, which Excel, Google Sheets and your accountant can open. Up to 400 days at a time.",
     download: "Download",
     seeHistory: "See the history of changes",
+    // All sites (M65): an owner of several kennels sees them side by side and added up.
+    sites: {
+      title: "All sites",
+      link: "See all your sites together",
+      ownersOnly: "All sites is for an owner of more than one kennel. A kennel you manage has its own reports.",
+      intro: "Each kennel you own, from its own reports, then added up. Each keeps its own parents, prices and bills.",
+      together: "All sites together",
+      // {currency} is a code like INR, shown when an owner's sites bill in different currencies.
+      togetherIn: "All sites together, in {currency}",
+      sites: { one: "{n} site", other: "{n} sites" },
+      owed: "Owed today",
+      onBills: { one: "on {n} bill", other: "on {n} bills" },
+      here: "You are working here now.",
+      note: "Kennels used counts every site's kennels over the month together, not an average of the sites. Owed is today's, whatever the month. Sites in different currencies are added up separately.",
+    },
     chart: {
       caption: "Pets in each day. The top line is all {n} kennels full.",
       // Said when a bar is pointed at. {pets} is "3 pets".

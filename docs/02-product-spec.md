@@ -112,7 +112,7 @@ reached, the form says so instead of blaming the password.
 ### A2. Create a kennel. Built.
 
 Three fields: kennel name, link name (the `slug`, used in `/i/{slug}`), your name. The person becomes the owner. They
-land on Kennels with a welcome note asking them to add kennels. A person can own at most five kennels (`WB012`).
+land on Kennels with a welcome note asking them to add kennels. A person can own at most ten kennels (`WB012`, D55). An owner adds another from More, **Add another site** (L21).
 
 ### A3. Add kennels. Built.
 
@@ -1061,7 +1061,7 @@ each is done.
 | Treats, toys and accessories sold over the counter, from stock | M62 | Built (L18) |
 | Orders to suppliers, received into stock | M63 | Built (L19) |
 | Export for Tally | M64 | Built (L20) |
-| Several sites under one owner, with combined reports | M65 | Planned |
+| Several sites under one owner, with combined reports | M65 | Built (L21) |
 
 ### L1. Passwords and Google. Built (M45, D50).
 
@@ -1249,6 +1249,23 @@ Note, money in or out by cash or bank a Receipt or Payment, credit kept or spent
 from its kind's ledger. **Ledger names in Tally** (owners and managers) sets once the company and the names of the
 sales, tax, round off, cash, bank and credit ledgers and the groups for parents and expenses. Not yet imported into Tally
 by a person: an accountant checks one month first (`HANDOFF.md`).
+
+### L21. Several sites. Built (M65, D55).
+
+Each site is a kennel of its own in Wagbook, with its own parents, pets, prices, bills, people and settings (D49). An
+owner adds another under **More, Add another site**, which opens the same three questions as the first kennel (with
+**Back to Wagbook** to return); a person owns ten kennels at most (`WB012`). Switching between sites stays where it was:
+**More, You also work at**, a button for each. Staff and managers who work at two sites are invited to each and see
+each one in turn, never both on one screen.
+
+**All sites** (Reports, **See all your sites together**, shown to an owner of two or more): the month for each kennel
+the reader owns, from that kennel's own reports, then **All sites together**: nights sold, day boarding days, kennels
+used, billed (less credit notes), received, refunded, spent, received less spent, and what is owed on issued bills
+today. Kennels used together counts every site's kennels over the month, not an average of the sites. Sites that bill
+in different currencies are added up in each currency apart. Each site has **Switch to** its own name, to go and work
+there. Kennels the reader manages but does not own are left out, and a manager or staff member is refused the page
+(`WB062`); the figures come from `report_sites()`, which reads each owned kennel through its own reports and never
+joins one kennel's rows to another's.
 
 ---
 

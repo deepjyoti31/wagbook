@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
 import { Field, Input, Loading } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import Link from "next/link";
+import { getMemberships, requireUser } from "@/lib/auth";
 import { getVisitorI18n, type I18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { createOrganization, respondToInvitation } from "./actions";
@@ -29,9 +30,18 @@ async function OnboardingForm() {
   const o = m.onboarding;
   const supabase = await createClient();
   const { data: invitations } = await supabase.rpc("my_invitations");
+  // An owner adding another site (M65) comes here from More, and may go back.
+  const working = (await getMemberships()).length > 0;
   return (
     <>
       <HtmlLang lang={language} />
+      {working ? (
+        <p className="mb-4">
+          <Link href="/app/more" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
+            {o.backToApp}
+          </Link>
+        </p>
+      ) : null}
       <h1 className="mb-2 text-3xl font-extrabold tracking-tight">{o.title}</h1>
       <p className="mb-6 text-slate">{o.intro}</p>
       {invitations && invitations.length > 0 ? (

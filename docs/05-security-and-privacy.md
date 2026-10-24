@@ -59,6 +59,7 @@ In summary (deleting anything is for owners, D29):
 | Payments received | Read, add | Also refunds and corrections | Also removal |
 | Expenses, and their receipt files | Nothing | Read, add, edit | Also delete (with the receipt file) |
 | Reports and CSV downloads | Nothing (`WB060`) | Read | Read |
+| All sites: every kennel one owns, side by side and together (`report_sites`, M65) | Nothing (`WB062`) | Nothing (`WB062`); a manager who also owns a kennel sees only the ones they own | Read, for the kennels they own |
 | Forms from parents | Read; accept or decline, once | Same as staff | Also delete |
 | A parent's details: download everything, erase on request | No (`WB070`) | Download (`export_client`) | Also erase (`erase_client`, `WB074`, D29) |
 | People | See colleagues | Invite (by email or link), suspend, restore, rename and change the role of staff and managers | Also owners |
@@ -533,7 +534,7 @@ These are real. Do not describe Wagbook as free of them.
 | An archived month's ZIP (M49) is the only full copy of its photos once removed | A ZIP lost by the owner cannot be recovered from Wagbook | The page says so before removing; the small copies stay |
 | Anyone holding a form's upload secret can add its certificates for an hour | Only the sender has it; the files can only be added, at most two per pet | By design |
 | A pet that overstays does not hold its kennel past its end date unless someone presses Extend to today | Someone else could be booked into that kennel while the pet is still there. Today, the booking page and the calendar show it in red, and Extend to today is one tap. | Revisit with the owner (open question in `HANDOFF.md`) |
-| Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of five kennels each) | Acceptable for now; revisit when a public instance exists |
+| Sign-up is open | Anyone can create an account and a kennel on a shared installation (limit of ten kennels each, D55) | Acceptable for now; revisit when a public instance exists |
 | An inviter can tell whether an email has an account | The message is the same either way, but a pending row appears on People only when the account exists. With open sign-up, anyone can test any email this way. | Invitation links (M6) need no lookup; the email invitation stays for people who already have an account. Remove it if this matters more than the convenience. |
 | An invitation link works for whoever holds it | A forwarded link lets someone else join, once, in its role, within seven days | Send it to one person; withdraw it from People if it went astray; suspend or remove the wrong person. The person's name and role show on People as soon as they join. |
 | Capacity is not enforced until a kennel exists | With no kennels in service, the count rule is off (Today warns). Taking a kennel out of service does not recheck bookings already made. | M2: warn when taking a kennel out of service would overfill a day |
