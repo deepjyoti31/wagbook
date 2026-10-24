@@ -12,7 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * A cancelled stay's advance, night by night (M38): what the kennel's rules
  * make of each night, and the refund and credit an owner or manager confirms
- * in one step. Shown while an advance is still held for the stay.
+ * in one step. Shown while an advance is held for the stay and not yet
+ * given back as the rules say.
  */
 export async function StayCancellation({ t, bookingId, choice, settled }: { t: I18n; bookingId: string; choice: "refund" | "credit" | null; settled: boolean }) {
   const { org, canManage } = await requireOrg();
@@ -21,10 +22,11 @@ export async function StayCancellation({ t, bookingId, choice, settled }: { t: I
   const supabase = await createClient();
   const worked = await cancelledStayOutcome(supabase, org, bookingId, choice);
   if (!worked) return null;
-  const { result: r, byKennel } = worked;
+  const { result: r, toSettle, givenMinor, byKennel } = worked;
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
   const paid = r.refundMinor + r.creditMinor + r.keptMinor;
-  if (paid <= 0 && !settled) return null;
+  const left = toSettle.refundMinor + toSettle.creditMinor;
+  if ((paid <= 0 || (left === 0 && givenMinor > 0)) && !settled) return null;
 
   return (
     <Section title={w.title}>
@@ -47,7 +49,7 @@ export async function StayCancellation({ t, bookingId, choice, settled }: { t: I
             ))}
           </Ledger>
           <p className="mt-3 font-semibold">{fill(w.summary, { paid: money(paid), refund: money(r.refundMinor), credit: money(r.creditMinor), kept: money(r.keptMinor) })}</p>
-          {canManage && r.refundMinor + r.creditMinor > 0 ? (
+          {canManage && left > 0 ? (
             <ActionForm action={settleCancellation} className="mt-3 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
               <input type="hidden" name="bookingId" value={bookingId} />
               {byKennel ? (
@@ -58,7 +60,7 @@ export async function StayCancellation({ t, bookingId, choice, settled }: { t: I
                   </Select>
                 </Field>
               ) : null}
-              {r.refundMinor > 0 || byKennel ? (
+              {toSettle.refundMinor > 0 || byKennel ? (
                 <Field label={w.refundHow}>
                   <Select name="method" defaultValue="upi">
                     {PAYMENT_METHODS.map((x) => (
@@ -71,9 +73,12 @@ export async function StayCancellation({ t, bookingId, choice, settled }: { t: I
               ) : null}
               <SubmitButton pendingLabel={m.common.saving}>{byKennel
                   ? w.confirmChoice
-                  : fill(r.creditMinor === 0 ? w.confirmRefund : r.refundMinor === 0 ? w.confirmCredit : w.confirmBoth, { refund: money(r.refundMinor), credit: money(r.creditMinor) })}</SubmitButton>
+                  : fill(toSettle.creditMinor === 0 ? w.confirmRefund : toSettle.refundMinor === 0 ? w.confirmCredit : w.confirmBoth, {
+                      refund: money(toSettle.refundMinor),
+                      credit: money(toSettle.creditMinor),
+                    })}</SubmitButton>
             </ActionForm>
-          ) : !canManage ? (
+          ) : !canManage && left > 0 ? (
             <p className="mt-2 text-sm text-slate">{w.managersConfirm}</p>
           ) : null}
         </>

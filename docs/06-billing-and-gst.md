@@ -49,7 +49,10 @@ holds for owners too. If a bill is wrong, void it and issue a new one.
 **Void.** `void_invoice(invoice_id, reason)`: owners and managers only (`WB002`), reason required (`WB039`). The number
 is not reused, so the series has no gap that cannot be explained. A tax invoice issued in an earlier month cannot be
 voided (`WB095`): it may already be in a return, so it is credited instead. Nor can a bill that has a credit note
-(`WB096`).
+(`WB096`). What was paid on a voided bill, and any refund of it, moves to the next bill issued for the same thing (the
+same stay, family, month of a series, appointment, sale, delivery or subscription period) when that bill is issued, so
+the new bill shows what is still owed. Moving a refund with the money it gave back is not a new refund, so `WB121`
+does not stop the new bill.
 
 ## Credit notes
 
@@ -193,6 +196,8 @@ A payment is a record that money moved: amount, method, date received, an option
 and optionally the invoice it settles.
 
 - An **advance** is a payment with no invoice yet. Tie it to the invoice later.
+- A payment is the money of **the parent of the bill or stay it names** (`WB058`), whoever records it: one parent's
+  money, or their credit, never pays another parent's bill.
 - A **refund** is a payment with `direction = 'out'`. The amount is always positive. Only owners and managers can
   record one, and only of money paid and not owed (D40): on a bill, up to what was paid over its total less its credit
   notes (`WB121`); on a stay with no bill, up to its advance (`WB122`); always against a bill or a stay (`WB120`). So a
@@ -379,10 +384,13 @@ parent asked with enough notice. The money paid goes to the refunds first, then 
 kennel cancels, the parent chooses all as refund or all as credit. An owner or manager confirms it on the stay's page:
 the refund is an ordinary refund payment, and the credit a refund paid "as credit" (`payments.method = 'credit'`,
 direction out), which makes a credit lot ending after the kennel's months (12 by default). Kept money stays as an
-advance on a cancelled stay with no bill (D40, question 11).
+advance on a cancelled stay with no bill (D40, question 11). The advance shared out is the one the stay held when it was
+cancelled; what was given back since is taken off what is still to give (`stillToSettle()`), so confirming again never
+offers the kept money as a refund.
 
-Credit is spent on an issued bill as a payment "from credit" (direction in, method credit): the database takes it from
-the parent's lots that end soonest, never more than is left and never after a lot ends (`WB211`). A credit payment is
+Credit is spent on an issued bill, or as an advance on a stay, as a payment "from credit" (direction in, method credit),
+never on nothing (`WB214`): the database takes it from the parent's lots that end soonest, never more than is left and
+never after a lot ends (`WB211`). A credit payment is
 never changed (`WB212`). Goodwill credit is added by an owner or manager with a reason. Reports leave credit payments
 out of money in and out, because no money moved: the refund kept as credit was not paid out, and the bill paid from
 credit brought nothing in. Whether credit is an advance for tax, and when, is question 15.

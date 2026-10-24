@@ -139,6 +139,12 @@ describe("health papers at the door (M40)", () => {
     expect(e.message).toContain("WB210: this pet lacks what the kennel requires at the door: Rabies, deworming");
   });
 
+  it("refuses a stay made already checked in for such a pet, so the door is never gone round", async () => {
+    const [start, end] = [await dayFromToday(db, k, 3), await dayFromToday(db, k, 4)];
+    const e = await errorOf(() => book(db, k, { pet: k.pets[0], start, end, status: "checked_in" }));
+    expect(e.message).toContain("WB210");
+  });
+
   it("agrees with the app's own reading of the rules", async () => {
     const today = await dayFromToday(db, k, 0);
     await q(db, staff, "insert into public.vaccinations (org_id, pet_id, vaccine, given_on) values ($1, $2, 'rabies', $3)", [k.org, pet(), await dayFromToday(db, k, -400)]);

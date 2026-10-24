@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zonedInstant } from "./food";
-import { cancellationOutcome, DEFAULT_CANCEL_RULE, holidayDates, stayUnits } from "./cancellation";
+import { cancellationOutcome, cancelledStayMoney, DEFAULT_CANCEL_RULE, holidayDates, stayUnits, stillToSettle } from "./cancellation";
 
 // Thursday 4 November 2027 to Monday 8 November 2027: Thu, Fri, Sat, Sun nights. Friday the 5th is a holiday.
 const units = ["2027-11-04", "2027-11-05", "2027-11-06", "2027-11-07"].map((date) => ({ date, priceMinor: 100000 }));
@@ -40,6 +40,42 @@ describe("cancelling a stay night by night (M38)", () => {
     const r = cancellationOutcome({ ...base, askedAt: at("2027-11-06", "12:00"), byKennel: "refund" });
     expect([r.refundMinor, r.creditMinor, r.keptMinor]).toEqual([400000, 0, 0]);
     expect(cancellationOutcome({ ...base, askedAt: at("2027-11-06", "12:00"), byKennel: "credit" }).creditMinor).toBe(400000);
+  });
+});
+
+describe("settling a cancelled stay's money once", () => {
+  const cancelledAt = "2027-11-06T06:30:00.000+00:00";
+  const pay = (direction: "in" | "out", amount_minor: number, created_at: string, method = "upi") => ({ direction, amount_minor, method, created_at });
+  const rule = { ...DEFAULT_CANCEL_RULE, weekend_late: "keep" as const };
+  const settle = (payments: ReturnType<typeof pay>[]) => {
+    const money = cancelledStayMoney(payments, cancelledAt);
+    const r = cancellationOutcome({ ...base, rule, paidMinor: money.paidMinor, askedAt: at("2027-11-06", "12:00") });
+    return stillToSettle(r, money.given);
+  };
+
+  it("counts the advance as it was when the stay was cancelled, and what went back since as given", () => {
+    const money = cancelledStayMoney(
+      [
+        pay("in", 300000, "2027-10-20T06:00:00.000+00:00"),
+        pay("out", 50000, "2027-10-21T06:00:00.000+00:00"),
+        pay("out", 100000, "2027-11-06T07:00:00.000+00:00"),
+        pay("out", 20000, "2027-11-06T07:00:00.000+00:00", "credit"),
+      ],
+      cancelledAt,
+    );
+    expect(money).toEqual({ paidMinor: 250000, given: { refundMinor: 100000, creditMinor: 20000 } });
+  });
+
+  it("offers nothing more once the credit was given, though the kennel kept the rest", () => {
+    const advance = pay("in", 250000, "2027-10-20T06:00:00.000+00:00");
+    // Credit for Thursday, the other nights kept (see above).
+    expect(settle([advance])).toEqual({ refundMinor: 0, creditMinor: 100000 });
+    expect(settle([advance, pay("out", 100000, "2027-11-06T07:00:00.000+00:00", "credit")])).toEqual({ refundMinor: 0, creditMinor: 0 });
+  });
+
+  it("gives what is left of a settling that stopped half way, of its own kind, and nothing twice when the parent's choice changes", () => {
+    expect(stillToSettle({ refundMinor: 100000, creditMinor: 300000 }, { refundMinor: 100000, creditMinor: 0 })).toEqual({ refundMinor: 0, creditMinor: 300000 });
+    expect(stillToSettle({ refundMinor: 400000, creditMinor: 0 }, { refundMinor: 0, creditMinor: 400000 })).toEqual({ refundMinor: 0, creditMinor: 0 });
   });
 });
 

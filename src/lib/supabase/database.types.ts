@@ -6024,6 +6024,7 @@ export type Database = {
           series_month: string | null;
           appointment_id: string | null;
           sale_id: string | null;
+          issued_on: string | null;
         };
         Relationships: [];
       };

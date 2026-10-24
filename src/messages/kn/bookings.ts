@@ -257,6 +257,7 @@ export const bookingsArea: typeof English = {
       priceNumber: "ದರವನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 1200 ಅಥವಾ 1200.50.",
       priceWhole: "ದರವನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 1200.",
       discountNumber: "ಡಿಸ್ಕೌಂಟ್ ಅನ್ನು ಸಂಖ್ಯೆಯಲ್ಲಿ ಬರೆಯಿರಿ, ಉದಾಹರಣೆಗೆ 200, ಅಥವಾ ಖಾಲಿ ಬಿಡಿ.",
+      discountTooBig: "ಡಿಸ್ಕೌಂಟ್ ವಾಸ್ತವ್ಯದ ದರಕ್ಕಿಂತ ಹೆಚ್ಚಿದೆ. ಕಡಿಮೆ ಮೊತ್ತ ಬರೆಯಿರಿ.",
       // When no usual price is set, by kind of stay.
       noPriceManager: {
         boarding: "ದರ ಬರೆಯಿರಿ, ಅಥವಾ ಸೆಟ್ಟಿಂಗ್ಸ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಬೋರ್ಡಿಂಗ್ ದರ ಇಡಿ, ಆಗ ಅದು ತಾನಾಗಿ ತುಂಬುತ್ತದೆ.",

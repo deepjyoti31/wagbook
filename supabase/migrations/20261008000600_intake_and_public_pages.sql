@@ -1323,7 +1323,7 @@ begin
   if v_pet is null then
     insert into public.pets (org_id, client_id, name) values (v_order.org_id, v_client, v_order.pet_name) returning id into v_pet;
     insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, notes)
-    values (v_order.org_id, v_pet, v_order.created_at::date, v_order.weight_g, 'From the food order form');
+    values (v_order.org_id, v_pet, (v_order.created_at at time zone v_org.time_zone)::date, v_order.weight_g, 'From the food order form');
   end if;
   insert into public.pet_food (org_id, pet_id, plan, started_on)
   values (v_order.org_id, v_pet, coalesce(v_order.plan, 'full'), greatest(v_order.starts_on, v_today))

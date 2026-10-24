@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stayLines, toStayCharges, wholeStayCharge } from "./stay";
+import { quoteStay, stayLines, toStayCharges, wholeStayCharge } from "./stay";
 
 describe("stay lines", () => {
   const stay = { kind: "boarding" as const, petName: "Bruno", startDate: "2027-04-14", endDate: "2027-04-19", rateMinor: 90000, taxRateBp: 1800 };
@@ -7,6 +7,13 @@ describe("stay lines", () => {
   it("is one line for the whole stay unless it is split", () => {
     expect(wholeStayCharge({ ...stay, discountMinor: 500 })).toEqual([{ part: "stay", quantity: 5, unitPriceMinor: 90000, discountMinor: 500 }]);
     expect(stayLines(stay).map((l) => [l.description, l.quantity])).toEqual([["Boarding: Bruno, 5 nights (14 Apr 2027 to 19 Apr 2027)", 5]]);
+  });
+
+  it("never takes more off than the stay comes to, as stay_charges() in the database", () => {
+    const short = { ...stay, endDate: "2027-04-15", discountMinor: 300000 };
+    expect(wholeStayCharge(short)).toEqual([{ part: "stay", quantity: 1, unitPriceMinor: 90000, discountMinor: 90000 }]);
+    // So the bill is worked out (nothing to pay) instead of refused as a line below nothing.
+    expect(quoteStay(short, { mode: "none" }).totalMinor).toBe(0);
   });
 
   it("names nights shared and nights alone, each at its own price, with the tax of the stay", () => {

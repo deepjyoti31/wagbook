@@ -117,9 +117,13 @@ describe("a parent's details (M9)", () => {
     const refused = await errorOf(() => q(db, k.owner, "select public.erase_client($1)", [k.client]));
     expect(refused.message).toContain("WB076");
     await q(db, k.owner, "update public.appointments set status = 'cancelled', cancel_reason = 'Moving away' where client_id = $1 and status in ('requested', 'confirmed')", [k.client]);
+    await q(db, k.owner, "update public.courses set notes = 'Nervous of men in hats' where client_id = $1", [k.client]);
     await q(db, k.owner, "select public.erase_client($1)", [k.client]);
     const left = await q<{ n: number }>(db, k.owner, "select count(*)::int as n from public.appointments where client_id = $1 and (homework is not null or after_notes is not null or cancel_reason <> 'Erased')", [k.client]);
     expect(left[0].n).toBe(0);
+    // Nor is any of it left in the history of changes.
+    const [{ history }] = await q<{ history: string }>(db, k.owner, "select coalesce(jsonb_agg(jsonb_build_array(old_data, new_data)), '[]')::text as history from public.audit_log where org_id = $1", [k.org]);
+    for (const secret of ["Sits on cue", "Five minutes of sit a day", "Moving away", "Nervous of men in hats"]) expect(history, secret).not.toContain(secret);
   });
 });
 

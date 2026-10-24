@@ -92,6 +92,50 @@ export function cancellationOutcome(i: CancelInput): CancelResult {
   return { nights, refundValue, creditValue, keptValue, refundMinor, creditMinor, keptMinor: paid - refundMinor - creditMinor };
 }
 
+/** A payment for a stay with no bill yet: an advance, or money given back. */
+export interface StayPayment {
+  direction: string;
+  amount_minor: Minor;
+  method: string;
+  created_at: string;
+}
+
+/**
+ * The money of a cancelled stay: the advance it held when it was cancelled
+ * (what came in, less what went back before), and what was given back since,
+ * as a refund or as credit. Money given back since is the outcome being
+ * settled, not less advance, or settling would start over on what is left.
+ */
+export function cancelledStayMoney(
+  payments: readonly StayPayment[],
+  cancelledAt: string | null,
+): { paidMinor: Minor; given: { refundMinor: Minor; creditMinor: Minor } } {
+  const since = cancelledAt === null ? Infinity : Date.parse(cancelledAt);
+  let paidMinor = 0;
+  const given = { refundMinor: 0, creditMinor: 0 };
+  for (const p of payments) {
+    if (p.direction === "in") paidMinor += p.amount_minor;
+    else if (Date.parse(p.created_at) < since) paidMinor -= p.amount_minor;
+    else if (p.method === "credit") given.creditMinor += p.amount_minor;
+    else given.refundMinor += p.amount_minor;
+  }
+  return { paidMinor, given };
+}
+
+/**
+ * What is still to give back of a cancelled stay's outcome once what was
+ * given back since it was cancelled is taken off, so confirming it again
+ * never gives the same money back twice: the refund first, then the credit.
+ */
+export function stillToSettle(
+  r: Pick<CancelResult, "refundMinor" | "creditMinor">,
+  given: { refundMinor: Minor; creditMinor: Minor },
+): { refundMinor: Minor; creditMinor: Minor } {
+  const left = Math.max(0, r.refundMinor + r.creditMinor - given.refundMinor - given.creditMinor);
+  const refundMinor = Math.min(left, Math.max(0, r.refundMinor - given.refundMinor));
+  return { refundMinor, creditMinor: left - refundMinor };
+}
+
 /** Every date of the peak periods marked as holidays. */
 export function holidayDates(periods: readonly { start_date: ISODate; end_date: ISODate; is_holiday: boolean }[]): Set<ISODate> {
   return new Set(periods.filter((p) => p.is_holiday).flatMap((p) => eachDate(p.start_date, addDays(p.end_date, 1))));

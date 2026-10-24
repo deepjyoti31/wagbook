@@ -128,6 +128,14 @@ describe("files stay in their kennel", () => {
     expect(
       (await fails("insert into public.vaccinations (org_id, pet_id, vaccine, certificate_path) values ($1, $2, 'rabies', $3)", [k.org, k.pets[1], theirs])).message,
     ).toContain("vaccinations_certificate_in_org");
+    // A supplier's bill too, which owners and managers keep.
+    const bill = await errorOf(() =>
+      as(db, user(k.owner), async () => {
+        const [{ id: supplier }] = (await db.query<{ id: string }>("insert into public.suppliers (org_id, name) values ($1, 'Butcher') returning id", [k.org])).rows;
+        await db.query("insert into public.supplier_orders (org_id, supplier_id, ordered_on, bill_path) values ($1, $2, current_date, $3)", [k.org, supplier, `${other.org}/expenses/bill.jpg`]);
+      }),
+    );
+    expect(bill.message).toContain("supplier_orders_bill_in_org");
     expect(
       (await fails("insert into public.stay_updates (org_id, booking_id, pet_id, body, media_paths) values ($1, $2, $3, 'x', $4)", [k.org, b, k.pets[1], Array.from({ length: 7 }, (_, i) => `${k.org}/updates/y/${i}.jpg`)])).message,
     ).toContain("stay_updates_at_most_six_photos");
