@@ -2,12 +2,15 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 24 October 2026, after the pre-launch review (M66, D56).
+Last updated: 24 October 2026, after M67 (departures on Today, finding a booking).
 
 ## In one paragraph
 
-Every milestone from M2 to M66 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. M66 (24 October 2026, D56) is the owner's pre-launch review: the app was walked
+Every milestone from M2 to M67 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. M67 (24 October 2026), asked for after the review: Today puts Arriving, a new
+**Going home today** and In house straight under the care counts and incidents, with the other notices after them, and
+each pet going home says what its parent owes (from its bill, or what Make bill would write now less what was paid
+ahead, `owedAtCheckOut()`); Bookings has a search box (pet, parent or phone) and Past pages back 100 at a time. M66 (24 October 2026, D56) is the owner's pre-launch review: the app was walked
 as staff and owner at 360 pixels against the local Supabase and six things that would hurt in the first busy weeks were
 fixed. A pet checked out now leaves nothing on Care, Play or Today's counts after the moment it left, and its parent's
 page no longer says a meal after pick-up was missed (`bookings_end_care_at_check_out`); **Undo check-out** puts a pet
@@ -96,7 +99,7 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (`npm run check`: 768 tests in all on 24 October 2026), and the whole day is
+database rules are tested in-process (`npm run check`: 773 tests in all on 24 October 2026), and the whole day is
 walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 82 steps).
 
 ## What is verified, and how
@@ -231,6 +234,8 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | M66: a checked-out pet's pending tasks and play sessions after the moment it left are removed, earlier ones and anything done or skipped kept, another pet's untouched, by staff (who delete nothing themselves); undoing a check-out takes its kennel off the list to clean unless already cleaned | `tests/db/the-day.test.ts` ("a pet that has gone home", 2 tests); the time-of-day branch, the security definer, the play delete and the undo's kennel rule each removed once to see a test fail | High |
 | M66 in a browser at 360 pixels, as staff: Mango checked out at 14:00, Care then lists only his tablet, breakfast and kennel clean (lunch and dinner gone), Today's meals 2 of 10 (was 12); Undo check-out puts him back in house with lunch and dinner on Care and K03 not to clean; checked out again, the bill first on the booking page; More grouped for staff (Every day, The team, Set up) | By hand with Playwright against the local Supabase, 24 October 2026; screenshots taken | High for the local stack |
 | M66 against the whole walk | `npm run test:e2e` against the local Supabase: 82 steps passing, 24 October 2026 (a Saturday). The first run failed at the food subscription step, which started a subscription two days ahead and billed "this week" first: from a Saturday or a Sunday that week has no delivery ("No deliveries to bill in that period"). The step now bills each offered week that has a delivery | High for the local stack |
+| M67: what is owed at check-out (an issued bill's balance or paid, a draft's total or the stay as it is now less advances, covered by an advance, nothing to say, a day of a series) | `src/lib/core/owed.test.ts` (5) | High |
+| M67 in a browser at 360 pixels, as staff: Today lists Arriving, then Going home today (Bruno, past his date: "No bill yet: about ₹3,600 to pay"; Mango with a ₹500 advance: "about ₹700 to pay. ₹500 paid ahead is taken off"), then In house (Biscuit and Pepper); Bookings found by phone (Vikram Mock's two) and by parent name, an empty search says so, and 120 past bookings page as 100 with Older bookings, then 20 with Newer bookings | By hand with Playwright against the local Supabase, 24 October 2026; screenshots taken | High for the local stack |
 | M66 Bills past 1,000 bills | Against the local Supabase with 1,100 older drafts: the old page said "Nothing is owed." with Bruno's ₹3,600 bill issued and unpaid (shown as paid); the new page says "₹3,600 owed on 1 bill" and lists it, also with 400 newer bills pushing it out of the 300 newest | High for the local stack |
 | `npm run dev` renders pages | Before M66 the login page stayed at its loading dots (the script policy had no `script-src`, so `default-src 'self'` refused every inline script); after, sign-in and Today render with no browser errors. `src/lib/csp.test.ts` checks the fallback | High |
 | Lint, types, production build | `npm run check` | High |
@@ -702,12 +707,8 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 Found in the pre-launch review (M66), not built; each wants an owner's yes first:
 
-- **Bookings** shows at most 300 current and upcoming and the latest 100 past, with no search or date filter. After a
-  few busy months an older stay is reached only from its pet's page.
-- **Today** puts Arriving and In house below every notice (forms, requests, waiting list, care counts, incidents,
-  flowers, to clean, checklists, supplies, appointments, the kitchen, reminders). With everything switched on, checking
-  a pet in is a long scroll. Pets leaving today are in In house with a "Leaves today" tag, not a list of their own, and
-  what each owes is not shown there.
+- **Bookings** (since M67 searchable, with Past paged) still shows at most 300 current and upcoming without a search,
+  and a search shows up to 100 matches with no paging: type more of the name.
 - **Care** ticks one pet at a time: 60 dogs are 60 taps a meal. There is no "done for everyone at 09:00, except...",
   which principle 8 (say true things) argues against unless each pet is still shown.
 - **Nothing prints** for staff without phones or a dead connection: no kennel-door card (name, food, medicines, flags,
@@ -783,7 +784,7 @@ Found in the pre-launch review (M66), not built; each wants an owner's yes first
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 768 tests, build
+npm run check        # dash check, lint, typecheck, 773 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -793,6 +794,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 24 October 2026: M67, asked for after the review: Going home today on Today with what each parent owes, the lists
+  moved above the notices, and Bookings searchable with Past paged. 5 unit tests; no database change. `npm run check`: 773 tests; the walk 82 steps.
 - 24 October 2026: the owner's pre-launch review (M66, D56). Walked as staff and owner at 360 pixels against the local
   Supabase; fixed care left behind at check-out (a database rule, 2 tests), added Undo check-out, the bill first after
   check-out, every unpaid bill on Bills past 1,000 bills, More grouped, and the script policy that broke `npm run dev`.

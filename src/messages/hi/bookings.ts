@@ -3,6 +3,12 @@ import type { bookingsArea as English } from "../en/bookings";
 /** Hindi words for bookings, the booking page, new booking, updates and the calendar. First draft, to be checked by a native speaker. */
 export const bookingsArea: typeof English = {
   bookings: {
+    searchLabel: "पालतू का नाम, पेरेंट का नाम या फ़ोन नंबर से बुकिंग खोजें",
+    searchPlaceholder: "पालतू, पेरेंट या फ़ोन",
+    search: "खोजें",
+    nothingFound: "\"{q}\" के लिए कोई बुकिंग नहीं मिली।",
+    older: "पुरानी बुकिंग",
+    newer: "नई बुकिंग",
     title: "बुकिंग",
     calendar: "कैलेंडर",
     newBooking: "नई बुकिंग",

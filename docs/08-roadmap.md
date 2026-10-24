@@ -1499,6 +1499,29 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M67. Departures on Today, and finding a booking
+
+- [x] Finished 24 October 2026. Asked for by the owner after the pre-launch review (M66).
+
+**Build**
+
+1. Today shows Arriving, **Going home today** and In house right under the care counts and incidents; the other
+   notices follow them.
+2. Going home today lists pets due out today or past their check-out date, each with what the parent owes: from the
+   bill when there is one, or else what Make bill would write now less what was paid ahead.
+3. Bookings has a search box (pet, parent or phone) on both tabs, and Past pages back 100 at a time.
+
+**Rules**
+
+- The amount is worked out the way Make bill and the bill page work it out; nothing new is stored.
+- Today must not wait for the amounts: each loads on its own.
+
+**Done when**
+
+- `owedAtCheckOut()` has unit tests for every case; Today and Bookings checked in a browser at 360 pixels.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

@@ -4,6 +4,12 @@ import type { bookingsArea as English } from "../en/bookings";
 export const bookingsArea: typeof English = {
   // The list of bookings.
   bookings: {
+    searchLabel: "ಸಾಕುಪ್ರಾಣಿಯ ಹೆಸರು, ಪೇರೆಂಟ್ ಹೆಸರು ಅಥವಾ ಫೋನ್ ನಂಬರ್‌ನಿಂದ ಬುಕಿಂಗ್ ಹುಡುಕಿ",
+    searchPlaceholder: "ಸಾಕುಪ್ರಾಣಿ, ಪೇರೆಂಟ್ ಅಥವಾ ಫೋನ್",
+    search: "ಹುಡುಕಿ",
+    nothingFound: "\"{q}\" ಗೆ ಯಾವ ಬುಕಿಂಗ್ ಸಿಗಲಿಲ್ಲ.",
+    older: "ಹಳೆಯ ಬುಕಿಂಗ್‌ಗಳು",
+    newer: "ಹೊಸ ಬುಕಿಂಗ್‌ಗಳು",
     title: "ಬುಕಿಂಗ್‌ಗಳು",
     calendar: "ಕ್ಯಾಲೆಂಡರ್",
     newBooking: "ಹೊಸ ಬುಕಿಂಗ್",

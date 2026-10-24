@@ -355,7 +355,9 @@ the same day. Day boarding holds its kennel for every day of the visit, includin
 
 ### C2. Bookings list. Built.
 
-Two tabs: Current and upcoming; Past. Each row: kennel tag, pet, status (a request says "Request"), "Family" when booked
+Two tabs: Current and upcoming; Past. A search box finds bookings by the pet's name or the parent's name or phone
+number, as on Pets, in the tab shown (up to 100 matches, M67). Past shows 100 at a time, newest first, with Older
+bookings and Newer bookings. Each row: kennel tag, pet, status (a request says "Request"), "Family" when booked
 with other pets, any peak period it touches, parent, dates, nights or days, price. A row opens the booking page, where
 cancelling happens. A Calendar button opens C5.
 
@@ -487,11 +489,20 @@ with its own price (a vet bill paid for the parent). Changing what an extra cost
 ### D1. Today. Built.
 
 The date, "N in house of M kennels, N to arrive", today's care counts ("Meals 2 of 12", medicines in red until done)
-linking to the Care screen, a prompt when forms from parents are waiting, then two lists. Pet names open the booking.
+linking to the Care screen, incidents to deal with, then three lists, and only after them everything else (forms from
+parents, parents' requests, the waiting list, flowers, kennels to clean, checklists, supplies, appointments, the kitchen,
+reminders to send). The lists come first so the gate's work is never a long scroll away (M67). Pet names open the
+booking.
 
 - **Arriving**: confirmed bookings due today or earlier (so yesterday's no-show is still visible, marked "Was due").
   Each has a kennel picker offering only kennels free for the whole stay, and Check in.
-- **In house**: checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
+- **Going home today** (M67, only when there is one): checked-in pets due out today or already past their check-out
+  date, with the same buttons as In house and a line saying what the parent owes, which opens the bill (or the booking):
+  "Owes ₹3,600 on bill WB/26-27/0001", "Bill WB/26-27/0001 is paid", "Bill not issued yet: ₹2,400 to pay", or, with no
+  bill, "No bill yet: about ₹700 to pay. ₹500 paid ahead is taken off", worked out as Make bill would
+  (`owedAtCheckOut()`, `owedFor()`). A family booked together shows its family's bill; a day of a series says it is on
+  the month's bill. The line loads on its own, so Today is not held up.
+- **In house**: the other checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
   parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves; a pet
   booked for longer gets "Check out early", which opens its booking to choose how to bill it (D40). A pet
   still here after its check-out date also gets Extend to today, which moves the check-out date to today, or says

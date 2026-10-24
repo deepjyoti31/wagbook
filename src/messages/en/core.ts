@@ -451,6 +451,18 @@ export const core = {
     checkingIn: "Checking in",
     inHouseTitle: "In house",
     noneInHouse: "No pets are checked in.",
+    // Pets due home today, or past their check-out date, with what is owed (M67).
+    goingHome: "Going home today",
+    owed: {
+      due: "Owes {amount} on bill {number}.",
+      paid: "Bill {number} is paid.",
+      draft: "Bill not issued yet: {amount} to pay.",
+      estimate: "No bill yet: about {amount} to pay.",
+      covered: "No bill yet. What was paid ahead covers it.",
+      afterAdvance: "{advance} paid ahead is taken off.",
+      family: "For the family's bill.",
+      monthly: "On the month's bill.",
+    },
     extend: "Extend to today",
     extending: "Extending",
     writeUpdate: "Write update",

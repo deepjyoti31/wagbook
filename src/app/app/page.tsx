@@ -7,7 +7,7 @@ import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
-  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
+  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
   UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, CREDIT_REMINDER_DAYS, REVIEW_REMINDER_DAYS, zonedInstant, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp, localClock, localDate, type GroomCard,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
@@ -19,6 +19,7 @@ import { OnNow } from "@/components/on-now";
 import { FlowersToSend, HouseJobs, SuppliesRunningOut, ToClean, TrialBadge, trialResults } from "@/components/today-day";
 import { PetAvatar } from "@/components/pet-avatar";
 import { ReminderLink } from "@/components/reminder-link";
+import { owedFor } from "@/lib/owed";
 import { siteOrigin } from "@/lib/site";
 import { bookingCards, familyHolds, type BookingCard } from "@/lib/queries";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -135,6 +136,53 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     return names ? fill(m.booking.kennelWith, { kennel: k.name, pets: names.join(", ") }) : k.name;
   };
 
+  // Going home today (M67): due out today or past the check-out date, each with what its parent owes.
+  const goingHome = inHouse.filter((b) => b.end_date <= today);
+  const stayingIn = inHouse.filter((b) => b.end_date > today);
+  const inHouseRow = (b: BookingCard, leaving: boolean) => (
+    <LedgerRow key={b.id}>
+      <BookingSummary t={t} booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
+      {leaving ? (
+        <Suspense fallback={null}>
+          <OwedAtCheckOut t={t} booking={b} />
+        </Suspense>
+      ) : null}
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+        {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
+          <ActionForm action={extendToToday} className="contents">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <input type="hidden" name="from" value="today" />
+            <SubmitButton variant="secondary" pendingLabel={m.today.extending}>
+              {m.today.extend}
+            </SubmitButton>
+          </ActionForm>
+        ) : null}
+        <Link href={`/app/bookings/${b.id}/update`} className={buttonStyles.whatsapp}>
+          {m.today.writeUpdate}
+        </Link>
+        {b.pets ? (
+          <Link href={`/app/dogs/${b.pets.id}/incident`} className={buttonStyles.quiet}>
+            {m.today.incident}
+          </Link>
+        ) : null}
+        {leavingEarly({ status: b.status, endDate: b.end_date }, today) ? (
+          // Going home early: the booking page asks whether to bill to today or as booked (D40).
+          <Link href={`/app/bookings/${b.id}`} className={buttonStyles.secondary}>
+            {m.today.checkOutEarly}
+          </Link>
+        ) : (
+          <ActionForm action={checkOut} className="contents">
+            <input type="hidden" name="bookingId" value={b.id} />
+            <input type="hidden" name="from" value="today" />
+            <SubmitButton pendingLabel={m.today.checkingOut} variant="primary">
+              {m.today.checkOut}
+            </SubmitButton>
+          </ActionForm>
+        )}
+      </div>
+    </LedgerRow>
+  );
+
   return (
     <>
       <PageTitle title={formatDate(today, locale)}>
@@ -179,6 +227,97 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           </Link>
         </p>
       ) : null}
+      {care.length > 0 ? (
+        <div className="mb-7 flex flex-wrap gap-2">
+          {care.map((c) => (
+            <Link
+              key={c.kind}
+              href={`/app/care?kind=${c.kind}&show=pending`}
+              className={`inline-flex min-h-12 items-center gap-2 rounded-lg border px-4 font-semibold ${
+                c.done === c.total ? "border-leaf bg-leaf-soft text-leaf" : c.kind === "medication" ? "border-alert bg-alert-soft text-alert" : "border-rule bg-paper"
+              }`}
+            >
+              {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      {incidents.length > 0 ? (
+        <Section title={m.today.incidents} count={incidents.length}>
+          <ul className="space-y-2">
+            {incidents.map((i) => (
+              <li key={i.id}>
+                <Link href={`/app/dogs/${i.pets?.id}`} className="block rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
+                  <span className="flex flex-wrap items-center gap-2 font-bold">
+                    {i.pets?.name}
+                    <Badge tone="alert">{m.labels.severityShort[i.severity]}</Badge>
+                    {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block">{i.description}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
+      <Section title={m.today.arriving} count={arrivals.length}>
+        {arrivals.length === 0 ? (
+          <Empty>{m.today.nobodyArriving}</Empty>
+        ) : (
+          <Ledger>
+            {arrivals.map((b, i) => (
+              <LedgerRow key={b.id}>
+                <BookingSummary
+                  t={t}
+                  booking={b}
+                  today={today}
+                  photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
+                  vaccineWarning={(vaccineWarnings.get(b.id) ?? []).length > 0}
+                  trial={b.pets ? trials.get(b.pets.id)?.outcome : undefined}
+                />
+                <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+                  <input type="hidden" name="bookingId" value={b.id} />
+                    <input type="hidden" name="from" value="today" />
+                  <label className="min-w-36 flex-1">
+                    <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
+                    <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
+                      <option value="">{m.today.noKennelYet}</option>
+                      {b.kennels ? <option value={b.kennels.id}>{kennelLabel(b, b.kennels)}</option> : null}
+                      {freeKennels[i]
+                        .filter((k) => k.id !== b.kennel_id)
+                        .map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {kennelLabel(b, k)}
+                          </option>
+                        ))}
+                    </Select>
+                  </label>
+                  <SubmitButton pendingLabel={m.today.checkingIn}>{m.today.checkIn}</SubmitButton>
+                </ActionForm>
+              </LedgerRow>
+            ))}
+          </Ledger>
+        )}
+      </Section>
+
+      {goingHome.length > 0 ? (
+        <Section title={m.today.goingHome} count={goingHome.length}>
+          <Ledger>{goingHome.map((b) => inHouseRow(b, true))}</Ledger>
+        </Section>
+      ) : null}
+
+      {inHouse.length === 0 ? (
+        <Section title={m.today.inHouseTitle} count={0}>
+          <Empty>{m.today.noneInHouse}</Empty>
+        </Section>
+      ) : stayingIn.length > 0 ? (
+        <Section title={m.today.inHouseTitle} count={stayingIn.length}>
+          <Ledger>{stayingIn.map((b) => inHouseRow(b, false))}</Ledger>
+        </Section>
+      ) : null}
+
       {newForms > 0 ? (
         <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
           {plural(language, newForms, m.today.newForms)}{" "}
@@ -235,41 +374,6 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
-      {care.length > 0 ? (
-        <div className="mb-7 flex flex-wrap gap-2">
-          {care.map((c) => (
-            <Link
-              key={c.kind}
-              href={`/app/care?kind=${c.kind}&show=pending`}
-              className={`inline-flex min-h-12 items-center gap-2 rounded-lg border px-4 font-semibold ${
-                c.done === c.total ? "border-leaf bg-leaf-soft text-leaf" : c.kind === "medication" ? "border-alert bg-alert-soft text-alert" : "border-rule bg-paper"
-              }`}
-            >
-              {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
-            </Link>
-          ))}
-        </div>
-      ) : null}
-
-      {incidents.length > 0 ? (
-        <Section title={m.today.incidents} count={incidents.length}>
-          <ul className="space-y-2">
-            {incidents.map((i) => (
-              <li key={i.id}>
-                <Link href={`/app/dogs/${i.pets?.id}`} className="block rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
-                  <span className="flex flex-wrap items-center gap-2 font-bold">
-                    {i.pets?.name}
-                    <Badge tone="alert">{m.labels.severityShort[i.severity]}</Badge>
-                    {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
-                  </span>
-                  <span className="mt-1 line-clamp-2 block">{i.description}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
       <Suspense fallback={null}>
         <FlowersToSend t={t} />
       </Suspense>
@@ -312,99 +416,48 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
-      <Section title={m.today.arriving} count={arrivals.length}>
-        {arrivals.length === 0 ? (
-          <Empty>{m.today.nobodyArriving}</Empty>
-        ) : (
-          <Ledger>
-            {arrivals.map((b, i) => (
-              <LedgerRow key={b.id}>
-                <BookingSummary
-                  t={t}
-                  booking={b}
-                  today={today}
-                  photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
-                  vaccineWarning={(vaccineWarnings.get(b.id) ?? []).length > 0}
-                  trial={b.pets ? trials.get(b.pets.id)?.outcome : undefined}
-                />
-                <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-                  <input type="hidden" name="bookingId" value={b.id} />
-                    <input type="hidden" name="from" value="today" />
-                  <label className="min-w-36 flex-1">
-                    <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
-                    <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
-                      <option value="">{m.today.noKennelYet}</option>
-                      {b.kennels ? <option value={b.kennels.id}>{kennelLabel(b, b.kennels)}</option> : null}
-                      {freeKennels[i]
-                        .filter((k) => k.id !== b.kennel_id)
-                        .map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {kennelLabel(b, k)}
-                          </option>
-                        ))}
-                    </Select>
-                  </label>
-                  <SubmitButton pendingLabel={m.today.checkingIn}>{m.today.checkIn}</SubmitButton>
-                </ActionForm>
-              </LedgerRow>
-            ))}
-          </Ledger>
-        )}
-      </Section>
-
-      <Section title={m.today.inHouseTitle} count={inHouse.length}>
-        {inHouse.length === 0 ? (
-          <Empty>{m.today.noneInHouse}</Empty>
-        ) : (
-          <Ledger>
-            {inHouse.map((b) => (
-              <LedgerRow key={b.id}>
-                <BookingSummary t={t} booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
-                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                  {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
-                    <ActionForm action={extendToToday} className="contents">
-                      <input type="hidden" name="bookingId" value={b.id} />
-                    <input type="hidden" name="from" value="today" />
-                      <SubmitButton variant="secondary" pendingLabel={m.today.extending}>
-                        {m.today.extend}
-                      </SubmitButton>
-                    </ActionForm>
-                  ) : null}
-                  <Link href={`/app/bookings/${b.id}/update`} className={buttonStyles.whatsapp}>
-                    {m.today.writeUpdate}
-                  </Link>
-                  {b.pets ? (
-                    <Link href={`/app/dogs/${b.pets.id}/incident`} className={buttonStyles.quiet}>
-                      {m.today.incident}
-                    </Link>
-                  ) : null}
-                  {leavingEarly({ status: b.status, endDate: b.end_date }, today) ? (
-                    // Going home early: the booking page asks whether to bill to today or as booked (D40).
-                    <Link href={`/app/bookings/${b.id}`} className={buttonStyles.secondary}>
-                      {m.today.checkOutEarly}
-                    </Link>
-                  ) : (
-                    <ActionForm action={checkOut} className="contents">
-                      <input type="hidden" name="bookingId" value={b.id} />
-                      <input type="hidden" name="from" value="today" />
-                      <SubmitButton pendingLabel={m.today.checkingOut} variant="primary">
-                        {m.today.checkOut}
-                      </SubmitButton>
-                    </ActionForm>
-                  )}
-                </div>
-              </LedgerRow>
-            ))}
-          </Ledger>
-        )}
-      </Section>
-
       {canManage ? (
         <Suspense fallback={null}>
           <TomorrowSummary t={t} today={today} />
         </Suspense>
       ) : null}
     </>
+  );
+}
+
+/**
+ * What the parent owes, on a pet going home today (M67): from its bill, or
+ * what the stay comes to now less what was paid ahead. Loaded on its own, so
+ * Today is not held up; it links to the bill when there is one.
+ */
+async function OwedAtCheckOut({ t, booking }: { t: I18n; booking: BookingCard }) {
+  const { org } = await requireOrg();
+  const { m, locale } = t;
+  const found = await owedFor(await createClient(), org, booking);
+  if (!found) return null;
+  const { owed, invoiceId, family } = found;
+  const w = m.today.owed;
+  const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
+  const sentence =
+    owed.kind === "due"
+      ? fill(w.due, { amount: money(owed.amountMinor), number: owed.number })
+      : owed.kind === "paid"
+        ? fill(w.paid, { number: owed.number })
+        : owed.kind === "monthly"
+          ? w.monthly
+          : owed.kind === "covered"
+            ? w.covered
+            : [fill(owed.kind === "draft" ? w.draft : w.estimate, { amount: money(owed.amountMinor) }), owed.advanceMinor > 0 ? fill(w.afterAdvance, { advance: money(owed.advanceMinor) }) : ""]
+                .filter(Boolean)
+                .join(" ");
+  const text = family && owed.kind !== "monthly" ? `${sentence} ${w.family}` : sentence;
+  const tone = owed.kind === "due" || owed.kind === "draft" || owed.kind === "estimate" ? "font-semibold text-alert" : "text-leaf";
+  return (
+    <p className="w-full">
+      <Link href={invoiceId ? `/app/bills/${invoiceId}` : `/app/bookings/${booking.id}`} className={`inline-flex min-h-12 items-center underline underline-offset-4 ${tone}`}>
+        {text}
+      </Link>
+    </p>
   );
 }
 

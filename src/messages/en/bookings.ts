@@ -2,6 +2,12 @@
 export const bookingsArea = {
   // The list of bookings.
   bookings: {
+    searchLabel: "Find a booking by pet name, parent name or phone number",
+    searchPlaceholder: "Pet, parent or phone",
+    search: "Search",
+    nothingFound: "No bookings found for \"{q}\".",
+    older: "Older bookings",
+    newer: "Newer bookings",
     title: "Bookings",
     calendar: "Calendar",
     newBooking: "New booking",

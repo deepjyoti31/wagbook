@@ -49,7 +49,8 @@ problems, fix them, and send that file. A parent you already have is recognised 
 
 **Today** is the first screen. At the top: how many pets are in, out of how many kennels. Below it, how much of the
 day's care is done (meals, medicines, cleaning); red means something is waiting. Then who is **arriving**, who is
-**going home**, and who is in the house.
+**going home today** (with what each parent owes, so you can take the money before the pet leaves), and who is in the
+house. Forms, requests, reminders and the rest come after.
 
 When a pet arrives, choose its kennel and press **Check in**. Wagbook asks you to confirm you have seen the vaccination
 certificates and to note what came with the pet (a bed, a lead, food).
@@ -82,6 +83,9 @@ can also start as a **request**, which holds no kennel until you confirm it.
 Full on those dates? **Add to the waiting list** instead. Waiting requests keep the order they joined in, and show on the
 calendar under the kennels. When a kennel frees up for one, Today says so at the top, with **Tell the parent** (WhatsApp,
 with the dates) and **Confirm booking** for once they say yes.
+
+To find a booking, type the pet's name, the parent's name or a phone number in the search box on **Bookings**. Past
+bookings go back a hundred at a time (**Older bookings**).
 
 Every booking has its own page:
 
