@@ -95,12 +95,16 @@ begin
     insert into public.kennel_cleans (org_id, kennel_id, booking_id)
     values (new.org_id, new.kennel_id, new.id)
     on conflict (org_id, kennel_id) where cleaned_at is null do nothing;
+  -- A check-out undone (the pet is still here): its kennel is not to clean.
+  elsif new.status = 'checked_in' and old.status = 'checked_out' then
+    delete from public.kennel_cleans c
+    where c.org_id = new.org_id and c.booking_id = new.id and c.cleaned_at is null;
   end if;
   return null;
 end;
 $$;
 comment on function public.bookings_leave_kennel_to_clean() is
-  'Trigger: when the last pet in a kennel is checked out, the kennel is to clean (kennel_cleans). A sibling still in it keeps it from being asked for. SECURITY DEFINER because nobody adds to kennel_cleans directly.';
+  'Trigger: when the last pet in a kennel is checked out, the kennel is to clean (kennel_cleans). A sibling still in it keeps it from being asked for. Undoing that check-out takes the kennel off the list again, if nobody has cleaned it yet. SECURITY DEFINER because nobody adds to or removes from kennel_cleans directly.';
 
 create trigger bookings_leave_kennel_to_clean
   after update of status on public.bookings

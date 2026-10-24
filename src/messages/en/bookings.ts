@@ -34,6 +34,7 @@ export const bookingsArea = {
       waitlisted: "On the waiting list. Today says when a kennel frees up for it.",
       unwaitlisted: "Taken off the waiting list. It is still a request.",
       photo_removed: "Photo deleted. The parent's stay page no longer shows it.",
+      check_out_undone: "Back in house. Its care for the rest of today is on Care again. If the stay was shortened at check-out, put its dates right below.",
     },
     // The waiting list (D42): requests that wait for a kennel to free up.
     waitlist: {
@@ -224,6 +225,10 @@ export const bookingsArea = {
       early: "Booked until {date}. Going home early? Bill only to today, or for the stay as booked.",
       checkOutToToday: "Check out, bill to today",
       checkOutAsBooked: "Check out, bill as booked",
+      // Checked out by mistake: the same day, before a bill is issued.
+      undoHint: "Checked out by mistake? Put {pet} back in house. Only on the day of the check-out.",
+      undoCheckOut: "Undo check-out",
+      undoingCheckOut: "Putting back",
       checklist: "Check-in checklist",
       kennel: "Kennel",
       noKennelYet: "No kennel yet",

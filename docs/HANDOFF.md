@@ -2,12 +2,21 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 23 October 2026, after building Phase 9 (M65, D55).
+Last updated: 24 October 2026, after the pre-launch review (M66, D56).
 
 ## In one paragraph
 
-Every milestone from M2 to M65 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. Phase 9 (M65, `02` section L21, D55) is built: each site is a kennel of its own,
+Every milestone from M2 to M66 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. M66 (24 October 2026, D56) is the owner's pre-launch review: the app was walked
+as staff and owner at 360 pixels against the local Supabase and six things that would hurt in the first busy weeks were
+fixed. A pet checked out now leaves nothing on Care, Play or Today's counts after the moment it left, and its parent's
+page no longer says a meal after pick-up was missed (`bookings_end_care_at_check_out`); **Undo check-out** puts a pet
+checked out by mistake back, the same day and before its bill is issued; a gone-home booking shows its bill first;
+Bills lists every unpaid bill however many bills exist (it used to read balances in one request capped at 1,000 rows,
+so past 1,000 bills unpaid ones could show as paid); More is grouped under headings; and the script policy no longer
+leaves every page at its loading dots when the build's manifest cannot be read (always under `npm run dev`, and
+possibly on a host that leaves the file out). The review's list of what to do before the first real day is under "Do
+this next". Phase 9 (M65, `02` section L21, D55) is built: each site is a kennel of its own,
 added by an owner from More ("Add another site", up to ten kennels each, `WB012`); an owner of two or more sees **All
 sites** under Reports, each kennel they own from its own reports and then added up per currency (nights, day boarding,
 how full, billed, received, refunded, spent, owed today), through `report_sites()`, which reads only kennels the caller
@@ -87,7 +96,7 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (`npm run check`: 766 tests in all on 23 October 2026), and the whole day is
+database rules are tested in-process (`npm run check`: 768 tests in all on 24 October 2026), and the whole day is
 walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 82 steps).
 
 ## What is verified, and how
@@ -219,6 +228,11 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Phase 8 in the database: selling the last piece and refused the next (`WB130`), nothing of a refused sale left; refused while the kennel does not sell (`WB280`), for what has no price (`WB281`), by weight (`stock_items_sold_by_the_piece`), with no lines (`WB287`), by riders and other kennels; priced from the item whatever is sent, a later price change leaving a sale as it was, staff unable to change a price; nobody writing a sale, its lines or a sale's stock by hand; the walk-in buyer one per kennel, no phone, no pets (`WB286`), never merged (`WB018`), not made by hand; a bill of its own issued by staff only as sold (`WB050`), once (`invoices_one_live_per_sale`), only to its buyer (`WB288`); a sale on a stay on that stay's bill (staff refused without it), nothing more once it is out (`WB283`), not on a cancelled stay (`WB282`); cancelled by owners and managers with a reason (`WB002`, `WB285`), once (`WB284`), its stock back and its draft bill gone, in the history; in the parent's export. Orders: placed by managers only, nothing in stock until it comes, lines never changed, received in part by staff (no cost) and in full by a manager with a cost, never more than still to come (`WB292`), only what is on it (`WB291`), not once closed (`WB290`); the bill an expense once (`WB293`); the shopping list leaving out what is on order; an order with receipts never deleted | `tests/db/shop.test.ts` (10), `tests/db/supplier-orders.test.ts` (8); the cap on what comes, the issued stay bill check and the price from the item each removed once to see the tests fail | High |
 | Sale bill lines, the counter's quantities, what to reorder, quantities typed back; the shopping list less what is on order; the Tally files: party ledgers, XML escaping, every voucher balanced, bills, credit notes, receipts, refunds, credit journals, expenses, one tax and IGST, masters once each | `src/lib/core/shop.test.ts`, `food.test.ts`, `tally.test.ts` | High for the arithmetic; none for Tally accepting the file (see below) |
 | Phase 8 in a browser at 360 pixels: the shop switched on, a chew bone and a rope toy added with prices and bought in on the Stock page; staff sell both chew bones to a walk-in, the bill opens to "Walk-in" and is issued (no WhatsApp button, no phone); the chew bone's box then disabled and on the list to reorder; four rope toys of three refused with the database's sentence; a rope toy sold on a stay in house, listed under "Sold on this stay", then cancelled by a manager with its stock back; an order to Ali Meats for 50 kg of chicken with a note, the WhatsApp link to the supplier's number with the lines, marked sent; the kitchen not asking for chicken while it is on order; staff (no cost box) putting 30 kg in stock, "20 kg to come"; the manager writing the bill (₹6,600) as an expense and closing the order; ledger names saved, and the month's ZIP holding the two XML files, the walk-in's ledger and Sales voucher, the supplier's bill, every voucher balanced | `npm run test:e2e` against the local Supabase: the whole walk, 81 steps passing, 23 October 2026; screenshots taken. The walk found the "sale cancelled" sentence vanishing with its form: it now goes back to the page with `?done=sale-cancelled` | High for the local stack; the Tally files not imported into Tally |
+| M66: a checked-out pet's pending tasks and play sessions after the moment it left are removed, earlier ones and anything done or skipped kept, another pet's untouched, by staff (who delete nothing themselves); undoing a check-out takes its kennel off the list to clean unless already cleaned | `tests/db/the-day.test.ts` ("a pet that has gone home", 2 tests); the time-of-day branch, the security definer, the play delete and the undo's kennel rule each removed once to see a test fail | High |
+| M66 in a browser at 360 pixels, as staff: Mango checked out at 14:00, Care then lists only his tablet, breakfast and kennel clean (lunch and dinner gone), Today's meals 2 of 10 (was 12); Undo check-out puts him back in house with lunch and dinner on Care and K03 not to clean; checked out again, the bill first on the booking page; More grouped for staff (Every day, The team, Set up) | By hand with Playwright against the local Supabase, 24 October 2026; screenshots taken | High for the local stack |
+| M66 against the whole walk | `npm run test:e2e` against the local Supabase: 82 steps passing, 24 October 2026 (a Saturday). The first run failed at the food subscription step, which started a subscription two days ahead and billed "this week" first: from a Saturday or a Sunday that week has no delivery ("No deliveries to bill in that period"). The step now bills each offered week that has a delivery | High for the local stack |
+| M66 Bills past 1,000 bills | Against the local Supabase with 1,100 older drafts: the old page said "Nothing is owed." with Bruno's ₹3,600 bill issued and unpaid (shown as paid); the new page says "₹3,600 owed on 1 bill" and lists it, also with 400 newer bills pushing it out of the 300 newest | High for the local stack |
+| `npm run dev` renders pages | Before M66 the login page stayed at its loading dots (the script policy had no `script-src`, so `default-src 'self'` refused every inline script); after, sign-in and Today render with no browser errors. `src/lib/csp.test.ts` checks the fallback | High |
 | Lint, types, production build | `npm run check` | High |
 | Next.js 16.4.1 (D51): `npm audit --omit=dev` finds nothing; the build no longer stops with the "SecurityFatalError" notice; the whole app works on it | `npm run check` (665 tests and the build, after merging Phase 5), and `npm run test:e2e` against the local Supabase (71 passed after the merge), 23 October 2026 | High |
 | `.github/workflows/ci.yml` on GitHub | Runs on every pull request and on `main`; green on pull request 3 and its merge (18 October 2026) | High |
@@ -239,7 +253,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Storage upload paths and policies in use | No screen uses storage yet | Covered structurally by tests only |
 | The Claude Code cloud SessionStart hook in a fresh container | Two sessions in a row found an old `node_modules` (`jsqr`, `qrcode-generator`, `@playwright/test` missing), because the hook skipped `npm ci` whenever the folder existed. On 16 October 2026 it was changed to install again when `package-lock.json` differs from the last install, and run by hand twice (installs, then skips) | If `npm run check` fails on missing modules, run `npm ci` and say so here |
 | Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
-| The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Pages still work without it (no script rule, logged). Check the header after the first deploy (`10`, "Check the browser protections") |
+| The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Before M66 pages would then have stayed at their loading dots (no `script-src`); now inline scripts are allowed without a nonce (logged). Check the header after the first deploy (`10`, "Check the browser protections"): it should carry `'sha256-` |
 | Rate limits on Vercel | Each copy of the app counts on its own | Add a Vercel Firewall rule (`10`, "Rate limits") |
 | Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
 | Recovery codes on a hosted Supabase project | Walked only against the CLI's Supabase Auth (v2.197.0) | They rely on the `session_id` claim in access tokens, which Supabase Auth has carried for years |
@@ -274,6 +288,29 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
+
+**Before the first real day at a kennel** (from the pre-launch review, M66; none of it needs code):
+
+- **Host it on Supabase's paid plan** (daily backups, never paused), in Mumbai, and finish M1 (item 1 below). Take your
+  own copy every week from day one ([15-backup-and-restore.md](15-backup-and-restore.md)).
+- **Write the kennel's terms into Consent wording** (More, Settings, Intake form): the boarding terms, permission to take
+  a pet to a vet in an emergency (and up to what cost), and the cancellation terms. Every new parent ticks it on the
+  intake form, and the date and wording are kept. Wagbook has no separate terms page or vet permission per stay.
+- **Set the kennel up once**: Settings (WhatsApp number, UPI ID, check-in and check-out times, tax left off until the
+  accountant says), prices, Daily routines, kennels named as on their doors, Health papers (warn or refuse), Cancellation
+  rules, Peak periods. Then bring in today's parents and pets (More, Bring in parents and pets) and book and check in the
+  pets already there.
+- **Agree as a team that every meal and medicine is ticked when it is given.** Parents see "Care given" on their stay
+  page every day, and the stay report counts what was ticked: a day of untidy ticking reads as a pet not fed.
+- **Do a dry run on the team's real phones** before parents see anything: sign in on each phone and add it to the home
+  screen, check in, tick a round, send an update with a photo from an iPhone and an Android phone, make and issue a bill,
+  scan its QR code with a real UPI app, and open each WhatsApp message.
+- **One account each, two-step sign-in for owners and managers**, with recovery codes written down. Sign out on a shared
+  phone at the end of a shift.
+- **Keep the paper register for the first weeks.** Today and Care open offline once loaded on a phone, but Wagbook prints
+  no care sheet or kennel-door card.
+
+Then, in order:
 
 1. **Finish M1** (needs the owner), if the kennel will run on a hosted Supabase: create a project (Mumbai), follow
    [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
@@ -460,6 +497,18 @@ are fixed, and the hint under Stay on a booking.
 ## Open questions
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
+
+Chosen in the pre-launch review (M66, D56) as the simplest thing:
+
+- Undo check-out is for anyone who can check out (staff too), only on the day of the check-out and only while no bill
+  for the stay is issued. Should it be a manager's?
+- Undoing a check-out leaves the dates as they are. A pet checked out with "bill to today" comes back with its stay
+  ending today, and someone puts the dates right under Change this booking.
+- At check-out, tasks with no time on that day are kept; so are tasks due earlier that nobody ticked (they stay on
+  Care to tick or skip).
+- The day a pet arrives still gets that day's tasks from before it came: a pet checked in at 15:00 has a 09:00
+  breakfast to tick or skip. Leave those out too?
+- Parents see "Care given" counts on their stay page every day. Should a kennel be able to hide them?
 
 - An advance kept on a cancelled stay (not refunded) is money in with no bill for it. Should Wagbook offer a bill for a
   cancellation charge? Waits for the accountant (question 11 in `06`).
@@ -651,6 +700,23 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ## Known rough edges in what is built
 
+Found in the pre-launch review (M66), not built; each wants an owner's yes first:
+
+- **Bookings** shows at most 300 current and upcoming and the latest 100 past, with no search or date filter. After a
+  few busy months an older stay is reached only from its pet's page.
+- **Today** puts Arriving and In house below every notice (forms, requests, waiting list, care counts, incidents,
+  flowers, to clean, checklists, supplies, appointments, the kitchen, reminders). With everything switched on, checking
+  a pet in is a long scroll. Pets leaving today are in In house with a "Leaves today" tag, not a list of their own, and
+  what each owes is not shown there.
+- **Care** ticks one pet at a time: 60 dogs are 60 taps a meal. There is no "done for everyone at 09:00, except...",
+  which principle 8 (say true things) argues against unless each pet is still shown.
+- **Nothing prints** for staff without phones or a dead connection: no kennel-door card (name, food, medicines, flags,
+  parent and vet), no day sheet.
+- **Other lists the 1,000-row cap could cut**: a month's attendance for a large team (15 people clocking twice a day
+  for 31 days is 930 rows), the stock page (asks for 2,000 moves), and Reports' "owed today" (only past 1,000 unpaid
+  bills). Bills was fixed in M66.
+- A new kennel's owner gets no checklist of what to set up first; `17` and the More menu are the guide.
+
 - Food: pick-ups and drops of boarders do not join runs yet (M39). The shopping list does not know what is already ordered from a supplier. Labels have no barcode. Pack all
   takes the newest batch in date of each recipe; to use another, pack one at a time. Stock has no units other than
   grams, millilitres and pieces (no "a dozen eggs").
@@ -717,7 +783,7 @@ Chosen in Phase 1 (M26 to M33) as the simplest thing:
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 766 tests, build
+npm run check        # dash check, lint, typecheck, 768 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -726,6 +792,12 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 24 October 2026: the owner's pre-launch review (M66, D56). Walked as staff and owner at 360 pixels against the local
+  Supabase; fixed care left behind at check-out (a database rule, 2 tests), added Undo check-out, the bill first after
+  check-out, every unpaid bill on Bills past 1,000 bills, More grouped, and the script policy that broke `npm run dev`.
+  `npm run check`: 768 tests; the walk 82 steps, after fixing its food subscription step, which failed on Saturdays and
+  Sundays. No new public function or error code. The list for the first real day is in "Do this next".
 
 - 23 October 2026: Phase 9 built (M65, D55): several sites under one owner, All sites under Reports from
   `report_sites()` (each owned kennel through its own reports, added up per currency in the app), Add another site on

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Select } from "@/components/ui";
+import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { switchOrganisation } from "@/app/app/actions";
 import { getMemberships, requireOrg } from "@/lib/auth";
 import type { Offers } from "@/lib/core";
@@ -15,38 +15,41 @@ import { setMyLanguage } from "./actions";
 export const generateMetadata = () => appTitle((m) => m.more.title);
 
 // Reports, expenses and the history are for owners and managers (D20), so staff are not shown them.
-// A link with `when` shows only while the kennel offers that (D44).
-const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; managers?: boolean; when?: (o: Offers & { keeps_rota: boolean }) => boolean }[] = [
-  { href: "/app/appointments", key: "appointments", when: (o) => o.offers_appointments },
-  { href: "/app/kitchen", key: "kitchen", when: (o) => o.offers_kitchen },
-  { href: "/app/food", key: "food", when: (o) => o.offers_food_delivery },
-  { href: "/app/shop", key: "shop", when: (o) => o.offers_shop },
-  { href: "/app/more/orders", key: "orders", when: (o) => o.offers_kitchen || o.offers_shop },
-  { href: "/app/more/rota", key: "rota", when: (o) => o.keeps_rota },
-  { href: "/app/more/leave", key: "leave", when: (o) => o.keeps_rota },
-  { href: "/app/more/attendance", key: "attendance", when: (o) => o.keeps_rota },
-  { href: "/app/bills", key: "bills" },
-  { href: "/app/more/reports", key: "reports", managers: true },
-  { href: "/app/more/expenses", key: "expenses", managers: true },
-  { href: "/app/more/intake", key: "intake" },
-  { href: "/app/more/kennels", key: "kennels" },
-  { href: "/app/more/people", key: "people" },
-  { href: "/app/more/routines", key: "routines" },
-  { href: "/app/more/house", key: "house" },
-  { href: "/app/more/play", key: "play" },
-  { href: "/app/more/extras", key: "extras" },
-  { href: "/app/more/peak", key: "peak" },
-  { href: "/app/more/cancellation", key: "cancellation" },
-  { href: "/app/more/health", key: "health" },
-  { href: "/app/more/areas", key: "areas", when: (o) => o.offers_food_delivery },
-  { href: "/app/more/appointments", key: "appointmentSetup", when: (o) => o.offers_appointments },
-  { href: "/app/more/alerts", key: "alerts" },
-  { href: "/app/more/settings", key: "settings" },
-  { href: "/app/more/history", key: "history", managers: true },
-  { href: "/app/more/import", key: "import", managers: true },
-  { href: "/app/more/photos", key: "photos", managers: true },
-  { href: "/app/more/problems", key: "problems", managers: true },
+// A link with `when` shows only while the kennel offers that (D44). Links are grouped so the
+// day's work comes first and what is set up once comes after.
+type Group = keyof Messages["more"]["groups"];
+const LINKS: readonly { href: string; key: keyof Messages["more"]["links"]; group: Group; managers?: boolean; when?: (o: Offers & { keeps_rota: boolean }) => boolean }[] = [
+  { href: "/app/bills", key: "bills", group: "daily" },
+  { href: "/app/appointments", key: "appointments", group: "daily", when: (o) => o.offers_appointments },
+  { href: "/app/more/intake", key: "intake", group: "daily" },
+  { href: "/app/more/house", key: "house", group: "daily" },
+  { href: "/app/kitchen", key: "kitchen", group: "daily", when: (o) => o.offers_kitchen },
+  { href: "/app/food", key: "food", group: "daily", when: (o) => o.offers_food_delivery },
+  { href: "/app/shop", key: "shop", group: "daily", when: (o) => o.offers_shop },
+  { href: "/app/more/orders", key: "orders", group: "daily", when: (o) => o.offers_kitchen || o.offers_shop },
+  { href: "/app/more/reports", key: "reports", group: "money", managers: true },
+  { href: "/app/more/expenses", key: "expenses", group: "money", managers: true },
+  { href: "/app/more/history", key: "history", group: "money", managers: true },
+  { href: "/app/more/people", key: "people", group: "team" },
+  { href: "/app/more/rota", key: "rota", group: "team", when: (o) => o.keeps_rota },
+  { href: "/app/more/leave", key: "leave", group: "team", when: (o) => o.keeps_rota },
+  { href: "/app/more/attendance", key: "attendance", group: "team", when: (o) => o.keeps_rota },
+  { href: "/app/more/alerts", key: "alerts", group: "team" },
+  { href: "/app/more/settings", key: "settings", group: "setup" },
+  { href: "/app/more/kennels", key: "kennels", group: "setup" },
+  { href: "/app/more/routines", key: "routines", group: "setup" },
+  { href: "/app/more/play", key: "play", group: "setup" },
+  { href: "/app/more/extras", key: "extras", group: "setup" },
+  { href: "/app/more/peak", key: "peak", group: "setup" },
+  { href: "/app/more/cancellation", key: "cancellation", group: "setup" },
+  { href: "/app/more/health", key: "health", group: "setup" },
+  { href: "/app/more/areas", key: "areas", group: "setup", when: (o) => o.offers_food_delivery },
+  { href: "/app/more/appointments", key: "appointmentSetup", group: "setup", when: (o) => o.offers_appointments },
+  { href: "/app/more/import", key: "import", group: "upkeep", managers: true },
+  { href: "/app/more/photos", key: "photos", group: "upkeep", managers: true },
+  { href: "/app/more/problems", key: "problems", group: "upkeep", managers: true },
 ];
+const GROUPS: readonly Group[] = ["daily", "money", "team", "setup", "upkeep"];
 
 export default function MorePage({ searchParams }: PageProps<"/app/more">) {
   return (
@@ -71,16 +74,23 @@ async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams
     <>
       <PageTitle title={m.more.title} />
       {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
-      <Ledger>
-        {LINKS.filter((l) => (canManage || !l.managers) && (!l.when || l.when(org))).map((l) => (
-          <li key={l.href}>
-            <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
-              <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>
-              <span className="block text-slate">{m.more.links[l.key].about}</span>
-            </Link>
-          </li>
-        ))}
-      </Ledger>
+      {GROUPS.map((group) => {
+        const links = LINKS.filter((l) => l.group === group && (canManage || !l.managers) && (!l.when || l.when(org)));
+        return links.length === 0 ? null : (
+          <Section key={group} title={m.more.groups[group]}>
+            <Ledger>
+              {links.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
+                    <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>
+                    <span className="block text-slate">{m.more.links[l.key].about}</span>
+                  </Link>
+                </li>
+              ))}
+            </Ledger>
+          </Section>
+        );
+      })}
     </>
   );
 }

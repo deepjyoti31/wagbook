@@ -74,6 +74,7 @@ export const core: typeof English = {
     ownersDelete: "ಮಾಲೀಕರು ಮಾತ್ರ ಅಳಿಸಬಹುದು.",
     notWaitingForCheckIn: "ಈ ಬುಕಿಂಗ್ ಈಗ ಚೆಕ್ ಇನ್‌ಗಾಗಿ ಕಾಯುತ್ತಿಲ್ಲ. ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     notCheckedIn: "ಈ ಸಾಕುಪ್ರಾಣಿ ಚೆಕ್ ಇನ್ ಆಗಿಲ್ಲ. ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
+    notUndoable: "ಇಂದು ಮಾಡಿದ, ಇನ್ನೂ ಬಿಲ್ ನೀಡದ ಚೆಕ್ ಔಟ್ ಅನ್ನು ಮಾತ್ರ ಹಿಂಪಡೆಯಬಹುದು.",
     constraints: {
       care_tasks_done_with_photo: "ಈ ಕೆಲಸಕ್ಕೆ ಫೋಟೋ ಬೇಕು. ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಲು ಫೋಟೋ ಸೇರಿಸಿ.",
       bookings_trial_is_a_day: "ಪ್ರಯೋಗದ ದಿನ ಡೇ ಬೋರ್ಡಿಂಗ್ ಆಗಿರುತ್ತದೆ.",

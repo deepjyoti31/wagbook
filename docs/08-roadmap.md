@@ -1462,6 +1462,43 @@ and messaging many parents at once (not needed).
 
 ---
 
+# Before going live
+
+## M66. Fixes from the pre-launch review
+
+- [x] Finished 24 October 2026 (D56). Asked for by the owner before running a kennel on Wagbook: the app was walked as
+  staff and owner at 360 pixels against the local Supabase, and what would hurt on the first busy weeks was fixed.
+
+**Build**
+
+1. A pet that goes home leaves nothing to do behind it: its care tasks and play sessions still to do after the moment
+   it left are removed by the database, so Care and Play stop listing them, Today's counts can reach done, and the
+   parent's stay page does not say a meal after pick-up was missed.
+2. **Undo check-out** on the booking page, for a pet checked out by mistake: the same day, while no bill for the stay is
+   issued. The pet is in house again, its kennel held (refused if another pet took it) and off the list to clean.
+3. Once a pet has gone home, its booking page shows the bill first: Make bill is under the sentence that asks for it.
+4. Bills lists every unpaid bill and the amount owed, however many bills the kennel has made. (It read every balance in
+   one request, and the database returns at most 1,000 rows: past 1,000 bills, unpaid ones could show as paid.)
+5. More groups its links under Every day, Money and records, The team, Set up, and Looking after Wagbook.
+6. The script policy, when the build's manifest cannot be read (always under `npm run dev`), lets inline scripts run
+   instead of leaving `default-src` to refuse them: every page used to stay at its loading dots.
+
+**Rules**
+
+- Tasks due before the pet left are kept as they were (done, skipped, or still to record): only what could never
+  happen is removed.
+- Undo is offered only on the day of the check-out and before the bill is issued; after that the stay and its bill are
+  changed on purpose by an owner or manager.
+
+**Done when**
+
+- A database test fails when the removal, its security definer, the play sessions or the undo's kennel rule is taken
+  out (each tried once).
+- Checked in a browser at 360 pixels: Care and Today after a check-out, Undo, the bill first, More, and Bills with
+  1,500 bills where the old page said "Nothing is owed" for a bill with ₹3,600 due.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

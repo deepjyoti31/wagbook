@@ -68,6 +68,77 @@ describe("kennels to clean between guests (M50)", () => {
   });
 });
 
+describe("a pet that has gone home", () => {
+  it("is not asked for after it left: care and play still to do from then on go, the rest stays", async () => {
+    const pet = await strangerPet(db, k);
+    const neighbour = await strangerPet(db, k);
+    const [yesterday, now, tomorrow, after] = await Promise.all([-1, 0, 1, 2].map((d) => dayFromToday(db, k, d)));
+    const stay = await book(db, k, { pet, start: yesterday, end: after, kennel: k.kennels[6] });
+    const next = await book(db, k, { pet: neighbour, start: yesterday, end: after, kennel: k.kennels[7] });
+    await q(db, staff, "update public.bookings set status = 'checked_in' where id = any($1)", [[stay, next]]);
+
+    const task = async (booking: string, petId: string, day: string, due: string, label: string, status = "pending") =>
+      (
+        await q<{ id: string }>(
+          db, k.owner,
+          "insert into public.care_tasks (org_id, booking_id, pet_id, task_date, kind, label, due_time, status) values ($1, $2, $3, $4, 'meal', $5, $6, $7) returning id",
+          [k.org, booking, petId, day, label, due, status],
+        )
+      )[0].id;
+    const kept = [
+      await task(stay, pet, yesterday, "19:00", "Dinner, never ticked"),
+      await task(stay, pet, yesterday, "09:00", "Breakfast, done", "done"),
+      await task(stay, pet, now, "00:00", "Midnight snack, due before it left"),
+      await task(stay, pet, tomorrow, "14:00", "Lunch, skipped", "skipped"),
+      await task(next, neighbour, tomorrow, "09:00", "Another pet's breakfast"),
+    ];
+    const gone = [await task(stay, pet, tomorrow, "09:00", "Breakfast tomorrow")];
+    // Due later today: gone, unless this runs in the last second of the kennel's day.
+    const [{ late }] = await q<{ late: boolean }>(db, k.owner, "select (now() at time zone o.time_zone)::time >= '23:59:59' as late from public.organizations o where o.id = $1", [k.org]);
+    (late ? kept : gone).push(await task(stay, pet, now, "23:59:59", "Last thing tonight"));
+
+    const [{ id: yard }] = await q<{ id: string }>(db, k.owner, "insert into public.play_yards (org_id, name) values ($1, 'Gone home yard') returning id", [k.org]);
+    const play = async (booking: string, petId: string, day: string) =>
+      (
+        await q<{ id: string }>(
+          db, k.owner,
+          "insert into public.play_sessions (org_id, yard_id, booking_id, pet_id, session_date, starts_at, duration_minutes) values ($1, $2, $3, $4, $5, '10:00', 20) returning id",
+          [k.org, yard, booking, petId, day],
+        )
+      )[0].id;
+    const playKept = [await play(stay, pet, yesterday)];
+    const playGone = [await play(stay, pet, tomorrow)];
+
+    // Staff check it out: they delete nothing themselves (D29), the database ends its care.
+    await q(db, staff, "update public.bookings set status = 'checked_out' where id = $1", [stay]);
+
+    const tasks = (await q<{ id: string }>(db, k.owner, "select id from public.care_tasks where id = any($1)", [[...kept, ...gone]])).map((r) => r.id);
+    expect(tasks.sort()).toEqual([...kept].sort());
+    const sessions = (await q<{ id: string }>(db, k.owner, "select id from public.play_sessions where id = any($1)", [[...playKept, ...playGone]])).map((r) => r.id);
+    expect(sessions).toEqual(playKept);
+  });
+
+  it("is back in its kennel when the check-out is undone, and the kennel is not to clean", async () => {
+    const pet = await strangerPet(db, k);
+    const stay = await book(db, k, { pet, start: await dayFromToday(db, k, -1), end: await dayFromToday(db, k, 1), kennel: k.kennels[5] });
+    await q(db, staff, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
+    await q(db, staff, "update public.bookings set status = 'checked_out' where id = $1", [stay]);
+    expect(await toClean(k.kennels[5])).toHaveLength(1);
+
+    await q(db, staff, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
+    expect(await toClean(k.kennels[5])).toEqual([]);
+    const [b] = await q<{ checked_out_at: string | null }>(db, staff, "select checked_out_at from public.bookings where id = $1", [stay]);
+    expect(b.checked_out_at).toBeNull();
+
+    // A kennel already cleaned stays cleaned: only the one still waiting is taken off.
+    await q(db, staff, "update public.bookings set status = 'checked_out' where id = $1", [stay]);
+    const [open] = await toClean(k.kennels[5]);
+    await q(db, staff, "update public.kennel_cleans set cleaned_at = now() where id = $1", [open.id]);
+    await q(db, staff, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
+    expect(await toClean(k.kennels[5])).toHaveLength(1);
+  });
+});
+
 describe("jobs that are not about a pet (M51)", () => {
   it("are set by owners and managers, ticked by anyone with who and when", async () => {
     const refused = await q(db, staff, "insert into public.house_jobs (org_id, list, label) values ($1, 'opening', 'Lights on') returning id", [k.org]).catch((e) => e);

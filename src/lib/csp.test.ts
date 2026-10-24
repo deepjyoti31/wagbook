@@ -44,8 +44,12 @@ describe("contentSecurityPolicy", () => {
     expect(directive(contentSecurityPolicy({ ...base, scriptHashes: [], dev: true }), "script-src")).toContain("'unsafe-eval'");
   });
 
-  it("leaves scripts unrestricted, rather than break pages, when the hashes are unknown", () => {
-    expect(directive(contentSecurityPolicy({ ...base, scriptHashes: null }), "script-src")).toBeUndefined();
+  it("lets inline scripts run, rather than break pages, when the hashes are unknown", () => {
+    // With no script-src at all, default-src 'self' would refuse every inline script.
+    const p = contentSecurityPolicy({ ...base, scriptHashes: null });
+    expect(directive(p, "script-src")).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(p).not.toContain("nonce-");
+    expect(directive(contentSecurityPolicy({ ...base, scriptHashes: null, dev: true }), "script-src")).toEqual(["'self'", "'unsafe-inline'", "'unsafe-eval'"]);
   });
 });
 

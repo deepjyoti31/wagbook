@@ -73,6 +73,7 @@ export const core = {
     ownersDelete: "Only an owner can delete things.",
     notWaitingForCheckIn: "This booking is no longer waiting to be checked in. Refresh the page.",
     notCheckedIn: "This pet is not checked in. Refresh the page.",
+    notUndoable: "Only a check-out made today, with no bill issued yet, can be undone.",
     constraints: {
       bookings_no_kennel_overlap: "That kennel has another parent's pet in it on some of those dates. Pick another kennel or change the dates.",
       care_tasks_done_with_photo: "This task needs a photo. Add the photo to mark it done.",

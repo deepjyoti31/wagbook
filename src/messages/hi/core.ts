@@ -74,6 +74,7 @@ export const core: typeof English = {
     ownersDelete: "चीज़ें सिर्फ़ मालिक मिटा सकते हैं।",
     notWaitingForCheckIn: "यह बुकिंग अब चेक इन के इंतज़ार में नहीं है। पेज रिफ़्रेश करें।",
     notCheckedIn: "इस पालतू का चेक इन नहीं हुआ है। पेज रिफ़्रेश करें।",
+    notUndoable: "सिर्फ़ आज किया गया चेक आउट, जिसका बिल अभी जारी नहीं हुआ, वापस लिया जा सकता है।",
     constraints: {
       care_tasks_done_with_photo: "इस काम के लिए फ़ोटो चाहिए। हो गया दर्ज करने के लिए फ़ोटो जोड़ें।",
       bookings_trial_is_a_day: "ट्रायल दिन डे बोर्डिंग होता है।",

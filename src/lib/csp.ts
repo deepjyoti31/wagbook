@@ -25,8 +25,9 @@ export interface CspOptions {
   nonce: string;
   /**
    * 'sha256-...' sources for the shell's inline scripts. Null when they could
-   * not be worked out: the policy then leaves scripts unrestricted rather than
-   * break every page, as before M9.
+   * not be worked out (always under `next dev`): inline scripts are then let
+   * run without a nonce, files still only from this site, rather than break
+   * every page.
    */
   scriptHashes: string[] | null;
   /** The Supabase project URL. Photos are shown from signed Storage links on it (img-src only). */
@@ -43,11 +44,15 @@ export function contentSecurityPolicy({ nonce, scriptHashes, supabaseUrl, dev }:
     supabase = "";
   }
   const directives: [string, ...string[]][] = [
-    // Without a script-src, default-src would govern scripts and refuse the shell's inline ones.
     ["default-src", "'self'"],
-    ...(scriptHashes
-      ? ([["script-src", "'self'", `'nonce-${nonce}'`, ...scriptHashes, ...(dev ? ["'unsafe-eval'"] : [])]] as [string, ...string[]][])
-      : []),
+    // Always a script-src: without one, default-src would govern scripts and
+    // refuse every inline one, leaving each page at its loading dots. With the
+    // hashes unknown, the shell's inline scripts (which carry no nonce) can
+    // only be let run as inline; a nonce in the list would make browsers
+    // ignore 'unsafe-inline'.
+    scriptHashes
+      ? ["script-src", "'self'", `'nonce-${nonce}'`, ...scriptHashes, ...(dev ? ["'unsafe-eval'"] : [])]
+      : ["script-src", "'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])],
     ["style-src", "'self'", "'unsafe-inline'"],
     ["img-src", "'self'", "blob:", "data:", ...(supabase ? [supabase] : [])],
     ["font-src", "'self'"],

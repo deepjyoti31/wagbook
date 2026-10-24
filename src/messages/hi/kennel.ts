@@ -4,6 +4,7 @@ import type { kennelArea as English } from "../en/kennel";
 export const kennelArea: typeof English = {
   more: {
     title: "और",
+    groups: { daily: "हर दिन", money: "पैसा और रिकॉर्ड", team: "टीम", setup: "सेटअप", upkeep: "Wagbook की देखरेख" },
     links: {
       bills: { title: "बिल", about: "पेरेंट पर कितना बाकी है, भेजने वाले बिल, और भुगतान।" },
       reports: { title: "रिपोर्ट", about: "कितना भरा रहा, कितना पैसा आया और गया, टैक्स, और डाउनलोड। मालिक और मैनेजर के लिए।" },

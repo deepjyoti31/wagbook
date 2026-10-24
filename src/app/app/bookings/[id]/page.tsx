@@ -6,7 +6,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { Rich } from "@/components/rich";
-import { checkIn, checkOut } from "@/app/app/actions";
+import { checkIn, checkOut, undoCheckOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
 import { PaymentForm } from "@/components/payment-form";
 import { PetAvatar } from "@/components/pet-avatar";
@@ -19,7 +19,7 @@ import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  addDays, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, peaksTouching, quoteStay,
+  addDays, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, localDate, peaksTouching, quoteStay,
   sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -240,6 +240,96 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       )
     : null;
 
+  // The bill, with advances. Once a pet has gone home it is the next job, so the page shows it first.
+  const billSection = b.status !== "requested" && (b.status !== "cancelled" || bill.data || advances.data.length > 0) ? (
+    <Section title={w.bill.title}>
+      {bill.data ? (
+        <Link href={`/app/bills/${bill.data.invoice_id}`} className="flex min-h-12 flex-wrap items-center gap-3 rounded-xl border border-rule bg-paper px-4 py-3 hover:bg-ground">
+          <span className="font-bold">{bill.data.number ?? w.bill.draft}</span>
+          <span className="flex-1 tabular-nums">{money(bill.data.total_minor ?? 0)}</span>
+          {bill.data.status === "issued" ? (
+            (bill.data.due_minor ?? 0) > 0 ? (
+              <Badge tone="attention">{fill(w.bill.due, { amount: money(bill.data.due_minor ?? 0) })}</Badge>
+            ) : (bill.data.due_minor ?? 0) < 0 ? (
+              <Badge tone="attention">{fill(w.bill.toRefund, { amount: money(-(bill.data.due_minor ?? 0)) })}</Badge>
+            ) : (
+              <Badge tone="good">{w.bill.paid}</Badge>
+            )
+          ) : (
+            <Badge tone="attention">{w.bill.notIssued}</Badge>
+          )}
+        </Link>
+      ) : b.status === "cancelled" ? null : (
+        <ActionForm action={makeBill} className="space-y-2">
+          <input type="hidden" name="bookingId" value={b.id} />
+          <p>
+            {b.series_id
+              ? w.bill.seriesNote
+              : b.status === "checked_out"
+                ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet })
+                : w.bill.noneYet}
+            {family.data.length > 0 ? ` ${w.bill.familyNote}` : ""}
+          </p>
+          <SubmitButton variant={b.status === "checked_out" && !b.series_id ? "primary" : "secondary"} pendingLabel={w.bill.making}>
+            {b.series_id ? fill(w.bill.makeMonth, { month: monthName(b.start_date, locale) }) : family.data.length > 0 ? w.bill.makeFamily : w.bill.make}
+          </SubmitButton>
+        </ActionForm>
+      )}
+
+      {advances.data.length > 0 ? (
+        <ul className="mt-3 space-y-1">
+          {advances.data.map((a) => {
+            const pay = w.payment;
+            // On a cancelled stay no bill will take the money in: just what moved, and when.
+            const template =
+              b.status === "cancelled"
+                ? a.direction === "out"
+                  ? pay.refunded
+                  : pay.paid
+                : a.direction === "out"
+                  ? a.reference
+                    ? pay.refundWithReference
+                    : pay.refund
+                  : a.reference
+                    ? pay.advanceWithReference
+                    : pay.advance;
+            return (
+              <li key={a.id} className="text-slate">
+                {fill(template, {
+                  amount: money(a.amount_minor),
+                  date: formatDate(a.received_on, locale),
+                  method: m.labels.paymentMethod[a.method],
+                  reference: a.reference ?? "",
+                })}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {b.status === "cancelled" && !bill.data ? (
+        advanceMinor > 0 ? (
+          <div className="mt-3 space-y-2">
+            <p className="font-semibold">{fill(w.refund.paid, { amount: money(advanceMinor) })}</p>
+            {noRefundText ? <p className="text-slate">{noRefundText}</p> : null}
+            {canManage ? (
+              // The rules above say what the advance becomes; a different refund agreed with the parent is recorded here.
+              <details>
+                <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.cancelRules.otherRefund}</summary>
+                <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
+              </details>
+            ) : (
+              <p className="text-slate">{w.refund.managersOnly}</p>
+            )}
+          </div>
+        ) : null
+      ) : bill.data?.status !== "issued" ? (
+        <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} />
+      ) : null}
+    </Section>
+  ) : null;
+  // Checked out by mistake: put back the same day, while no bill is issued.
+  const undoable = b.status === "checked_out" && b.checked_out_at !== null && localDate(b.checked_out_at, org.time_zone) === today && bill.data?.status !== "issued";
+
   return (
     <>
       {pet ? (
@@ -325,6 +415,17 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             updateLink={b.status === "checked_in" ? `/app/bookings/${b.id}/update` : null}
           />
         </Section>
+      ) : null}
+
+      {b.status === "checked_out" ? billSection : null}
+      {undoable ? (
+        <ActionForm action={undoCheckOut} className="mb-7 space-y-2">
+          <input type="hidden" name="bookingId" value={b.id} />
+          <p className="text-slate">{fill(w.step.undoHint, { pet: pet?.name ?? w.pet })}</p>
+          <SubmitButton variant="secondary" pendingLabel={w.step.undoingCheckOut}>
+            {w.step.undoCheckOut}
+          </SubmitButton>
+        </ActionForm>
       ) : null}
 
       {b.status !== "cancelled" && b.status !== "no_show" ? (
@@ -482,92 +583,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         />
       ) : null}
 
-      {b.status !== "requested" && (b.status !== "cancelled" || bill.data || advances.data.length > 0) ? (
-        <Section title={w.bill.title}>
-          {bill.data ? (
-            <Link href={`/app/bills/${bill.data.invoice_id}`} className="flex min-h-12 flex-wrap items-center gap-3 rounded-xl border border-rule bg-paper px-4 py-3 hover:bg-ground">
-              <span className="font-bold">{bill.data.number ?? w.bill.draft}</span>
-              <span className="flex-1 tabular-nums">{money(bill.data.total_minor ?? 0)}</span>
-              {bill.data.status === "issued" ? (
-                (bill.data.due_minor ?? 0) > 0 ? (
-                  <Badge tone="attention">{fill(w.bill.due, { amount: money(bill.data.due_minor ?? 0) })}</Badge>
-                ) : (bill.data.due_minor ?? 0) < 0 ? (
-                  <Badge tone="attention">{fill(w.bill.toRefund, { amount: money(-(bill.data.due_minor ?? 0)) })}</Badge>
-                ) : (
-                  <Badge tone="good">{w.bill.paid}</Badge>
-                )
-              ) : (
-                <Badge tone="attention">{w.bill.notIssued}</Badge>
-              )}
-            </Link>
-          ) : b.status === "cancelled" ? null : (
-            <ActionForm action={makeBill} className="space-y-2">
-              <input type="hidden" name="bookingId" value={b.id} />
-              <p>
-                {b.series_id
-                  ? w.bill.seriesNote
-                  : b.status === "checked_out"
-                    ? fill(w.bill.goneHome, { pet: pet?.name ?? w.bill.thePet })
-                    : w.bill.noneYet}
-                {family.data.length > 0 ? ` ${w.bill.familyNote}` : ""}
-              </p>
-              <SubmitButton variant={b.status === "checked_out" && !b.series_id ? "primary" : "secondary"} pendingLabel={w.bill.making}>
-                {b.series_id ? fill(w.bill.makeMonth, { month: monthName(b.start_date, locale) }) : family.data.length > 0 ? w.bill.makeFamily : w.bill.make}
-              </SubmitButton>
-            </ActionForm>
-          )}
-
-          {advances.data.length > 0 ? (
-            <ul className="mt-3 space-y-1">
-              {advances.data.map((a) => {
-                const pay = w.payment;
-                // On a cancelled stay no bill will take the money in: just what moved, and when.
-                const template =
-                  b.status === "cancelled"
-                    ? a.direction === "out"
-                      ? pay.refunded
-                      : pay.paid
-                    : a.direction === "out"
-                      ? a.reference
-                        ? pay.refundWithReference
-                        : pay.refund
-                      : a.reference
-                        ? pay.advanceWithReference
-                        : pay.advance;
-                return (
-                  <li key={a.id} className="text-slate">
-                    {fill(template, {
-                      amount: money(a.amount_minor),
-                      date: formatDate(a.received_on, locale),
-                      method: m.labels.paymentMethod[a.method],
-                      reference: a.reference ?? "",
-                    })}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-          {b.status === "cancelled" && !bill.data ? (
-            advanceMinor > 0 ? (
-              <div className="mt-3 space-y-2">
-                <p className="font-semibold">{fill(w.refund.paid, { amount: money(advanceMinor) })}</p>
-                {noRefundText ? <p className="text-slate">{noRefundText}</p> : null}
-                {canManage ? (
-                  // The rules above say what the advance becomes; a different refund agreed with the parent is recorded here.
-                  <details>
-                    <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.cancelRules.otherRefund}</summary>
-                    <PaymentForm words={m} bookingId={b.id} defaultAmount={toDecimalString(advanceMinor).replace(/\.00$/, "")} today={today} canRefund refundOnly />
-                  </details>
-                ) : (
-                  <p className="text-slate">{w.refund.managersOnly}</p>
-                )}
-              </div>
-            ) : null
-          ) : bill.data?.status !== "issued" ? (
-            <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} />
-          ) : null}
-        </Section>
-      ) : null}
+      {b.status === "checked_out" ? null : billSection}
 
       {open ? (
         <Section title={w.change.title}>

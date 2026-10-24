@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 20. Tables: 89. Views: 9. Functions: 200.
+Migrations applied: 20. Tables: 89. Views: 9. Functions: 201.
 
 ## Contents
 
@@ -766,6 +766,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_check_package` (before insert or update of package_id, package_price_minor) runs `bookings_check_package()`
 - `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
+- `bookings_end_care_at_check_out` (after update of status) runs `bookings_end_care_at_check_out()`
 - `bookings_follow_appointments` (after update of status, start_date, end_date) runs `bookings_follow_appointments()`
 - `bookings_follow_trips` (after update of status, start_date, end_date) runs `bookings_follow_trips()`
 - `bookings_forbid_org_change` (before update) runs `forbid_org_change()`
@@ -4985,6 +4986,18 @@ bookings_check_shared_price() returns trigger
 
 Trigger: a new booking made by staff at the shared kennel price must share its kennel with another pet of the same parent on overlapping days (WB023 otherwise).
 
+### bookings_end_care_at_check_out
+
+```
+bookings_end_care_at_check_out() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
+- Volatility: volatile
+
+Trigger: when a pet is checked out, its care tasks and play sessions still to do that fall after the moment it left (in the kennel's time zone) are removed, so Care, Play, Today's counts and the parent's stay page stop asking for them. Tasks due earlier, and anything done or skipped, are kept. Undoing the check-out brings the day's tasks back through generate_care_tasks. SECURITY DEFINER because only owners delete rows (D29) and staff check pets out.
+
 ### bookings_follow_appointments
 
 ```
@@ -5043,7 +5056,7 @@ bookings_leave_kennel_to_clean() returns trigger
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Trigger: when the last pet in a kennel is checked out, the kennel is to clean (kennel_cleans). A sibling still in it keeps it from being asked for. SECURITY DEFINER because nobody adds to kennel_cleans directly.
+Trigger: when the last pet in a kennel is checked out, the kennel is to clean (kennel_cleans). A sibling still in it keeps it from being asked for. Undoing that check-out takes the kennel off the list again, if nobody has cleaned it yet. SECURITY DEFINER because nobody adds to or removes from kennel_cleans directly.
 
 ### bookings_stamp_status
 

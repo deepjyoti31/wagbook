@@ -40,7 +40,9 @@ One person can belong to several kennels, with a different role in each.
 /app/dogs/{id}        One pet: details, photo, vaccinations, stays, incidents  signed in
 /app/dogs/{id}/incident  Write down an incident                      signed in
 /app/clients/{id}     One parent: details, pets, stays, bills, merge signed in
-/app/more             Menu, account, switch kennel, sign out         signed in
+/app/more             Menu (grouped: Every day, Money and records,   signed in
+                      The team, Set up, Looking after Wagbook),
+                      account, switch kennel, sign out
 /app/more/intake      Forms from parents                             signed in
 /app/more/kennels     Kennels                                        signed in
 /app/more/routines    Daily (house) routines                         signed in
@@ -367,6 +369,11 @@ cancelling happens. A Calendar button opens C5.
   instead of Check out (D40): "Check out, bill to today" ends the stay today (a boarding stay keeps its first night),
   so the bill is for the days stayed; "Check out, bill as booked" leaves the dates alone. A no-refund peak period is
   named beside them.
+- **Gone home** (M66, D56): once a pet is checked out, the **Bill** section comes first, with Make bill (or the bill
+  made). On the day of the check-out, while no bill for the stay is issued, **Undo check-out** puts a pet checked out by
+  mistake back in house: its kennel is held again (refused if another pet took it), comes off the list to clean, and
+  the rest of today's care is back on Care. The dates stay as they are; a stay shortened at check-out is put right
+  under Change this booking.
 - **Parent's stay page**: the link, Copy link, Open it, and Send confirmation (WhatsApp, with dates, nights and the
   estimated total).
 - **Booked together**: the other pets of a family booking.
@@ -510,7 +517,9 @@ add and stop; owners and managers. A pet's own routines are added and stopped fr
 
 `generate_care_tasks(org, date)` turns routines into the day's `care_tasks` for every pet checked in, from its first day
 until it is checked out (so an overstaying pet is still fed). Today and the Care screen call it when opened; it is safe
-to repeat.
+to repeat. When a pet is checked out, its tasks and play sessions still to do after that moment are removed by the
+database (`bookings_end_care_at_check_out`, M66, D56), so Care, Play, Today's counts and the parent's stay page stop
+asking for them; tasks due before it left stay as they were.
 
 `/app/care`: today's tasks grouped by time; within a time, medicines first, then kennel by kennel in kennel order. A pending
 medicine has a red edge and badge and is never folded away. One tap on Done; a second tap does nothing (the database keeps
@@ -579,8 +588,8 @@ or opens the issued bill. Owners and managers can change, add and remove lines o
 (`issue_invoice`), gives the next number for the financial year and freezes it; staff can issue only a bill exactly as
 its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
 cancel an issued bill with a reason; the number stays used. A tax invoice from an earlier month, or a bill with a credit
-note, is not cancelled but credited (`WB095`, `WB096`). Bills, under More: what is owed first, then drafts, then
-recent.
+note, is not cancelled but credited (`WB095`, `WB096`). Bills, under More: what is owed first (every unpaid bill,
+however old, M66), then drafts, then recent.
 
 **Credit notes (D34).** On an issued bill, owners and managers make a credit note: the whole bill (while nothing has
 been credited) or part of it (an amount at one of the bill's tax rates), with a reason. It has its own number

@@ -1622,14 +1622,23 @@ test("Biscuit's portion, and a food subscription every day: billed ahead and cre
   await narrow(page);
   await shot(page, "m29-subscription");
 
-  // Billed ahead: this week and the next.
+  // Billed ahead: this week and the next, each that has a delivery. From a Saturday or a Sunday, two days on is
+  // next week, so this week has nothing to bill and keeps its button.
   const subscription = page.url().split("?")[0];
+  let empty = 0;
   for (let i = 0; i < 2; i++) {
     await page.goto(subscription);
-    await page.getByRole("button", { name: /^Make the bill for / }).first().click();
-    await page.getByRole("button", { name: "Issue bill" }).click();
+    await page.getByRole("button", { name: /^Make the bill for / }).nth(empty).click();
+    const issue = page.getByRole("button", { name: "Issue bill" });
+    await expect(issue.or(page.getByText(en.subscription.nothingToBill))).toBeVisible();
+    if (!(await issue.isVisible())) {
+      empty++;
+      continue;
+    }
+    await issue.click();
     await expect(page.getByText(/^Issued\./)).toBeVisible();
   }
+  expect(empty).toBeLessThan(2);
   await expect(page.getByText(/Fresh food for Biscuit: /).first()).toBeVisible();
 
   // The first delivery is cancelled before it is cooked: its bill offers the difference back.
