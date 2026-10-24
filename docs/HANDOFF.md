@@ -2,12 +2,22 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 24 October 2026, after M67 (departures on Today, finding a booking).
+Last updated: 24 October 2026, after a bug review of the whole code that followed M67.
 
 ## In one paragraph
 
 Every milestone from M2 to M67 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. M67 (24 October 2026), asked for after the review: Today puts Arriving, a new
+except M1 and the ideas not scheduled. A bug review of the whole code after M67 (24 October 2026) fixed fourteen bugs,
+each with a test: one parent's money or credit could pay another parent's bill (now `WB058`, and credit spent on
+nothing `WB214`); money paid on a cancelled family, series, appointment, sale or food bill was left on it, and a refund
+on a cancelled bill stopped the next one being issued; a stay made already checked in skipped the health papers at the
+door; staff could take the delivery charge or tax off a delivery; erasing a parent who had ever had food delivered
+was refused (`WB151`, their address could not leave past deliveries), and erasing left their appointment, course,
+trip and draft bill notes in the history of changes; a stay made shorter after its discount broke its page and bill; a
+cancelled stay's refund and credit were offered again for the money the kennel kept; Going home today left out money
+paid on a cancelled bill; Today's unpaid reminders read only the 200 oldest bills; `/book/` had no limit per address
+and `/b/` refused a parent's photo of a problem over 1 MB; a food order's weight was dated in UTC; and a supplier's bill
+could point into another kennel's folder. M67 (24 October 2026), asked for after the review: Today puts Arriving, a new
 **Going home today** and In house straight under the care counts and incidents, with the other notices after them, and
 each pet going home says what its parent owes (from its bill, or what Make bill would write now less what was paid
 ahead, `owedAtCheckOut()`); Bookings has a search box (pet, parent or phone) and Past pages back 100 at a time. M66 (24 October 2026, D56) is the owner's pre-launch review: the app was walked
@@ -99,8 +109,8 @@ calendar, a series billed by the month (D41), removing a photo, recovery codes (
 (D39), parents' booking links (D36), day boarding regulars and packs (D37), GSTR-1 files (D38). M14 and M15: stays priced
 in parts (D32), credit notes (D34), each kennel's own tax rate (D35), the owner's answers on phones, erasure and bills
 (D30, D31, D33). Earlier: families (D27), only owners delete (D29), the licence (AGPL), no public demo (D28). The
-database rules are tested in-process (`npm run check`: 773 tests in all on 24 October 2026), and the whole day is
-walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 82 steps).
+database rules are tested in-process (`npm run check`: 787 tests in all on 24 October 2026), and the whole day is
+walked in a real browser at 360 pixels wide against a **local** Supabase (`npm run test:e2e`, 83 steps).
 
 ## What is verified, and how
 
@@ -115,6 +125,9 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 | Invoice numbering, freezing, voiding, tax checks, payments | `tests/db/billing.test.ts` | High |
 | TypeScript and SQL agree on every bill: three tax modes, prices with and without tax, other-state GST, rounding on and off, odd paise, discounts, zero rate, the worked example in `06` | `tests/db/bills.test.ts` | High |
 | Staff issue only a bill that matches its booking (`WB050`); one live bill per booking; advances join the bill; drafts saved in one go | `tests/db/bills.test.ts`; each rule removed once to see its test fail | High |
+| The bug review after M67: a payment is the money of its bill's or stay's parent (`WB058`), credit is spent on a bill or a stay (`WB214`); a voided bill's payments, refunds with them, move to the next bill for the same thing; a stay made already checked in meets the health papers; staff change no delivery's kind, charge or tax; a parent with past deliveries can be erased, each delivery keeping its charge; erasing scrubs appointments, courses, trips and draft bills from the history; a discount never takes more than its line; a food order's weight dated by the kennel's calendar; a supplier's bill stays in its kennel's folder | `tests/db/credit.test.ts`, `bills.test.ts`, `trips-and-health.test.ts`, `subscriptions.test.ts`, `privacy.test.ts`, `appointment-services.test.ts`, `stay-charges.test.ts`, `food-orders.test.ts`, `media.test.ts`; each rule removed once to see its test fail | High |
+| A cancelled stay's money is settled once (`cancelledStayMoney()`, `stillToSettle()`); the discount cap in `wholeStayCharge()`; rate limits on `/book/` and the photo limit on `/b/` | `src/lib/core/cancellation.test.ts`, `stay.test.ts`, `src/lib/rate-limit.test.ts`; the settling rule broken once to see its tests fail | High |
+| The bug review after M67 in a browser at 360 pixels: a discount above the stay refused in words; a cancelled stay paid ₹9,000 for a ₹1,200 night offers "Refund ₹1,200", says Done, and on a later visit offers nothing more (the ₹7,800 kept shows as an advance); Today lists a bill issued five days ago as "Bill unpaid" | `npm run test:e2e` against the local Supabase: 83 steps passing, 24 October 2026; and a one-off script for the screenshots, the bill's date set back by hand | High for the local stack |
 | The UPI QR code scans back to the exact pay link | `src/lib/core/qr.test.ts`, decoded with `jsqr` | High |
 | Photos on a stay page reach only the holder of that stay's link, only shared ones, only while the stay is live; stored paths stay in their kennel; another kennel cannot read a file | `tests/db/media.test.ts`; rules removed once to see the tests fail | High |
 | Location data is removed from photos | `src/lib/core/jpeg.test.ts`; and end to end, a real JPEG with planted GPS data comes back from Storage without it, resized to 1,600 pixels | High |
@@ -260,6 +273,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Supabase's own self-hosting stack (`docs/14-self-hosting.md`, Part 1), HTTPS certificates, SMTP, `db push` through its pooler | Needs a server with public names | The CLI's Supabase is the same software; names of settings may differ by version |
 | The script policy on Vercel | Vercel may not ship `.next/build-manifest.json` to the proxy | Before M66 pages would then have stayed at their loading dots (no `script-src`); now inline scripts are allowed without a nonce (logged). Check the header after the first deploy (`10`, "Check the browser protections"): it should carry `'sha256-` |
 | Rate limits on Vercel | Each copy of the app counts on its own | Add a Vercel Firewall rule (`10`, "Rate limits") |
+| Going home today for a stay whose bill was cancelled and not yet made again (the bug review after M67) | Not looked at in a browser, and `owedFor()` has no test of its own (it only reads; the money it now counts is what `issue_invoice()` takes in, which `tests/db/bills.test.ts` checks) | Low: it can only say less is owed, by what was paid on the cancelled bill |
 | Erasure against the law | Not read by a lawyer | D25 says what is kept and why; see Open questions |
 | Recovery codes on a hosted Supabase project | Walked only against the CLI's Supabase Auth (v2.197.0) | They rely on the `session_id` claim in access tokens, which Supabase Auth has carried for years |
 | Two waiting requests for the same last kennel | The database test confirms both show as fitting, then the second is refused at Confirm | By design (D42); a kennel with long waiting lists may want "first in line only" |
@@ -784,7 +798,7 @@ Found in the pre-launch review (M66), not built; each wants an owner's yes first
 
 ```bash
 npm ci
-npm run check        # dash check, lint, typecheck, 773 tests, build
+npm run check        # dash check, lint, typecheck, 787 tests, build
 ```
 
 All of it should pass on a clean clone with no environment variables set. With Docker, also `npm run test:e2e`,
@@ -793,6 +807,13 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 24 October 2026: a bug review of the whole code after M67. Fourteen bugs fixed (listed in "In one paragraph"), each
+  with a test that fails without the fix: 10 database tests changed or added, 4 unit tests, 1 browser step (the
+  discount refused, and a cancelled stay's money settled once). Two new error codes (`WB058`, `WB214`);
+  `invoice_balances` gained `issued_on`; no new public function, no new dependency. `npm run check`: 787 tests. The
+  walk (83 steps) passes against the local Supabase (images from Docker Hub, where `ghcr.io`'s downloads were refused),
+  the changed screens were looked at at 360 pixels, and both races in `scripts/race-checks.sh` held.
 
 - 24 October 2026: M67, asked for after the review: Going home today on Today with what each parent owes, the lists
   moved above the notices, and Bookings searchable with Past paged. 5 unit tests; no database change. `npm run check`: 773 tests; the walk 82 steps.

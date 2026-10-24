@@ -142,6 +142,10 @@ begin
   if new.method <> 'credit' then
     return null;
   end if;
+  -- Credit pays for something: spent on no bill and no stay, it would be gone with nothing to show for it.
+  if new.direction = 'in' and new.invoice_id is null and new.booking_id is null then
+    raise exception 'WB214: credit is spent on a bill or a stay' using errcode = '23514';
+  end if;
   -- One at a time per parent, so two payments cannot both take the last of it.
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('credit:' || new.client_id::text, 0));
   if new.direction = 'out' then
@@ -170,7 +174,7 @@ begin
 end;
 $$;
 comment on function public.payments_credit() is
-  'Trigger: a refund paid as credit (method credit, out) becomes a credit ending after the kennel''s credit_months; a payment from credit (method credit, in) takes from the parent''s credits still spendable, the soonest to end first, and is refused when there is not enough (WB211).';
+  'Trigger: a refund paid as credit (method credit, out) becomes a credit ending after the kennel''s credit_months; a payment from credit (method credit, in) pays a bill or a stay (WB214) and takes from the parent''s credits still spendable, the soonest to end first, and is refused when there is not enough (WB211).';
 
 create trigger payments_credit
   after insert on public.payments

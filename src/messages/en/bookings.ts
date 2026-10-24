@@ -268,6 +268,7 @@ export const bookingsArea = {
       priceNumber: "Enter the price as a number, like 1200 or 1200.50.",
       priceWhole: "Enter the price as a number, like 1200.",
       discountNumber: "Enter the discount as a number, like 200, or leave it empty.",
+      discountTooBig: "The discount is more than the stay costs. Enter a smaller one.",
       // When no usual price is set, by kind of stay.
       noPriceManager: {
         boarding: "Enter a price, or set your boarding price in Settings so it fills in by itself.",

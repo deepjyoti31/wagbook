@@ -54,7 +54,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const generated = await supabase.rpc("generate_care_tasks", { p_org: org.id, p_date: today });
   if (generated.error) console.error("generate_care_tasks failed", generated.error.message);
 
-  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes, upcomingRes, oldBillsRes, origin, requestsRes, waitingRes] = await Promise.all([
+  const [arrivalsRes, inHouseRes, kennelsRes, intakeRes, tasksRes, incidentsRes, upcomingRes, unpaidRes, origin, requestsRes, waitingRes] = await Promise.all([
     // Confirmed and due today or earlier: includes anyone who was expected yesterday and has not turned up.
     bookingCards(supabase, org.id).eq("status", "confirmed").lte("start_date", today).order("start_date"),
     bookingCards(supabase, org.id).eq("status", "checked_in").order("end_date"),
@@ -70,13 +70,15 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       .in("severity", ["medium", "high"])
       .order("occurred_at", { ascending: false })
       .limit(20),
-    // For reminders: stays starting within a week, and bills old enough to remind about.
+    // For reminders: stays starting within a week, and the bills still owed that are old enough to remind about.
+    // Owed first, as on the bills page: the oldest bills of a kennel that has issued hundreds are paid.
     bookingCards(supabase, org.id).eq("status", "confirmed").gt("start_date", today).lte("start_date", addDays(today, VACCINATION_REMINDER_DAYS)).order("start_date").limit(100),
     supabase
-      .from("invoices")
-      .select("id, number, issued_on, public_token, clients(full_name, phone)")
+      .from("invoice_balances")
+      .select("invoice_id")
       .eq("org_id", org.id)
       .eq("status", "issued")
+      .gt("due_minor", 0)
       .lte("issued_on", addDays(today, -UNPAID_REMINDER_DAYS))
       .order("issued_on")
       .limit(200),
@@ -105,7 +107,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const vaccineWarnings = new Map(
     arrivals.map((b) => [b.id, vaccinationWarnings(vaccinations.filter((v) => v.pet_id === b.pets?.id), { startDate: b.start_date, endDate: b.end_date })]),
   );
-  const reminders = await todaysReminders(supabase, org, today, origin, upcomingRes.data ?? [], inHouse, oldBillsRes.data ?? []);
+  const unpaid = (unpaidRes.data ?? []).flatMap((b) => (b.invoice_id ? [b.invoice_id] : []));
+  const oldBills =
+    unpaid.length > 0
+      ? ((await supabase.from("invoices").select("id, number, issued_on, public_token, clients(full_name, phone)").eq("org_id", org.id).in("id", unpaid).order("issued_on")).data ?? [])
+      : [];
+  const reminders = await todaysReminders(supabase, org, today, origin, upcomingRes.data ?? [], inHouse, oldBills);
   // How each arriving pet settled on its trial day, if it had one (M56).
   const trials = await trialResults(supabase, org.id, arrivals.flatMap((b) => (b.pets ? [b.pets.id] : [])));
   const capacity = kennelsRes.count ?? 0;

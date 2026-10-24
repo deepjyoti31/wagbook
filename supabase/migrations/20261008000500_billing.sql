@@ -442,7 +442,9 @@ comment on function public.invoice_bookings(uuid, uuid, uuid, uuid, date) is
 --     nights it shared its kennel with a pet of the same parent at that price,
 --     and the nights it had the kennel to itself at the usual price. A sibling
 --     that went home early shares only up to the day it was checked out.
--- The discount goes on the largest line (the first, if two are equal).
+-- The discount goes on the largest line (the first, if two are equal), and
+-- never takes more off than that line comes to: a stay made shorter after a
+-- discount was given costs nothing, not less than nothing.
 create function public.stay_charges(p_org uuid, p_bookings uuid[])
 returns table (booking_id uuid, part text, quantity integer, unit_price_minor bigint, discount_minor bigint)
 language sql
@@ -513,13 +515,13 @@ as $$
     from parts p
     where p.quantity > 0
   )
-  select k.id, k.part, k.quantity, k.unit_price_minor, case when k.rank = 1 then b.discount_minor else 0 end
+  select k.id, k.part, k.quantity, k.unit_price_minor, case when k.rank = 1 then least(b.discount_minor, k.quantity * k.unit_price_minor) else 0 end
   from kept k
   join b on b.id = k.id
   order by array_position(p_bookings, k.id), k.position;
 $$;
 comment on function public.stay_charges(uuid, uuid[]) is
-  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
+  'What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount (on the largest line, never more than it comes to). The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).';
 
 -- In plpgsql so that it may read the sales over the counter (M62), whose
 -- tables are made after this file.
@@ -870,28 +872,44 @@ begin
   returning * into v_inv;
   perform set_config('wagbook.issuing', 'off', true);
 
-  -- Money already received for these stays counts against the bill: advances
-  -- (on any pet of a family, or any day of the series in the month), and
-  -- anything paid against an earlier bill for them that was voided.
-  if v_inv.booking_id is not null or v_inv.group_id is not null or v_inv.series_id is not null then
-    update public.payments p
-    set invoice_id = v_inv.id
-    where p.org_id = v_inv.org_id
-      and (p.booking_id = v_inv.booking_id
-           or p.booking_id in (select b.id from public.bookings b where b.org_id = v_inv.org_id and b.group_id = v_inv.group_id)
-           or p.booking_id in (
-             select b.id from public.bookings b
-             where b.org_id = v_inv.org_id and b.series_id = v_inv.series_id
-               and b.start_date >= v_inv.series_month and b.start_date < (v_inv.series_month + interval '1 month')::date))
-      and (p.invoice_id is null
-           or p.invoice_id in (select i.id from public.invoices i where i.org_id = v_inv.org_id and i.status = 'void'));
-  end if;
+  -- Money already received for what the bill is for counts against it:
+  -- advances for its stays (on any pet of a family, or any day of the series
+  -- in the month), anything paid for them against a bill that was voided, and
+  -- everything paid, or given back, on a voided bill for the same thing (a
+  -- family's bill, or one for an appointment, a sale or food, names no stay).
+  -- Moving a refund with the money it gave back is not a new refund, so
+  -- payments_check_refund lets these through while the flag is on.
+  perform set_config('wagbook.issuing', 'on', true);
+  update public.payments p
+  set invoice_id = v_inv.id
+  where p.org_id = v_inv.org_id
+    and p.client_id = v_inv.client_id
+    and ((p.booking_id = v_inv.booking_id
+          or p.booking_id in (select b.id from public.bookings b where b.org_id = v_inv.org_id and b.group_id = v_inv.group_id)
+          or p.booking_id in (
+            select b.id from public.bookings b
+            where b.org_id = v_inv.org_id and b.series_id = v_inv.series_id
+              and b.start_date >= v_inv.series_month and b.start_date < (v_inv.series_month + interval '1 month')::date))
+         and (p.invoice_id is null
+              or p.invoice_id in (select i.id from public.invoices i where i.org_id = v_inv.org_id and i.status = 'void'))
+      or p.invoice_id in (
+        select i.id from public.invoices i
+        where i.org_id = v_inv.org_id and i.status = 'void'
+          and (i.booking_id = v_inv.booking_id
+               or i.group_id = v_inv.group_id
+               or (i.series_id = v_inv.series_id and i.series_month = v_inv.series_month)
+               or i.appointment_id = v_inv.appointment_id
+               or i.sale_id = v_inv.sale_id
+               or i.delivery_id = v_inv.delivery_id
+               or (i.subscription_id = v_inv.subscription_id
+                   and i.period_start <= v_inv.period_end and i.period_end >= v_inv.period_start))));
+  perform set_config('wagbook.issuing', 'off', true);
 
   return v_inv;
 end;
 $$;
 comment on function public.issue_invoice(uuid) is
-  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays.';
+  'Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller''s and buyer''s details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family''s bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays, and what was paid or given back on a voided bill for the same thing.';
 
 create function public.void_invoice(p_invoice uuid, p_reason text)
 returns public.invoices
@@ -1424,7 +1442,8 @@ as $$
 declare
   v_room bigint;
 begin
-  if new.direction <> 'out' then
+  -- issue_invoice moving a voided bill's payments, refunds with them, to the new bill.
+  if new.direction <> 'out' or coalesce(current_setting('wagbook.issuing', true), '') = 'on' then
     return new;
   end if;
   if new.invoice_id is null and new.booking_id is null then
@@ -1468,6 +1487,36 @@ comment on function public.payments_check_refund() is
 create trigger payments_check_refund
   before insert or update of direction, amount_minor, invoice_id, booking_id on public.payments
   for each row execute function public.payments_check_refund();
+
+-- Money paid, refunded or spent from credit belongs to the parent of the bill
+-- or stay it names: one parent's money, or their credit, never pays another
+-- parent's bill. Merging two parents moves the payments with their bills and
+-- stays (merge_clients). Runs as the caller.
+create function public.payments_check_parent()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('wagbook.merging', true), '') = 'on' then
+    return new;
+  end if;
+  if (new.invoice_id is not null and not exists (
+        select 1 from public.invoices i where i.org_id = new.org_id and i.id = new.invoice_id and i.client_id = new.client_id))
+     or (new.booking_id is not null and not exists (
+        select 1 from public.bookings b where b.org_id = new.org_id and b.id = new.booking_id and b.client_id = new.client_id))
+  then
+    raise exception 'WB058: a payment is for the parent of the bill or stay it names' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+comment on function public.payments_check_parent() is
+  'Trigger: a payment''s parent is the parent of the bill and the stay it names (WB058), so one parent''s money or credit never pays another''s bill.';
+
+create trigger payments_check_parent
+  before insert or update of client_id, invoice_id, booking_id on public.payments
+  for each row execute function public.payments_check_parent();
 
 create table public.expenses (
   id uuid primary key default gen_random_uuid(),
@@ -1527,7 +1576,8 @@ select
   i.series_id,
   i.series_month,
   i.appointment_id,
-  i.sale_id
+  i.sale_id,
+  i.issued_on
 from public.invoices i
 left join lateral (
   select sum(case when pay.direction = 'in' then pay.amount_minor else -pay.amount_minor end) as paid_minor

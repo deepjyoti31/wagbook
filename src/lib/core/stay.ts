@@ -90,9 +90,13 @@ export interface StayQuoteInput {
   addOns?: readonly AddOn[];
 }
 
-/** Every night or day of a stay at its booked rate: what a stay costs unless it is split. */
+/**
+ * Every night or day of a stay at its booked rate: what a stay costs unless it is split. The discount never takes
+ * more off than the stay comes to, as in stay_charges().
+ */
 export function wholeStayCharge(input: Pick<StayQuoteInput, "kind" | "startDate" | "endDate" | "rateMinor" | "discountMinor">): StayCharge[] {
-  return [{ part: "stay", quantity: chargeableUnits(input.kind, input.startDate, input.endDate), unitPriceMinor: input.rateMinor, discountMinor: input.discountMinor ?? 0 }];
+  const quantity = chargeableUnits(input.kind, input.startDate, input.endDate);
+  return [{ part: "stay", quantity, unitPriceMinor: input.rateMinor, discountMinor: Math.min(input.discountMinor ?? 0, quantity * input.rateMinor) }];
 }
 
 /** What a stay line says on a bill. Stored with the bill, so in English like the rest of its lines. */

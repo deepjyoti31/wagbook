@@ -38,6 +38,7 @@ describe("rateRuleFor", () => {
     expect(rateRuleFor("/f/happy-tails")?.name).toBe("food");
     expect(rateRuleFor("/join/abc")?.name).toBe("join");
     expect(rateRuleFor("/b/abc")?.name).toBe("requests");
+    expect(rateRuleFor("/book/happy-tails")?.name).toBe("booking");
     expect(rateRuleFor("/app")).toBeNull();
     expect(rateRuleFor("/app/bookings/new")).toBeNull();
     expect(rateRuleFor("/loginx")).toBeNull();
@@ -49,6 +50,8 @@ describe("bodyLimitFor", () => {
     expect(bodyLimitFor("/app/bookings/1/update")).toBe(12 * 1024 * 1024);
     expect(bodyLimitFor("/i/happy-tails")).toBe(12 * 1024 * 1024);
     expect(bodyLimitFor("/rider")).toBe(12 * 1024 * 1024);
+    expect(bodyLimitFor("/b/abc")).toBe(12 * 1024 * 1024);
+    expect(bodyLimitFor("/book/happy-tails")).toBe(1024 * 1024);
     expect(bodyLimitFor("/f/happy-tails")).toBe(1024 * 1024);
     expect(bodyLimitFor("/login")).toBe(1024 * 1024);
     expect(bodyLimitFor("/join/abc")).toBe(1024 * 1024);

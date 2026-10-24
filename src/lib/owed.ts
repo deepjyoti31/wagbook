@@ -11,8 +11,9 @@ type Org = Pick<Tables<"organizations">, "id" | "tax_mode" | "gst_state_code" | 
 /**
  * What a parent owes as their pet goes home (M67): the stay's bill (its
  * family's, when booked together) if it has one, or what Make bill would
- * write now, less advances no bill has taken in yet. `invoiceId` is the bill
- * to open, if any. Null when nothing can be said.
+ * write now, less advances no bill has taken in yet, and what was paid on a
+ * cancelled bill for it, which its next bill takes in (issue_invoice).
+ * `invoiceId` is the bill to open, if any. Null when nothing can be said.
  */
 export async function owedFor(
   supabase: Supabase,
@@ -22,7 +23,7 @@ export async function owedFor(
   const family = b.group_id !== null;
   if (b.series_id) return { owed: { kind: "monthly" }, invoiceId: null, family };
 
-  const [bill, stays] = await Promise.all([
+  const [bill, stays, voided] = await Promise.all([
     supabase
       .from("invoice_balances")
       .select("invoice_id, status, number, total_minor, due_minor")
@@ -31,8 +32,9 @@ export async function owedFor(
       .neq("status", "void")
       .maybeSingle(),
     family ? supabase.from("bookings").select("id").eq("org_id", org.id).eq("group_id", b.group_id!) : Promise.resolve({ data: [{ id: b.id }], error: null }),
+    supabase.from("invoice_balances").select("paid_minor").eq("org_id", org.id).eq(family ? "group_id" : "booking_id", b.group_id ?? b.id).eq("status", "void"),
   ]);
-  if (bill.error || stays.error) return null;
+  if (bill.error || stays.error || voided.error) return null;
   const live = bill.data && (bill.data.status === "draft" || bill.data.status === "issued") ? bill.data : null;
   const invoiceId = live?.invoice_id ?? null;
 
@@ -45,7 +47,9 @@ export async function owedFor(
       .in("booking_id", stays.data.map((s) => s.id))
       .is("invoice_id", null);
     if (paid.error) return null;
-    advanceMinor = paid.data.reduce((sum, p) => sum + (p.direction === "out" ? -p.amount_minor : p.amount_minor), 0);
+    advanceMinor =
+      paid.data.reduce((sum, p) => sum + (p.direction === "out" ? -p.amount_minor : p.amount_minor), 0) +
+      voided.data.reduce((sum, v) => sum + (v.paid_minor ?? 0), 0);
   }
 
   let estimateMinor: number | null = null;

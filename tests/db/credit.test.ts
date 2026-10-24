@@ -1,6 +1,7 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMember, book, seedKennel, type Kennel } from "./fixtures";
+import { billFor, draftPayload } from "../../src/lib/billing";
+import { addMember, book, seedKennel, strangerPet, type Kennel } from "./fixtures";
 import { createTestDb, errorOf } from "./harness";
 import { dayFromToday, q } from "./kitchen-fixtures";
 
@@ -112,5 +113,46 @@ describe("spending credit", () => {
       [k.org],
     );
     expect([received, refunded]).toEqual(["361000", "120000"]);
+  });
+});
+
+describe("one parent's money and credit", () => {
+  let otherBill: string;
+  let otherStay: string;
+
+  beforeAll(async () => {
+    // Another parent of the kennel, with a stay and an issued bill of their own.
+    const otherPet = await strangerPet(db, k);
+    const [{ client_id: other }] = await q<{ client_id: string }>(db, k.owner, "select client_id from public.pets where id = $1", [otherPet]);
+    otherStay = await book(db, k, { pet: otherPet, start: await dayFromToday(db, k, 50), end: await dayFromToday(db, k, 52) });
+    const t = billFor({ tax_mode: "none", gst_state_code: null, prices_include_tax: false, round_invoice_totals: true }, [{ description: "Grooming", quantity: 1, unitPriceMinor: 30000 }]);
+    const { p_totals, p_lines } = draftPayload(t);
+    [{ id: otherBill }] = await q<{ id: string }>(db, k.owner, "insert into public.invoices (org_id, client_id) values ($1, $2) returning id", [k.org, other]);
+    await q(db, k.owner, "select public.save_invoice_draft($1, $2, $3)", [otherBill, JSON.stringify(p_totals), JSON.stringify(p_lines)]);
+    await q(db, k.owner, "select public.issue_invoice($1)", [otherBill]);
+  });
+
+  it("never pays another parent's bill, from credit or otherwise, and leaves the credit as it was", async () => {
+    const before = await left();
+    const fromCredit = await errorOf(() => pay(staff, { invoice: otherBill, direction: "in", amount: 30000, method: "credit" }));
+    expect(fromCredit.message).toContain("WB058");
+    const inCash = await errorOf(() => pay(staff, { invoice: otherBill, direction: "in", amount: 30000, method: "cash" }));
+    expect(inCash.message).toContain("WB058");
+    expect(await left()).toBe(before);
+    const [{ due }] = await q<{ due: string }>(db, staff, "select due_minor::text as due from public.invoice_balances where invoice_id = $1", [otherBill]);
+    expect(due).toBe("30000");
+  });
+
+  it("is never an advance on another parent's stay, nor moved onto one", async () => {
+    const e = await errorOf(() => pay(staff, { booking: otherStay, direction: "in", amount: 1000 }));
+    expect(e.message).toContain("WB058");
+    const [{ id }] = await pay(staff, { booking: stay, direction: "in", amount: 1000 });
+    const moved = await errorOf(() => q(db, manager, "update public.payments set booking_id = $2 where id = $1", [id, otherStay]));
+    expect(moved.message).toContain("WB058");
+  });
+
+  it("is never spent on nothing", async () => {
+    const e = await errorOf(() => pay(staff, { direction: "in", amount: 1000, method: "credit" }));
+    expect(e.message).toContain("WB214");
   });
 });
