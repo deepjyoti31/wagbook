@@ -3,6 +3,12 @@ import type { bookingsArea as English } from "../en/bookings";
 /** Hindi words for bookings, the booking page, new booking, updates and the calendar. First draft, to be checked by a native speaker. */
 export const bookingsArea: typeof English = {
   bookings: {
+    searchLabel: "पालतू का नाम, पेरेंट का नाम या फ़ोन नंबर से बुकिंग खोजें",
+    searchPlaceholder: "पालतू, पेरेंट या फ़ोन",
+    search: "खोजें",
+    nothingFound: "\"{q}\" के लिए कोई बुकिंग नहीं मिली।",
+    older: "पुरानी बुकिंग",
+    newer: "नई बुकिंग",
     title: "बुकिंग",
     calendar: "कैलेंडर",
     newBooking: "नई बुकिंग",
@@ -33,6 +39,7 @@ export const bookingsArea: typeof English = {
     allBookings: "सभी बुकिंग",
     pet: "पालतू",
     done: {
+      check_out_undone: "फिर से अंदर। आज की बाकी देखभाल फिर से देखभाल पेज पर है। अगर चेक आउट पर ठहराव छोटा किया गया था, तो नीचे उसकी तारीखें ठीक करें।",
       photo_removed: "फ़ोटो मिटा दी गई। पेरेंट के ठहराव पेज पर अब नहीं दिखती।",
       unwaitlisted: "वेटिंग लिस्ट से हटा दिया। यह अब भी एक अनुरोध है।",
       waitlisted: "वेटिंग लिस्ट में जुड़ गया। केनेल खाली होने पर आज वाला पेज बताएगा।",
@@ -190,6 +197,9 @@ export const bookingsArea: typeof English = {
       cancelling: "रद्द हो रही है",
     },
     step: {
+      undoHint: "गलती से चेक आउट हो गया? {pet} को फिर से अंदर करें। सिर्फ़ चेक आउट वाले दिन।",
+      undoCheckOut: "चेक आउट वापस लें",
+      undoingCheckOut: "वापस ले रहे हैं",
       checkOutAsBooked: "चेक आउट, बिल बुकिंग जितना",
       checkOutToToday: "चेक आउट, बिल आज तक",
       early: "{date} तक बुक है। जल्दी घर जा रहा है? बिल सिर्फ़ आज तक का बनाएं, या बुकिंग जितने दिनों का।",

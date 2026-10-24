@@ -22,7 +22,7 @@ things: the kennel's name, a short name for its links (`happy-tails`), and your 
 
 ### Five minutes of setting up
 
-Under **More**:
+Under **More** (its links are grouped: what you use every day first, then money, the team, and what you set up once):
 
 1. **Settings**: your phone and WhatsApp number, address, check-in and check-out times, and your UPI ID so parents can
    pay by scanning a code. If you charge GST, your GSTIN and state.
@@ -49,7 +49,8 @@ problems, fix them, and send that file. A parent you already have is recognised 
 
 **Today** is the first screen. At the top: how many pets are in, out of how many kennels. Below it, how much of the
 day's care is done (meals, medicines, cleaning); red means something is waiting. Then who is **arriving**, who is
-**going home**, and who is in the house.
+**going home today** (with what each parent owes, so you can take the money before the pet leaves), and who is in the
+house. Forms, requests, reminders and the rest come after.
 
 When a pet arrives, choose its kennel and press **Check in**. Wagbook asks you to confirm you have seen the vaccination
 certificates and to note what came with the pet (a bed, a lead, food).
@@ -83,12 +84,16 @@ Full on those dates? **Add to the waiting list** instead. Waiting requests keep 
 calendar under the kennels. When a kennel frees up for one, Today says so at the top, with **Tell the parent** (WhatsApp,
 with the dates) and **Confirm booking** for once they say yes.
 
+To find a booking, type the pet's name, the parent's name or a phone number in the search box on **Bookings**. Past
+bookings go back a hundred at a time (**Older bookings**).
+
 Every booking has its own page:
 
 <img src="guide/04-booking.jpg" alt="A booking: check out, updates, the parent's link" width="270">
 
 From here you check the pet in and out, write updates for the parent, add extras (a bath, a pick-up), and send the
-parent their link. If a pet in day boarding stays the night after all, an owner or manager uses **Staying overnight**:
+parent their link. Once the pet has gone home, the bill is at the top. Checked out by mistake? **Undo check-out** puts
+the pet back in house, the same day and before its bill is issued. If a pet in day boarding stays the night after all, an owner or manager uses **Staying overnight**:
 the days so far stay day boarding, and the nights are boarding, each at its own price on the bill.
 
 Going home before the booked date? The booking asks how to bill it: **bill to today** (only the nights stayed) or

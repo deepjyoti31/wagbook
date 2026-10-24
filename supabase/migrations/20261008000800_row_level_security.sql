@@ -399,8 +399,9 @@ create policy attendance_delete on public.attendance for delete to authenticated
   using (org_id in (select public.my_org_ids_with_role(array['owner']::public.member_role[])));
 
 -- The day, smoother (Phase 6, M50 to M57). A kennel to clean is written only
--- by the database when its last pet leaves (bookings_leave_kennel_to_clean);
--- any member reads the list and marks one cleaned, which the database stamps.
+-- by the database when its last pet leaves, and taken off when that check-out
+-- is undone (bookings_leave_kennel_to_clean); any member reads the list and
+-- marks one cleaned, which the database stamps.
 -- House jobs are set up by owners and managers (the setup list above); their
 -- ticks, repairs, stay reports, a parent's supplies and vet visits are daily
 -- operations (the list above). What is left of each supply is a view.

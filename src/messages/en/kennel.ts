@@ -2,6 +2,8 @@
 export const kennelArea = {
   more: {
     title: "More",
+    // Headings that group the links, so daily work is not lost among things set up once.
+    groups: { daily: "Every day", money: "Money and records", team: "The team", setup: "Set up", upkeep: "Looking after Wagbook" },
     links: {
       bills: { title: "Bills", about: "What parents owe, bills to send, and payments." },
       reports: { title: "Reports", about: "How full you were, money in and out, tax, and downloads. Owners and managers." },

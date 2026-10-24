@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getMemberships, rememberOrg, requireOrg } from "@/lib/auth";
-import { shortenedEnd, todayIn } from "@/lib/core";
+import { localDate, shortenedEnd, todayIn } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { sendAlertsAfter } from "@/lib/push";
 import { getAppI18n } from "@/lib/i18n-server";
@@ -127,6 +127,52 @@ export async function checkOut(_state: FormState, form: FormData): Promise<FormS
   if (form.get("from") === "booking") redirect(`/app/bookings/${bookingId.data}?done=${update.end_date ? "checked_out_early" : "checked_out"}`);
   if (form.get("from") === "today") redirect(`/app?done=checked_out&booking=${bookingId.data}`);
   return { ok: t.m.today.checkedOut };
+}
+
+/**
+ * Undo a check-out made by mistake: the pet is in house again, its kennel held
+ * (the database refuses if another pet has taken it meanwhile) and off the
+ * list to clean, and the rest of today's care is back on Care. Only on the day
+ * of the check-out and while no bill for the stay is issued; after that the
+ * stay and its bill are history, changed on purpose by an owner or manager.
+ */
+export async function undoCheckOut(_state: FormState, form: FormData): Promise<FormState> {
+  const { org } = await requireOrg();
+  const t = await getAppI18n();
+  const bookingId = Id.safeParse(form.get("bookingId"));
+  if (!bookingId.success) return { error: t.m.errors.bookingNotFound };
+
+  const supabase = await createClient();
+  const current = await supabase.from("bookings").select("status, checked_out_at, group_id").eq("org_id", org.id).eq("id", bookingId.data).maybeSingle();
+  if (current.error) return { error: friendlyError(current.error, t) };
+  if (!current.data) return { error: t.m.errors.bookingNotFound };
+  const b = current.data;
+  if (b.status !== "checked_out" || !b.checked_out_at || localDate(b.checked_out_at, org.time_zone) !== todayIn(org.time_zone)) {
+    return { error: t.m.errors.notUndoable };
+  }
+  // A family is billed together (D27), so its bill is found by the family.
+  const issued = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("org_id", org.id)
+    .eq(b.group_id ? "group_id" : "booking_id", b.group_id ?? bookingId.data)
+    .eq("status", "issued")
+    .limit(1);
+  if (issued.error) return { error: friendlyError(issued.error, t) };
+  if (issued.data.length > 0) return { error: t.m.errors.notUndoable };
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ status: "checked_in" })
+    .eq("org_id", org.id)
+    .eq("id", bookingId.data)
+    .eq("status", "checked_out")
+    .select("id");
+  if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) return { error: t.m.errors.notUndoable };
+
+  revalidatePath("/app", "layout");
+  redirect(`/app/bookings/${bookingId.data}?done=check_out_undone`);
 }
 
 /**

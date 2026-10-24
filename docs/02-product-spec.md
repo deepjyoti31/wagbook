@@ -40,7 +40,9 @@ One person can belong to several kennels, with a different role in each.
 /app/dogs/{id}        One pet: details, photo, vaccinations, stays, incidents  signed in
 /app/dogs/{id}/incident  Write down an incident                      signed in
 /app/clients/{id}     One parent: details, pets, stays, bills, merge signed in
-/app/more             Menu, account, switch kennel, sign out         signed in
+/app/more             Menu (grouped: Every day, Money and records,   signed in
+                      The team, Set up, Looking after Wagbook),
+                      account, switch kennel, sign out
 /app/more/intake      Forms from parents                             signed in
 /app/more/kennels     Kennels                                        signed in
 /app/more/routines    Daily (house) routines                         signed in
@@ -353,7 +355,9 @@ the same day. Day boarding holds its kennel for every day of the visit, includin
 
 ### C2. Bookings list. Built.
 
-Two tabs: Current and upcoming; Past. Each row: kennel tag, pet, status (a request says "Request"), "Family" when booked
+Two tabs: Current and upcoming; Past. A search box finds bookings by the pet's name or the parent's name or phone
+number, as on Pets, in the tab shown (up to 100 matches, M67). Past shows 100 at a time, newest first, with Older
+bookings and Newer bookings. Each row: kennel tag, pet, status (a request says "Request"), "Family" when booked
 with other pets, any peak period it touches, parent, dates, nights or days, price. A row opens the booking page, where
 cancelling happens. A Calendar button opens C5.
 
@@ -367,6 +371,11 @@ cancelling happens. A Calendar button opens C5.
   instead of Check out (D40): "Check out, bill to today" ends the stay today (a boarding stay keeps its first night),
   so the bill is for the days stayed; "Check out, bill as booked" leaves the dates alone. A no-refund peak period is
   named beside them.
+- **Gone home** (M66, D56): once a pet is checked out, the **Bill** section comes first, with Make bill (or the bill
+  made). On the day of the check-out, while no bill for the stay is issued, **Undo check-out** puts a pet checked out by
+  mistake back in house: its kennel is held again (refused if another pet took it), comes off the list to clean, and
+  the rest of today's care is back on Care. The dates stay as they are; a stay shortened at check-out is put right
+  under Change this booking.
 - **Parent's stay page**: the link, Copy link, Open it, and Send confirmation (WhatsApp, with dates, nights and the
   estimated total).
 - **Booked together**: the other pets of a family booking.
@@ -480,11 +489,20 @@ with its own price (a vet bill paid for the parent). Changing what an extra cost
 ### D1. Today. Built.
 
 The date, "N in house of M kennels, N to arrive", today's care counts ("Meals 2 of 12", medicines in red until done)
-linking to the Care screen, a prompt when forms from parents are waiting, then two lists. Pet names open the booking.
+linking to the Care screen, incidents to deal with, then three lists, and only after them everything else (forms from
+parents, parents' requests, the waiting list, flowers, kennels to clean, checklists, supplies, appointments, the kitchen,
+reminders to send). The lists come first so the gate's work is never a long scroll away (M67). Pet names open the
+booking.
 
 - **Arriving**: confirmed bookings due today or earlier (so yesterday's no-show is still visible, marked "Was due").
   Each has a kennel picker offering only kennels free for the whole stay, and Check in.
-- **In house**: checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
+- **Going home today** (M67, only when there is one): checked-in pets due out today or already past their check-out
+  date, with the same buttons as In house and a line saying what the parent owes, which opens the bill (or the booking):
+  "Owes ₹3,600 on bill WB/26-27/0001", "Bill WB/26-27/0001 is paid", "Bill not issued yet: ₹2,400 to pay", or, with no
+  bill, "No bill yet: about ₹700 to pay. ₹500 paid ahead is taken off", worked out as Make bill would
+  (`owedAtCheckOut()`, `owedFor()`). A family booked together shows its family's bill; a day of a series says it is on
+  the month's bill. The line loads on its own, so Today is not held up.
+- **In house**: the other checked-in pets, with "Leaves today" or "Was due to leave" badges, "Send update" (opens WhatsApp to the
   parent with a message and the stay link) and Check out. Check out is the main button on the day the pet leaves; a pet
   booked for longer gets "Check out early", which opens its booking to choose how to bill it (D40). A pet
   still here after its check-out date also gets Extend to today, which moves the check-out date to today, or says
@@ -510,7 +528,9 @@ add and stop; owners and managers. A pet's own routines are added and stopped fr
 
 `generate_care_tasks(org, date)` turns routines into the day's `care_tasks` for every pet checked in, from its first day
 until it is checked out (so an overstaying pet is still fed). Today and the Care screen call it when opened; it is safe
-to repeat.
+to repeat. When a pet is checked out, its tasks and play sessions still to do after that moment are removed by the
+database (`bookings_end_care_at_check_out`, M66, D56), so Care, Play, Today's counts and the parent's stay page stop
+asking for them; tasks due before it left stay as they were.
 
 `/app/care`: today's tasks grouped by time; within a time, medicines first, then kennel by kennel in kennel order. A pending
 medicine has a red edge and badge and is never folded away. One tap on Done; a second tap does nothing (the database keeps
@@ -579,8 +599,8 @@ or opens the issued bill. Owners and managers can change, add and remove lines o
 (`issue_invoice`), gives the next number for the financial year and freezes it; staff can issue only a bill exactly as
 its booking prices it (`WB050`). Send bill opens WhatsApp with `billMessage()` and the bill's link. Owners and managers
 cancel an issued bill with a reason; the number stays used. A tax invoice from an earlier month, or a bill with a credit
-note, is not cancelled but credited (`WB095`, `WB096`). Bills, under More: what is owed first, then drafts, then
-recent.
+note, is not cancelled but credited (`WB095`, `WB096`). Bills, under More: what is owed first (every unpaid bill,
+however old, M66), then drafts, then recent.
 
 **Credit notes (D34).** On an issued bill, owners and managers make a credit note: the whole bill (while nothing has
 been credited) or part of it (an amount at one of the bill's tax rates), with a reason. It has its own number

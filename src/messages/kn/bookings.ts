@@ -4,6 +4,12 @@ import type { bookingsArea as English } from "../en/bookings";
 export const bookingsArea: typeof English = {
   // The list of bookings.
   bookings: {
+    searchLabel: "ಸಾಕುಪ್ರಾಣಿಯ ಹೆಸರು, ಪೇರೆಂಟ್ ಹೆಸರು ಅಥವಾ ಫೋನ್ ನಂಬರ್‌ನಿಂದ ಬುಕಿಂಗ್ ಹುಡುಕಿ",
+    searchPlaceholder: "ಸಾಕುಪ್ರಾಣಿ, ಪೇರೆಂಟ್ ಅಥವಾ ಫೋನ್",
+    search: "ಹುಡುಕಿ",
+    nothingFound: "\"{q}\" ಗೆ ಯಾವ ಬುಕಿಂಗ್ ಸಿಗಲಿಲ್ಲ.",
+    older: "ಹಳೆಯ ಬುಕಿಂಗ್‌ಗಳು",
+    newer: "ಹೊಸ ಬುಕಿಂಗ್‌ಗಳು",
     title: "ಬುಕಿಂಗ್‌ಗಳು",
     calendar: "ಕ್ಯಾಲೆಂಡರ್",
     newBooking: "ಹೊಸ ಬುಕಿಂಗ್",
@@ -37,6 +43,7 @@ export const bookingsArea: typeof English = {
     pet: "ಸಾಕುಪ್ರಾಣಿ",
     // After a step that changes the booking's status.
     done: {
+      check_out_undone: "ಮತ್ತೆ ಒಳಗೆ. ಇಂದಿನ ಉಳಿದ ಆರೈಕೆ ಮತ್ತೆ ಆರೈಕೆ ಪುಟದಲ್ಲಿದೆ. ಚೆಕ್ ಔಟ್‌ನಲ್ಲಿ ವಾಸ್ತವ್ಯ ಕಡಿಮೆ ಮಾಡಿದ್ದರೆ, ಕೆಳಗೆ ಅದರ ದಿನಾಂಕಗಳನ್ನು ಸರಿಪಡಿಸಿ.",
       photo_removed: "ಫೋಟೋ ಅಳಿಸಲಾಗಿದೆ. ಪೇರೆಂಟ್‌ನ ವಾಸ್ತವ್ಯ ಪುಟದಲ್ಲಿ ಇನ್ನು ಕಾಣುವುದಿಲ್ಲ.",
       unwaitlisted: "ಕಾಯುವ ಪಟ್ಟಿಯಿಂದ ತೆಗೆಯಲಾಗಿದೆ. ಇದು ಇನ್ನೂ ವಿನಂತಿಯೇ.",
       waitlisted: "ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಕೆನೆಲ್ ಖಾಲಿಯಾದಾಗ ಇಂದಿನ ಪುಟ ತಿಳಿಸುತ್ತದೆ.",
@@ -202,6 +209,9 @@ export const bookingsArea: typeof English = {
     },
     // The "Next" section: what to do now.
     step: {
+      undoHint: "ತಪ್ಪಾಗಿ ಚೆಕ್ ಔಟ್ ಆಯಿತೇ? {pet} ಅನ್ನು ಮತ್ತೆ ಒಳಗೆ ಸೇರಿಸಿ. ಚೆಕ್ ಔಟ್ ಆದ ದಿನ ಮಾತ್ರ.",
+      undoCheckOut: "ಚೆಕ್ ಔಟ್ ಹಿಂಪಡೆಯಿರಿ",
+      undoingCheckOut: "ಹಿಂಪಡೆಯಲಾಗುತ್ತಿದೆ",
       checkOutAsBooked: "ಚೆಕ್ ಔಟ್, ಬುಕ್ ಮಾಡಿದಂತೆ ಬಿಲ್",
       checkOutToToday: "ಚೆಕ್ ಔಟ್, ಇಂದಿನವರೆಗೆ ಬಿಲ್",
       early: "{date} ವರೆಗೆ ಬುಕ್ ಆಗಿದೆ. ಬೇಗ ಮನೆಗೆ ಹೋಗುತ್ತಿದೆಯೇ? ಇಂದಿನವರೆಗೆ ಮಾತ್ರ ಬಿಲ್ ಮಾಡಿ, ಅಥವಾ ಬುಕ್ ಮಾಡಿದಂತೆ.",

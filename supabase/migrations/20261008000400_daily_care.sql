@@ -255,6 +255,50 @@ create trigger play_sessions_fill_client
   before insert or update on public.play_sessions
   for each row execute function public.play_sessions_fill_client();
 
+-- A pet that has gone home is not fed, given its medicine or played with
+-- after it left. Left behind, those tasks would stay on Care and Play, keep
+-- Today's counts short of done, and tell the parent a meal was missed. Tasks
+-- due before it left stay as they are: done, skipped, or still to record.
+create function public.bookings_end_care_at_check_out()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_left timestamp;
+begin
+  -- SECURITY DEFINER: only owners delete rows (D29), but whoever checks a pet
+  -- out ends its care. The check-out itself was allowed (or refused) by the
+  -- bookings policies before this runs, and only this booking's tasks and
+  -- sessions still to do, after the moment it left, are removed.
+  if new.status = 'checked_out' and old.status = 'checked_in' then
+    select new.checked_out_at at time zone o.time_zone into v_left
+    from public.organizations o
+    where o.id = new.org_id;
+
+    delete from public.care_tasks t
+    where t.org_id = new.org_id
+      and t.booking_id = new.id
+      and t.status = 'pending'
+      and (t.task_date > v_left::date or (t.task_date = v_left::date and t.due_time > v_left::time));
+
+    delete from public.play_sessions s
+    where s.org_id = new.org_id
+      and s.booking_id = new.id
+      and s.status = 'pending'
+      and s.session_date + s.starts_at > v_left;
+  end if;
+  return null;
+end;
+$$;
+comment on function public.bookings_end_care_at_check_out() is
+  'Trigger: when a pet is checked out, its care tasks and play sessions still to do that fall after the moment it left (in the kennel''s time zone) are removed, so Care, Play, Today''s counts and the parent''s stay page stop asking for them. Tasks due earlier, and anything done or skipped, are kept. Undoing the check-out brings the day''s tasks back through generate_care_tasks. SECURITY DEFINER because only owners delete rows (D29) and staff check pets out.';
+
+create trigger bookings_end_care_at_check_out
+  after update of status on public.bookings
+  for each row execute function public.bookings_end_care_at_check_out();
+
 -- ---------------------------------------------------------------------------
 -- Updates for parents and incidents
 -- ---------------------------------------------------------------------------

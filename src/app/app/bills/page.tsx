@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export const generateMetadata = () => appTitle((m) => m.bills.title);
 
+const BILL_ROW = "id, status, number, issued_on, created_at, total_minor, group_id, series_id, series_month, clients(full_name), bookings(pets(name))";
+
 export default function BillsPage() {
   return (
     <Suspense fallback={<Loading />}>
@@ -23,16 +25,22 @@ async function Bills() {
   const { org } = await requireOrg();
   const { m, language, locale } = await getAppI18n();
   const supabase = await createClient();
-  const [invoices, balances] = await Promise.all([
-    supabase
-      .from("invoices")
-      .select("id, status, number, issued_on, created_at, total_minor, group_id, series_id, series_month, clients(full_name), bookings(pets(name))")
-      .eq("org_id", org.id)
-      .order("created_at", { ascending: false })
-      .limit(300),
-    supabase.from("invoice_balances").select("invoice_id, paid_minor, due_minor").eq("org_id", org.id).limit(5000),
+  const [recent, balances] = await Promise.all([
+    supabase.from("invoices").select(BILL_ROW).eq("org_id", org.id).order("created_at", { ascending: false }).limit(300),
+    // Only the bills still owed, however old. The database hands back at most
+    // 1,000 rows a request, so asking for every balance would, once a kennel
+    // has more bills than that, leave some unpaid bills out and show them paid.
+    supabase.from("invoice_balances").select("invoice_id, due_minor").eq("org_id", org.id).eq("status", "issued").gt("due_minor", 0).limit(1000),
   ]);
-  if (invoices.error || balances.error) throw new Error("Could not load bills.");
+  if (recent.error || balances.error) throw new Error("Could not load bills.");
+  // An unpaid bill older than the 300 newest is still owed, so it is still listed.
+  const recentIds = new Set(recent.data.map((i) => i.id));
+  const olderUnpaid = balances.data.flatMap((b) => (b.invoice_id && !recentIds.has(b.invoice_id) ? [b.invoice_id] : []));
+  const older = olderUnpaid.length
+    ? await supabase.from("invoices").select(BILL_ROW).eq("org_id", org.id).in("id", olderUnpaid).order("created_at", { ascending: false })
+    : { data: [], error: null };
+  if (older.error) throw new Error("Could not load bills.");
+  const invoices = { data: [...recent.data, ...older.data] };
 
   // A family's bill names every pet on it.
   const groups = [...new Set(invoices.data.flatMap((i) => (i.group_id ? [i.group_id] : [])))];

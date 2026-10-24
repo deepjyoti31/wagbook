@@ -287,8 +287,9 @@ their account; that stays with you, as above. Removing the factor also voids eve
 curl -sI https://YOUR-DOMAIN/login | grep -i content-security-policy
 ```
 
-The answer must contain `script-src 'self' 'nonce-` followed by `'sha256-`. If it has no `script-src`, the server could
-not read `.next/build-manifest.json` and says so in its log (D23); pages still work, with weaker protection.
+The answer must contain `script-src 'self' 'nonce-` followed by `'sha256-`. If it says `script-src 'self'
+'unsafe-inline'` instead, the server could not read `.next/build-manifest.json` and says so in its log (D23); pages
+still work, with weaker protection.
 
 ### Updating Wagbook
 

@@ -435,8 +435,10 @@ policy Next.js documents (`'nonce-…' 'strict-dynamic'`) every page stopped wor
 files on this site, inline scripts that carry this request's nonce, and the shell's inline scripts by their SHA-256
 hash. The hashes are worked out once per server from the build's own `.next/build-manifest.json`, the same way Next.js
 writes those scripts (`src/lib/csp.ts`, `src/lib/csp-hashes.ts`); unit tests fail if an upgrade of React or Next.js
-changes how either is written. If the manifest cannot be read, the policy is sent without a `script-src` (as before
-M9) and the server logs it once, rather than breaking every page. Styles keep `'unsafe-inline'`, because React writes
+changes how either is written. If the manifest cannot be read, the policy is sent with `script-src 'self'
+'unsafe-inline'` and the server logs it once, rather than breaking every page. (Until 24 October 2026 it was sent with
+no `script-src`, which let `default-src 'self'` refuse every inline script: every page stayed at its loading dots,
+which is what `npm run dev` showed, and what a host that leaves the manifest out would have shown.) Styles keep `'unsafe-inline'`, because React writes
 style attributes and a stylesheet cannot run code.
 
 **Why.** `'self'` is safe here because nothing a visitor sends is ever served from this origin as a script: uploads
@@ -1345,3 +1347,33 @@ different time zones are reported for the same calendar month, read in each site
 **Look again** if parents regularly use more than one site and want one link for all of them (D49), if an owner asks
 for a manager over several sites (an "area manager") to see the combined report, or if a chain needs more than ten
 sites on one account.
+
+## D56. Care ends when a pet goes home, and a check-out made by mistake can be undone that day
+
+**Context.** The pre-launch review (M66) walked a check-out as staff. The pet's lunch, dinner and tablet stayed on Care
+after it had gone home, Today's medicines count stayed red all day, and the parent's stay page said "0 of 3 meals" for
+the day of going home. With several pets leaving a day, Care fills with tasks nobody can do. Check out is also one tap
+on Today, beside Write update, with no way back in the app: a pet checked out by mistake drops out of the next day's
+care round (its tasks are made only for pets in house) and its kennel shows free.
+
+**Decision.**
+
+- **The database ends the care** (`bookings_end_care_at_check_out`). When a booking goes from in house to checked out,
+  its care tasks and play sessions still pending whose time falls after the check-out moment, in the kennel's time
+  zone, are deleted. Tasks due earlier stay, whatever their state: the record keeps what was and was not ticked while
+  the pet was there. It runs as SECURITY DEFINER because only owners delete rows (D29) and staff check pets out; it
+  touches only that booking's pending rows after that moment.
+- **Undo check-out** is the app's (`undoCheckOut`), offered on the booking page on the day of the check-out while no
+  bill for the stay (or its family) is issued. The database already allowed a stay to be reopened
+  (`bookings_stamp_status` clears the check-out stamps); it now also takes the kennel off the list to clean if nobody
+  has cleaned it (`bookings_leave_kennel_to_clean`). Today's tasks come back through `generate_care_tasks`.
+
+**Why.** A tired person at the end of a twelve hour day should see on Care only what is still theirs to do (principle
+6), and a parent should never be told that a meal was missed when the pet was already home (principle 8). An undo is
+kinder than a second tap on the most common button of the day.
+
+**Cost.** A task with no time (`due_time` empty) on the day of check-out is kept. The day a pet arrives still gets that
+day's tasks from before it came (breakfast for a pet checked in at three); those stay on Care to tick or skip. Undo is
+not offered the next day or after the bill is issued; an owner or manager then changes the stay and credits the bill.
+
+**Look again** if kennels want arrival-day tasks before the check-in time left out too, or want undo to be a manager's.

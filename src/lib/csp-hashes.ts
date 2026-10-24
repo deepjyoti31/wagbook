@@ -22,7 +22,7 @@ export function scriptHashes(): string[] | null {
   } catch (error) {
     // `next dev` builds pages as they are asked for, so its manifest is not final.
     if (process.env.NODE_ENV === "production") {
-      console.error("Content-Security-Policy: could not read .next/build-manifest.json, so scripts are not restricted.", error);
+      console.error("Content-Security-Policy: could not read .next/build-manifest.json, so inline scripts are allowed without a nonce.", error);
     }
     cached = null;
   }

@@ -73,6 +73,7 @@ export const core = {
     ownersDelete: "Only an owner can delete things.",
     notWaitingForCheckIn: "This booking is no longer waiting to be checked in. Refresh the page.",
     notCheckedIn: "This pet is not checked in. Refresh the page.",
+    notUndoable: "Only a check-out made today, with no bill issued yet, can be undone.",
     constraints: {
       bookings_no_kennel_overlap: "That kennel has another parent's pet in it on some of those dates. Pick another kennel or change the dates.",
       care_tasks_done_with_photo: "This task needs a photo. Add the photo to mark it done.",
@@ -450,6 +451,18 @@ export const core = {
     checkingIn: "Checking in",
     inHouseTitle: "In house",
     noneInHouse: "No pets are checked in.",
+    // Pets due home today, or past their check-out date, with what is owed (M67).
+    goingHome: "Going home today",
+    owed: {
+      due: "Owes {amount} on bill {number}.",
+      paid: "Bill {number} is paid.",
+      draft: "Bill not issued yet: {amount} to pay.",
+      estimate: "No bill yet: about {amount} to pay.",
+      covered: "No bill yet. What was paid ahead covers it.",
+      afterAdvance: "{advance} paid ahead is taken off.",
+      family: "For the family's bill.",
+      monthly: "On the month's bill.",
+    },
     extend: "Extend to today",
     extending: "Extending",
     writeUpdate: "Write update",
