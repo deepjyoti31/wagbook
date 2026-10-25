@@ -2665,7 +2665,10 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await expect(page.getByText(/^Added Clean the wound at 09:00/)).toBeVisible();
   await page.goto("/app/care?kind=medication");
   const task = page.getByRole("listitem").filter({ hasText: "Nori" }).filter({ hasText: "Clean the wound" });
-  await expect(task.getByRole("button", { name: en.care.markDone })).toHaveCount(0);
+  // No plain Done on a task that asks for a photo: only "Done with photo". The row first, so the check is not made
+  // before the list has loaded.
+  await expect(task).toBeVisible();
+  await expect(task.getByRole("button", { name: en.care.markDone, exact: true })).toHaveCount(0);
   await task.locator("input[name=photo]").setInputFiles({ name: "wound.jpg", mimeType: "image/jpeg", buffer: await photoWithLocation(page) });
   await task.getByRole("button", { name: en.proof.doneWithPhoto }).click();
   // The form goes once the task is done; the row shows the photo.
@@ -3297,6 +3300,8 @@ test("the bug review: a discount above the stay is refused, and a cancelled stay
   // Back on the stay later, the money the rules keep is not offered as a refund or credit again.
   await page.goto(page.url().split("?")[0]);
   await expect(page.getByRole("heading", { level: 1, name: "Tara" })).toBeVisible();
+  // The kept money shows as an advance, below where the panel would be, so the page has loaded that far.
+  await expect(page.getByText(en.booking.refund.paid.replace("{amount}", "₹7,800"))).toBeVisible();
   await expect(page.getByRole("heading", { name: en.cancelRules.title })).toHaveCount(0);
   await expect(settle).toHaveCount(0);
 });
