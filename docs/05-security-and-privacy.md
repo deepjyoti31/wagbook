@@ -339,8 +339,8 @@ What the software does:
   as one file (`export_client`), addresses and pets' weights included.
 - **Erases on request** (`erase_client`, D25 and D30). The parent's contact details, consent and notes, their delivery
   addresses (M25), the notes on their stays, the updates sent to them, their intake forms, draft bills, and the files among those (with vaccination
-  certificates, because a card shows the owner) are deleted or emptied, and the stays' notes that the history of
-  changes had copied are taken out of it. The pets stay, hidden, with their health, routines, incidents, care and
+  certificates, because a card shows the owner) are deleted or emptied, and the notes of their stays, appointments,
+  courses and trips, and the draft bills, that the history of changes had copied are taken out of it. The pets stay, hidden, with their health, routines, incidents, care and
   play: the kennel's record of the animal (D30). What tax law makes the kennel keep stays: issued and cancelled bills
   with the buyer printed on them, payments, and the stays' dates and prices. Refused while a pet is in house or a stay
   is still to come.

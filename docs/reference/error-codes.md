@@ -93,6 +93,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB055` | this day is part of a repeating booking. Bill the month's days together. | `20261008000500_billing.sql` |
 | `WB056` | that repeating booking was not found for this parent | `20261008000500_billing.sql` |
 | `WB057` | this day is on its month's bill. Cancel it and book the new day instead. | `20261008000500_billing.sql` |
+| `WB058` | a payment is for the parent of the bill or stay it names | `20261008000500_billing.sql` |
 | `WB060` | Reports are for owners and managers. | `20261008001000_reports.sql` |
 | `WB061` | Choose a period of a year or less, with the start before the end. | `20261008001000_reports.sql` |
 | `WB062` | The report for all sites is for owners. | `20261008001000_reports.sql` |
@@ -178,6 +179,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB211` | there is only % of credit left to spend | `20261008000560_credit.sql` |
 | `WB212` | a payment from or into credit is not changed. Remove it and record it again. | `20261008000560_credit.sql` |
 | `WB213` | credit from a cancellation comes from a refund kept as credit | `20261008000560_credit.sql` |
+| `WB214` | credit is spent on a bill or a stay | `20261008000560_credit.sql` |
 | `WB215` | choose an address of this parent<br>that address is not in the areas you serve. An owner or manager sets the price. | `20261008000460_trips_and_health.sql` |
 | `WB216` | a cancelled trip stays cancelled. Add a new one. | `20261008000460_trips_and_health.sql` |
 | `WB220` | that shift is off the list | `20261008000470_team.sql` |

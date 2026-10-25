@@ -237,6 +237,7 @@ declare
   v_paths text[];
   v_bookings uuid[];
   v_pets uuid[];
+  v_drafts uuid[];
 begin
   -- SECURITY DEFINER: erasing has to remove personal text from the audit log,
   -- which nobody may write, and nothing else. Who may do it is checked here:
@@ -336,7 +337,11 @@ begin
   where v.org_id = v_client.org_id and v.pet_id = any (v_pets) and v.certificate_path is not null;
   -- Drafts were never given to anyone; issued and cancelled bills stay, as
   -- the law requires, with the buyer details frozen on them when issued.
-  delete from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id and i.status = 'draft';
+  with gone as (
+    delete from public.invoices i where i.org_id = v_client.org_id and i.client_id = v_client.id and i.status = 'draft'
+    returning i.id
+  )
+  select coalesce(array_agg(gone.id), '{}') into v_drafts from gone;
 
   -- Stays keep their dates, kennel and prices (bills and reports rest on
   -- them), and lose the notes, which are the parent's arrangements.
@@ -366,13 +371,29 @@ begin
       deleted_at = coalesce(c.deleted_at, now()), erased_at = now()
   where c.id = v_client.id;
 
-  -- The history of changes copied the stays' notes when they were written,
-  -- and again just now. Take them out of those entries; keep who changed
-  -- what, when.
+  -- The history of changes copied the notes of the stays, appointments,
+  -- courses and trips when they were written, and again just now, and the
+  -- draft bills deleted above. Take that text out of those entries; keep who
+  -- changed what, when.
   update public.audit_log a
-  set old_data = a.old_data - 'belongings' - 'gate_notes' - 'notes' - 'cancel_reason' - 'expected_arrival' - 'expected_departure',
-      new_data = a.new_data - 'belongings' - 'gate_notes' - 'notes' - 'cancel_reason' - 'expected_arrival' - 'expected_departure'
-  where a.org_id = v_client.org_id and a.table_name = 'bookings' and a.row_id = any (v_bookings);
+  set old_data = a.old_data - x.keys, new_data = a.new_data - x.keys
+  from (
+    select 'bookings' as table_name, b.id, array['belongings', 'gate_notes', 'notes', 'cancel_reason', 'expected_arrival', 'expected_departure'] as keys
+    from public.bookings b where b.id = any (v_bookings)
+    union all
+    select 'appointments', ap.id, array['notes', 'after_notes', 'homework', 'cancel_reason']
+    from public.appointments ap where ap.org_id = v_client.org_id and ap.client_id = v_client.id
+    union all
+    select 'courses', c.id, array['notes']
+    from public.courses c where c.org_id = v_client.org_id and c.client_id = v_client.id
+    union all
+    select 'trips', t.id, array['note', 'cancel_reason']
+    from public.trips t where t.org_id = v_client.org_id and t.client_id = v_client.id
+    union all
+    select 'invoices', d.id, array['notes', 'buyer']
+    from unnest(v_drafts) as d (id)
+  ) x
+  where a.org_id = v_client.org_id and a.table_name = x.table_name and a.row_id = x.id;
 
   -- And the erasure itself is recorded.
   insert into public.audit_log (org_id, actor, action, table_name, row_id, old_data, new_data)
@@ -383,7 +404,7 @@ begin
 end;
 $$;
 comment on function public.erase_client(uuid) is
-  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates and stay reports sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, vet visits, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
+  'Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates and stay reports sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text (stays, appointments, courses, trips and the draft bills) out of the history of changes. Keeps the pets with their health, routines, incidents, vet visits, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays'' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).';
 
 revoke all on function public.check_privacy_access(uuid) from public, anon;
 revoke all on function public.client_file_paths(uuid) from public, anon;

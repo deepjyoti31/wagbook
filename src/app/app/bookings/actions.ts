@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
-import { diffDays, formatDate, isISODate, parseMoney, payFromPacks, seriesDates, todayIn, zonedInstant } from "@/lib/core";
+import { chargeableUnits, diffDays, formatDate, isISODate, parseMoney, payFromPacks, seriesDates, todayIn, zonedInstant } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { searchPets, type PetChoice } from "@/lib/pet-search";
@@ -237,6 +237,7 @@ export async function updateBooking(_state: FormState, form: FormData): Promise<
     const discount = typedMoney(form, "discount");
     if (rate === undefined || rate === null) return { error: e.priceWhole };
     if (discount === undefined) return { error: e.discountNumber };
+    if ((discount ?? 0) > chargeableUnits(kind, stay.data.startDate, stay.data.endDate) * rate) return { error: e.discountTooBig };
     update.rate_minor = rate;
     update.discount_minor = discount ?? 0;
     // The price for nights alone, on a pet booked at the shared kennel price. Empty: the price above throughout.

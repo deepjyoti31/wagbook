@@ -259,7 +259,9 @@ comment on function public.pet_health_problems(uuid, uuid, date) is
   'What a pet lacks on a day by the kennel''s rules (M40): vaccine (a required vaccine with no record, or lapsed: its end date, else the day given plus its months), deworming and ticks (not done within the kennel''s days), neutering (not neutered above the age; a pet of unknown age is not held to it). Empty when it lacks nothing. Must match healthProblems() in src/lib/core/health.ts.';
 
 -- Check-in refuses a pet that lacks what the kennel requires, while the kennel
--- refuses at the door, unless an owner or manager let it in with a note.
+-- refuses at the door, unless an owner or manager let it in with a note. A stay
+-- made already checked in is checked the same way: it has no note yet, so it is
+-- made first and let in after.
 create function public.bookings_check_health()
 returns trigger
 language plpgsql
@@ -269,7 +271,7 @@ declare
   v_mode text;
   v_lacks text;
 begin
-  if new.status <> 'checked_in' or old.status = 'checked_in' or old.status = 'checked_out' then
+  if new.status <> 'checked_in' or (tg_op = 'UPDATE' and old.status in ('checked_in', 'checked_out')) then
     return new;
   end if;
   select o.health_check into v_mode from public.organizations o where o.id = new.org_id;
@@ -288,10 +290,10 @@ begin
 end;
 $$;
 comment on function public.bookings_check_health() is
-  'Trigger: while the kennel refuses at the door (organizations.health_check), check-in is refused for a pet that lacks a required vaccine, deworming, tick treatment or neutering (pet_health_problems), unless an owner or manager let it in (health_overrides). WB210.';
+  'Trigger: while the kennel refuses at the door (organizations.health_check), check-in, or a stay made already checked in, is refused for a pet that lacks a required vaccine, deworming, tick treatment or neutering (pet_health_problems), unless an owner or manager let it in (health_overrides). WB210.';
 
 create trigger bookings_check_health
-  before update of status on public.bookings
+  before insert or update of status on public.bookings
   for each row execute function public.bookings_check_health();
 
 -- The same at an appointment for a visitor, when it is marked done: a boarder

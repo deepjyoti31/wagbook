@@ -123,6 +123,14 @@ describe("a parent's details", () => {
       await db.query("insert into public.payments (org_id, client_id, invoice_id, amount_minor, method, received_on) values ($1, $2, $3, 100000, 'upi', '2026-01-13')", [
         k.org, k.client, draft.rows[0].id,
       ]);
+      // A pick-up from home with a note for the rider, and a draft bill never sent.
+      const address = await db.query<{ id: string }>("insert into public.client_addresses (org_id, client_id, line, postal_code) values ($1, $2, '12 Lake Road', '560001') returning id", [
+        k.org, k.client,
+      ]);
+      await db.query("insert into public.trips (org_id, booking_id, client_id, pet_id, kind, at_time, address_id, note) values ($1, $2, $3, $4, 'pickup', '09:00', $5, 'Ring twice, the dog bites')", [
+        k.org, pastStay, k.client, k.pets[0], address.rows[0].id,
+      ]);
+      await db.query("insert into public.invoices (org_id, client_id, notes) values ($1, $2, 'Send to the office on MG Road')", [k.org, k.client]);
     });
   });
 
@@ -203,7 +211,7 @@ describe("a parent's details", () => {
 
     // No personal text is left in the history of changes, and the erasure is in it.
     const history = JSON.stringify((await db.query("select old_data, new_data from public.audit_log where org_id = $1", [k.org])).rows);
-    for (const secret of ["Blue blanket", "Gate code 4411", "Plans changed"]) expect(history).not.toContain(secret);
+    for (const secret of ["Blue blanket", "Gate code 4411", "Plans changed", "Ring twice", "MG Road"]) expect(history, secret).not.toContain(secret);
     expect(Number((await db.query<{ n: string }>("select count(*) as n from public.audit_log where table_name = 'clients' and row_id = $1", [k.client])).rows[0].n)).toBe(1);
 
     expect((await errorOf(() => as(db, user(k.owner), () => db.query("select public.erase_client($1)", [k.client])))).message).toContain("WB073");

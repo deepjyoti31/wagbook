@@ -100,6 +100,7 @@ alter table public.vaccinations add constraint vaccinations_certificate_in_org c
 alter table public.care_tasks add constraint care_tasks_photo_in_org check (public.paths_in_org(array[photo_path], org_id));
 alter table public.expenses add constraint expenses_receipt_in_org check (public.paths_in_org(array[receipt_path], org_id));
 alter table public.stock_costs add constraint stock_costs_bill_in_org check (public.paths_in_org(array[bill_path], org_id));
+alter table public.supplier_orders add constraint supplier_orders_bill_in_org check (public.paths_in_org(array[bill_path], org_id));
 alter table public.deliveries add constraint deliveries_proof_in_org check (public.paths_in_org(array[proof_path], org_id));
 alter table public.delivery_problems add constraint delivery_problems_photo_in_org check (public.paths_in_org(array[photo_path], org_id));
 

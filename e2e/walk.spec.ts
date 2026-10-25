@@ -2665,7 +2665,10 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await expect(page.getByText(/^Added Clean the wound at 09:00/)).toBeVisible();
   await page.goto("/app/care?kind=medication");
   const task = page.getByRole("listitem").filter({ hasText: "Nori" }).filter({ hasText: "Clean the wound" });
-  await expect(task.getByRole("button", { name: en.care.markDone })).toHaveCount(0);
+  // No plain Done on a task that asks for a photo: only "Done with photo". The row first, so the check is not made
+  // before the list has loaded.
+  await expect(task).toBeVisible();
+  await expect(task.getByRole("button", { name: en.care.markDone, exact: true })).toHaveCount(0);
   await task.locator("input[name=photo]").setInputFiles({ name: "wound.jpg", mimeType: "image/jpeg", buffer: await photoWithLocation(page) });
   await task.getByRole("button", { name: en.proof.doneWithPhoto }).click();
   // The form goes once the task is done; the row shows the photo.
@@ -3260,4 +3263,45 @@ test("M65: an owner adds a second site and sees both side by side and together; 
   await page.goto("/app/more/reports/sites");
   await expect(page.getByText(en.reports.sites.ownersOnly)).toBeVisible();
   await expect(page.getByText("Demo City Site")).toHaveCount(0);
+});
+
+test("the bug review: a discount above the stay is refused, and a cancelled stay's money is settled once", async ({ page }) => {
+  await signIn(page, "manager");
+  await addPet(page, "9800000917", "Ira Sample", "Tara");
+  await page.goto("/app/bookings/new");
+  await page.locator("select[name=petId]").selectOption({ label: "Tara (Ira Sample)" });
+  await page.getByLabel("Check-in date").fill(day(20));
+  await page.getByLabel("Check-out date").fill(day(21));
+  await page.getByRole("button", { name: "Confirm booking" }).click();
+  await expect(page.getByText("Booked.")).toBeVisible();
+
+  // More off than the night costs is refused in words, where it used to break the stay's page and its bill.
+  await page.getByLabel(en.booking.change.discount).fill("99999");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText(en.booking.errors.discountTooBig)).toBeVisible();
+  await narrow(page);
+  await shot(page, "review-discount-too-big");
+
+  // Paid well over what the night costs, and cancelled with notice: the night goes back, the rest is kept.
+  await page.reload();
+  await page.getByLabel("Amount").fill("9000");
+  await page.getByRole("button", { name: "Record advance" }).click();
+  await expect(page.getByText("Advance recorded.")).toBeVisible();
+  await page.getByLabel("Why is it cancelled?").fill("Plans changed");
+  await page.getByRole("button", { name: "Cancel booking" }).click();
+  await expect(page.getByText("Booking cancelled. The space is free again.")).toBeVisible();
+  const settle = page.getByRole("button", { name: /^(Refund|Give) / });
+  await expect(settle).toBeVisible();
+  await settle.click();
+  await expect(page.getByText(en.cancelRules.settled)).toBeVisible();
+  await narrow(page);
+  await shot(page, "review-cancel-settled");
+
+  // Back on the stay later, the money the rules keep is not offered as a refund or credit again.
+  await page.goto(page.url().split("?")[0]);
+  await expect(page.getByRole("heading", { level: 1, name: "Tara" })).toBeVisible();
+  // The kept money shows as an advance, below where the panel would be, so the page has loaded that far.
+  await expect(page.getByText(en.booking.refund.paid.replace("{amount}", "₹7,800"))).toBeVisible();
+  await expect(page.getByRole("heading", { name: en.cancelRules.title })).toHaveCount(0);
+  await expect(settle).toHaveCount(0);
 });

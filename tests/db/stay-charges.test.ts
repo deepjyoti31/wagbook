@@ -125,6 +125,15 @@ describe("a pet at the shared kennel price, left on its own", () => {
     ]);
   });
 
+  it("never takes more off than the stay comes to, so a stay made shorter after its discount still bills", async () => {
+    const stay = await book(db, k, { pet: k.pets[0], start: "2028-11-01", end: "2028-11-04", kennel: k.kennels[1] });
+    await as(db, user(manager), () => db.query("update public.bookings set discount_minor = 300000 where id = $1", [stay]));
+    await as(db, user(staff), () => db.query("update public.bookings set end_date = '2028-11-02' where id = $1", [stay]));
+    expect(brief(await charges(k, [stay]))).toEqual([["stay", 1, 120000, 120000]]);
+    const lines = stayLines({ kind: "boarding", petName: "Dog", startDate: "2028-11-01", endDate: "2028-11-02", rateMinor: 120000, discountMinor: 300000 });
+    expect(await issue(staff, await draft(k, staff, computeInvoice(lines, { mode: "none" }), { booking: stay }))).toBe(0);
+  });
+
   it("lets staff issue the bill only with the nights alone at the usual price", async () => {
     const f = await shareKennel(k, k.kennels[0], "2028-08-01", "2028-08-06");
     await as(db, user(manager), () => db.query("update public.bookings set end_date = '2028-08-04' where id = $1", [f.ids[0]]));

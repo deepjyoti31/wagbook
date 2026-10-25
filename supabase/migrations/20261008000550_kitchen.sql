@@ -902,6 +902,13 @@ declare
 begin
   v_manager := new.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]));
   select * into v_org from public.organizations o where o.id = new.org_id;
+  -- Staff never change a delivery's kind (a replacement costs nothing), its
+  -- delivery charge (from the area) or its tax (from the rate card) by hand:
+  -- each would change the bill.
+  if tg_op = 'UPDATE' and not v_manager
+     and (new.kind, new.delivery_charge_minor, new.tax_rate_bp) is distinct from (old.kind, old.delivery_charge_minor, old.tax_rate_bp) then
+    raise exception 'WB022: only an owner or manager can change a price' using errcode = '42501';
+  end if;
   if new.kind = 'replacement' then
     new.unit_price_minor := 0;
     new.delivery_charge_minor := 0;
@@ -947,7 +954,8 @@ begin
     new.packs := ceil(new.grams::numeric / v_org.food_pack_g)::integer;
     new.price_minor := case when new.kind = 'trial' then new.unit_price_minor else round(new.grams * new.unit_price_minor / 1000.0)::bigint end;
   end if;
-  if new.kind <> 'replacement' and (tg_op = 'INSERT' or new.address_id is distinct from old.address_id) then
+  -- An address that went (erasing a parent deletes their addresses, D25) leaves the charge as it was, as a trip keeps its price.
+  if new.kind <> 'replacement' and (tg_op = 'INSERT' or (new.address_id is distinct from old.address_id and new.address_id is not null)) then
     new.delivery_charge_minor := coalesce((
       select sa.delivery_charge_minor
       from public.client_addresses a
@@ -959,10 +967,11 @@ begin
 end;
 $$;
 comment on function public.deliveries_price() is
-  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address. Only owners and managers give another unit price (WB022). A replacement costs nothing. A made-to-order item is refused sooner than the kennel''s lead time (WB156).';
+  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel''s lead time (WB156).';
 
 create trigger deliveries_price
-  before insert or update of kind, product_id, grams, quantity, unit_price_minor, address_id on public.deliveries
+  before insert or update of kind, product_id, grams, quantity, unit_price_minor, price_minor, delivery_charge_minor, tax_rate_bp, address_id
+  on public.deliveries
   for each row execute function public.deliveries_price();
 
 -- After the cut-off a delivery is being cooked: staff only move it along
@@ -985,6 +994,10 @@ begin
   -- Merging two parents moves every delivery to the parent who stays.
   if coalesce(current_setting('wagbook.merging', true), '') = 'on' then
     v_moving := array_append(v_moving, 'client_id');
+  end if;
+  -- Erasing a parent deletes their addresses, past deliveries' included (D25).
+  if tg_op = 'UPDATE' and new.address_id is null and old.address_id is not null then
+    v_moving := array_append(v_moving, 'address_id');
   end if;
   v_closed := now() >= public.delivery_cutoff(old.org_id, old.delivery_date, old.slot);
   v_manager := old.org_id in (select public.my_org_ids_with_role(array['owner', 'manager']::public.member_role[]));
@@ -1025,7 +1038,7 @@ begin
 end;
 $$;
 comment on function public.deliveries_guard() is
-  'Trigger: after its cut-off (delivery_cutoff) a delivery only moves along: packed, out, at the door, or cancelled by an owner or manager (WB151). A delivery on a bill is cancelled, never deleted (WB152). A cancelled one stays cancelled, and one that has been to the door is not cancelled (WB153).';
+  'Trigger: after its cut-off (delivery_cutoff) a delivery only moves along: packed, out, at the door, or cancelled by an owner or manager (WB151), and loses its address when the parent is erased. A delivery on a bill is cancelled, never deleted (WB152). A cancelled one stays cancelled, and one that has been to the door is not cancelled (WB153).';
 
 create trigger deliveries_guard
   before update or delete on public.deliveries

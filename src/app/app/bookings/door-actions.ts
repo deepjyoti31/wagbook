@@ -34,13 +34,14 @@ export async function settleCancellation(_state: FormState, form: FormData): Pro
   const supabase = await createClient();
   const worked = await cancelledStayOutcome(supabase, org, id.data, choice);
   if (!worked) return { error: t.m.errors.bookingNotFound };
-  const { result, clientId } = worked;
-  if (result.refundMinor + result.creditMinor === 0) return { error: w.errors.nothing };
+  // What is still to give back: confirming twice never gives the same money back twice.
+  const { toSettle, clientId } = worked;
+  if (toSettle.refundMinor + toSettle.creditMinor === 0) return { error: w.errors.nothing };
   const today = todayIn(org.time_zone);
   const base = { org_id: org.id, client_id: clientId, booking_id: id.data, received_on: today, direction: "out" };
   const rows: TablesInsert<"payments">[] = [
-    ...(result.refundMinor > 0 ? [{ ...base, amount_minor: result.refundMinor, method, note: w.refundNote }] : []),
-    ...(result.creditMinor > 0 ? [{ ...base, amount_minor: result.creditMinor, method: "credit" as const, note: w.creditNote }] : []),
+    ...(toSettle.refundMinor > 0 ? [{ ...base, amount_minor: toSettle.refundMinor, method, note: w.refundNote }] : []),
+    ...(toSettle.creditMinor > 0 ? [{ ...base, amount_minor: toSettle.creditMinor, method: "credit" as const, note: w.creditNote }] : []),
   ];
   for (const row of rows) {
     const { error } = await supabase.from("payments").insert(row);

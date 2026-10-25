@@ -33,11 +33,11 @@ function payload(t: InvoiceTotals) {
 }
 
 /** Make a draft as the app does: insert an empty draft, then save its lines and totals in one go. */
-async function makeDraft(actor: string, t: InvoiceTotals, opts: { booking?: string | null; placeOfSupply?: string | null } = {}): Promise<string> {
+async function makeDraft(actor: string, t: InvoiceTotals, opts: { booking?: string | null; group?: string; placeOfSupply?: string | null } = {}): Promise<string> {
   return as(db, user(actor), async () => {
     const r = await db.query<{ id: string }>(
-      "insert into public.invoices (org_id, client_id, booking_id, place_of_supply_state_code) values ($1, $2, $3, $4) returning id",
-      [k.org, k.client, opts.booking ?? null, opts.placeOfSupply ?? null],
+      "insert into public.invoices (org_id, client_id, booking_id, group_id, place_of_supply_state_code) values ($1, $2, $3, $4, $5) returning id",
+      [k.org, k.client, opts.booking ?? null, opts.group ?? null, opts.placeOfSupply ?? null],
     );
     const p = payload(t);
     await db.query("select public.save_invoice_draft($1, $2, $3)", [r.rows[0].id, JSON.stringify(p.totals), JSON.stringify(p.lines)]);
@@ -157,6 +157,9 @@ describe("a bill is what its booking says, unless a manager says otherwise", () 
 });
 
 describe("advances and drafts", () => {
+  const balance = (id: string) =>
+    as(db, user(staff), async () => (await db.query<{ paid_minor: number; due_minor: number }>("select paid_minor, due_minor from public.invoice_balances where invoice_id = $1", [id])).rows[0]);
+
   it("counts an advance against the stay's bill, and moves it to the new bill when one is voided", async () => {
     await setTax("none", false, true);
     const b = await book(db, k, { pet: k.pets[2], start: "2028-05-01", end: "2028-05-03", kennel: k.kennels[2] });
@@ -170,14 +173,56 @@ describe("advances and drafts", () => {
     const t = computeInvoice(lines, { mode: "none" }, { roundToWholeUnit: true });
     const first = await makeDraft(staff, t, { booking: b });
     await issue(staff, first);
-    const balance = (id: string) =>
-      as(db, user(staff), async () => (await db.query<{ paid_minor: number; due_minor: number }>("select paid_minor, due_minor from public.invoice_balances where invoice_id = $1", [id])).rows[0]);
     expect(await balance(first)).toEqual({ paid_minor: 100000, due_minor: 140000 });
 
     await as(db, user(manager), () => db.query("select public.void_invoice($1, 'Wrong dates')", [first]));
     const second = await makeDraft(staff, t, { booking: b });
     await issue(staff, second);
     expect(await balance(second)).toEqual({ paid_minor: 100000, due_minor: 140000 });
+  });
+
+  it("moves what was paid on a voided family bill, which names no stay, to the family's new bill", async () => {
+    const group = "00000000-0000-4000-8000-0000000000b1";
+    await as(db, user(k.owner), () =>
+      db.query(
+        `insert into public.bookings (org_id, client_id, pet_id, start_date, end_date, rate_minor, group_id)
+         values ($1, $2, $3, '2029-02-01', '2029-02-03', 120000, $5), ($1, $2, $4, '2029-02-01', '2029-02-03', 120000, $5)`,
+        [k.org, k.client, k.pets[0], k.pets[1], group],
+      ),
+    );
+    const t = computeInvoice([{ description: "Boarding, two dogs", quantity: 4, unitPriceMinor: 120000 }], { mode: "none" }, { roundToWholeUnit: true });
+    const first = await makeDraft(manager, t, { group });
+    await issue(manager, first);
+    // Paid on the bill, as the app records it: a family's bill names no one stay.
+    await as(db, user(staff), () =>
+      db.query("insert into public.payments (org_id, client_id, invoice_id, amount_minor, method, received_on) values ($1, $2, $3, 200000, 'upi', '2029-02-03')", [k.org, k.client, first]),
+    );
+    await as(db, user(manager), () => db.query("select public.void_invoice($1, 'Wrong dates')", [first]));
+    const second = await makeDraft(manager, t, { group });
+    await issue(manager, second);
+    expect(await balance(second)).toEqual({ paid_minor: 200000, due_minor: 280000 });
+  });
+
+  it("issues a stay's new bill after some of what was paid on the voided one went back", async () => {
+    const b = await book(db, k, { pet: k.pets[2], start: "2029-03-01", end: "2029-03-03", kennel: k.kennels[3] });
+    const lines = stayLines({ kind: "boarding", petName: "Dog", startDate: "2029-03-01", endDate: "2029-03-03", rateMinor: 120000 });
+    const t = computeInvoice(lines, { mode: "none" }, { roundToWholeUnit: true });
+    const first = await makeDraft(staff, t, { booking: b });
+    await issue(staff, first);
+    await as(db, user(staff), () =>
+      db.query("insert into public.payments (org_id, client_id, booking_id, invoice_id, amount_minor, method, received_on) values ($1, $2, $3, $4, 240000, 'upi', '2029-03-03')", [k.org, k.client, b, first]),
+    );
+    await as(db, user(manager), async () => {
+      await db.query("select public.void_invoice($1, 'Wrong rate')", [first]);
+      // A voided bill comes to nothing, so what was paid on it can go back.
+      await db.query(
+        "insert into public.payments (org_id, client_id, booking_id, invoice_id, direction, amount_minor, method, received_on) values ($1, $2, $3, $4, 'out', 100000, 'upi', '2029-03-04')",
+        [k.org, k.client, b, first],
+      );
+    });
+    const second = await makeDraft(staff, t, { booking: b });
+    await issue(staff, second);
+    expect(await balance(second)).toEqual({ paid_minor: 140000, due_minor: 100000 });
   });
 
   it("replaces a draft's lines in one go, and refuses to touch an issued bill", async () => {

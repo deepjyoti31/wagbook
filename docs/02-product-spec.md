@@ -266,7 +266,7 @@ On the parent page, for owners and managers (`WB070` for anyone else); erasing i
   personal detail on the parent (the parent is then shown as "Erased" where a past stay or bill names them) and the
   notes on their stays; deletes their addresses, the updates sent to them (with their photos), their intake forms (with their files),
   draft bills, and the vaccination certificate files, because a card carries the owner's name and address; and takes
-  the stays' notes out of the history of changes. **The pets stay** (D30): their details, photo, vaccinations (without
+  the notes of their stays, appointments, courses and trips, and the draft bills, out of the history of changes. **The pets stay** (D30): their details, photo, vaccinations (without
   the card), routines, incidents, care tasks and play, hidden from lists. Issued and cancelled bills stay, with the
   buyer printed on them, and so do payments and the stays' dates and prices, because tax law requires the kennel to
   keep them. Refused while a pet is in house (`WB071`) or a stay is still to come (`WB072`). The erasure itself is in
@@ -592,7 +592,8 @@ Details in [06-billing-and-gst.md](06-billing-and-gst.md).
 
 Make bill, on the booking page (and offered after check-out), builds a draft from the booking: the stay as the
 database prices it (`stay_charges`: at its booked rate, or split into nights shared and nights alone, or days and then
-nights, D32), with its discount on the largest line and its tax, then each extra (`billForBooking()`, `stayLines()`,
+nights, D32), with its discount on the largest line (never more than that line comes to, so a stay made shorter after
+its discount costs nothing rather than less) and its tax, then each extra (`billForBooking()`, `stayLines()`,
 `computeInvoice()`), saved in one go
 (`save_invoice_draft`). A stay has one live bill; pressing Make bill again brings a draft back in line with the booking
 or opens the issued bill. Owners and managers can change, add and remove lines of a draft. Issue checks every sum
@@ -989,7 +990,7 @@ day's runs (H6) by their slot, and a rider sees and marks them like deliveries (
 **More, Health papers** (owners and managers): the vaccines the kennel requires and how many months each lasts when the
 card gives no date, deworming and tick treatment within so many days, spayed or neutered above an age in months, and
 whether failing them **warns** or **refuses** (off by default). Pets have the days they were last dewormed and treated
-for ticks, on the pet page and the intake form. `pet_health_problems()` says what a pet lacks on a day. A stay's page (before check-in) and a visitor's appointment page show the problems, and while the kennel refuses, the database refuses them (`WB210`)
+for ticks, on the pet page and the intake form. `pet_health_problems()` says what a pet lacks on a day. A stay's page (before check-in) and a visitor's appointment page show the problems, and while the kennel refuses, the database refuses them (`WB210`), at check-in and for a stay made already checked in,
 unless an owner or manager let the pet in with a note (`health_overrides`, in History of changes). Today lists stays
 starting within a week whose pet will lack something, to send the parent (D39).
 

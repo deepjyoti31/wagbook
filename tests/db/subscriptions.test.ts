@@ -99,6 +99,24 @@ describe("a subscription two days a week", () => {
     await q(db, manager, "update public.food_products set price_minor = 40000 where id = $1", [k.subscriptionFood]);
   });
 
+  it("will not let staff take the delivery charge, the tax or the price off a delivery", async () => {
+    const [{ id: order }] = await q<{ id: string }>(
+      db, staff,
+      "insert into public.deliveries (org_id, kind, client_id, pet_id, product_id, delivery_date, grams, recipe_id, address_id) values ($1, 'order', $2, $3, $4, $5, 1000, $6, $7) returning id",
+      [k.org, k.client, k.pets[2], k.subscriptionFood, await dayFromToday(db, k, 12), k.recipes[0], k.address],
+    );
+    const [first] = await deliveries(sub);
+    for (const change of ["delivery_charge_minor = 0", "tax_rate_bp = 1800", `kind = 'replacement', replaces_id = '${first.id}'`]) {
+      const e = await fails(staff, `update public.deliveries set ${change} where id = $1`, [order]);
+      expect(e.message, change).toContain("WB022");
+    }
+    // A price typed by hand is worked out again from the grams.
+    await q(db, staff, "update public.deliveries set price_minor = 1 where id = $1", [order]);
+    const [d] = await q<{ price_minor: string; delivery_charge_minor: string }>(db, staff, "select price_minor, delivery_charge_minor from public.deliveries where id = $1", [order]);
+    expect([Number(d.price_minor), Number(d.delivery_charge_minor)]).toEqual([40000, 5000]);
+    await q(db, k.owner, "delete from public.deliveries where id = $1", [order]);
+  });
+
   it("is paused for a week and resumed", async () => {
     const before = await deliveries(sub);
     await q(db, staff, "update public.subscriptions set paused_from = $2, paused_until = ($2::date + 6) where id = $1", [sub, before[2].delivery_date]);

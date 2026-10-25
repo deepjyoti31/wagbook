@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 20. Tables: 89. Views: 9. Functions: 201.
+Migrations applied: 20. Tables: 89. Views: 9. Functions: 202.
 
 ## Contents
 
@@ -762,7 +762,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_audit` (after insert or delete or update) runs `audit_row()`
 - `bookings_check_capacity` (after insert or update of status, start_date, end_date, kind, kennel_id) runs `bookings_check_capacity()`
 - `bookings_check_group` (before insert or update of group_id, client_id) runs `bookings_check_group()`
-- `bookings_check_health` (before update of status) runs `bookings_check_health()`
+- `bookings_check_health` (before insert or update of status) runs `bookings_check_health()`
 - `bookings_check_package` (before insert or update of package_id, package_price_minor) runs `bookings_check_package()`
 - `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
@@ -1440,7 +1440,7 @@ Food going to a pet's home on a day: made ahead from a subscription, or a one-of
 - `deliveries_check_run` (before insert or update of run_id, delivery_date, slot) runs `deliveries_check_run()`
 - `deliveries_forbid_org_change` (before update) runs `forbid_org_change()`
 - `deliveries_guard` (before delete or update) runs `deliveries_guard()`
-- `deliveries_price` (before insert or update of kind, product_id, grams, quantity, unit_price_minor, address_id) runs `deliveries_price()`
+- `deliveries_price` (before insert or update of kind, product_id, grams, quantity, unit_price_minor, price_minor, delivery_charge_minor, tax_rate_bp, address_id) runs `deliveries_price()`
 - `deliveries_refuse_passed_pet` (before insert) runs `refuse_passed_pet()`
 - `deliveries_set_updated_at` (before update) runs `set_updated_at()`
 - `deliveries_stamp_actor` (before insert or update) runs `stamp_actor()`
@@ -2742,6 +2742,7 @@ Money received from a parent, or refunded to one. Wagbook records payments; it d
 **Triggers**
 
 - `payments_audit` (after insert or delete or update) runs `audit_row()`
+- `payments_check_parent` (before insert or update of client_id, invoice_id, booking_id) runs `payments_check_parent()`
 - `payments_check_refund` (before insert or update of direction, amount_minor, invoice_id, booking_id) runs `payments_check_refund()`
 - `payments_credit` (after insert) runs `payments_credit()`
 - `payments_forbid_org_change` (before update) runs `forbid_org_change()`
@@ -4225,6 +4226,7 @@ An order to a supplier (M63): what was asked for, sent on WhatsApp. Stock goes i
 - Foreign key `supplier_orders_org_id_expense_id_fkey`: `FOREIGN KEY (org_id, expense_id) REFERENCES expenses(org_id, id) ON DELETE SET NULL (expense_id)`
 - Foreign key `supplier_orders_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `supplier_orders_org_id_supplier_id_fkey`: `FOREIGN KEY (org_id, supplier_id) REFERENCES suppliers(org_id, id)`
+- Check `supplier_orders_bill_in_org`: `CHECK (paths_in_org(ARRAY[bill_path], org_id))`
 - Check `supplier_orders_bill_number_check`: `CHECK (((bill_number IS NULL) OR (char_length(bill_number) <= 40)))`
 - Check `supplier_orders_note_check`: `CHECK (((note IS NULL) OR (char_length(note) <= 300)))`
 
@@ -4556,6 +4558,7 @@ Each invoice with what has been paid against it, what credit notes took off it, 
 | `series_month` | `date` |  |  |  |
 | `appointment_id` | `uuid` |  |  |  |
 | `sale_id` | `uuid` |  |  |  |
+| `issued_on` | `date` |  |  |  |
 
 **Access**: signed-in users may select. Runs with the caller's row level security.
 
@@ -4948,7 +4951,7 @@ bookings_check_health() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: while the kennel refuses at the door (organizations.health_check), check-in is refused for a pet that lacks a required vaccine, deworming, tick treatment or neutering (pet_health_problems), unless an owner or manager let it in (health_overrides). WB210.
+Trigger: while the kennel refuses at the door (organizations.health_check), check-in, or a stay made already checked in, is refused for a pet that lacks a required vaccine, deworming, tick treatment or neutering (pet_health_problems), unless an owner or manager let it in (health_overrides). WB210.
 
 ### bookings_check_package
 
@@ -5284,7 +5287,7 @@ deliveries_guard() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: after its cut-off (delivery_cutoff) a delivery only moves along: packed, out, at the door, or cancelled by an owner or manager (WB151). A delivery on a bill is cancelled, never deleted (WB152). A cancelled one stays cancelled, and one that has been to the door is not cancelled (WB153).
+Trigger: after its cut-off (delivery_cutoff) a delivery only moves along: packed, out, at the door, or cancelled by an owner or manager (WB151), and loses its address when the parent is erased. A delivery on a bill is cancelled, never deleted (WB152). A cancelled one stays cancelled, and one that has been to the door is not cancelled (WB153).
 
 ### deliveries_price
 
@@ -5296,7 +5299,7 @@ deliveries_price() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: a delivery's unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address. Only owners and managers give another unit price (WB022). A replacement costs nothing. A made-to-order item is refused sooner than the kennel's lead time (WB156).
+Trigger: a delivery's unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel's lead time (WB156).
 
 ### delivery_cutoff
 
@@ -5344,7 +5347,7 @@ erase_client(p_client uuid) returns text[]
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates and stay reports sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text out of the history of changes. Keeps the pets with their health, routines, incidents, vet visits, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
+Erases a parent on their request: empties every personal detail on the parent and the notes on their stays, deletes their addresses, the updates and stay reports sent to them, their intake forms and food orders, draft bills, vaccination certificates (a card shows the owner) and photos taken at their door, and takes that text (stays, appointments, courses, trips and the draft bills) out of the history of changes. Keeps the pets with their health, routines, incidents, vet visits, care and play (hidden), issued and cancelled bills (with the buyer details printed on them), payments, and the stays' dates and prices. Empties the notes, session notes and homework of their appointments. Refused while a pet is in house (WB071), a stay is still to come (WB072), food is still to be delivered (WB075) or an appointment is still to come (WB076). Returns the storage paths of the files to remove. Owner only (WB070, WB074).
 
 ### export_client
 
@@ -5752,7 +5755,7 @@ issue_invoice(p_invoice uuid) returns invoices
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays.
+Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays, and what was paid or given back on a voided bill for the same thing.
 
 ### job_forget_old_rows
 
@@ -6018,6 +6021,18 @@ paths_in_org(p_paths text[], p_org uuid) returns boolean
 
 True when every path that is set is inside the given organisation's folder. Empty paths are allowed.
 
+### payments_check_parent
+
+```
+payments_check_parent() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a payment's parent is the parent of the bill and the stay it names (WB058), so one parent's money or credit never pays another's bill.
+
 ### payments_check_refund
 
 ```
@@ -6040,7 +6055,7 @@ payments_credit() returns trigger
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Trigger: a refund paid as credit (method credit, out) becomes a credit ending after the kennel's credit_months; a payment from credit (method credit, in) takes from the parent's credits still spendable, the soonest to end first, and is refused when there is not enough (WB211).
+Trigger: a refund paid as credit (method credit, out) becomes a credit ending after the kennel's credit_months; a payment from credit (method credit, in) pays a bill or a stay (WB214) and takes from the parent's credits still spendable, the soonest to end first, and is refused when there is not enough (WB211).
 
 ### payments_guard_credit
 
@@ -6820,7 +6835,7 @@ stay_charges(p_org uuid, p_bookings uuid[]) returns TABLE(booking_id uuid, part 
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount. The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).
+What each stay costs, as bill lines: part (stay; or days, then the nights after a switch from day boarding; shared and alone for a pet at the shared kennel price; package, the whole stay as its package), quantity, price and discount (on the largest line, never more than it comes to). The one place a stay is priced: invoice_expected_lines() checks staff bills against it and the app builds bills from it (stayLines() in src/lib/core/stay.ts).
 
 ### stay_media_visible
 

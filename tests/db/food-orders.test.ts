@@ -1,7 +1,7 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addMember } from "./fixtures";
-import { anon, as, createTestDb, errorOf } from "./harness";
+import { admin, anon, as, createTestDb, errorOf } from "./harness";
 import { dayFromToday, q, seedKitchen, type Kitchen } from "./kitchen-fixtures";
 
 /**
@@ -79,6 +79,16 @@ describe("the food order page", () => {
     expect((await q(db, staff, "select id from public.deliveries where client_id = $1", [client])).length).toBeGreaterThanOrEqual(4);
     const twice = await errorOf(() => q(db, staff, "select public.confirm_food_order($1)", [id]));
     expect(twice.message).toContain("WB188");
+  });
+
+  it("dates the weight the parent gave by the kennel's own calendar", async () => {
+    const r = await send(order({ phone: "+919845011111", pet_name: "Kaju" }));
+    // Sent at half past one in the night in India: still the evening before in UTC.
+    await as(db, admin, () => db.query("update public.food_orders set created_at = '2027-03-01 20:00:00+00' where public_token = $1", [r.token]));
+    const [{ id }] = await q<{ id: string }>(db, staff, "select id from public.food_orders where public_token = $1", [r.token]);
+    const [{ client }] = await q<{ client: string }>(db, staff, "select public.confirm_food_order($1) as client", [id]);
+    const weighed = await q<{ weighed_on: string }>(db, staff, "select w.weighed_on::text from public.pet_weights w join public.pets p on p.id = w.pet_id where p.client_id = $1", [client]);
+    expect(weighed).toEqual([{ weighed_on: "2027-03-02" }]);
   });
 
   it("keeps a PIN code it does not serve waiting for its area, with nothing to pay", async () => {
@@ -173,5 +183,18 @@ describe("erasing a parent who had food", () => {
     const [s] = await q<{ notes: string | null; cancel_reason: string }>(db, e.owner, "select notes, cancel_reason from public.subscriptions where id = $1", [sub]);
     expect(s).toEqual({ notes: null, cancel_reason: "Erased" });
     expect(await q(db, e.owner, "select id from public.client_addresses where client_id = $1", [e.client])).toHaveLength(0);
+  });
+
+  it("erases a parent whose food went out before, each delivery keeping what it cost", async () => {
+    const e = await seedKitchen(db);
+    await q(
+      db, e.owner,
+      "insert into public.deliveries (org_id, kind, client_id, pet_id, product_id, delivery_date, grams, recipe_id, address_id) values ($1, 'order', $2, $3, $4, $5, 1000, $6, $7)",
+      [e.org, e.client, e.pets[0], e.subscriptionFood, await dayFromToday(db, e, -7), e.recipes[0], e.address],
+    );
+    // Its address goes with the parent, though the delivery is long past its cut-off.
+    await q(db, e.owner, "select public.erase_client($1)", [e.client]);
+    const [d] = await q<{ address_id: string | null; delivery_charge_minor: string }>(db, e.owner, "select address_id, delivery_charge_minor from public.deliveries where client_id = $1", [e.client]);
+    expect([d.address_id, Number(d.delivery_charge_minor)]).toEqual([null, 5000]);
   });
 });
