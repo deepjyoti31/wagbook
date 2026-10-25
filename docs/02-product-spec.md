@@ -85,6 +85,7 @@ One person can belong to several kennels, with a different role in each.
 /login/new-password   Choose the new password, from the emailed link signed in by the link
 /auth/google          Continue with Google (when set up)             public
 /api/health           For an uptime service                          public
+/api/site/{slug}      Forms on a kennel's own website send here (M68)  public, only from that website
 /book/{slug}          A kennel's booking form for new parents        public
 /rider                A rider's own run for today                    riders (D45)
 /f/{slug}             A kennel's food order page                     public
@@ -299,7 +300,9 @@ parent's export, move when parents are merged, and are deleted when the parent i
 
 More, **Areas you serve** (shown while the kennel delivers): one row a PIN code, with the area's name and an optional
 delivery charge (empty is free). Owners and managers add and change them; owners remove them. A PIN code appears once
-(`service_areas_org_id_postal_code_key`). Delivery runs (M31) and pick-ups from home (M39) use them.
+(`service_areas_org_id_postal_code_key`). Delivery runs (M31) and pick-ups from home (M39) use them. Each area may
+also have its **delivery days** (M68): food ordered from the order page or the kennel's website for that PIN code comes
+on those days only, so a city split into parts gets each part on its own two days. None ticked is any day.
 
 ### B13. Weights. Built (M25).
 
@@ -834,7 +837,7 @@ kennel's screens is sent back to their run.
 within the kennel's window (`WB174`). It is replaced (a new delivery at no charge) or refunded (a credit note and a refund
 from the bill), or closed with nothing done.
 
-### H7. Ordering food from the kennel's website. Built (M32).
+### H7. Ordering food from the kennel's website. Built (M32, M68).
 
 `/f/{slug}`, a link the kennel puts on its own website: a trial or regular deliveries, the dog's name and weight (the
 portion is worked out as they type: "About 300 g a day for a medium dog"), days and slot, address and PIN code ("We
@@ -842,6 +845,14 @@ deliver to Indiranagar", or "We do not deliver to that PIN code yet"), their nam
 what the first week costs; the database works it out again (`submit_food_order`), and that is what is asked: the UPI QR
 code and link, then **I have paid**. A PIN code not served is kept as waiting for its area, with nothing to pay; staff see
 how many wait in each PIN code.
+
+Since M68: an area with its own delivery days decides a subscription's days (the page then shows "We deliver to
+Yelahanka on Mon, Thu" instead of asking), and a trial comes on the area's next delivery day. A **made-to-order item**
+(a birthday cake, from Kitchen settings, Food prices) is ordered once: the day, the time and the words to write on it.
+It is priced at the item's price with the area's delivery charge, paid ahead like a trial, needs the kennel's notice
+(`item_lead_hours`, `WB156`), and comes on a day some area takes deliveries (`item_weekdays()`, `WB300`: with every area
+off on Sunday, no cake on Sunday). Confirm makes the item's delivery with its words, even if the notice has since
+passed.
 
 **Orders from the website** (Food for homes): staff check the money has arrived and **Confirm**, which makes or finds the
 parent by phone, the dog by name (with its weight as the first weighing), the address, and the trial delivery or the
@@ -857,6 +868,19 @@ then subscribed; deliveries, kilos delivered and a day, and food sold; kilos coo
 kilo (from each batch's own version and that day's prices); what was thrown away and its cost; deliveries by rider by
 day; and where customers came from. Downloads as CSV: food month by month for the year, and deliveries by rider.
 Owners and managers only, refused in the database (`WB060`, as D20).
+
+### H9. Orders and booking requests from the kennel's own website. Built (M68).
+
+A kennel with a website of its own keeps its own forms and sends them to Wagbook: Settings, **Your own website**, takes
+its address (`https://` and the name, nothing after it), and Wagbook then shows the address the forms send to,
+`/api/site/{slug}`. A booking request lands in Forms from parents (as the booking form for new parents does, through
+`submit_intake`); a food order or a cake lands in Orders and requests (`submit_food_order`), and the answer carries the
+amount, the UPI link and the first delivery day for the website's own payment screen; "I have paid" goes through
+`food_order_paid`. The website's reference number is kept (`site_ref`), shown to staff, and used as the UPI payment note;
+the same request sent again from the same phone is kept once. Where the visitor came from (campaign tags) is kept too.
+An appointment asked for without a time (grooming, a swim, training, a party) names the kennel's service of that kind,
+and staff agree a time with the parent ("Asks for Full groom, with no time yet"). The format is in
+[07-whatsapp-and-upi.md](07-whatsapp-and-upi.md), "A kennel's own website".
 
 ## I. Appointments (Phase 2, M34 to M37, D46)
 

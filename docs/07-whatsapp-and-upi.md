@@ -132,6 +132,53 @@ Built in M4. The parent's bill page draws the QR code on the server as one SVG p
 [09-decisions.md](09-decisions.md)). A test decodes the drawn code and gets the exact link back. No third-party QR
 image service is called: that would send every bill's payment details to someone else's server.
 
+## A kennel's own website
+
+Built in M68 (D57). A kennel whose website has its own booking and food forms sends them to Wagbook instead of using
+`/book/` and `/f/`. In Settings, **Your own website** takes the website's address; Wagbook then shows where the forms send:
+`https://{wagbook}/api/site/{slug}`.
+
+The website posts one JSON object, as `text/plain` so the browser sends it without asking first (no CORS preflight).
+Unknown fields are ignored and text is cut to its length (`SiteRequest` in `src/lib/site-request.ts`).
+
+```json
+{
+  "v": 1,
+  "kind": "booking",
+  "ref": "WEB-261025-7KQ2",
+  "hp": "",
+  "elapsed_ms": 48211,
+  "parent": { "name": "Asha Rao", "phone": "98450 12345", "address": "12 First Cross", "area": "Hebbal", "postal_code": "560024" },
+  "pet": { "name": "Bruno", "breed": "Indie", "weight_kg": 28, "vaccinated": true, "notes": "Scared of thunder", "avoid_foods": "chicken" },
+  "booking": { "service": "boarding", "start_date": "2026-11-02", "end_date": "2026-11-05", "pickup": true, "notes": "" },
+  "consent": true,
+  "consent_text": "What the visitor agreed to on the website",
+  "source": { "page": "/book", "referrer": "", "utm_source": "instagram", "utm_medium": "", "utm_campaign": "launch" }
+}
+```
+
+| Field | What it is |
+| --- | --- |
+| `kind` | `booking`, `food`, or `paid` ("I have paid", with `token` from the food answer). |
+| `ref` | The website's own reference number, 4 to 40 letters, digits and dashes. A request sent again with the same `ref` from the same phone is kept once. It is also the UPI payment note. |
+| `hp`, `elapsed_ms` | A hidden field robots fill, and the time from opening the page. Filled, or under 2,500 ms: answered as saved, kept nowhere. |
+| `parent.phone` | A mobile number; in India ten digits, with or without +91 or 0. |
+| `parent.postal_code` | Needed for food: it decides the area, its charge and its delivery days. |
+| `booking.service` | `boarding`, `daycare`, `grooming`, `swimming`, `training` or `party`. Dates may be left out for staff to agree. An appointment has a day and no time: it names the kennel's service of that kind, and staff give it a time. |
+| `food` | `{ "kind": "trial" or "subscription" or "item", "starts_on": "2026-11-04", "slot": "morning", "inscription": "Bruno", "plan": "full", "note": "" }`. For a subscription `pet.weight_kg` is needed and Wagbook works out the grams a day itself. For an item (a cake), `starts_on` is its day and `inscription` the words on it. |
+| `consent` | Must be `true`. |
+
+The answer is always JSON.
+
+| Situation | Answer |
+| --- | --- |
+| Booking kept | `{ "ok": true, "ref": "..." }`, with `"repeat": true` for a request sent again |
+| Food order kept | `{ "ok": true, "ref", "kind", "status", "served", "amount_minor", "amount", "currency", "starts_on", "token", "upi_link" }`. `served: false` is a PIN code the kennel does not deliver to yet: kept waiting for the area, nothing to pay. |
+| Something to fix | `{ "ok": false, "error": "invalid", "field" or "code", "message" }`, the message in the parents' language. `field` is one of `name`, `phone`, `pet`, `dates`, `address`, `pin`, `weight`, `consent`, `service`, `food`; `code` is the database's (`WB300`: no deliveries that day). |
+| Too many | `{ "ok": false, "error": "rate_limited", "message" }` |
+| Not this website, or not taking requests | `{ "ok": false, "error": "not_allowed" }` or `"unavailable"` |
+| Anything else | `"bad_request"` or `"server_error"`, with a message |
+
 ## If you outgrow this
 
 Both choices are deliberately replaceable.

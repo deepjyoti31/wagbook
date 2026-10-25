@@ -49,7 +49,7 @@ describe("the food order page", () => {
   it("shows the kennel's food, portions and areas, only while it takes orders", async () => {
     const [{ f }] = await as(db, anon, async () => (await db.query<{ f: { subscription: { price_per_kg_minor: number }; areas: unknown[]; pack_g: number } }>("select public.get_public_food_form($1) as f", [slug])).rows);
     expect(f.subscription.price_per_kg_minor).toBe(40000);
-    expect(f.areas).toEqual([{ postal_code: "560038", name: "Indiranagar", charge_minor: 5000 }]);
+    expect(f.areas).toEqual([{ postal_code: "560038", name: "Indiranagar", charge_minor: 5000, weekdays: null }]);
     expect(f.pack_g).toBe(250);
     const other = await (async () => {
       const o = await seedKitchen(db);

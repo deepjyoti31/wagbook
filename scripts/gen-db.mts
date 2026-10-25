@@ -79,6 +79,7 @@ export function errorCodes(): string {
     "| WB240 to WB249 | Running for real: import and the photo archive |",
     "| WB250 to WB259 | The day: cleaning, house jobs, a pet that passed away, costs as expenses, vet visits |",
     "| WB260 to WB269 | Stay reports |",
+    "| WB300 to WB309 | Food orders from the website (continued) |",
     "",
     "| Code | Message | Raised in |",
     "| --- | --- | --- |",

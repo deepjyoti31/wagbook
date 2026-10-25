@@ -25,9 +25,12 @@ interface PublicFood {
   };
   pack_g: number;
   portions: PortionSettings;
+  today: string;
+  item_lead_hours: number;
   trial: { name: string; price_minor: number; grams: number } | null;
   subscription: { name: string; price_per_kg_minor: number } | null;
-  areas: { postal_code: string; name: string; charge_minor: number }[];
+  items: { id: string; name: string; price_minor: number }[];
+  areas: { postal_code: string; name: string; charge_minor: number; weekdays: number[] | null }[];
 }
 
 /** The kennel behind a food order link, or null. Read once per request, for the title and the page. */
@@ -63,7 +66,7 @@ async function FoodOrder({ params }: Pick<PageProps<"/f/[slug]">, "params">) {
   const { language, m, locale } = parentI18n(food.kennel.language, food.kennel.locale);
   const w = m.foodOrder;
   const k = food.kennel;
-  const open = food.trial !== null || food.subscription !== null;
+  const open = food.trial !== null || food.subscription !== null || food.items.length > 0;
 
   return (
     <div lang={language}>
@@ -87,8 +90,11 @@ async function FoodOrder({ params }: Pick<PageProps<"/f/[slug]">, "params">) {
             countryCode: k.country_code,
             packG: food.pack_g,
             portions: food.portions,
+            today: food.today,
+            itemLeadHours: food.item_lead_hours,
             trial: food.trial,
             subscription: food.subscription,
+            items: food.items,
             areas: food.areas,
           }}
           kennelName={k.name}

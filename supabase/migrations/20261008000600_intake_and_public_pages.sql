@@ -28,6 +28,7 @@ create table public.intake_submissions (
   reviewed_by uuid references auth.users (id) on delete set null,
   reviewed_at timestamptz,
   upload_token text not null default public.new_token(),
+  site_ref text check (site_ref is null or site_ref ~ '^[A-Za-z0-9-]{4,40}$'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, id),
@@ -37,13 +38,18 @@ create table public.intake_submissions (
 comment on table public.intake_submissions is
   'What a parent typed into the public intake form, kept exactly as sent until staff accept it. Nothing here is trusted until a person has reviewed it.';
 comment on column public.intake_submissions.payload is
-  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), consent}.';
+  'The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), site:{ref,page,referrer,utm_source,utm_medium,utm_campaign} from the kennel''s own website (M68), consent}.';
 comment on column public.intake_submissions.consent_text is 'The exact consent wording the parent agreed to, kept as evidence.';
 comment on column public.intake_submissions.client_id is 'The client created or matched when the submission was accepted.';
 comment on column public.intake_submissions.upload_token is
   'Secret returned to whoever sent the form, so the same visitor can add a vaccination certificate per pet within the hour (intake_upload_allowed). Useless after that.';
 
+comment on column public.intake_submissions.site_ref is
+  'The reference number the kennel''s own website gave the request (M68), so staff can find it from a WhatsApp message. The same reference from the same phone is the same request sent again, and is not kept twice.';
+
 create index intake_submissions_org_status_idx on public.intake_submissions (org_id, status, created_at desc);
+create unique index intake_submissions_one_per_site_ref on public.intake_submissions (org_id, parent_phone, site_ref) where site_ref is not null;
+comment on index public.intake_submissions_one_per_site_ref is 'A website request sent again (a retry) is kept once.';
 
 create trigger intake_submissions_set_updated_at
   before update on public.intake_submissions
@@ -140,6 +146,10 @@ as $$
     'language', o.parent_language,
     'delivers', o.offers_food_delivery,
     'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language)),
+    -- The kennel's own website, the only place its forms may send from (M68),
+    -- and its country, for reading a phone number and a PIN code sent from there.
+    'website', o.website_url,
+    'country_code', o.country_code,
     -- For the booking form's estimate (M41): the usual prices, nothing private.
     'currency', o.currency,
     'locale', o.locale,
@@ -161,7 +171,7 @@ as $$
   where o.slug = lower(btrim(p_slug));
 $$;
 comment on function public.get_public_intake_form(text) is
-  'PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate.';
+  'PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate; and the kennel''s own website and country (M68), the only place its forms may send from.';
 
 create function public.submit_intake(p_slug text, p_payload jsonb)
 returns jsonb
@@ -178,6 +188,7 @@ declare
   v_end date;
   v_id uuid;
   v_token text;
+  v_ref text;
 begin
   select * into v_org from public.organizations o where o.slug = lower(btrim(p_slug));
   if v_org.id is null or not v_org.intake_enabled then
@@ -220,6 +231,14 @@ begin
     raise exception 'WB047: check-out is before check-in' using errcode = '22023';
   end if;
 
+  -- A website sends a request again when it did not hear back (M68): the
+  -- same reference from the same phone is that request, kept once.
+  v_ref := case when p_payload #>> '{site,ref}' ~ '^[A-Za-z0-9-]{4,40}$' then p_payload #>> '{site,ref}' end;
+  if v_ref is not null and exists (select 1 from public.intake_submissions s
+                                   where s.org_id = v_org.id and s.parent_phone = v_phone and s.site_ref = v_ref) then
+    return jsonb_build_object('repeat', true);
+  end if;
+
   -- A blunt flood limit. Real rate limiting belongs at the edge (see docs/05).
   -- Only forms still waiting count, so clearing junk reopens the form at once.
   if (select count(*) from public.intake_submissions s
@@ -231,12 +250,17 @@ begin
     raise exception 'WB048: we already have your form. The kennel will be in touch.' using errcode = '53400';
   end if;
 
-  insert into public.intake_submissions
-    (org_id, parent_name, parent_phone, requested_start, requested_end, payload, consent_at, consent_text)
-  values
-    (v_org.id, v_name, v_phone, v_start, v_end, p_payload, now(),
-     coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name, v_org.parent_language)))
-  returning id, upload_token into v_id, v_token;
+  begin
+    insert into public.intake_submissions
+      (org_id, parent_name, parent_phone, requested_start, requested_end, payload, consent_at, consent_text, site_ref)
+    values
+      (v_org.id, v_name, v_phone, v_start, v_end, p_payload, now(),
+       coalesce(nullif(btrim(v_org.intake_notice), ''), public.default_intake_notice(v_org.name, v_org.parent_language)), v_ref)
+    returning id, upload_token into v_id, v_token;
+  exception when unique_violation then
+    -- The same request arriving twice at the same moment.
+    return jsonb_build_object('repeat', true);
+  end;
 
   -- What the sender needs to add certificates: the folder for them, and the
   -- secret that proves they sent this form.
@@ -244,7 +268,7 @@ begin
 end;
 $$;
 comment on function public.submit_intake(text, jsonb) is
-  'PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed).';
+  'PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed). A request from the kennel''s website sent again with the same reference and phone (site.ref, M68) is not kept twice and returns {repeat: true}.';
 
 -- Turning a reviewed submission into a client and pets. SECURITY INVOKER: it
 -- runs as the staff member, so row level security decides what they may do.
@@ -902,9 +926,9 @@ comment on function public.renew_request_link(uuid) is
 -- makes or matches the parent (by phone), the pet and the subscription.
 -- ---------------------------------------------------------------------------
 
-create type public.food_order_kind as enum ('trial', 'subscription', 'pause', 'skip', 'more');
+create type public.food_order_kind as enum ('trial', 'subscription', 'item', 'pause', 'skip', 'more');
 comment on type public.food_order_kind is
-  'trial, subscription: an order from the website order page. pause, skip, more: a known parent''s change to their food from their own link (pause for some days, skip one delivery, an extra order).';
+  'trial, subscription, item: an order from the order page or the kennel''s own website (item: a made-to-order item such as a birthday cake, once, M68). pause, skip, more: a known parent''s change to their food from their own link (pause for some days, skip one delivery, an extra order).';
 
 create type public.food_order_status as enum ('waiting_area', 'unpaid', 'paid', 'requested', 'confirmed', 'declined');
 comment on type public.food_order_status is
@@ -936,29 +960,45 @@ create table public.food_orders (
   amount_minor bigint check (amount_minor is null or amount_minor >= 0),
   note text check (note is null or char_length(note) <= 1000),
   consent_text text,
+  product_id uuid,
+  inscription text check (inscription is null or char_length(inscription) between 1 and 60),
+  site_ref text check (site_ref is null or site_ref ~ '^[A-Za-z0-9-]{4,40}$'),
+  site_source text check (site_source is null or char_length(site_source) <= 200),
+  delivery_id uuid,
   paid_claimed_at timestamptz,
   reviewed_by uuid references auth.users (id) on delete set null,
   reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   unique (org_id, id),
   foreign key (org_id, client_id) references public.clients (org_id, id) on delete set null (client_id),
-  foreign key (org_id, subscription_id) references public.subscriptions (org_id, id) on delete set null (subscription_id)
+  foreign key (org_id, subscription_id) references public.subscriptions (org_id, id) on delete set null (subscription_id),
+  foreign key (org_id, product_id) references public.food_products (org_id, id) on delete set null (product_id),
+  foreign key (org_id, delivery_id) references public.deliveries (org_id, id) on delete set null (delivery_id),
+  constraint food_orders_item_names_product check (kind <> 'item' or product_id is not null or status in ('confirmed', 'declined'))
 );
 
 comment on table public.food_orders is
-  'Food asked for from outside: an order from the website order page (a trial or a subscription), or a known parent''s change from their own link (pause, skip, more). Written only by submit_food_order() and submit_food_request(); staff confirm or decline it.';
+  'Food asked for from outside: an order from the order page or the kennel''s own website (a trial, a subscription or a made-to-order item), or a known parent''s change from their own link (pause, skip, more). Written only by submit_food_order() and submit_food_request(); staff confirm or decline it.';
 comment on column public.food_orders.public_token is 'Secret in the order''s page after it is sent, so the parent can say they have paid (food_order_paid).';
 comment on column public.food_orders.client_id is 'The parent: known from their link, or matched or made by phone when staff confirm a website order.';
 comment on column public.food_orders.subscription_id is 'The subscription a change is for, or the one a confirmed order made.';
 comment on column public.food_orders.grams_per_day is 'The portion worked out on the order page from the dog''s weight; staff may change it after confirming.';
-comment on column public.food_orders.starts_on is 'Website orders: the first delivery day asked for. Changes: the first day of a pause, or the delivery to skip.';
+comment on column public.food_orders.starts_on is 'Website orders: the first delivery day, worked out from the area''s delivery days; an item: the day it is delivered. Changes: the first day of a pause, or the delivery to skip.';
 comment on column public.food_orders.until_date is 'A pause: the last day of it. Empty: until the parent says.';
 comment on column public.food_orders.grams is 'More: how much extra food, in grams.';
 comment on column public.food_orders.amount_minor is 'What the order page asked the parent to pay: the trial, or the first week ahead, with delivery. Worked out by the database.';
 comment on column public.food_orders.consent_text is 'The consent wording the parent agreed to, in the language they read it.';
+comment on column public.food_orders.product_id is 'An item order (M68): the made-to-order item in the rate card.';
+comment on column public.food_orders.inscription is 'An item order: the name or words to write on it.';
+comment on column public.food_orders.site_ref is
+  'The reference number the kennel''s own website gave the order (M68), also the UPI payment note, so staff can match the money. The same reference from the same phone is the same order sent again, and is not kept twice.';
+comment on column public.food_orders.site_source is 'Where the website visitor came from (its campaign tags), for knowing which advertising works.';
+comment on column public.food_orders.delivery_id is 'The delivery a confirmed trial or item order made.';
 comment on column public.food_orders.paid_claimed_at is 'When the parent said they had paid. Staff check the money before confirming.';
 
 create index food_orders_org_status_idx on public.food_orders (org_id, status, created_at desc);
+create unique index food_orders_one_per_site_ref on public.food_orders (org_id, phone, site_ref) where site_ref is not null;
+comment on index public.food_orders_one_per_site_ref is 'A website order sent again (a retry) is kept once.';
 
 create function public.food_orders_stamp_review()
 returns trigger
@@ -990,10 +1030,12 @@ as $$
     'kennel', jsonb_build_object(
       'name', o.name, 'whatsapp_phone', coalesce(o.whatsapp_phone, o.phone), 'language', o.parent_language, 'locale', o.locale,
       'currency', o.currency, 'country_code', o.country_code, 'upi_vpa', o.upi_vpa, 'upi_payee_name', coalesce(o.upi_payee_name, o.name),
-      'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language))
+      'notice', coalesce(nullif(btrim(o.intake_notice), ''), public.default_intake_notice(o.name, o.parent_language)),
+      'website', o.website_url
     ),
     'today', (now() at time zone o.time_zone)::date,
     'cutoff_hours', o.food_cutoff_hours,
+    'item_lead_hours', o.item_lead_hours,
     'pack_g', o.food_pack_g,
     'portions', jsonb_build_object(
       'portion_small_bp', o.portion_small_bp, 'portion_medium_bp', o.portion_medium_bp, 'portion_large_bp', o.portion_large_bp,
@@ -1004,30 +1046,50 @@ as $$
               from public.food_products p where p.org_id = o.id and p.kind = 'trial' and p.is_active order by p.created_at limit 1),
     'subscription', (select jsonb_build_object('name', p.name, 'price_per_kg_minor', p.price_minor)
                      from public.food_products p where p.org_id = o.id and p.kind = 'subscription' and p.is_active order by p.created_at limit 1),
-    'areas', coalesce((select jsonb_agg(jsonb_build_object('postal_code', a.postal_code, 'name', a.name, 'charge_minor', coalesce(a.delivery_charge_minor, 0)) order by a.postal_code)
+    'items', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'price_minor', p.price_minor) order by p.created_at)
+                       from public.food_products p where p.org_id = o.id and p.kind = 'item' and p.is_active), '[]'::jsonb),
+    'areas', coalesce((select jsonb_agg(jsonb_build_object('postal_code', a.postal_code, 'name', a.name, 'charge_minor', coalesce(a.delivery_charge_minor, 0),
+                                                           'weekdays', a.delivery_weekdays) order by a.postal_code)
                        from public.service_areas a where a.org_id = o.id), '[]'::jsonb)
   )
   from public.organizations o
   where o.slug = lower(btrim(p_slug)) and o.offers_food_delivery and o.food_orders_enabled;
 $$;
 comment on function public.get_public_food_form(text) is
-  'PUBLIC. What the food order page needs: the kennel''s name and UPI details, the consent wording, the trial and subscription food with their prices, the kennel''s portion settings and pack size, and the PIN codes it delivers to with their charges. Nothing unless the kennel delivers food and takes orders.';
+  'PUBLIC. What the food order page needs: the kennel''s name, UPI details and own website, the consent wording, the trial, subscription food and made-to-order items with their prices, the kennel''s portion settings, pack size and notice for items, and the PIN codes it delivers to with their charges and delivery days. Nothing unless the kennel delivers food and takes orders.';
 
--- The first day a delivery can be asked for: the first day whose morning
--- slot is still before the cut-off.
-create function public.first_delivery_day(p_org uuid, p_weekdays smallint[] default null)
+-- The first day a delivery can be asked for: the first day, from p_from
+-- (today when empty), whose morning slot is still before the cut-off.
+create function public.first_delivery_day(p_org uuid, p_weekdays smallint[] default null, p_from date default null)
 returns date
 language sql
 stable
 set search_path = ''
 as $$
   select min(d::date)
-  from public.organizations o, generate_series((now() at time zone o.time_zone)::date, (now() at time zone o.time_zone)::date + 14, interval '1 day') d
+  from public.organizations o,
+       generate_series(greatest((now() at time zone o.time_zone)::date, coalesce(p_from, (now() at time zone o.time_zone)::date)),
+                       greatest((now() at time zone o.time_zone)::date, coalesce(p_from, (now() at time zone o.time_zone)::date)) + 14, interval '1 day') d
   where o.id = p_org
     and now() < public.delivery_cutoff(o.id, d::date, 'morning')
     and (p_weekdays is null or extract(isodow from d)::smallint = any (p_weekdays));
 $$;
-comment on function public.first_delivery_day(uuid, smallint[]) is 'The first day, on one of the given weekdays, whose morning delivery is still before its cut-off.';
+comment on function public.first_delivery_day(uuid, smallint[], date) is 'The first day from p_from (today when empty), on one of the given weekdays, whose morning delivery is still before its cut-off.';
+
+-- The weekdays a made-to-order item may be delivered on: any day one of the
+-- kennel's areas takes deliveries (an area with no days set takes any day).
+create function public.item_weekdays(p_org uuid)
+returns smallint[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(array_agg(distinct w order by w), array[1, 2, 3, 4, 5, 6, 7]::smallint[])
+  from public.service_areas a, unnest(coalesce(a.delivery_weekdays, array[1, 2, 3, 4, 5, 6, 7]::smallint[])) w
+  where a.org_id = p_org;
+$$;
+comment on function public.item_weekdays(uuid) is
+  'The weekdays a made-to-order item ordered from outside may be delivered on (M68): every day some area of the kennel takes deliveries. Every day when the kennel lists no areas.';
 
 create function public.submit_food_order(p_slug text, p_payload jsonb)
 returns jsonb
@@ -1050,8 +1112,14 @@ declare
   v_served boolean;
   v_amount bigint;
   v_start date;
+  v_from date;
+  v_today date;
+  v_slot public.delivery_slot;
+  v_ref text;
+  v_area public.service_areas;
   v_trial public.food_products;
   v_sub public.food_products;
+  v_item public.food_products;
   v_order public.food_orders;
 begin
   -- SECURITY DEFINER: the anonymous role reaches no table. Everything sent
@@ -1062,7 +1130,7 @@ begin
     raise exception 'WB180: this kennel is not taking food orders here' using errcode = 'P0002';
   end if;
   if p_payload is null or jsonb_typeof(p_payload) <> 'object' or octet_length(p_payload::text) > 8000
-     or coalesce(p_payload ->> 'kind', '') not in ('trial', 'subscription') then
+     or coalesce(p_payload ->> 'kind', '') not in ('trial', 'subscription', 'item') then
     raise exception 'WB181: the order could not be read' using errcode = '22023';
   end if;
   v_kind := (p_payload ->> 'kind')::public.food_order_kind;
@@ -1079,7 +1147,23 @@ begin
   end if;
   v_weight := case when p_payload ->> 'weight_g' ~ '^[0-9]{1,6}$' then (p_payload ->> 'weight_g')::integer end;
   if v_weight is null or v_weight < 500 or v_weight > 199999 then
-    raise exception 'WB183: give the dog''s weight in kilos' using errcode = '22023';
+    -- An item (a cake) is not portioned: the weight is only kept when given.
+    if v_kind <> 'item' then
+      raise exception 'WB183: give the dog''s weight in kilos' using errcode = '22023';
+    end if;
+    v_weight := null;
+  end if;
+  v_slot := case p_payload ->> 'slot' when 'afternoon' then 'afternoon' when 'evening' then 'evening' else 'morning' end::public.delivery_slot;
+
+  -- A website sends an order again when it did not hear back (M68): the same
+  -- reference from the same phone is that order, answered as the first time.
+  v_ref := case when p_payload ->> 'site_ref' ~ '^[A-Za-z0-9-]{4,40}$' then p_payload ->> 'site_ref' end;
+  if v_ref is not null then
+    select * into v_order from public.food_orders f where f.org_id = v_org.id and f.phone = v_phone and f.site_ref = v_ref;
+    if v_order.id is not null then
+      return jsonb_build_object('token', v_order.public_token, 'status', v_order.status, 'amount_minor', v_order.amount_minor,
+                                'starts_on', v_order.starts_on, 'kind', v_order.kind, 'repeat', true);
+    end if;
   end if;
 
   -- A form is a few taps; a flood is something else (as with the intake form).
@@ -1088,57 +1172,103 @@ begin
     raise exception 'WB184: we already have your order. The kennel will be in touch.' using errcode = '54000';
   end if;
 
-  select coalesce(a.delivery_charge_minor, 0), true into v_charge, v_served
-  from public.service_areas a where a.org_id = v_org.id and a.postal_code = v_postal;
-  v_served := coalesce(v_served, false);
-  v_charge := coalesce(v_charge, 0);
+  select * into v_area from public.service_areas a where a.org_id = v_org.id and a.postal_code = v_postal;
+  v_served := v_area.id is not null;
+  v_charge := coalesce(v_area.delivery_charge_minor, 0);
+  v_today := (now() at time zone v_org.time_zone)::date;
+  -- The day the parent would like to start from, or have the item.
+  v_from := public.safe_date(p_payload ->> 'starts_on');
+  if (nullif(p_payload ->> 'starts_on', '') is not null and v_from is null) or v_from < v_today or v_from > v_today + 120 then
+    raise exception 'WB187: those dates or amounts cannot be asked for. Check them and try again.' using errcode = '22023';
+  end if;
 
   if v_kind = 'trial' then
     select * into v_trial from public.food_products p where p.org_id = v_org.id and p.kind = 'trial' and p.is_active order by p.created_at limit 1;
     if v_trial.id is null then
       raise exception 'WB180: this kennel is not taking food orders here' using errcode = 'P0002';
     end if;
-    v_start := public.first_delivery_day(v_org.id);
+    -- The trial comes on one of the area's delivery days (M68).
+    v_start := public.first_delivery_day(v_org.id, v_area.delivery_weekdays, v_from);
     v_amount := v_trial.price_minor + v_charge;
-  else
+  elsif v_kind = 'subscription' then
     select * into v_sub from public.food_products p where p.org_id = v_org.id and p.kind = 'subscription' and p.is_active order by p.created_at limit 1;
     if v_sub.id is null then
       raise exception 'WB180: this kennel is not taking food orders here' using errcode = 'P0002';
     end if;
-    select coalesce(array_agg(distinct x::smallint order by x::smallint), '{}') into v_days
-    from jsonb_array_elements_text(case when jsonb_typeof(p_payload -> 'weekdays') = 'array' then p_payload -> 'weekdays' else '[]'::jsonb end) x
-    where x ~ '^[1-7]$';
+    -- An area with its own delivery days takes those (M68); otherwise the parent chooses.
+    if v_area.delivery_weekdays is not null then
+      select array_agg(distinct w order by w) into v_days from unnest(v_area.delivery_weekdays) w;
+    else
+      select array_agg(distinct x::smallint order by x::smallint) into v_days
+      from jsonb_array_elements_text(case when jsonb_typeof(p_payload -> 'weekdays') = 'array' then p_payload -> 'weekdays' else '[]'::jsonb end) x
+      where x ~ '^[1-7]$';
+    end if;
     v_grams := case when p_payload ->> 'grams_per_day' ~ '^[0-9]{1,4}$' then (p_payload ->> 'grams_per_day')::integer end;
-    if cardinality(v_days) = 0 or v_grams is null or v_grams < 10 or v_grams > 5000 then
+    if v_grams is null or v_grams < 10 or v_grams > 5000 or (v_served and coalesce(cardinality(v_days), 0) = 0) then
       raise exception 'WB185: choose the delivery days and the grams a day' using errcode = '22023';
     end if;
-    v_start := public.first_delivery_day(v_org.id, v_days);
-    -- The first week ahead: each delivery day's grams in whole packs, at the price per kilo, with its charge.
-    select sum(round((ceil(v_grams * c.covers / v_org.food_pack_g::numeric) * v_org.food_pack_g) * v_sub.price_minor / 1000.0) + v_charge)::bigint
-    into v_amount
-    from (select w, (select min(((w2 - w + 6) % 7) + 1) from unnest(v_days) w2) as covers from unnest(v_days) w) c;
+    if coalesce(cardinality(v_days), 0) > 0 then
+      v_start := public.first_delivery_day(v_org.id, v_days, v_from);
+      -- The first week ahead: each delivery day's grams in whole packs, at the price per kilo, with its charge.
+      select sum(round((ceil(v_grams * c.covers / v_org.food_pack_g::numeric) * v_org.food_pack_g) * v_sub.price_minor / 1000.0) + v_charge)::bigint
+      into v_amount
+      from (select w, (select min(((w2 - w + 6) % 7) + 1) from unnest(v_days) w2) as covers from unnest(v_days) w) c;
+    end if;
+  else
+    -- A made-to-order item (M68): the one asked for, or the kennel's first.
+    select * into v_item from public.food_products p
+    where p.org_id = v_org.id and p.kind = 'item' and p.is_active
+      and (p_payload ->> 'product_id' is null or p.id::text = p_payload ->> 'product_id')
+    order by p.created_at limit 1;
+    if v_item.id is null then
+      raise exception 'WB180: this kennel is not taking food orders here' using errcode = 'P0002';
+    end if;
+    if v_from is null then
+      raise exception 'WB189: choose the day to deliver it' using errcode = '22023';
+    end if;
+    if ((v_from + case v_slot when 'morning' then time '08:00' when 'afternoon' then time '13:00' else time '18:00' end)
+        at time zone v_org.time_zone) < now() + make_interval(hours => v_org.item_lead_hours) then
+      raise exception 'WB156: a made-to-order item needs % hours'' notice. Choose a later day.', v_org.item_lead_hours using errcode = '23514';
+    end if;
+    if not (extract(isodow from v_from)::smallint = any (public.item_weekdays(v_org.id))) then
+      raise exception 'WB300: there are no deliveries on that day. Choose another day.' using errcode = '23514';
+    end if;
+    v_start := v_from;
+    v_amount := v_item.price_minor + v_charge;
   end if;
 
-  insert into public.food_orders (org_id, kind, status, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot,
-                                  line, area, postal_code, door_note, starts_on, amount_minor, note, consent_text)
-  values (
-    v_org.id, v_kind, case when v_served then 'unpaid' else 'waiting_area' end::public.food_order_status,
-    v_name, v_phone, v_pet, v_weight,
-    case when p_payload ->> 'plan' = 'topper' then 'topper' else 'full' end::public.food_plan,
-    v_grams, v_days,
-    case p_payload ->> 'slot' when 'afternoon' then 'afternoon' when 'evening' then 'evening' else 'morning' end::public.delivery_slot,
-    v_line, nullif(left(btrim(coalesce(p_payload ->> 'area', '')), 120), ''), v_postal,
-    nullif(left(btrim(coalesce(p_payload ->> 'door_note', '')), 300), ''),
-    v_start, case when v_served then v_amount end,
-    nullif(left(btrim(coalesce(p_payload ->> 'note', '')), 1000), ''),
-    left(coalesce(p_payload ->> 'consent_text', ''), 4000)
-  )
-  returning * into v_order;
-  return jsonb_build_object('token', v_order.public_token, 'status', v_order.status, 'amount_minor', v_order.amount_minor, 'starts_on', v_order.starts_on);
+  begin
+    insert into public.food_orders (org_id, kind, status, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot,
+                                    line, area, postal_code, door_note, starts_on, amount_minor, note, consent_text,
+                                    product_id, inscription, site_ref, site_source)
+    values (
+      v_org.id, v_kind, case when v_served then 'unpaid' else 'waiting_area' end::public.food_order_status,
+      v_name, v_phone, v_pet, v_weight,
+      case when v_kind = 'item' then null when p_payload ->> 'plan' = 'topper' then 'topper' else 'full' end::public.food_plan,
+      case when v_kind = 'subscription' then v_grams end, nullif(v_days, '{}'), v_slot,
+      v_line, nullif(left(btrim(coalesce(p_payload ->> 'area', '')), 120), ''), v_postal,
+      nullif(left(btrim(coalesce(p_payload ->> 'door_note', '')), 300), ''),
+      v_start, case when v_served then v_amount end,
+      nullif(left(btrim(coalesce(p_payload ->> 'note', '')), 1000), ''),
+      left(coalesce(p_payload ->> 'consent_text', ''), 4000),
+      v_item.id,
+      case when v_kind = 'item' then nullif(left(btrim(coalesce(p_payload ->> 'inscription', '')), 60), '') end,
+      v_ref,
+      nullif(left(btrim(coalesce(p_payload ->> 'site_source', '')), 200), '')
+    )
+    returning * into v_order;
+  exception when unique_violation then
+    -- The same order arriving twice at the same moment: answer as the first.
+    select * into v_order from public.food_orders f where f.org_id = v_org.id and f.phone = v_phone and f.site_ref = v_ref;
+    return jsonb_build_object('token', v_order.public_token, 'status', v_order.status, 'amount_minor', v_order.amount_minor,
+                              'starts_on', v_order.starts_on, 'kind', v_order.kind, 'repeat', true);
+  end;
+  return jsonb_build_object('token', v_order.public_token, 'status', v_order.status, 'amount_minor', v_order.amount_minor,
+                            'starts_on', v_order.starts_on, 'kind', v_order.kind);
 end;
 $$;
 comment on function public.submit_food_order(text, jsonb) is
-  'PUBLIC. An order from the kennel''s food order page: a trial, or a subscription with its days and grams a day. Works out what to pay now (the trial, or the first week ahead, with delivery) and returns it with a token for saying it was paid; a PIN code not served is kept as waiting for the area, with nothing to pay. Refused when the kennel takes no orders (WB180), for a malformed order (WB181), missing details or consent (WB182), no weight (WB183), a flood (WB184) or no days or grams (WB185).';
+  'PUBLIC. An order from the kennel''s food order page or its own website: a trial, a subscription with its grams a day, or a made-to-order item (M68) for a day with what to write on it. Works out what to pay now (the trial, the first week ahead, or the item, each with delivery) and returns it with a token for saying it was paid; a PIN code not served is kept as waiting for the area, with nothing to pay. The area''s delivery days (M68) decide a subscription''s days and a trial''s first day; an item comes on a day some area takes deliveries (item_weekdays). An order sent again with the same site_ref from the same phone is answered as the first time, with repeat. Refused when the kennel takes no orders (WB180), for a malformed order (WB181), missing details or consent (WB182), no weight (WB183), a flood (WB184), no days or grams (WB185), a day in the past or too far ahead (WB187), an item with no day (WB189), too little notice (WB156) or on a day with no deliveries (WB300).';
 
 create function public.food_order_paid(p_token text)
 returns text
@@ -1322,12 +1452,17 @@ begin
   where p.org_id = v_order.org_id and p.client_id = v_client and lower(p.name) = lower(v_order.pet_name) and p.deleted_at is null limit 1;
   if v_pet is null then
     insert into public.pets (org_id, client_id, name) values (v_order.org_id, v_client, v_order.pet_name) returning id into v_pet;
-    insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, notes)
-    values (v_order.org_id, v_pet, (v_order.created_at at time zone v_org.time_zone)::date, v_order.weight_g, 'From the food order form');
+    if v_order.weight_g is not null then
+      insert into public.pet_weights (org_id, pet_id, weighed_on, weight_g, notes)
+      values (v_order.org_id, v_pet, (v_order.created_at at time zone v_org.time_zone)::date, v_order.weight_g, 'From the food order form');
+    end if;
   end if;
-  insert into public.pet_food (org_id, pet_id, plan, started_on)
-  values (v_order.org_id, v_pet, coalesce(v_order.plan, 'full'), greatest(v_order.starts_on, v_today))
-  on conflict (org_id, pet_id) do nothing;
+  -- A cake is not the kitchen's food for the dog: only food orders start it.
+  if v_order.kind <> 'item' then
+    insert into public.pet_food (org_id, pet_id, plan, started_on)
+    values (v_order.org_id, v_pet, coalesce(v_order.plan, 'full'), greatest(v_order.starts_on, v_today))
+    on conflict (org_id, pet_id) do nothing;
+  end if;
   -- The address: theirs with this PIN code and line, or a new one.
   select a.id into v_address from public.client_addresses a
   where a.org_id = v_order.org_id and a.client_id = v_client and a.postal_code = v_order.postal_code and a.line = v_order.line limit 1;
@@ -1343,7 +1478,20 @@ begin
     insert into public.deliveries (org_id, kind, client_id, pet_id, product_id, delivery_date, slot, address_id, recipe_id, version_id)
     values (v_order.org_id, 'trial', v_client, v_pet, v_product, greatest(coalesce(v_order.starts_on, v_today), v_today), coalesce(v_order.slot, 'morning'),
             v_address, public.rotation_recipe(v_order.org_id, 0),
-            (select c.version_id from public.recipe_current c where c.org_id = v_order.org_id and c.recipe_id = public.rotation_recipe(v_order.org_id, 0)));
+            (select c.version_id from public.recipe_current c where c.org_id = v_order.org_id and c.recipe_id = public.rotation_recipe(v_order.org_id, 0)))
+    returning * into v_delivery;
+  elsif v_order.kind = 'item' then
+    -- A made-to-order item (M68), on the day the parent chose. Its notice was
+    -- checked when the order was sent, so a later confirm is not refused.
+    if v_order.product_id is null then
+      raise exception 'WB180: this kennel is not taking food orders here' using errcode = 'P0002';
+    end if;
+    perform set_config('wagbook.confirming_order', 'on', true);
+    insert into public.deliveries (org_id, kind, client_id, pet_id, product_id, delivery_date, slot, address_id, quantity, inscription)
+    values (v_order.org_id, 'item', v_client, v_pet, v_order.product_id, greatest(coalesce(v_order.starts_on, v_today), v_today),
+            coalesce(v_order.slot, 'morning'), v_address, 1, v_order.inscription)
+    returning * into v_delivery;
+    perform set_config('wagbook.confirming_order', 'off', true);
   else
     select p.id into v_product from public.food_products p
     where p.org_id = v_order.org_id and p.kind = 'subscription' and p.is_active order by p.created_at limit 1;
@@ -1353,10 +1501,11 @@ begin
     returning id into v_sub;
     perform public.plan_subscription(v_sub, greatest(coalesce(v_order.starts_on, v_today), v_today) + 13);
   end if;
-  update public.food_orders f set status = 'confirmed', client_id = v_client, subscription_id = coalesce(v_sub, f.subscription_id)
+  update public.food_orders f set status = 'confirmed', client_id = v_client, subscription_id = coalesce(v_sub, f.subscription_id),
+                                 delivery_id = v_delivery.id
   where f.id = v_order.id;
   return v_client;
 end;
 $$;
 comment on function public.confirm_food_order(uuid) is
-  'Confirms a food order once its money has arrived: a website order makes or matches the parent by phone, the pet by name (with its first weighing), the address, and the trial delivery or the subscription with its first two weeks of deliveries; a parent''s change pauses the subscription, skips the delivery, or adds the extra order. Returns the parent. Any member (row level security applies); once only (WB188).';
+  'Confirms a food order once its money has arrived: a website order makes or matches the parent by phone, the pet by name (with its first weighing), the address, and the trial delivery, the made-to-order item on its day (M68, not refused for notice the order already gave) or the subscription with its first two weeks of deliveries; a parent''s change pauses the subscription, skips the delivery, or adds the extra order. Returns the parent. Any member (row level security applies); once only (WB188).';

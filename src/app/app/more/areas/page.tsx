@@ -6,6 +6,7 @@ import { requireOrg } from "@/lib/auth";
 import { formatMoney, toDecimalString } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
+import { WEEKDAYS, weekdayList } from "@/lib/kitchen";
 import { createClient } from "@/lib/supabase/server";
 import { addArea, changeArea, removeArea } from "./actions";
 
@@ -25,11 +26,26 @@ async function Areas() {
   const { m } = t;
   const a = m.areas;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("service_areas").select("id, postal_code, name, delivery_charge_minor, trip_charge_minor").eq("org_id", org.id).order("name").order("postal_code");
+  const { data, error } = await supabase.from("service_areas").select("id, postal_code, name, delivery_charge_minor, trip_charge_minor, delivery_weekdays").eq("org_id", org.id).order("name").order("postal_code");
   if (error) throw new Error("Could not load areas.");
   const charge = (minor: number | null) =>
     minor === null || minor === 0 ? a.free : fill(a.perDelivery, { amount: formatMoney(minor, { currency: org.currency, locale: t.locale, trimZeros: true }) });
   const plain = (minor: number | null) => (minor === null ? "" : toDecimalString(minor).replace(/\.00$/, ""));
+  // The days food goes to an area (M68), ticked; none ticked is any day.
+  const days = (ticked: readonly number[] | null) => (
+    <fieldset className="sm:col-span-3">
+      <legend className="mb-1 font-semibold">{a.days}</legend>
+      <div className="flex flex-wrap gap-x-4">
+        {WEEKDAYS.map((d) => (
+          <label key={d} className="flex min-h-12 items-center gap-2">
+            <input type="checkbox" name={`day_${d}`} defaultChecked={ticked?.includes(d) ?? false} className="size-5" />
+            <span>{m.weekdays[d]}</span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-1 text-sm text-slate">{a.daysHint}</p>
+    </fieldset>
+  );
 
   return (
     <>
@@ -52,6 +68,7 @@ async function Areas() {
             <Field label={m.trips.areaCharge} hint={m.trips.areaChargeHint}>
               <Input name="tripCharge" inputMode="decimal" />
             </Field>
+            {days(null)}
             <SubmitButton pendingLabel={m.common.adding}>{a.addButton}</SubmitButton>
           </ActionForm>
         </Section>
@@ -69,6 +86,7 @@ async function Areas() {
                     {x.name} <span className="font-normal tabular-nums text-slate">{x.postal_code}</span>
                   </p>
                   <p className="text-slate">{charge(x.delivery_charge_minor)}</p>
+                  {x.delivery_weekdays ? <p className="text-slate">{fill(a.daysLine, { days: weekdayList(m, x.delivery_weekdays) })}</p> : null}
                   {x.trip_charge_minor !== null ? (
                     <p className="text-slate">{fill(m.trips.areaChargeLine, { amount: formatMoney(x.trip_charge_minor, { currency: org.currency, locale: t.locale, trimZeros: true }) })}</p>
                   ) : null}
@@ -94,6 +112,7 @@ async function Areas() {
                       <Field label={m.trips.areaCharge} hint={m.trips.areaChargeHint}>
                         <Input name="tripCharge" inputMode="decimal" defaultValue={plain(x.trip_charge_minor)} />
                       </Field>
+                      {days(x.delivery_weekdays)}
                       <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
                     </ActionForm>
                     {canDelete ? (

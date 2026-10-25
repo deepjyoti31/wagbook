@@ -295,6 +295,7 @@ create table public.service_areas (
   name text not null check (char_length(name) between 1 and 80),
   delivery_charge_minor bigint check (delivery_charge_minor is null or delivery_charge_minor >= 0),
   trip_charge_minor bigint check (trip_charge_minor is null or trip_charge_minor >= 0),
+  delivery_weekdays smallint[] check (delivery_weekdays is null or (cardinality(delivery_weekdays) between 1 and 7 and delivery_weekdays <@ array[1, 2, 3, 4, 5, 6, 7]::smallint[])),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (org_id, postal_code)
@@ -305,6 +306,8 @@ comment on table public.service_areas is
 comment on column public.service_areas.name is 'What the kennel calls the area, e.g. Indiranagar.';
 comment on column public.service_areas.delivery_charge_minor is 'What a food delivery there costs the parent, in minor units. Empty: free.';
 comment on column public.service_areas.trip_charge_minor is 'What a pick-up or drop of a boarder there costs (M39). Empty: the delivery charge.';
+comment on column public.service_areas.delivery_weekdays is
+  'The days food is delivered there (M68), 1 Monday to 7 Sunday. Orders from the order page and the website take these days. Empty: any day.';
 
 create trigger service_areas_set_updated_at
   before update on public.service_areas

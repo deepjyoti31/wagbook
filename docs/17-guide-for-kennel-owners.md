@@ -164,6 +164,18 @@ answers wait for you to check:
 **Accept and book** adds the parent and pet and opens a new booking with their dates. A parent you already know is
 recognised by their phone number, and their details are never overwritten by a form.
 
+### If your kennel has its own website
+
+Your website can keep its own booking and food forms and send them to Wagbook. In More, Settings, **Your own website**,
+write its address (like `https://yourkennel.com`); Wagbook then shows the address the forms should send to, for
+whoever looks after your website (the format is in [07-whatsapp-and-upi.md](07-whatsapp-and-upi.md)). Bookings arrive in
+Forms from parents and food orders in Food for homes, Orders and requests, each with the website's reference number,
+which is also on the parent's UPI payment.
+
+In Areas you serve, tick each area's **delivery days**: food ordered for that PIN code comes on those days only. A
+birthday cake (a made-to-order item in Kitchen settings) can be ordered once from your order page or your website, for
+any day you deliver, with your notice.
+
 ### What parents see
 
 <img src="guide/14-stay-page.jpg" alt="The parent's stay page" width="270">

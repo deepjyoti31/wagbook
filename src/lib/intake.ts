@@ -77,6 +77,18 @@ export const IntakePayload = z.object({
     })
     .optional()
     .catch(undefined),
+  /** From the kennel's own website (M68): its reference number and where the visitor came from. */
+  site: z
+    .object({
+      ref: optional(z.string().regex(/^[A-Za-z0-9-]{4,40}$/)),
+      page: optional(short),
+      referrer: optional(short),
+      utm_source: optional(short),
+      utm_medium: optional(short),
+      utm_campaign: optional(short),
+    })
+    .optional()
+    .catch(undefined),
   consent: z.literal(true),
 });
 

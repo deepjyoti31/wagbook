@@ -1377,3 +1377,46 @@ day's tasks from before it came (breakfast for a pet checked in at three); those
 not offered the next day or after the bill is issued; an owner or manager then changes the stay and credits the bill.
 
 **Look again** if kennels want arrival-day tasks before the check-in time left out too, or want undo to be a manager's.
+
+## D57. A kennel's own website sends to Wagbook; each area has its delivery days; a cake is a food order once
+
+**Context.** A kennel that already has a website with its own booking and food forms wants those forms to land in
+Wagbook rather than in a spreadsheet and chat messages, without moving its parents to Wagbook's own pages. The kennel
+delivers food to parts of its city on fixed days (two days for each part, nobody on Sunday), and sells birthday cakes,
+which are ordered once and paid ahead with the delivery charge. Wagbook had cakes as a made-to-order item for parties
+(M36) but no way for a parent to order one, and every area took deliveries any day.
+
+**Decision.**
+
+- **A route, not a new public function.** `/api/site/{slug}` reads the website's request (`SiteRequest`), turns it into
+  the payload the public functions already take, and calls them as the anonymous role: `submit_intake()` for a booking,
+  `submit_food_order()` for food or a cake, `food_order_paid()` for "I have paid". The anonymous role still calls the
+  same thirteen functions. The answer is readable only by the kennel's own website (Settings, **Your own website**,
+  `organizations.website_url`, an origin), so another site cannot put the kennel's forms on its pages. The format is
+  general (`v: 1`) and documented in `07`, so any kennel's website can use it.
+- **The website keeps its reference number.** `site_ref` on intake forms and food orders, with a unique index per phone,
+  makes a resend the same request: the website can retry and resend later without staff seeing it twice. The reference
+  is the UPI payment note, so the money is matched to the order.
+- **Delivery days belong to the area** (`service_areas.delivery_weekdays`). An area with days decides a subscription's
+  days and a trial's day, whatever the page asked for; an area with none takes the days the parent chose, as before.
+  Staff making a subscription by hand are not held to them.
+- **A made-to-order item is a food order of its own kind** (`food_order_kind` `item`): a product, a day, a time and
+  words to write. It is priced like a trial (the item's price and the area's delivery charge, paid ahead), so a PIN code
+  not served waits for its area. Its day must give the kennel's notice (`item_lead_hours`) and fall on a weekday some
+  area takes deliveries (`item_weekdays()`), so a kennel with no Sunday deliveries takes no Sunday cake. Confirm makes
+  the item's delivery even if the notice has passed since, as the order gave it in time.
+- **The server works out the portion** for a website subscription from the weight and the kennel's portions, not from
+  the website.
+
+**Why.** No new function means no new door to the database: every check written for the public pages applies again.
+A city's parts on their own days is how a small kitchen with one or two riders can deliver across a city. A cake ordered
+by a parent is the same as a trial to the kitchen and to the bill: one delivery, one price, paid first.
+
+**Cost.** The website and Wagbook must agree on the format; a change to it is a change in two places. The origin check
+stops other websites, not people calling the public functions directly, which were open before. A subscription's
+weekly amount is in whole packs with a delivery charge per delivery, so it can differ by some rupees, and paise, from a
+website's own estimate; the website must show Wagbook's amount. An appointment asked for from a website has no time:
+staff agree it with the parent.
+
+**Look again** if a kennel wants a cake on a day its areas do not deliver, delivery days by the kennel's own week
+rather than by area, or the website to ask for an appointment's time.

@@ -75,6 +75,7 @@ export const core = {
     notCheckedIn: "This pet is not checked in. Refresh the page.",
     notUndoable: "Only a check-out made today, with no bill issued yet, can be undone.",
     constraints: {
+      organizations_website_is_origin: "Write the website as https:// and the name, with nothing after it, like https://yourkennel.com.",
       bookings_no_kennel_overlap: "That kennel has another parent's pet in it on some of those dates. Pick another kennel or change the dates.",
       care_tasks_done_with_photo: "This task needs a photo. Add the photo to mark it done.",
       bookings_trial_is_a_day: "A trial day is day boarding.",
@@ -275,6 +276,8 @@ export const core = {
       WB185: "Choose the delivery days and the grams a day.",
       WB186: "Choose one of your food subscriptions.",
       WB187: "Those dates or amounts cannot be asked for. Check them and try again.",
+      WB189: "Choose the day to deliver it.",
+      WB300: "There are no deliveries on that day. Choose another day.",
       WB188: "This order has already been dealt with.",
       WB076: "This parent has appointments still to come. Cancel them first.",
       WB156: "A made-to-order item needs more notice. Choose a later day.",
