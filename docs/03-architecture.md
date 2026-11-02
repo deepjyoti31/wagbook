@@ -305,39 +305,53 @@ real phones, and WhatsApp itself (Wagbook only builds the link). `HANDOFF.md` re
 
 The whole look is in two files: tokens in `src/app/globals.css`, pieces in `src/components/ui.tsx`.
 
-**Idea.** Wagbook is a register, so screens are ledgers: rows on white paper on a cool grey ground. The one piece of
-decoration is the kennel door tag, a marigold tag with a punched hole, which is how a kennel is shown everywhere.
+**Idea.** Wagbook is a register, so screens are ledgers: rows in white cards on a cool grey ground, with a dark ink
+sidebar on a laptop. The one piece of decoration is the kennel door tag, a marigold tag with a punched hole, which is
+how a kennel is shown everywhere. The look was redesigned in M70 (D59); the twelve agreed screens are the reference for
+any new one.
 
 **Colour always means the same thing.**
 
 | Token | Hex | Means |
 | --- | --- | --- |
-| `ink` | `#14213d` | Text, primary buttons |
+| `ink` | `#14213d` | Text, primary buttons, the sidebar |
+| `ink-soft` | `#1f2e52` | Hover and the search box on the sidebar |
+| `haze` | `#aab4c8` | Quiet words on the sidebar |
 | `slate` | `#55607a` | Secondary text |
-| `ground` | `#edf0f5` | Page background |
+| `ground` | `#f3f5f9` | Page background |
+| `wash` | `#f6f8fb` | A quiet fill inside a card |
 | `paper` | `#ffffff` | Cards and rows |
-| `rule` | `#d5dae4` | Borders |
-| `marigold` | `#f2a900` | Needs attention: arrivals, the door tag |
-| `leaf` | `#1b7446` | Done, in house, success |
+| `rule` | `#e2e6ee` | Card borders and lines between rows |
+| `rule-strong` | `#c3cad8` | Field and secondary button borders |
+| `mist` | `#e6ecf7` | A confirmed stay on the calendar |
+| `chart` | `#3d5a99` | Bars of a chart |
+| `marigold` | `#f2a900` | Needs attention: arrivals, the door tag, the busiest day |
+| `leaf` | `#1b7446` | Done, in house, success, WhatsApp |
 | `alert` | `#b3261e` | Medical, allergies, incidents, errors |
+| `cream`, `cream-rule` | `#faf8f4`, `#ebe6dc` | Parents' pages (`.wb-parent` swaps `ground`, `wash` and `rule` for these) |
 
-Each of the last three has a `-soft` background tint. Colour is never the only signal: a badge always has words.
+Each of marigold, leaf and alert has a `-soft` background tint and an `-ink` text colour that reads on it. Colour is
+never the only signal: a badge always has words. A pet with no photo shows its letter on one of seven soft colours
+(`.pet-avatar` in `globals.css`, picked by `avatarTone()`).
 
 **Type.** The system font, so nothing downloads on a slow connection. Numbers are tabular everywhere so dates and
 prices line up. Headings are heavy and tight; body text is 16 pixels or larger.
 
-**Pieces.** `PageTitle`, `Section` (a heading with a count), `Ledger` and `LedgerRow`, `Empty`, `DoorTag`, `Badge`
-(neutral, attention, good, alert), `Field` (label, hint, control), `Input`, `Textarea`, `Select`, `Loading`, `Notice`,
-and `buttonStyles` (primary, secondary, quiet, whatsapp). Build screens from these. If a screen needs something new,
-add it to `ui.tsx`; do not style one-off elements in a page.
+**Pieces.** `PageTitle` (with an optional `eyebrow` above it), `Section` (a card with its heading, a `Count` pill and an
+optional `action`), `Ledger` and `LedgerRow` (a list straight inside a section runs to its edges), `Figure` (a number
+card), `Meter` (done out of total), `Empty`, `DoorTag`, `Badge` (neutral, attention, good, alert), `Field`, `Input`,
+`Textarea`, `Select`, `Loading`, `Notice`, `buttonStyles` (primary, secondary, quiet, whatsapp, danger), and
+`formCardStyles` with `formActionsStyles` for a page that is one form. Icons are `Icon` in `src/components/icons.tsx`,
+always beside words. `AuthShell` frames sign in and the pages around it. Build screens from these. If a screen needs
+something new, add it to `ui.tsx`; do not style one-off elements in a page.
 
 **Layout.** Laptop first, and it works down to a phone (D58). 48 pixel touch targets everywhere.
 
 | Screen | Navigation | Page |
 | --- | --- | --- |
-| Laptop (`lg`, 1024 pixels and up) | A sidebar on the left: Today, Bookings, Calendar, Care, Pets, More, then the day's work from More and, for owners and managers, the money (`SIDEBAR_GROUPS` in `src/lib/menu.ts`) | Up to `max-w-7xl` beside it; `Columns` puts a page in two from `xl` |
+| Laptop (`lg`, 1024 pixels and up) | A dark sidebar on the left, with search and icons: Today, Bookings, Calendar, Care, Pets, More, then the day's work from More and, for owners and managers, the money (`SIDEBAR_GROUPS` in `src/lib/menu.ts`) | Up to `88rem` beside it; `Columns` puts a page in two from `xl` |
 | Tablet (`sm` to `lg`) | A bar along the top with the kennel's name and the five places | The full width |
-| Phone | A bar along the bottom, within thumb reach | One column |
+| Phone | A bar along the bottom, icons over words, within thumb reach | One column |
 
 The links under More live in `src/lib/menu.ts`, so More and the sidebar always agree. Pieces for width:
 

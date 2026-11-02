@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: PageProps<"/b/[token]">): Pro
 /** A known parent's own page for asking the kennel for a stay. No sign-in (D36). */
 export default function BookingRequestPage({ params, searchParams }: PageProps<"/b/[token]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8">
       <Suspense fallback={<Loading />}>
         <RequestForm params={params} searchParams={searchParams} />
       </Suspense>

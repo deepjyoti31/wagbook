@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { NewBookingFields } from "@/components/new-booking-fields";
-import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle, Textarea } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle, Textarea, formActionsStyles, formCardStyles } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -84,8 +84,8 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
 
   return (
     <>
-      <PageTitle title={w.title} />
-      <ActionForm action={createBooking}>
+      <PageTitle eyebrow={m.bookings.title} title={w.title} />
+      <ActionForm action={createBooking} className={`${formCardStyles} max-w-4xl`}>
         <NewBookingFields
           pickerWords={w.picker}
           defaultPetId={askedPet}
@@ -115,7 +115,7 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
         <Field label={w.notes}>
           <Textarea name="notes" maxLength={2000} />
         </Field>
-        <div className="flex flex-wrap gap-3">
+        <div className={formActionsStyles}>
           <SubmitButton name="intent" value="confirmed" pendingLabel={w.booking}>
             {w.confirm}
           </SubmitButton>

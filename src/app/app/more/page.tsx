@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { Icon } from "@/components/icons";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { switchOrganisation } from "@/app/app/actions";
@@ -19,7 +20,7 @@ export default function MorePage({ searchParams }: PageProps<"/app/more">) {
       <Suspense fallback={<Loading />}>
         <Menu searchParams={searchParams} />
       </Suspense>
-      <div className="mt-8 max-w-3xl">
+      <div className="mt-2 max-w-3xl rounded-2xl border border-rule bg-paper p-5 lg:p-6">
         <Suspense fallback={<Loading />}>
           <Account />
         </Suspense>
@@ -45,9 +46,12 @@ async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams
             <Ledger>
               {links.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="block px-4 py-4 hover:bg-ground">
-                    <span className="block text-lg font-bold">{m.more.links[l.key].title}</span>
-                    <span className="block text-slate">{m.more.links[l.key].about}</span>
+                  <Link href={l.href} className="flex min-h-14 items-center gap-3 px-5 py-3.5 hover:bg-wash">
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold">{m.more.links[l.key].title}</span>
+                      <span className="block text-sm text-slate">{m.more.links[l.key].about}</span>
+                    </span>
+                    <Icon name="forward" className="size-5 text-slate/60" />
                   </Link>
                 </li>
               ))}

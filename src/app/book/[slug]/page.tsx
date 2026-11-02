@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: PageProps<"/book/[slug]">): P
  */
 export default function BookPage({ params }: PageProps<"/book/[slug]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8">
       <Suspense fallback={<Loading />}>
         <Book params={params} />
       </Suspense>

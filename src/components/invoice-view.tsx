@@ -86,7 +86,7 @@ export function InvoiceView({
 
   return (
     <div className="invoice">
-      <ul className="divide-y divide-rule rounded-xl border border-rule bg-paper">
+      <ul className="divide-y divide-rule rounded-2xl border border-rule bg-paper print:rounded-none print:border-x-0">
         {lines.map((l, i) => (
           <li key={i} className="px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -101,7 +101,7 @@ export function InvoiceView({
         ))}
       </ul>
 
-      <dl className="mt-3 space-y-1 rounded-xl border border-rule bg-paper px-4 py-3 tabular-nums">
+      <dl className="mt-3 space-y-1 rounded-2xl border border-rule bg-wash px-4 py-3 tabular-nums print:bg-paper">
         {totals.discountMinor > 0 || showTax ? <Row label={w.beforeDiscount} value={money(totals.subtotalMinor)} /> : null}
         {totals.discountMinor > 0 ? <Row label={w.discount} value={`- ${money(totals.discountMinor)}`} /> : null}
         {showTax ? <Row label={w.taxableValue} value={money(totals.taxableMinor)} /> : null}

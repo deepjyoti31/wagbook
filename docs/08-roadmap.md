@@ -1577,6 +1577,32 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M70. A finished look
+
+- [x] Finished 2 November 2026 (G in `02`, D59). Asked for by the owner: the screens worked but looked basic. Twelve
+  screens were designed and agreed first, then built into the shared pieces so every screen changed together.
+
+**Build**
+
+1. Tokens and pieces: section cards with a count pill, ledgers that run to the card's edge, figures, a meter, pill
+   badges, softer buttons and fields, and line icons drawn in the code.
+2. The shell: a dark sidebar with icons, search and who is signed in; the tablet bar; the phone bar with icons.
+3. Today's figures and care bars; the calendar's stays as bars with today marked; a stay's header card; Care's rows
+   and filters; the new booking and new pet forms as cards; the chart on Reports; More with arrows.
+4. Sign in and the pages around it in one frame; parents' pages in warmer colours, the stay page with its photo and a
+   WhatsApp button that stays in reach, and the bill as a white sheet that prints cleanly.
+
+**Rules**
+
+- No database change, no new dependency, every word from the message files.
+- Colour keeps its meaning; 48 pixel targets; no all-capitals, arrows in buttons or decorative gradients.
+
+**Done when**
+
+- `npm run check` passes; the changed screens were looked at at 1366, 820 and 360 pixels.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

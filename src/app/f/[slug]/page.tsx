@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: PageProps<"/f/[slug]">): Prom
 /** The public food order page for one kennel (M32): a link it can put on its own website. No sign-in. */
 export default function FoodOrderPage({ params }: PageProps<"/f/[slug]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8">
       <Suspense fallback={<Loading />}>
         <FoodOrder params={params} />
       </Suspense>

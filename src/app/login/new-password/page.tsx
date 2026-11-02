@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth-shell";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -23,11 +24,11 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default function NewPasswordPage() {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
+    <AuthShell>
       <Suspense fallback={<Loading />}>
         <NewPasswordForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
 
@@ -57,7 +58,7 @@ async function NewPasswordForm() {
         </>
       ) : (
         <>
-          <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">
+          <p role="alert" className="mb-4 rounded-xl bg-alert-soft px-4 py-3 font-semibold text-alert-ink">
             {w.expired}
           </p>
           <Link href="/login/forgot" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">

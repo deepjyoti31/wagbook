@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth-shell";
 import { HtmlLang } from "@/components/html-lang";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -25,11 +26,11 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default function JoinPage({ params }: PageProps<"/join/[token]">) {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
+    <AuthShell>
       <Suspense fallback={<Loading />}>
         <Join params={params} />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
 
@@ -42,7 +43,7 @@ async function Join({ params }: Pick<PageProps<"/join/[token]">, "params">) {
   return (
     <>
       <HtmlLang lang={language} />
-      <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{j.title}</h1>
+      <h1 className="mb-6 text-[1.875rem] font-extrabold leading-tight tracking-tight">{j.title}</h1>
       <JoinBody token={token} here={here} j={j} />
     </>
   );

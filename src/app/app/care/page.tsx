@@ -108,7 +108,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
     return s ? `/app/care?${s}` : "/app/care";
   };
   const chip = (active: boolean) =>
-    `inline-flex min-h-12 items-center rounded-lg px-4 font-semibold ${active ? "bg-ink text-paper" : "border border-rule bg-paper text-ink"}`;
+    `inline-flex min-h-12 items-center whitespace-nowrap rounded-full px-4 text-[0.9375rem] font-semibold ${active ? "bg-ink text-paper" : "border border-rule-strong bg-paper text-ink hover:bg-wash"}`;
 
   // {n} is left in place by plural() so that Rich can draw it in bold.
   const summary = plural(language, pending, kind ? m.care.stillToDoOfKind : m.care.stillToDo, {
@@ -124,11 +124,11 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
           {m.play.title}
         </Link>
       </PageTitle>
-      <p className="mb-4 text-lg">
+      <p className="mb-5 text-lg">
         <Rich text={summary} parts={{ n: <strong className="font-extrabold">{pending}</strong> }} />
       </p>
 
-      <nav aria-label={m.common.show} className="mb-5 flex flex-wrap gap-2">
+      <nav aria-label={m.common.show} className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <Link href={filter(kind, !pendingOnly)} className={chip(pendingOnly)} aria-pressed={pendingOnly}>
           {m.care.showStillToDo}
         </Link>
@@ -166,7 +166,7 @@ async function Care({ searchParams }: Pick<PageProps<"/app/care">, "searchParams
       ) : (
         [...groups.entries()].map(([time, list]) => (
           <Section key={time} title={time} count={list.filter((t) => t.status === "pending").length}>
-            <ul className="divide-y divide-rule overflow-hidden rounded-xl border border-rule bg-paper">
+            <ul className="wb-ledger divide-y divide-rule overflow-hidden rounded-2xl border border-rule bg-paper">
               {list.map((t) => (
                 <TaskRow
                   key={t.id}
@@ -202,14 +202,14 @@ function TaskRow({ i18n, task: t, photo, proof, food }: { i18n: I18n; task: Task
   const medicine = t.kind === "medication";
   const pet = t.bookings?.pets;
   return (
-    <li className={`px-4 py-3 ${medicine && t.status === "pending" ? "border-l-4 border-alert bg-alert-soft" : ""}`}>
+    <li className={`px-4 py-3.5 sm:px-5 ${medicine && t.status === "pending" ? "bg-alert-soft/60" : ""}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <PetAvatar name={pet?.name ?? "?"} url={photo} />
         <div className="min-w-0 flex-1 basis-48">
           <p className="flex flex-wrap items-center gap-2">
             <DoorTag name={t.bookings?.kennels?.name} empty={m.common.noKennel} />
             <span className="text-lg font-bold">{pet?.name ?? m.care.pet}</span>
-            <span className={medicine ? "font-bold text-alert" : "font-semibold"}>{t.label}</span>
+            <span className={medicine ? "font-bold text-alert-ink" : "font-semibold"}>{t.label}</span>
             {medicine ? <Badge tone="alert">{m.labels.careKind.medication}</Badge> : null}
             {t.needs_photo ? <Badge>{m.proof.needsPhoto}</Badge> : null}
             {t.status === "done" ? <Badge tone="good">{m.labels.taskStatus.done}</Badge> : null}
@@ -258,7 +258,7 @@ function TaskRow({ i18n, task: t, photo, proof, food }: { i18n: I18n; task: Task
       ) : null}
       {t.status === "pending" ? (
         <details className="mt-2">
-          <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">{m.care.skip}</summary>
+          <summary className="inline-flex min-h-12 cursor-pointer items-center rounded-[0.625rem] px-3 font-semibold text-slate hover:bg-ground">{m.care.skip}</summary>
           <ActionForm action={skipTask} className="mt-2 space-y-2">
             <input type="hidden" name="taskId" value={t.id} />
             <input type="hidden" name="kind" value={t.kind} />

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, Columns, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
-import { Rich } from "@/components/rich";
+import { Badge, buttonStyles, Columns, DoorTag, Empty, Figure, Ledger, LedgerRow, Loading, Meter, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
@@ -194,8 +194,9 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
 
   return (
     <>
-      <PageTitle title={formatDate(today, locale)}>
+      <PageTitle eyebrow={m.today.title} title={formatDate(today, locale)}>
         <Link href="/app/bookings/new" className={buttonStyles.primary}>
+          <Icon name="plus" />
           {m.today.newBooking}
         </Link>
       </PageTitle>
@@ -214,13 +215,28 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Notice>
       ) : null}
 
-      <p className="mb-6 text-lg">
-        <Rich
-          text={capacity > 0 ? m.today.inHouseOf : m.today.inHouse}
-          parts={{ inHouse: <strong className="font-extrabold">{inHouse.length}</strong>, capacity: <strong className="font-extrabold">{capacity}</strong> }}
-        />{" "}
-        <Rich text={m.today.toArrive} parts={{ arrivals: <strong className="font-extrabold">{arrivals.length}</strong> }} />
-      </p>
+      {/* The day in four numbers (D59). The sentence under the title said the same in words. */}
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <Figure
+          label={m.today.inHouseTitle}
+          hint={capacity > 0 ? <Meter value={inHouse.length} total={capacity} tone="leaf" label={fill(m.today.inHouseOf, { inHouse: inHouse.length, capacity })} /> : undefined}
+        >
+          {inHouse.length}
+          {capacity > 0 ? <span className="ml-1.5 text-base font-semibold tracking-normal text-slate">{fill(m.today.ofKennels, { capacity })}</span> : null}
+        </Figure>
+        <Figure label={m.today.arriving}>{arrivals.length}</Figure>
+        <Figure label={m.today.goingHome}>{goingHome.length}</Figure>
+        <Figure
+          label={m.today.careLeft}
+          tone={care.some((c) => c.kind === "medication" && c.done < c.total) ? "alert" : undefined}
+          hint={care
+            .filter((c) => c.kind === "medication" && c.done < c.total)
+            .map((c) => fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total }))
+            .join("")}
+        >
+          {care.reduce((sum, c) => sum + c.total - c.done, 0)}
+        </Figure>
+      </div>
 
       {org.keeps_rota ? (
         <Suspense fallback={null}>
@@ -229,7 +245,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       ) : null}
 
       {capacity === 0 ? (
-        <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
+        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
           {m.today.noKennels}{" "}
           <Link href="/app/more/kennels" className="font-semibold underline underline-offset-4">
             {m.today.addKennels}
@@ -237,18 +253,26 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </p>
       ) : null}
       {care.length > 0 ? (
-        <div className="mb-7 flex flex-wrap gap-2">
-          {care.map((c) => (
-            <Link
-              key={c.kind}
-              href={`/app/care?kind=${c.kind}&show=pending`}
-              className={`inline-flex min-h-12 items-center gap-2 rounded-lg border px-4 font-semibold ${
-                c.done === c.total ? "border-leaf bg-leaf-soft text-leaf" : c.kind === "medication" ? "border-alert bg-alert-soft text-alert" : "border-rule bg-paper"
-              }`}
-            >
-              {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
-            </Link>
-          ))}
+        <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {care.map((c) => {
+            const done = c.done === c.total;
+            const medicine = c.kind === "medication" && !done;
+            return (
+              <Link
+                key={c.kind}
+                href={`/app/care?kind=${c.kind}&show=pending`}
+                className={`flex min-h-12 flex-col justify-center gap-2 rounded-xl border px-4 py-3 font-bold ${
+                  done ? "border-leaf-soft bg-leaf-soft text-leaf-ink" : medicine ? "border-alert-soft bg-alert-soft text-alert-ink" : "border-rule bg-paper hover:bg-wash"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  {done ? <Icon name="check" className="size-4.5" /> : null}
+                  {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
+                </span>
+                <Meter value={c.done} total={c.total} tone={medicine ? "alert" : "ink"} />
+              </Link>
+            );
+          })}
         </div>
       ) : null}
 
@@ -261,13 +285,18 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           <ul className="space-y-2">
             {incidents.map((i) => (
               <li key={i.id}>
-                <Link href={`/app/dogs/${i.pets?.id}`} className="block rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
+                <Link href={`/app/dogs/${i.pets?.id}`} className="flex gap-3 rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
+                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-alert text-paper">
+                    <Icon name="warning" />
+                  </span>
+                  <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-2 font-bold">
                     {i.pets?.name}
                     <Badge tone="alert">{m.labels.severityShort[i.severity]}</Badge>
                     {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
                   </span>
                   <span className="mt-1 line-clamp-2 block">{i.description}</span>
+                  </span>
                 </Link>
               </li>
             ))}
@@ -336,7 +365,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       side={
       <>
       {newForms > 0 ? (
-        <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
+        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
           {plural(language, newForms, m.today.newForms)}{" "}
           <Link href="/app/more/intake" className="font-semibold underline underline-offset-4">
             {m.today.review}
@@ -345,7 +374,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       ) : null}
 
       {(requestsRes.count ?? 0) > 0 ? (
-        <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
+        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
           {plural(language, requestsRes.count ?? 0, m.today.parentRequests)}{" "}
           <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
             {m.today.seeRequests}

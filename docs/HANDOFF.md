@@ -2,12 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 2 November 2026, after M69 (laptop first, responsive down to a phone).
+Last updated: 2 November 2026, after M70 (a finished look).
 
 ## In one paragraph
 
-Every milestone from M2 to M69 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. M69 (2 November 2026, D58), asked for by the owner after trying Wagbook on a
+Every milestone from M2 to M70 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. M70 (2 November 2026, D59), asked for by the owner: the screens looked basic, so
+twelve were designed and agreed first, then built into the shared pieces so every screen changed together. A dark
+sidebar with icons, a bookings search and who is signed in; sections are cards with a count pill, and a list straight
+in a section runs to its edges; Today opens with four figures and a bar for each kind of care; stays are bars on the
+calendar; a stay's page has a header card; sign in and the pages around it share one frame (`AuthShell`); parents'
+pages are warmer (`.wb-parent`), and the stay page has the pet's photo large and a WhatsApp button in reach. Icons are
+drawn in `src/components/icons.tsx` (no library). No database change. M69 (2 November 2026, D58), asked for by the owner after trying Wagbook on a
 real Supabase project: the signed-in screens are laptop first and responsive down to a phone. A laptop has a sidebar
 (Today, Bookings, Calendar, Care, Pets, More, then the day's work from More and the money for owners and managers, from
 one list in `src/lib/menu.ts`) and a wide page; Today (from 1536 pixels) and the pages of one booking, pet, parent,
@@ -131,6 +137,9 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 | Thing | Verified by | Confidence |
 | --- | --- | --- |
 | M69: every signed-in screen at 1366, 1024, 820 and 360 pixels (all 50 pages without an id, and a booking, a pet and a parent), as owner with everything offered switched on, against the local Supabase: no sideways scroll; the sidebar and the tablet's top bar stay in place as the page scrolls | By hand with Playwright, 2 November 2026 | Medium: desktop Chromium, not a real tablet or a laptop's touch screen |
+| M70: the new shell and pieces (sidebar, tablet bar, phone bar, figures, care bars, section cards with lists, a form card with an error) and the sign-in frame, at 1366, 820 and 360 pixels: no sideways scroll | A page of sample data in the real shell and pieces, and `/login`, screenshotted with Playwright on `next dev`, 2 November 2026 (the page was not committed) | Medium: the signed-in pages were not opened with real data, see below |
+| M70: a pet with no photo always gets the same of seven colours (`avatarTone()`) | `src/components/pet-avatar.test.ts` | High |
+| M70: the whole walk (83 tests) at 360 pixels against the local Supabase, including that no page is wider than the phone | CI on pull request 21, 2 November 2026, after five fixes it found: Today's figure, button labels that could not wrap, the sidebar's search label, a name in the sidebar, money figures too wide for a phone | High for what the walk covers |
 | M69: which links the sidebar and More show to whom, and which one is lit (`menuFor()`, `activeHref()`) | `src/lib/menu.test.ts` | High |
 | M68: an area's delivery days decide a subscription's and a trial's days; a cake is priced with delivery, needs notice and a delivery day, and is confirmed into its delivery even after the notice passed; a resend with the same reference is kept once; the website address is an origin | `tests/db/website-orders.test.ts`; the area days, the resend index and the confirm exemption each removed once to see a test fail | High |
 | M68: reading a website's request (`SiteRequest`, `bookingPayload()`, `foodPayload()`, `originAllowed()`, `isWebsiteOrigin()`) | `src/lib/site-request.test.ts` | High |
@@ -281,6 +290,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
 | A hosted Supabase project, and `docs/10-setup-and-deploy.md` followed end to end | Needs a person with a Supabase account | The local stack is the same software, so schema problems are unlikely. Settings screens, email templates and menu names in the guide may be off. |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
+| M70 on the real signed-in pages with data, looked at by a person at 1366, 820 and 360 pixels | The local Supabase could not start in the session that built M70: Docker Hub refused image pulls (too many requests) and the other registries' download hosts were blocked. The walk did run them, in CI (below) | Low for logic (no query or action changed), medium for looks: a screen with its own boxes inside a section shows a box in a card |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
 | "A full meal round for twenty dogs in under two minutes" (M3), "billed, sent, paid and marked paid from a phone in under a minute" (M4), "today's photo within seconds on a slow connection" (M5) | Not timed on a phone or a throttled connection | Each step is one round trip; the stay page loads small copies (480 pixels) of photos. Probably fine; slow networks are M8 |
 | The CSV downloads opened in Excel, Google Sheets and LibreOffice | Checked as text in tests: byte order mark, quoting, CRLF | Low; an accountant opening one would settle it |
@@ -327,6 +337,11 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
+
+**Look at M70 with real data** on the local Supabase (`npx -y supabase@2.120.0 start`; the walk already passes in
+CI): Today, the calendar, a booking, Care, New booking, Reports, More, a stay page and a bill at 1366, 820 and 360
+pixels. Expect some screens with their own
+white boxes inside a section card; change those to `bg-wash` or a `Ledger` as you meet them.
 
 **Try the laptop layout (M69)** on the real Supabase project: a laptop (1366 or 1440 pixels), a tablet, and a phone.
 Say which pages still feel like a phone on a laptop. Not split in two yet, and candidates if they do: Care, Bookings,
@@ -467,6 +482,8 @@ parents see (intake form, stay page, bill, WhatsApp messages). The drafts were l
 - **Kannada:** tax words (ಟ್ಯಾಕ್ಸ್ or ತೆರಿಗೆ, used both ways), place of supply, issue a bill (ನೀಡು or ಇಶ್ಯೂ ಮಾಡು),
   extend (ಹೆಚ್ಚಿಸಿ or ವಿಸ್ತರಿಸಿ), routine (ರೂಟೀನ್ or ದಿನಚರಿ), undo (ಹಿಂಪಡೆಯಿರಿ or ಅನ್‌ಡೂ), cash (ಕ್ಯಾಶ್ or ನಗದು),
   decline (ತಿರಸ್ಕರಿಸಿ may be too formal), and "Pets" in the bottom bar, shortened to ಪ್ರಾಣಿಗಳು to fit.
+- **M70:** Today's two new figure labels, `today.ofKennels` ("of 24 kennels", under the number in house) and
+  `today.careLeft` ("Care still to do"), are short drafts in both languages; check they fit on a phone.
 
 Drafted in M9 and M10, also unchecked: the two-step sign-in screens (दो-चरण साइन इन, ಎರಡು ಹಂತದ ಸೈನ್ ಇನ್), the
 words for "authenticator app" (kept close to English in both), "erase" (मिटाएं, ಅಳಿಸಿ), the export and erase section
@@ -852,6 +869,13 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 2 November 2026: M70 (D59), asked for by the owner: a finished look. Twelve screens designed on a canvas and agreed,
+  then built: tokens, icons, section cards, figures, meters, the dark sidebar, Today's figures, calendar bars, a stay's
+  header, Care's rows, form cards, the chart, More, `AuthShell` for sign in and onboarding, warmer parents' pages and
+  the bill as a sheet. Two new words on Today in three languages. Checked with sample data at three widths; the local
+  Supabase would not start here, so the walk ran in CI, where it found five things the redesign broke (all fixed):
+  walk steps that read the old Today sentence and a figure's old classes, button labels that could not wrap, a sidebar
+  search label that matched other fields, and money figures too wide for a phone.
 - 2 November 2026: M69 (D58), asked for by the owner: laptop first. A sidebar on laptops, the top bar on tablets and
   the bottom bar on phones; two columns on Today and the pages of one booking, pet, parent, bill, appointment and
   subscription; forms by container queries; one-form pages narrowed; More in two columns. The links of More moved to

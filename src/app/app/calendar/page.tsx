@@ -110,7 +110,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
         {nav(addDays(from, DAYS), w.later)}
       </div>
       {requests.data.length > MAX_REQUESTS ? (
-        <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">
+        <p className="mb-4 rounded-xl bg-marigold-soft px-4 py-3">
           {fill(w.moreRequests, { n: MAX_REQUESTS })}{" "}
           <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
             {w.seeBookings}
@@ -125,30 +125,30 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
           </Link>
         </Empty>
       ) : (
-        <div className="relative overflow-x-auto rounded-xl border border-rule bg-paper" role="region" aria-label={w.region} tabIndex={0}>
+        <div className="relative overflow-x-auto rounded-2xl border border-rule bg-paper" role="region" aria-label={w.region} tabIndex={0}>
           <table className="border-collapse text-sm">
             <thead>
               <tr>
-                <th scope="col" className="sticky left-0 z-10 min-w-16 border-b border-r border-rule bg-paper px-2 py-2 text-left">
+                <th scope="col" className="sticky left-0 z-10 min-w-24 border-b border-rule bg-paper px-3 py-2.5 text-left align-bottom text-[0.8125rem] font-semibold text-slate">
                   {w.kennel}
                 </th>
                 {days.map((d, i) => (
-                  <th key={d} scope="col" className={`min-w-16 border-b border-rule px-1 py-2 text-center font-semibold ${d === today ? "bg-marigold-soft" : ""}`}>
-                    <span className="block text-slate">{labels[i].weekday}</span>
-                    <span className="block whitespace-nowrap">{labels[i].day}</span>
+                  <th key={d} scope="col" className={`min-w-16 border-b border-l border-rule px-1 py-2.5 text-center font-semibold ${d === today ? "border-b-2 border-b-marigold bg-marigold-soft" : ""}`}>
+                    <span className={`block text-[0.8125rem] ${d === today ? "font-bold text-marigold-ink" : "font-medium text-slate"}`}>{labels[i].weekday}</span>
+                    <span className="block whitespace-nowrap text-[0.9375rem]">{labels[i].day}</span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
-                <th scope="row" className="sticky left-0 z-10 border-b border-r border-rule bg-ground px-2 py-2 text-left">
+                <th scope="row" className="sticky left-0 z-10 border-b border-rule bg-wash px-3 py-2 text-left text-[0.8125rem] font-semibold text-slate">
                   {w.inHouse}
                 </th>
                 {(occupancy.data ?? []).map((o) => (
                   <td
                     key={o.day}
-                    className={`border-b border-rule px-1 py-2 text-center font-bold ${o.capacity > 0 && o.occupied >= o.capacity ? "bg-alert-soft text-alert" : "bg-ground"}`}
+                    className={`border-b border-l border-rule px-1 py-2 text-center font-bold ${o.capacity > 0 && o.occupied >= o.capacity ? "bg-alert-soft text-alert-ink" : "bg-wash"}`}
                   >
                     {o.occupied}
                     <span className="font-normal text-slate">/{o.capacity}</span>
@@ -158,7 +158,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
               </tr>
               {rows.map((k) => (
                 <tr key={k.id}>
-                  <th scope="row" className="sticky left-0 z-10 border-b border-r border-rule bg-paper px-2 text-left">
+                  <th scope="row" className="sticky left-0 z-10 border-b border-rule bg-paper px-3 py-1 text-left">
                     <span className="door-tag">{k.name}</span>
                     {k.is_active && toClean.has(k.id) ? <span className="mt-1 block text-xs font-semibold text-alert">{m.cleaning.badge}</span> : null}
                   </th>
@@ -167,15 +167,21 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                     if (cell.length > 0) {
                       // Two siblings sharing the kennel are one above the other, each a full-height link.
                       return (
-                        <td key={day} className="border-b border-rule p-0">
+                        <td key={day} className={`border-b border-rule px-0 py-1 ${day === today ? "bg-marigold-soft/40" : ""}`}>
                           {cell.map((stay) => {
                             const starts = stay.startDate === day || i === 0;
+                            // A stay is drawn as one bar across its days: rounded where it begins and ends.
+                            const ends = i === days.length - 1 || !grid.byKennel.get(k.id)![i + 1].some((s) => s.id === stay.id);
                             return (
                               <Link
                                 key={stay.id}
                                 href={`/app/bookings/${stay.id}`}
-                                className={`flex h-12 items-center overflow-hidden whitespace-nowrap px-1 font-semibold ${
-                                  stay.overstay ? "bg-alert-soft text-alert" : stay.status === "checked_in" ? "bg-leaf-soft text-leaf" : "bg-ground text-ink"
+                                className={`flex h-10 items-center overflow-hidden whitespace-nowrap border-y px-2 text-[0.8125rem] font-semibold ${starts ? "ml-1 rounded-l-lg border-l" : ""} ${ends ? "mr-1 rounded-r-lg border-r" : ""} ${
+                                  stay.overstay
+                                    ? "border-alert/40 bg-alert-soft text-alert-ink"
+                                    : stay.status === "checked_in"
+                                      ? "border-leaf/40 bg-leaf-soft text-leaf-ink"
+                                      : "border-rule-strong bg-mist text-ink"
                                 }`}
                                 title={stay.pet}
                               >
@@ -187,11 +193,11 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                       );
                     }
                     return (
-                      <td key={day} className="h-12 border-b border-rule p-0">
+                      <td key={day} className={`h-12 border-b border-l border-rule p-0 ${day === today ? "bg-marigold-soft/40" : ""}`}>
                         {day >= today && k.is_active ? (
                           <Link
                             href={`/app/bookings/new?kennel=${k.id}&start=${day}`}
-                            className="flex h-12 items-center justify-center text-slate/60 hover:bg-marigold-soft hover:text-ink"
+                            className="flex h-12 items-center justify-center text-slate/50 hover:bg-marigold-soft hover:text-ink"
                           >
                             <span aria-hidden="true">+</span>
                             <span className="sr-only">{fill(w.bookFrom, { kennel: k.name, day: labels[i].day })}</span>
@@ -234,7 +240,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                         {on ? (
                           <Link
                             href={`/app/bookings/${r.id}`}
-                            className="flex h-12 items-center overflow-hidden whitespace-nowrap border-2 border-dashed border-marigold bg-marigold-soft px-1 font-semibold text-ink"
+                            className="mx-0.5 my-1 flex h-10 items-center overflow-hidden whitespace-nowrap rounded-lg border-2 border-dashed border-marigold-ink/60 bg-paper px-2 text-[0.8125rem] font-semibold text-marigold-ink"
                             title={fill(r.waitlisted_at ? w.waitingFor : w.requestFor, { pet })}
                           >
                             {r.start_date === days[i] || i === 0 || !r.covered[i - 1] ? pet.slice(0, 9) : <span className="sr-only">{pet}</span>}
