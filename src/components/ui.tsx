@@ -134,9 +134,10 @@ export function LedgerRow({ children }: { children: ReactNode }) {
 export function Figure({ label, children, hint, tone }: { label: string; children: ReactNode; hint?: ReactNode; tone?: "attention" | "alert" }) {
   const hintColour = tone === "attention" ? "font-semibold text-marigold-ink" : tone === "alert" ? "font-semibold text-alert-ink" : "text-slate";
   return (
-    <div className="flex flex-col gap-1.5 rounded-2xl border border-rule bg-paper px-4 py-4 lg:px-5">
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-2xl border border-rule bg-paper px-4 py-4 lg:px-5">
       <p className="text-sm font-semibold text-slate">{label}</p>
-      <div className="text-[1.75rem] font-extrabold leading-none tracking-tight tabular-nums lg:text-[2rem]">{children}</div>
+      {/* Sized by the room its column has (cqi), so money like ₹4,12,300 fits two to a row on a phone; never wider than its card. */}
+      <div className="text-[clamp(1.125rem,5.5cqi,2rem)] font-extrabold leading-tight tracking-tight tabular-nums [overflow-wrap:anywhere]">{children}</div>
       {hint ? <div className={`text-sm ${hintColour}`}>{hint}</div> : null}
     </div>
   );
