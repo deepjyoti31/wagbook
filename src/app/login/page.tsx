@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth-shell";
 import { ForgetOfflineCopies } from "@/components/forget-offline-copies";
 import { HtmlLang } from "@/components/html-lang";
 import Link from "next/link";
@@ -16,11 +17,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
+    <AuthShell>
       <Suspense fallback={<Loading />}>
         <LoginForm searchParams={searchParams} />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
 
@@ -36,18 +37,18 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
     <>
       <HtmlLang lang={language} />
       <ForgetOfflineCopies />
-      <h1 className="mb-6 text-3xl font-extrabold tracking-tight">{signup ? a.signUpHeading : a.signInHeading}</h1>
+      <h1 className="mb-6 text-[1.875rem] font-extrabold leading-tight tracking-tight">{signup ? a.signUpHeading : a.signInHeading}</h1>
       {params.error === "link" ? (
-        <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">
+        <p role="alert" className="mb-4 rounded-xl bg-alert-soft px-4 py-3 font-semibold text-alert-ink">
           {a.linkExpired}
         </p>
       ) : null}
       {params.error === "google" ? (
-        <p role="alert" className="mb-4 rounded-lg bg-alert-soft px-4 py-3 font-semibold text-alert">
+        <p role="alert" className="mb-4 rounded-xl bg-alert-soft px-4 py-3 font-semibold text-alert-ink">
           {m.account.google.failed}
         </p>
       ) : null}
-      {next?.startsWith("/join/") ? <p className="mb-4 rounded-lg bg-marigold-soft px-4 py-3">{signup ? a.invitedSignUp : a.invitedSignIn}</p> : null}
+      {next?.startsWith("/join/") ? <p className="mb-4 rounded-xl bg-marigold-soft px-4 py-3">{signup ? a.invitedSignUp : a.invitedSignIn}</p> : null}
       {googleSignInOn() ? (
         <>
           {/* A plain link: the route sends the browser on to Google (src/app/auth/google/route.ts). */}

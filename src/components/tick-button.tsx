@@ -44,7 +44,7 @@ export function TickButton({
 
   if (queued) {
     return (
-      <span role="status" className="inline-flex min-h-12 min-w-28 items-center rounded-lg bg-marigold-soft px-3 font-semibold" title={words.queued}>
+      <span role="status" className="inline-flex min-h-12 min-w-28 items-center rounded-[0.625rem] bg-marigold-soft px-3 font-semibold text-marigold-ink" title={words.queued}>
         {words.doneNotSent}
       </span>
     );

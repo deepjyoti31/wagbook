@@ -429,6 +429,9 @@ export const core = {
     inHouseOf: "{inHouse} in house of {capacity} kennels.",
     inHouse: "{inHouse} in house.",
     toArrive: "{arrivals} to arrive.",
+    // On Today's figures (D59): under the number in house, and the care still to do.
+    ofKennels: "of {capacity} kennels",
+    careLeft: "Care still to do",
     noKennels: "You have not added any kennels yet, so Wagbook cannot stop you overbooking.",
     addKennels: "Add your kennels",
     newForms: { one: "One new form from a parent is waiting.", other: "{n} new forms from parents are waiting." },

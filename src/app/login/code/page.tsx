@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth-shell";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -15,11 +16,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function CodePage({ searchParams }: PageProps<"/login/code">) {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
+    <AuthShell>
       <Suspense fallback={<Loading />}>
         <CodeForm searchParams={searchParams} />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
 

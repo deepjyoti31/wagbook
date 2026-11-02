@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthShell } from "@/components/auth-shell";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -14,11 +15,11 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Ask for a link to choose a new password (M45). */
 export default function ForgotPage() {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 py-12">
+    <AuthShell>
       <Suspense fallback={<Loading />}>
         <ForgotForm />
       </Suspense>
-    </main>
+    </AuthShell>
   );
 }
 

@@ -1450,3 +1450,43 @@ at once. Keeping the phone order means the yard loses nothing.
 **Cost.** Three layouts to look at for every screen instead of one (1366, 820 and 360 pixels, CLAUDE.md rule 23). The
 sidebar is long for a kennel that offers everything and scrolls on its own on a short laptop screen. Pages not split in
 two (Care, Bookings, the setup pages) are one wide column on a laptop; they read well but could use the room better.
+
+## D59. A finished look: a dark sidebar, cards, figures and a warmer page for parents
+
+**Context.** After M69 the owner found the screens laid out well but plain: grey rows on grey, headings floating over
+lists, a sentence where a number would do, and the pages parents open looking like the staff app. A redesign was drawn
+first as twelve screens (Today, the calendar, a stay, Care at three widths, a form, Reports, sign in, the printed bill,
+the parent's stay page and More) and agreed with the owner before any code changed.
+
+**Decision.**
+
+- **Same colours, same meanings.** Ink, slate, marigold, leaf and alert keep what they mean. New tokens only fill in
+  shades: `ink-soft` and `haze` for the sidebar, `wash` for a quiet fill, `rule-strong` for field borders, `mist` for a
+  confirmed stay on the calendar, `chart` for a chart's bars, `-ink` text colours that read on each `-soft` tint, and
+  `cream` with `cream-rule` for parents' pages.
+- **A dark sidebar on a laptop**, with icons, a search box for bookings and who is signed in; the tablet's top bar and
+  the phone's bottom bar (icons over words) stay as in D58.
+- **A section is a card** with its heading and a count pill inside it. A `Ledger` put straight in a section runs to the
+  card's edges (`.wb-section` in `globals.css`), so no card sits inside another.
+- **Numbers before sentences.** Today opens with four figures (in house of the kennels, arriving, going home, care still
+  to do) and a bar for each kind of care; Reports uses the same `Figure`.
+- **Icons drawn in the code** (`src/components/icons.tsx`), about twenty-five line icons that take the text's colour.
+  Always beside words, never instead of them, and hidden from screen readers. No icon library: it would be a dependency
+  for a few dozen paths.
+- **Pets without a photo** get their letter on one of seven soft colours picked from the name (`avatarTone()`), so a
+  list of pets can be scanned by colour.
+- **One frame before the app** (`AuthShell`): sign in, forgotten password, the two-step code, setting up and joining a
+  kennel, with the navy panel saying what Wagbook is.
+- **Parents' pages are the kennel's**: warmer paper (`.wb-parent` swaps the tokens), the kennel's name at the top, the
+  pet's photo large, and on the stay page the WhatsApp button kept at the foot of the screen.
+
+**Why.** The people at the front desk read Today many times a day; numbers and cards let them see the day at a glance.
+Parents judge a kennel partly by the page it sends them. Keeping the colour meanings and the pieces means every screen,
+including those not drawn, changes together.
+
+**Cost.** Every screen looks different, so the screenshots in guides go out of date. Cards take a little more room than
+rows on a phone. A screen with its own ad hoc boxes inside a section can still show a box inside a card; those are
+left until someone works on the screen.
+
+**Look again** if a kennel asks for a light sidebar, or the icons start being needed without words.
+

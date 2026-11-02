@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Field, Input, Loading, Narrow, PageTitle, Select, Textarea } from "@/components/ui";
+import { buttonStyles, Field, formActionsStyles, formCardStyles, Input, Loading, Narrow, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -27,7 +27,7 @@ async function NewPetForm() {
   return (
     <>
       <PageTitle title={m.newPet.title} />
-      <ActionForm action={createPet}>
+      <ActionForm action={createPet} className={formCardStyles}>
         <fieldset className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <legend className="px-1 text-lg font-bold">{m.newPet.parent}</legend>
           <Field label={m.newPet.mobile} hint={m.newPet.mobileHint}>
@@ -101,7 +101,7 @@ async function NewPetForm() {
           </div>
         </fieldset>
 
-        <div className="flex flex-wrap gap-3">
+        <div className={formActionsStyles}>
           <SubmitButton pendingLabel={m.common.saving}>{m.newPet.save}</SubmitButton>
           <Link href="/app/dogs" className={buttonStyles.quiet}>
             {m.newPet.back}

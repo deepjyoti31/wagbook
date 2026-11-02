@@ -435,6 +435,8 @@ export const core: typeof English = {
     inHouseOf: "{inHouse} पालतू यहाँ हैं, कुल {capacity} केनेल।",
     inHouse: "{inHouse} पालतू यहाँ हैं।",
     toArrive: "{arrivals} आने बाकी हैं।",
+    ofKennels: "{capacity} केनेल में से",
+    careLeft: "बाकी देखभाल",
     noKennels: "आपने अभी कोई केनेल नहीं जोड़ा है, इसलिए Wagbook ओवरबुकिंग नहीं रोक सकता।",
     addKennels: "अपने केनेल जोड़ें",
     newForms: { one: "पेरेंट का एक नया फ़ॉर्म इंतज़ार में है।", other: "पेरेंट के {n} नए फ़ॉर्म इंतज़ार में हैं।" },

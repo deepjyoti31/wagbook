@@ -103,7 +103,7 @@ export async function generateMetadata({ params }: PageProps<"/inv/[token]">): P
 /** The bill a parent opens from the link the kennel sent them. No sign-in. Prints as a clean A4 invoice. */
 export default function PublicInvoicePage({ params, searchParams }: PageProps<"/inv/[token]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 print:max-w-none print:p-0">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8 print:max-w-none print:p-0">
       <Suspense fallback={<Loading />}>
         <Invoice params={params} searchParams={searchParams} />
       </Suspense>
@@ -173,8 +173,9 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
   const sellerTaxId = inv.seller.tax_id ? <span className="font-semibold">{inv.seller.tax_id}</span> : null;
 
   return (
-    <article className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    // A white sheet on the parent's page; on paper, just the page.
+    <article className="space-y-6 rounded-3xl border border-rule bg-paper p-5 sm:p-8 print:rounded-none print:border-0 print:p-0">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b-[3px] border-marigold pb-5">
         <div>
           <p className="text-2xl font-extrabold tracking-tight">{inv.seller.trade_name ?? inv.seller.name}</p>
           {inv.seller.trade_name && inv.seller.trade_name !== inv.seller.name ? <p>{inv.seller.name}</p> : null}

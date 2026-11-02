@@ -4,11 +4,12 @@ import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
-import { Badge, buttonStyles, Columns, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, Section, Select, Textarea } from "@/components/ui";
 import { Rich } from "@/components/rich";
 import { checkIn, checkOut, undoCheckOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
 import { PaymentForm } from "@/components/payment-form";
+import { Icon } from "@/components/icons";
 import { PetAvatar } from "@/components/pet-avatar";
 import { VaccinationList, VaccinationWarnings } from "@/components/pet-panels";
 import { signedUrls } from "@/lib/media";
@@ -332,19 +333,15 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
 
   return (
     <>
-      {pet ? (
-        <div className="mb-3">
-          <PetAvatar name={pet.name} url={pet.photo_path ? media.get(pet.photo_path) : null} size="lg" />
-        </div>
-      ) : null}
-      <PageTitle title={pet?.name ?? w.title}>
-        <Link href="/app/bookings" className={buttonStyles.quiet}>
-          {w.allBookings}
-        </Link>
-      </PageTitle>
-
-      <div className="mb-5 space-y-2">
-        <p className="flex flex-wrap items-center gap-2">
+      <Link href="/app/bookings" className="no-print mb-2 inline-flex min-h-11 items-center gap-1.5 font-semibold text-slate hover:text-ink">
+        <Icon name="back" className="size-4.5" />
+        {w.allBookings}
+      </Link>
+      <header className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border border-rule bg-paper p-5 lg:p-6">
+        {pet ? <PetAvatar name={pet.name} url={pet.photo_path ? media.get(pet.photo_path) : null} size="lg" /> : null}
+        <div className="min-w-0 flex-1 basis-72 space-y-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-[2rem]">{pet?.name ?? w.title}</h1>
           <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
           <Badge tone={b.status === "checked_in" ? "good" : b.status === "requested" ? "attention" : "neutral"}>{m.labels.bookingStatus[b.status]}</Badge>
           {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
@@ -360,7 +357,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               {flagText(m, f)}
             </Badge>
           ))}
-        </p>
+        </div>
         <p className="text-lg">{stayText(t, b.kind, b.start_date, b.end_date)}</p>
         {b.boarding_from ? (
           <p className="font-semibold">
@@ -379,7 +376,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </p>
         ) : null}
         {b.cancel_reason && b.status === "cancelled" ? <p className="text-slate">{fill(w.cancelledBecause, { reason: b.cancel_reason })}</p> : null}
-      </div>
+        </div>
+      </header>
 
       {justBooked ? (
         <Notice tone="ok">

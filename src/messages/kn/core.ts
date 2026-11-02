@@ -436,6 +436,8 @@ export const core: typeof English = {
     inHouseOf: "{capacity} ಕೆನೆಲ್‌ಗಳಲ್ಲಿ {inHouse} ತುಂಬಿವೆ.",
     inHouse: "ಕೆನೆಲ್‌ನಲ್ಲಿ {inHouse} ಸಾಕುಪ್ರಾಣಿಗಳು ಇವೆ.",
     toArrive: "ಇನ್ನೂ {arrivals} ಬರಬೇಕಿದೆ.",
+    ofKennels: "{capacity} ಕೆನೆಲ್‌ಗಳಲ್ಲಿ",
+    careLeft: "ಇನ್ನೂ ಮಾಡಬೇಕಾದ ಆರೈಕೆ",
     noKennels: "ನೀವು ಇನ್ನೂ ಯಾವ ಕೆನೆಲ್‌ಗಳನ್ನೂ ಸೇರಿಸಿಲ್ಲ, ಹಾಗಾಗಿ ಓವರ್‌ಬುಕಿಂಗ್ ತಡೆಯಲು Wagbook ಗೆ ಆಗುವುದಿಲ್ಲ.",
     addKennels: "ನಿಮ್ಮ ಕೆನೆಲ್‌ಗಳನ್ನು ಸೇರಿಸಿ",
     newForms: { one: "ಪೇರೆಂಟ್‌ನಿಂದ ಒಂದು ಹೊಸ ಫಾರ್ಮ್ ಕಾಯುತ್ತಿದೆ.", other: "ಪೇರೆಂಟ್‌ಗಳಿಂದ {n} ಹೊಸ ಫಾರ್ಮ್‌ಗಳು ಕಾಯುತ್ತಿವೆ." },

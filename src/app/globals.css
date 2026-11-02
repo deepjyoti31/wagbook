@@ -12,16 +12,30 @@
  */
 @theme {
   --color-ink: #14213d;
+  --color-ink-soft: #1f2e52;
   --color-slate: #55607a;
-  --color-ground: #edf0f5;
+  --color-haze: #aab4c8;
+  --color-ground: #f3f5f9;
+  --color-wash: #f6f8fb;
   --color-paper: #ffffff;
-  --color-rule: #d5dae4;
+  --color-rule: #e2e6ee;
+  --color-rule-strong: #c3cad8;
+  /* A confirmed stay on the calendar: there, but not yet in the house. */
+  --color-mist: #e6ecf7;
+  /* The bars of a chart: a calmer blue than ink, so a busy month is not a black wall. */
+  --color-chart: #3d5a99;
   --color-marigold: #f2a900;
   --color-marigold-soft: #fdf1cf;
+  --color-marigold-ink: #6b4800;
   --color-leaf: #1b7446;
-  --color-leaf-soft: #ddf1e5;
+  --color-leaf-soft: #e0f2e7;
+  --color-leaf-ink: #14532d;
   --color-alert: #b3261e;
   --color-alert-soft: #fbe4e2;
+  --color-alert-ink: #8c1d17;
+  /* The pages parents open (a stay, a bill, a form): warmer, and the kennel's, not Wagbook's. */
+  --color-cream: #faf8f4;
+  --color-cream-rule: #ebe6dc;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
 }
@@ -36,6 +50,7 @@ body {
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Numbers line up in columns everywhere: dates, prices, kennel codes. */
@@ -47,6 +62,10 @@ body {
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
+/* On the dark sidebar an ink ring would not show. */
+.wb-dark :focus-visible {
+  outline-color: var(--color-marigold);
+}
 
 /*
  * The kennel door tag: the one piece of decoration in the app. It is how a
@@ -56,7 +75,7 @@ body {
   display: inline-flex;
   align-items: center;
   min-width: 3.25rem;
-  padding: 0.2rem 0.6rem 0.2rem 1.35rem;
+  padding: 0.2rem 0.65rem 0.2rem 1.4rem;
   background: var(--color-marigold);
   color: var(--color-ink);
   font-weight: 800;
@@ -70,18 +89,66 @@ body {
 .door-tag::before {
   content: "";
   position: absolute;
-  left: 0.6rem;
+  left: 0.625rem;
   top: 50%;
-  width: 0.4rem;
-  height: 0.4rem;
-  margin-top: -0.2rem;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-top: -0.1875rem;
   border-radius: 9999px;
-  background: var(--color-ground);
+  background: var(--color-paper);
 }
 .door-tag[data-empty="true"] {
   background: var(--color-rule);
   color: var(--color-slate);
   font-weight: 600;
+}
+
+/* A pet with no photo: its first letter on one of seven soft colours (see PetAvatar). */
+.pet-avatar { background: #eef1f6; color: #3d4863; }
+.pet-avatar[data-tone="0"] { background: #fde6d3; color: #7a3a0c; }
+.pet-avatar[data-tone="1"] { background: #dfe9fb; color: #1d3f86; }
+.pet-avatar[data-tone="2"] { background: #ece3f7; color: #4b2a7a; }
+.pet-avatar[data-tone="3"] { background: #e3f0e8; color: #1f5a37; }
+.pet-avatar[data-tone="4"] { background: #fbe1ea; color: #7d1f45; }
+.pet-avatar[data-tone="5"] { background: #fdeccd; color: #6b4800; }
+.pet-avatar[data-tone="6"] { background: #dff3f3; color: #135353; }
+
+/*
+ * The pages a parent opens (a stay, a bill, the forms): warmer paper and
+ * softer rules than the staff app, so they read as the kennel's own page.
+ * The tokens are swapped inside, so every building block follows.
+ */
+html:has(.wb-parent) {
+  background: var(--color-cream);
+}
+.wb-parent {
+  --color-ground: #f1ede5;
+  --color-wash: #f6f3ed;
+  --color-rule: var(--color-cream-rule);
+}
+
+
+/*
+ * A section is a card with its heading inside. A ruled list placed straight
+ * in a section runs to the card's edges, so the rows line up with the heading
+ * and no card sits inside another.
+ */
+.wb-section {
+  --wb-pad: 1rem;
+}
+@media (width >= 40rem) {
+  .wb-section {
+    --wb-pad: 1.25rem;
+  }
+}
+.wb-section > .wb-ledger {
+  margin-inline: calc(-1 * var(--wb-pad));
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+.wb-section > .wb-ledger:last-child {
+  margin-bottom: calc(-1 * var(--wb-pad));
+  border-radius: 0 0 1rem 1rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

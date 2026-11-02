@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: PageProps<"/i/[slug]">): Prom
 /** The public intake form for one kennel. No sign-in. */
 export default function IntakePage({ params }: PageProps<"/i/[slug]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8">
       <Suspense fallback={<Loading />}>
         <Intake params={params} />
       </Suspense>

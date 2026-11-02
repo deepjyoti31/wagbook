@@ -7,7 +7,8 @@ import type { Messages } from "@/messages";
  * chart is every kennel full. A day with more pets than kennels (pets booked
  * with no kennel) is drawn full and in red. Each bar says its numbers when
  * pointed at, and the same numbers are in a table below for anyone who
- * cannot see the bars. `words` is m.reports.chart.
+ * cannot see the bars. The busiest day is drawn in marigold, so it stands
+ * out without reading the numbers. `words` is m.reports.chart.
  */
 export function OccupancyChart({
   days,
@@ -22,6 +23,7 @@ export function OccupancyChart({
 }) {
   const capacity = Math.max(0, ...days.map((d) => d.capacity));
   const top = Math.max(capacity, ...days.map((d) => d.boarding + d.dayBoarding), 1);
+  const busiest = Math.max(0, ...days.map((d) => d.boarding + d.dayBoarding));
   const text = (d: OccupancyDay) => {
     const vars = {
       date: formatDate(d.day, locale),
@@ -34,10 +36,10 @@ export function OccupancyChart({
   };
 
   return (
-    <figure className="rounded-xl border border-rule bg-paper p-4">
-      <figcaption className="mb-2 text-sm text-slate">{fill(words.caption, { n: capacity })}</figcaption>
-      <div aria-hidden="true" className="relative h-40 border-t-2 border-dashed border-slate/60">
-        <div className="flex h-full items-end gap-[2px] border-b border-rule">
+    <figure className="rounded-2xl border border-rule bg-paper p-5">
+      <figcaption className="mb-3 text-sm text-slate">{fill(words.caption, { n: capacity })}</figcaption>
+      <div aria-hidden="true" className="relative h-44 border-t-[1.5px] border-dashed border-slate/50 lg:h-56">
+        <div className="flex h-full items-end gap-[2px] border-b border-rule-strong sm:gap-1">
           {days.map((d) => {
             const pets = d.boarding + d.dayBoarding;
             // Siblings sharing a kennel may make pets more than kennels; only kennels in use can overfill.
@@ -45,7 +47,7 @@ export function OccupancyChart({
             return (
               <div key={d.day} title={text(d)} className="flex h-full min-w-0 flex-1 items-end">
                 <div
-                  className={`w-full rounded-t-[2px] ${over ? "bg-alert" : "bg-ink"}`}
+                  className={`w-full rounded-t-[3px] ${over ? "bg-alert" : pets > 0 && pets === busiest ? "bg-marigold" : "bg-chart"}`}
                   style={{ height: `${(Math.min(pets, top) / top) * 100}%` }}
                 />
               </div>
@@ -53,7 +55,7 @@ export function OccupancyChart({
           })}
         </div>
       </div>
-      <div aria-hidden="true" className="mt-1 flex gap-[2px] text-xs text-slate">
+      <div aria-hidden="true" className="mt-1.5 flex gap-[2px] text-xs text-slate sm:gap-1">
         {days.map((d, i) => (
           <span key={d.day} className="min-w-0 flex-1 overflow-visible whitespace-nowrap">
             {i % 7 === 0 ? Number(d.day.slice(8)) : ""}
@@ -61,7 +63,7 @@ export function OccupancyChart({
         ))}
       </div>
       <details className="mt-3">
-        <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{words.seeEachDay}</summary>
+        <summary className="inline-flex min-h-12 cursor-pointer items-center rounded-[0.625rem] font-semibold underline underline-offset-4 hover:bg-ground">{words.seeEachDay}</summary>
         <table className="mt-2 w-full text-left text-sm">
           <thead>
             <tr className="border-b border-rule text-slate">
