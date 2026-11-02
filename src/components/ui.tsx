@@ -10,7 +10,7 @@ import type { ComponentProps, ReactNode } from "react";
  */
 
 const BUTTON_BASE =
-  "inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[0.625rem] px-4 text-[0.9375rem] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-[0.625rem] px-4 py-2 text-center text-[0.9375rem] font-semibold leading-snug transition-colors disabled:opacity-50 disabled:pointer-events-none";
 
 export const buttonStyles = {
   primary: `${BUTTON_BASE} bg-ink text-paper hover:bg-ink-soft`,
