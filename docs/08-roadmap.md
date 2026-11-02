@@ -1550,6 +1550,33 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M69. Laptop first, and responsive down to a phone
+
+- [x] Finished 2 November 2026 (G in `02`, D58). Asked for by the owner after trying Wagbook on a real Supabase project:
+  the screens were made for a phone, and the kennel works mostly at a laptop.
+
+**Build**
+
+1. A sidebar on a laptop with the main places, the day's work from More and, for owners and managers, the money; the
+   top bar on a tablet; the bottom bar on a phone.
+2. A wider page, and two columns (`Columns`) on Today and the pages of one booking, pet, parent, bill, appointment and
+   food subscription.
+3. Forms laid out by the width of their column (container queries), and pages that are one form kept to a readable
+   width (`Narrow`). More in two columns.
+
+**Rules**
+
+- Nothing is moved off a phone: a page in two columns keeps its order when it is one column.
+- Touch targets stay 48 pixels on every screen, a laptop's too.
+- No new dependency (Tailwind's container queries are built in).
+
+**Done when**
+
+- Every signed-in screen was looked at at 1366, 1024, 820 and 360 pixels against the local Supabase with no sideways
+  scroll; `src/lib/menu.ts` has unit tests; the walk at 360 pixels passes unchanged.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

@@ -1318,6 +1318,7 @@ joins one kennel's rows to another's.
 
 | Feature | State |
 | --- | --- |
+| Laptop first, and every screen on a tablet and a phone (M69, D58) | Built: on a laptop a sidebar on the left (the main places, the day's work from More, and the money for owners and managers) and a wide page; Today and the pages of one booking, pet, parent, bill, appointment and subscription in two columns on a wide screen; forms kept to a readable width. On a tablet the navigation is a bar along the top, on a phone along the bottom. Forms lay out by the room their column has. |
 | Install to the phone's home screen (web app manifest, icons) | Built |
 | Works offline or on a bad connection | Built: Today and Care open from the last copy on the phone; ticking a care task offline is saved and sent when the connection is back (D22). Everything else waits for the connection. |
 | Languages other than English | Built: English, Hindi and Kannada (drafts until reviewed). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |

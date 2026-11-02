@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Field, Input, Loading, PageTitle, Select, Textarea } from "@/components/ui";
+import { buttonStyles, Field, Input, Loading, Narrow, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText } from "@/lib/bookings";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -12,9 +12,11 @@ export const generateMetadata = () => appTitle((m) => m.newPet.title);
 
 export default function NewPetPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <NewPetForm />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <NewPetForm />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -45,7 +47,7 @@ async function NewPetForm() {
           <Field label={f.name}>
             <Input name="petName" required maxLength={80} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={f.animal}>
               <Select name="species" defaultValue="dog">
                 <option value="dog">{m.labels.species.dog}</option>
@@ -88,7 +90,7 @@ async function NewPetForm() {
           </Field>
           <div>
             <p className="mb-2 font-semibold">{f.staffShouldKnow}</p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 @lg:grid-cols-2">
               {PET_FLAGS.map((flag) => (
                 <label key={flag} className="flex min-h-12 items-center gap-3 rounded-lg border border-rule px-3">
                   <input type="checkbox" name={`flag_${flag}`} className="size-5" />

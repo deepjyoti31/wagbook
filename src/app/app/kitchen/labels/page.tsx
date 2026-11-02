@@ -65,7 +65,7 @@ async function Labels({ searchParams }: Pick<PageProps<"/app/kitchen/labels">, "
       {labels.length === 0 ? (
         <Empty>{w.none}</Empty>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 print:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2 @lg:grid-cols-2 print:grid-cols-2">
           {labels.map((l) => (
             <li key={l.key} className="break-inside-avoid rounded-lg border-2 border-dashed border-ink bg-paper p-3">
               <p className="text-lg font-extrabold">{fill(w.pet, { pet: l.pet })}</p>

@@ -50,7 +50,7 @@ export async function StayCancellation({ t, bookingId, choice, settled }: { t: I
           </Ledger>
           <p className="mt-3 font-semibold">{fill(w.summary, { paid: money(paid), refund: money(r.refundMinor), credit: money(r.creditMinor), kept: money(r.keptMinor) })}</p>
           {canManage && left > 0 ? (
-            <ActionForm action={settleCancellation} className="mt-3 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={settleCancellation} className="mt-3 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <input type="hidden" name="bookingId" value={bookingId} />
               {byKennel ? (
                 <Field label={w.parentChose}>

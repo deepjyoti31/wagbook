@@ -15,7 +15,7 @@ export async function RoutineForm({ petId }: { petId?: string }) {
     <ActionForm action={addRoutine} className="mt-4 space-y-4 rounded-xl border border-rule bg-paper p-4">
       {petId ? <input type="hidden" name="petId" value={petId} /> : null}
       <p className="font-bold">{petId ? r.addForPet : r.addHouse}</p>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 @lg:grid-cols-3">
         <Field label={r.what}>
           <Input name="label" required maxLength={80} placeholder={petId ? r.examplePet : r.exampleHouse} />
         </Field>

@@ -6,7 +6,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { InvoiceView } from "@/components/invoice-view";
 import { PaymentForm } from "@/components/payment-form";
-import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { BILLABLE_IN_FAMILY } from "@/lib/billing";
 import { billMessage, formatDate, formatMoney, formatPhone, todayIn, toDecimalString, whatsappLink } from "@/lib/core";
@@ -189,6 +189,9 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
 
+      <Columns
+      main={
+      <>
       {inv.status === "draft" ? (
         <Section title={m.bill.next}>
           <ActionForm action={issueBill} className="space-y-3">
@@ -345,6 +348,10 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
         </Section>
       ) : null}
 
+      </>
+      }
+      side={
+      <>
       {credits.data.length > 0 ? (
         <Section title={m.invoice.creditNotes} count={credits.data.length}>
           <Ledger>
@@ -426,7 +433,7 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
                   ))}
                 </fieldset>
               ) : null}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 @lg:grid-cols-2">
                 <Field label={inv.is_tax_invoice ? (inv.prices_include_tax ? m.bill.credit.amountWith : m.bill.credit.amountBefore) : m.bill.credit.amount}>
                   <Input name="amount" inputMode="decimal" />
                 </Field>
@@ -485,6 +492,9 @@ async function Bill({ params, searchParams }: Pick<PageProps<"/app/bills/[id]">,
           <ConfirmStep label={m.bill.deleteDraft} warning={m.common.cannotUndo} confirm={m.common.yesDelete} pending={m.bill.deleting} />
         </ActionForm>
       ) : null}
+      </>
+      }
+      />
     </>
   );
 }

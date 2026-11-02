@@ -163,8 +163,8 @@ async function Shop({ searchParams }: Pick<PageProps<"/app/shop">, "searchParams
 
       {canManage ? (
         <Section title={s.add}>
-          <ActionForm action={addShopItem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="text-sm text-slate sm:col-span-2">{s.addAbout}</p>
+          <ActionForm action={addShopItem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="text-sm text-slate @lg:col-span-2">{s.addAbout}</p>
             <Field label={s.name}>
               <Input name="name" required maxLength={80} autoComplete="off" />
             </Field>
@@ -201,7 +201,7 @@ async function Shop({ searchParams }: Pick<PageProps<"/app/shop">, "searchParams
                   ))}
               </Select>
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.adding}>{s.addButton}</SubmitButton>
             </div>
           </ActionForm>
@@ -217,7 +217,7 @@ function ChangeItem({ item, m }: { item: ShopItem; m: Messages }) {
   return (
     <details className="mt-2">
       <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{s.change}</summary>
-      <ActionForm action={updateShopItem} className="mt-2 grid gap-3 sm:grid-cols-2">
+      <ActionForm action={updateShopItem} className="mt-2 grid gap-3 @lg:grid-cols-2">
         <input type="hidden" name="itemId" value={item.item_id} />
         <Field label={s.price}>
           <Input name="price" inputMode="decimal" required defaultValue={String(item.sell_price_minor / 100)} autoComplete="off" />
@@ -231,7 +231,7 @@ function ChangeItem({ item, m }: { item: ShopItem; m: Messages }) {
         <Field label={s.lowLevel}>
           <Input name="lowLevel" inputMode="numeric" defaultValue={item.low_level === null ? "" : String(item.low_level)} autoComplete="off" />
         </Field>
-        <div className="flex flex-wrap gap-2 sm:col-span-2">
+        <div className="flex flex-wrap gap-2 @lg:col-span-2">
           <SubmitButton pendingLabel={m.common.saving}>{s.save}</SubmitButton>
           <SubmitButton variant="quiet" name="intent" value="stop" pendingLabel={m.common.saving}>
             {s.stopSelling}

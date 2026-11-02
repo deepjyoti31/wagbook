@@ -80,7 +80,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                   <ActionForm action={setSkills} className="mt-2 space-y-2">
                     <input type="hidden" name="userId" value={mm.user_id} />
                     <p className="text-sm text-slate">{m.skills.about}</p>
-                    <div className="grid gap-1 sm:grid-cols-2">
+                    <div className="grid gap-1 @lg:grid-cols-2">
                       {offered.map((s) => (
                         <label key={s} className="flex min-h-12 items-center gap-3">
                           <input type="checkbox" name={`skill_${s}`} defaultChecked={mm.skills.includes(s)} className="size-5" />
@@ -97,7 +97,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
               {canChange(mm) ? (
                 <details className="mt-2">
                   <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{m.common.change}</summary>
-                  <ActionForm action={updateMember} className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <ActionForm action={updateMember} className="mt-2 grid gap-3 @lg:grid-cols-3">
                     <input type="hidden" name="userId" value={mm.user_id} />
                     <Field label={w.name}>
                       <Input name="displayName" required maxLength={80} defaultValue={mm.display_name} />
@@ -185,7 +185,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                 })}
               </ul>
             ) : null}
-            <ActionForm action={createInviteLink} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <ActionForm action={createInviteLink} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
               <Field label={w.theirName}>
                 <Input name="displayName" required maxLength={80} autoComplete="off" />
               </Field>
@@ -206,7 +206,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
 
           <Section title={w.byEmail.title}>
             <p className="mb-3 text-slate">{w.byEmail.intro}</p>
-            <ActionForm action={inviteMember} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={inviteMember} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <Field label={w.theirName}>
                 <Input name="displayName" required maxLength={80} autoComplete="off" />
               </Field>

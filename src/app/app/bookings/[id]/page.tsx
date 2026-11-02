@@ -4,7 +4,7 @@ import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
-import { Badge, buttonStyles, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { Rich } from "@/components/rich";
 import { checkIn, checkOut, undoCheckOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
@@ -400,6 +400,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         <HealthAtTheDoor t={t} petId={pet.id} on={b.start_date > today ? b.start_date : today} bookingId={b.id} />
       ) : null}
 
+      <Columns
+      main={
+      <>
       {open ? (
         <Section title={w.next}>
           <NextStep
@@ -493,8 +496,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           <ActionForm action={addExtra} className="mt-4 space-y-4 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="bookingId" value={b.id} />
             <p className="font-bold">{w.extra.title}</p>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-2">
+            <div className="grid gap-4 @lg:grid-cols-3">
+              <div className="@lg:col-span-2">
                 <Field label={w.extra.fromList}>
                   <Select name="serviceId" defaultValue="">
                     <option value="">{w.extra.somethingElse}</option>
@@ -510,8 +513,8 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 <Input name="quantity" inputMode="decimal" defaultValue="1" />
               </Field>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-2">
+            <div className="grid gap-4 @lg:grid-cols-3">
+              <div className="@lg:col-span-2">
                 <Field label={w.extra.describe} hint={w.extra.describeHint}>
                   <Input name="description" maxLength={200} />
                 </Field>
@@ -597,7 +600,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 </Select>
               </Field>
             ) : null}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={b.kind === "daycare" ? w.change.firstDay : w.change.checkInDate}>
                 <Input name="startDate" type="date" required defaultValue={b.start_date} />
               </Field>
@@ -615,7 +618,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 ))}
               </Select>
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={w.change.dropOff}>
                 <Input name="expectedArrival" type="time" defaultValue={b.expected_arrival?.slice(0, 5) ?? ""} />
               </Field>
@@ -624,7 +627,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
               </Field>
             </div>
             {canManage && !b.package_id ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 @lg:grid-cols-2">
                 <Field label={b.kind === "boarding" ? w.change.pricePerNight : w.change.pricePerDay}>
                   <Input name="rate" inputMode="decimal" required defaultValue={toDecimalString(b.rate_minor).replace(/\.00$/, "")} />
                 </Field>
@@ -686,7 +689,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           <ActionForm action={switchToBoarding} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
             <input type="hidden" name="bookingId" value={b.id} />
             <p>{fill(w.overnight.text, { pet: pet?.name ?? w.bill.thePet })}</p>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 @lg:grid-cols-3">
               <Field label={w.overnight.firstNight}>
                 <Input name="firstNight" type="date" required defaultValue={today > b.start_date ? today : b.start_date} />
               </Field>
@@ -709,6 +712,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         </Section>
       ) : null}
 
+      </>
+      }
+      side={
+      <>
       {pet ? (
         <Section title={fill(w.routines.title, { pet: pet.name })} count={routines.data.length}>
           {routines.data.length === 0 ? (
@@ -856,6 +863,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         </Section>
       ) : null}
+      </>
+      }
+      />
     </>
   );
 }

@@ -113,8 +113,8 @@ async function Stock() {
 
       {items.length > 0 && canManage ? (
         <Section title={s.buy}>
-          <ActionForm action={recordPurchase} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="text-sm text-slate sm:col-span-2">{s.buyAbout}</p>
+          <ActionForm action={recordPurchase} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="text-sm text-slate @lg:col-span-2">{s.buyAbout}</p>
             <Field label={s.item}>{itemSelect}</Field>
             <Field label={s.quantity} hint={s.quantityHint}>
               <Input name="quantity" required autoComplete="off" />
@@ -141,14 +141,14 @@ async function Stock() {
             <Field label={s.billNumber}>
               <Input name="billNumber" maxLength={40} autoComplete="off" />
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <PhotoInput name="bill" label={s.billPhoto} accept="image/*,application/pdf" words={m.photos} />
             </div>
-            <label className="flex min-h-12 items-center gap-3 sm:col-span-2">
+            <label className="flex min-h-12 items-center gap-3 @lg:col-span-2">
               <input type="checkbox" name="asExpense" defaultChecked className="size-5" />
               <span>{s.asExpense}</span>
             </label>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.saving}>{s.recordBuy}</SubmitButton>
             </div>
           </ActionForm>
@@ -158,7 +158,7 @@ async function Stock() {
       {items.length > 0 ? (
         <>
           <Section title={s.out}>
-            <ActionForm action={recordWaste} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={recordWaste} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <Field label={s.item}>{itemSelect}</Field>
               <Field label={s.quantity} hint={s.quantityHint}>
                 <Input name="quantity" required autoComplete="off" />
@@ -176,7 +176,7 @@ async function Stock() {
                 <Input name="note" maxLength={300} autoComplete="off" />
               </Field>
               <input type="hidden" name="on" value={today} />
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
                   {s.recordWaste}
                 </SubmitButton>
@@ -185,14 +185,14 @@ async function Stock() {
           </Section>
 
           <Section title={s.count}>
-            <ActionForm action={recordCount} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-              <p className="text-sm text-slate sm:col-span-2">{s.countAbout}</p>
+            <ActionForm action={recordCount} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+              <p className="text-sm text-slate @lg:col-span-2">{s.countAbout}</p>
               <Field label={s.item}>{itemSelect}</Field>
               <Field label={s.counted} hint={s.quantityHint}>
                 <Input name="counted" required autoComplete="off" />
               </Field>
               <input type="hidden" name="on" value={today} />
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
                   {s.recordCount}
                 </SubmitButton>
@@ -224,7 +224,7 @@ async function Stock() {
 
       {canManage ? (
         <Section title={s.addItem}>
-          <ActionForm action={addItem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={addItem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <Field label={s.itemName}>
               <Input name="name" required maxLength={80} autoComplete="off" />
             </Field>
@@ -263,7 +263,7 @@ async function Stock() {
               <input type="checkbox" name="never" className="size-5" />
               <span>{s.never}</span>
             </label>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.adding}>{s.addItemButton}</SubmitButton>
             </div>
           </ActionForm>
@@ -291,7 +291,7 @@ async function Stock() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addSupplier} className="mt-3 grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={addSupplier} className="mt-3 grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <Field label={s.supplierName}>
               <Input name="name" required maxLength={80} autoComplete="off" />
             </Field>
@@ -301,7 +301,7 @@ async function Stock() {
             <Field label={s.supplies}>
               <Input name="supplies" maxLength={200} autoComplete="off" />
             </Field>
-            <div className="sm:col-span-3">
+            <div className="@lg:col-span-3">
               <SubmitButton variant="secondary" pendingLabel={m.common.adding}>
                 {s.addSupplierButton}
               </SubmitButton>

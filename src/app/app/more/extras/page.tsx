@@ -60,7 +60,7 @@ async function Extras() {
                       {taxed ? (
                         <details className="w-full">
                           <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{x.change}</summary>
-                          <ActionForm action={changeExtraPrice} className="mt-2 grid gap-3 sm:grid-cols-3">
+                          <ActionForm action={changeExtraPrice} className="mt-2 grid gap-3 @lg:grid-cols-3">
                             <input type="hidden" name="serviceId" value={s.id} />
                             <Field label={x.price}>
                               <Input name="price" inputMode="decimal" defaultValue={toDecimalString(s.price_minor).replace(/\.00$/, "")} />
@@ -105,8 +105,8 @@ async function Extras() {
 
       {canManage ? (
         <Section title={x.add}>
-          <ActionForm action={addExtraService} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
-            <div className="sm:col-span-2">
+          <ActionForm action={addExtraService} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-4">
+            <div className="@lg:col-span-2">
               <Field label={x.what}>
                 <Input name="name" required maxLength={80} placeholder={x.whatExample} />
               </Field>
@@ -162,7 +162,7 @@ async function Extras() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addDayPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
+          <ActionForm action={addDayPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-4">
             <Field label={x.packName}>
               <Input name="name" required maxLength={80} placeholder={x.packNameExample} />
             </Field>

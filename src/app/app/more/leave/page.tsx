@@ -125,7 +125,7 @@ async function Leave({ searchParams }: Pick<PageProps<"/app/more/leave">, "searc
       ) : null}
 
       <Section title={w.ask.title}>
-        <ActionForm action={askLeave} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+        <ActionForm action={askLeave} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
           {canManage ? (
             <Field label={w.ask.who}>
               <Select name="userId" defaultValue={user.id}>
@@ -143,13 +143,13 @@ async function Leave({ searchParams }: Pick<PageProps<"/app/more/leave">, "searc
           <Field label={w.ask.to}>
             <Input name="to" type="date" required min={today} />
           </Field>
-          <div className="sm:col-span-2">
+          <div className="@lg:col-span-2">
             <Field label={w.ask.reason} hint={w.ask.reasonHint}>
               <Textarea name="reason" maxLength={300} rows={2} />
             </Field>
           </div>
           {canManage ? (
-            <label className="flex min-h-12 items-start gap-3 sm:col-span-2">
+            <label className="flex min-h-12 items-start gap-3 @lg:col-span-2">
               <input type="checkbox" name="granted" className="mt-1 size-5" />
               <span>{w.ask.granted}</span>
             </label>

@@ -108,7 +108,7 @@ async function Order({ params, searchParams }: Pick<PageProps<"/app/more/orders/
             <input type="hidden" name="orderId" value={x.id} />
             <ul className="space-y-4">
               {left.map((l) => (
-                <li key={l.item_id} className="grid gap-3 sm:grid-cols-3">
+                <li key={l.item_id} className="grid gap-3 @lg:grid-cols-3">
                   <Field label={`${p.came}: ${l.name}`}>
                     <Input name={`q-${l.item_id}`} autoComplete="off" defaultValue={typedQuantity(l.still_to_come, l.unit)} />
                   </Field>
@@ -136,8 +136,8 @@ async function Order({ params, searchParams }: Pick<PageProps<"/app/more/orders/
           {x.expense_id ? (
             <p>{fill(p.billDone, { amount: expense ? formatMoney(expense.amount_minor, { currency: org.currency, locale, trimZeros: true }) : (x.bill_number ?? "") })}</p>
           ) : (
-            <ActionForm action={recordOrderBill} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-              <p className="text-sm text-slate sm:col-span-2">{p.billAbout}</p>
+            <ActionForm action={recordOrderBill} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+              <p className="text-sm text-slate @lg:col-span-2">{p.billAbout}</p>
               <input type="hidden" name="orderId" value={x.id} />
               <Field label={p.amount}>
                 <Input name="amount" inputMode="decimal" required autoComplete="off" />
@@ -151,10 +151,10 @@ async function Order({ params, searchParams }: Pick<PageProps<"/app/more/orders/
               <Field label={p.category}>
                 <Input name="category" maxLength={60} required defaultValue={m.stock.expenseCategory} autoComplete="off" />
               </Field>
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <PhotoInput name="bill" label={p.billPhoto} accept="image/*,application/pdf" words={m.photos} />
               </div>
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <SubmitButton pendingLabel={m.common.saving}>{p.recordBill}</SubmitButton>
               </div>
             </ActionForm>

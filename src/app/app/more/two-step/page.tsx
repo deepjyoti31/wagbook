@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Loading, Notice, PageTitle } from "@/components/ui";
+import { Loading, Narrow, Notice, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -14,9 +14,11 @@ export const generateMetadata = () => appTitle((m) => m.twoStep.title);
 /** Two-step sign-in for the person signed in (roadmap M9). Each person's own; any role. */
 export default function TwoStepPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <TwoStep />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <TwoStep />
+      </Suspense>
+    </Narrow>
   );
 }
 

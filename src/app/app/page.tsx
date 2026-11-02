@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { Badge, buttonStyles, Columns, DoorTag, Empty, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { Rich } from "@/components/rich";
 import { requireOrg } from "@/lib/auth";
 import { datesText, flagText } from "@/lib/bookings";
@@ -149,12 +149,13 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   const inHouseRow = (b: BookingCard, leaving: boolean) => (
     <LedgerRow key={b.id}>
       <BookingSummary t={t} booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
+      <div className="flex w-full flex-col gap-1 sm:w-auto">
       {leaving ? (
         <Suspense fallback={null}>
           <OwedAtCheckOut t={t} booking={b} />
         </Suspense>
       ) : null}
-      <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+      <div className="flex flex-wrap gap-2">
         {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
           <ActionForm action={extendToToday} className="contents">
             <input type="hidden" name="bookingId" value={b.id} />
@@ -186,6 +187,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
             </SubmitButton>
           </ActionForm>
         )}
+      </div>
       </div>
     </LedgerRow>
   );
@@ -250,6 +252,10 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </div>
       ) : null}
 
+      <Columns
+      from="2xl"
+      main={
+      <>
       {incidents.length > 0 ? (
         <Section title={m.today.incidents} count={incidents.length}>
           <ul className="space-y-2">
@@ -325,6 +331,10 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Section>
       ) : null}
 
+      </>
+      }
+      side={
+      <>
       {newForms > 0 ? (
         <p className="mb-6 rounded-lg bg-marigold-soft px-4 py-3">
           {plural(language, newForms, m.today.newForms)}{" "}
@@ -428,6 +438,9 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           <TomorrowSummary t={t} today={today} />
         </Suspense>
       ) : null}
+      </>
+      }
+      />
     </>
   );
 }
@@ -460,7 +473,7 @@ async function OwedAtCheckOut({ t, booking }: { t: I18n; booking: BookingCard })
   const text = family && owed.kind !== "monthly" ? `${sentence} ${w.family}` : sentence;
   const tone = owed.kind === "due" || owed.kind === "draft" || owed.kind === "estimate" ? "font-semibold text-alert" : "text-leaf";
   return (
-    <p className="w-full">
+    <p>
       <Link href={invoiceId ? `/app/bills/${invoiceId}` : `/app/bookings/${booking.id}`} className={`inline-flex min-h-12 items-center underline underline-offset-4 ${tone}`}>
         {text}
       </Link>

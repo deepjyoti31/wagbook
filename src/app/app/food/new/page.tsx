@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, dailyGrams, formatMoney, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -14,9 +14,11 @@ export const generateMetadata = () => appTitle((m) => m.food.start);
 
 export default function NewFoodPage({ searchParams }: PageProps<"/app/food/new">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <NewFood searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <NewFood searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -121,7 +123,7 @@ async function NewFood({ searchParams }: Pick<PageProps<"/app/food/new">, "searc
 
       {isOrder ? (
         <Section title={f.order}>
-          <ActionForm action={addOrder} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={addOrder} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <input type="hidden" name="petId" value={p.id} />
             <Field label={f.orderKind}>
               <Select name="kind" defaultValue="trial">
@@ -164,19 +166,19 @@ async function NewFood({ searchParams }: Pick<PageProps<"/app/food/new">, "searc
               </Select>
             </Field>
             {addressSelect}
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <Field label={f.orderNote}>
                 <Input name="note" maxLength={300} autoComplete="off" />
               </Field>
             </div>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.adding}>{f.orderButton}</SubmitButton>
             </div>
           </ActionForm>
         </Section>
       ) : (
         <Section title={f.start}>
-          <ActionForm action={startSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={startSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <input type="hidden" name="petId" value={p.id} />
             <Field label={f.product}>
               <Select name="productId" required>
@@ -197,7 +199,7 @@ async function NewFood({ searchParams }: Pick<PageProps<"/app/food/new">, "searc
               <Input name="grams" inputMode="numeric" required defaultValue={grams ?? ""} />
             </Field>
             {slotSelect}
-            <fieldset className="sm:col-span-2">
+            <fieldset className="@lg:col-span-2">
               <legend className="mb-1 font-semibold">{f.days}</legend>
               <div className="flex flex-wrap gap-x-4">
                 {WEEKDAYS.map((d) => (
@@ -227,7 +229,7 @@ async function NewFood({ searchParams }: Pick<PageProps<"/app/food/new">, "searc
                 ))}
               </Select>
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={f.starting}>{f.startButton}</SubmitButton>
             </div>
           </ActionForm>

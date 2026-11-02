@@ -2,12 +2,20 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 25 October 2026, after M68 (orders from a kennel's own website, delivery days by area, cakes).
+Last updated: 2 November 2026, after M69 (laptop first, responsive down to a phone).
 
 ## In one paragraph
 
-Every milestone from M2 to M68 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. M68 (25 October 2026, D57), asked for by the owner: a kennel's own website sends
+Every milestone from M2 to M69 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. M69 (2 November 2026, D58), asked for by the owner after trying Wagbook on a
+real Supabase project: the signed-in screens are laptop first and responsive down to a phone. A laptop has a sidebar
+(Today, Bookings, Calendar, Care, Pets, More, then the day's work from More and the money for owners and managers, from
+one list in `src/lib/menu.ts`) and a wide page; Today (from 1536 pixels) and the pages of one booking, pet, parent,
+bill, appointment and food subscription (from 1280) are in two columns (`Columns`), split where the phone's order
+already was, so a phone sees the same order; forms lay out by their column's width (container queries, `@lg:` not
+`sm:`); pages that are one form are kept readable (`Narrow`); More is in two columns. A tablet has the bar along the
+top, a phone the bar along the bottom, as before. No database change. Both navigations are in the page and one is
+hidden, so a browser test should find words by role or inside `main`, not with a bare `getByText`. M68 (25 October 2026, D57), asked for by the owner: a kennel's own website sends
 its booking and food forms to Wagbook (`/api/site/{slug}`, Settings, **Your own website**), through the public
 functions that already existed, so the anonymous role still calls thirteen; the website's reference number is kept,
 shown to staff and used as the UPI note, and a resend is kept once; each area can have its own **delivery days**, which
@@ -122,6 +130,8 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 
 | Thing | Verified by | Confidence |
 | --- | --- | --- |
+| M69: every signed-in screen at 1366, 1024, 820 and 360 pixels (all 50 pages without an id, and a booking, a pet and a parent), as owner with everything offered switched on, against the local Supabase: no sideways scroll; the sidebar and the tablet's top bar stay in place as the page scrolls | By hand with Playwright, 2 November 2026 | Medium: desktop Chromium, not a real tablet or a laptop's touch screen |
+| M69: which links the sidebar and More show to whom, and which one is lit (`menuFor()`, `activeHref()`) | `src/lib/menu.test.ts` | High |
 | M68: an area's delivery days decide a subscription's and a trial's days; a cake is priced with delivery, needs notice and a delivery day, and is confirmed into its delivery even after the notice passed; a resend with the same reference is kept once; the website address is an origin | `tests/db/website-orders.test.ts`; the area days, the resend index and the confirm exemption each removed once to see a test fail | High |
 | M68: reading a website's request (`SiteRequest`, `bookingPayload()`, `foodPayload()`, `originAllowed()`, `isWebsiteOrigin()`) | `src/lib/site-request.test.ts` | High |
 | M68 in a browser: a kennel's website (served locally) sent a boarding request, a grooming request, a subscription ("I have paid" too), a cake refused on Sunday and taken on Wednesday, and an order outside the areas to a real Wagbook on the local Supabase; another origin refused; a resend kept once; a cake ordered on `/f/` and confirmed by staff; Orders and requests, Forms from parents, Areas, Settings and `/f/` looked at at 360 pixels | By hand with Playwright, 25 October 2026; the walk (83 steps) passes against the local Supabase. Its first run that day failed once at the booking form for new parents (`/book/`, not changed in M68): the drop-off date typed came back empty, as if the page reset it as it loaded. The second run passed. Watch for it | High for the local stack |
@@ -317,6 +327,11 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
+
+**Try the laptop layout (M69)** on the real Supabase project: a laptop (1366 or 1440 pixels), a tablet, and a phone.
+Say which pages still feel like a phone on a laptop. Not split in two yet, and candidates if they do: Care, Bookings,
+Bills, the kitchen and the setup pages (a list on the left and the form to add on the right). Not looked at on a real
+tablet or a touch laptop.
 
 **Connecting a kennel's own website (M68)**, once the hosted project exists:
 
@@ -836,6 +851,14 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 2 November 2026: M69 (D58), asked for by the owner: laptop first. A sidebar on laptops, the top bar on tablets and
+  the bottom bar on phones; two columns on Today and the pages of one booking, pet, parent, bill, appointment and
+  subscription; forms by container queries; one-form pages narrowed; More in two columns. The links of More moved to
+  `src/lib/menu.ts` (6 unit tests). No database change, no new dependency. Every signed-in screen looked at at four
+  widths against the local Supabase; the walk (83 steps) passes at 360 pixels after one step was made to look for
+  the exact word "Change" (the hidden sidebar's "History of changes" matched first). Principle 1 in `01`, rule 23 in `CLAUDE.md` and the design system in `03` now say
+  laptop first.
 
 - 25 October 2026: M68 (D57), asked for by the owner: requests from a kennel's own website (`/api/site/{slug}`, no new
   public function), delivery days on each area, and a made-to-order item (a cake) ordered once and paid ahead with

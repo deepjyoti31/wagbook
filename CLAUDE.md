@@ -108,7 +108,8 @@ docs/                  Numbered guides, plus reference/ (generated, do not edit)
 22. **No all-capitals labels, no arrows in button text, no decorative gradients.** Use the tokens in
     `src/app/globals.css` and the pieces in `src/components/ui.tsx`. The design system is described in
     `docs/03-architecture.md`.
-23. **Touch targets are at least 48 pixels high.** Test every screen at 360 pixels wide.
+23. **Laptop first, and it works on a tablet and a phone** (D58). Touch targets are at least 48 pixels high. Lay a form
+    out by its container (`@lg:grid-cols-2`, not `sm:`), and look at every screen at 1366, 820 and 360 pixels wide.
 
 ### Clean room
 
@@ -129,7 +130,7 @@ A piece of work is done when all of these are true:
 - [ ] New database rules have a test in `tests/db/` that fails when the rule is removed.
 - [ ] New pure logic has a unit test next to it.
 - [ ] `npm run gen:db` has been run if a migration changed.
-- [ ] The screen was looked at in a browser at 360 pixels wide (take a screenshot), or `docs/HANDOFF.md` says plainly
+- [ ] The screen was looked at in a browser at 1366, 820 and 360 pixels wide (take screenshots), or `docs/HANDOFF.md` says plainly
       that it was not.
 - [ ] `docs/02-product-spec.md` marks the feature as built, and `docs/08-roadmap.md` ticks the milestone.
 - [ ] `docs/HANDOFF.md` is updated: what changed, what is verified, what is next.

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Field, Input, Loading, Notice, PageTitle } from "@/components/ui";
+import { Field, Input, Loading, Narrow, Notice, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -11,9 +11,11 @@ export const generateMetadata = () => appTitle((m) => m.account.change.title);
 /** Change one's own password (M45). Each person's own; any role. */
 export default function PasswordPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <ChangePassword />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <ChangePassword />
+      </Suspense>
+    </Narrow>
   );
 }
 

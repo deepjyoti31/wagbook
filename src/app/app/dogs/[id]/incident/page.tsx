@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Field, Loading, PageTitle, Select, Textarea } from "@/components/ui";
+import { buttonStyles, Field, Loading, Narrow, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -19,9 +19,11 @@ export const generateMetadata = () => appTitle((m) => m.incident.title);
  */
 export default function IncidentPage({ params, searchParams }: PageProps<"/app/dogs/[id]/incident">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <IncidentForm params={params} searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <IncidentForm params={params} searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -64,7 +66,7 @@ async function IncidentForm({ params, searchParams }: Pick<PageProps<"/app/dogs/
       <ActionForm action={current ? correctIncident : addIncident}>
         <input type="hidden" name="petId" value={id} />
         {current ? <input type="hidden" name="incidentId" value={current.id} /> : null}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 @lg:grid-cols-2">
           <Field label={m.incident.whatHappened}>
             <Select name="category" defaultValue={current?.category ?? "illness"}>
               {INCIDENT_CATEGORIES.map((c) => (

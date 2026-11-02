@@ -89,7 +89,7 @@ export async function StaySupplies({ t, bookingId, petId, status }: { t: I18n; b
           <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{w.add}</summary>
           <ActionForm action={addSupply} className="mt-2 space-y-4">
             <input type="hidden" name="bookingId" value={bookingId} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={w.kind}>
                 <Select name="kind" defaultValue="food">
                   <option value="food">{w.kinds.food}</option>
@@ -392,7 +392,7 @@ export async function VetVisits({
             <p className="text-sm text-slate">
               {fill(w.about, { pet: petName })} {canManage ? null : w.staffNote}
             </p>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={w.day}>
                 <Input name="day" type="date" required defaultValue={today} max={today} />
               </Field>
@@ -412,7 +412,7 @@ export async function VetVisits({
             <fieldset className="space-y-3">
               <legend className="mb-1 font-semibold">{w.medicines}</legend>
               {[1, 2, 3].map((n) => (
-                <div key={n} className="grid gap-3 sm:grid-cols-3">
+                <div key={n} className="grid gap-3 @lg:grid-cols-3">
                   <Field label={fill(w.medicine, { n })}>
                     <Input name={`med${n}`} maxLength={80} />
                   </Field>

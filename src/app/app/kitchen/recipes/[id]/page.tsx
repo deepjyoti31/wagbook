@@ -103,7 +103,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
             <input type="hidden" name="recipeId" value={x.id} />
             <p className="text-sm text-slate">{w.newVersionAbout}</p>
             {rows.map((row, i) => (
-              <div key={i} className="grid gap-3 sm:grid-cols-2">
+              <div key={i} className="grid gap-3 @lg:grid-cols-2">
                 <Field label={w.item}>
                   <Select name={`item_${i}`} defaultValue={row?.item_id ?? ""}>
                     <option value="">{m.common.none}</option>
@@ -127,7 +127,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
             <Field label={w.goodForField}>
               <Textarea name="goodFor" rows={2} maxLength={500} defaultValue={current?.good_for ?? ""} />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 @lg:grid-cols-3">
               <Field label={w.yieldField}>
                 <Input name="yieldG" inputMode="numeric" defaultValue={current?.cooked_yield_bp ? String(current.cooked_yield_bp / 10) : ""} />
               </Field>
@@ -154,7 +154,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
 
       {canManage && !x.is_retired ? (
         <Section title={w.settings}>
-          <ActionForm action={updateRecipe} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={updateRecipe} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <input type="hidden" name="recipeId" value={x.id} />
             <Field label={r.place} hint={r.placeHint}>
               <Input name="place" inputMode="numeric" defaultValue={x.rotation_position ?? ""} />
@@ -165,7 +165,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
             <Field label={r.storage}>
               <Input name="storage" maxLength={200} defaultValue={x.storage_note ?? ""} />
             </Field>
-            <div className="flex flex-wrap gap-2 sm:col-span-3">
+            <div className="flex flex-wrap gap-2 @lg:col-span-3">
               <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
                 {m.common.saveChanges}
               </SubmitButton>
@@ -173,7 +173,7 @@ async function Recipe({ params, searchParams }: Pick<PageProps<"/app/kitchen/rec
                 {w.retire}
               </SubmitButton>
             </div>
-            <p className="text-sm text-slate sm:col-span-3">{w.retireHint}</p>
+            <p className="text-sm text-slate @lg:col-span-3">{w.retireHint}</p>
           </ActionForm>
         </Section>
       ) : null}

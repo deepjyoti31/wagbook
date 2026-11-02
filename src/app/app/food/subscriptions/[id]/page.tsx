@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PhotoInput } from "@/components/photo-input";
-import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, billPeriod, deliveryCutoff, formatDate, formatKg, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
@@ -100,6 +100,9 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
         </p>
       </div>
 
+      <Columns
+      main={
+      <>
       <Section title={w.deliveries} count={deliveries.data.length}>
         {deliveries.data.length === 0 ? (
           <Empty>{w.deliveriesNone}</Empty>
@@ -228,8 +231,8 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
 
       {delivered.length > 0 ? (
         <Section title={w.report}>
-          <ActionForm action={reportProblem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="text-sm text-slate sm:col-span-2">{fill(w.reportAbout, { hours: org.problem_window_hours })}</p>
+          <ActionForm action={reportProblem} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="text-sm text-slate @lg:col-span-2">{fill(w.reportAbout, { hours: org.problem_window_hours })}</p>
             <Field label={w.which}>
               <Select name="deliveryId" required>
                 {delivered.map((d) => (
@@ -248,15 +251,15 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                 ))}
               </Select>
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <Field label={w.note}>
                 <Input name="note" maxLength={500} />
               </Field>
             </div>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <PhotoInput name="photo" label={w.photo} words={m.photos} />
             </div>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton variant="secondary" pendingLabel={m.common.saving}>
                 {w.reportButton}
               </SubmitButton>
@@ -265,12 +268,16 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
         </Section>
       ) : null}
 
+      </>
+      }
+      side={
+      <>
       {ended ? null : (
         <>
           <Section title={w.change}>
-            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <input type="hidden" name="subscriptionId" value={s.id} />
-              <p className="text-sm text-slate sm:col-span-2">{fill(w.changeAbout, { hours: org.food_cutoff_hours })}</p>
+              <p className="text-sm text-slate @lg:col-span-2">{fill(w.changeAbout, { hours: org.food_cutoff_hours })}</p>
               <Field label={f.grams}>
                 <Input name="grams" inputMode="numeric" required defaultValue={s.grams_per_day} />
               </Field>
@@ -295,7 +302,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                   <option value="month">{f.pays.month}</option>
                 </Select>
               </Field>
-              <fieldset className="sm:col-span-2">
+              <fieldset className="@lg:col-span-2">
                 <legend className="mb-1 font-semibold">{f.days}</legend>
                 <div className="flex flex-wrap gap-x-4">
                   {WEEKDAYS.map((d) => (
@@ -306,7 +313,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                   ))}
                 </div>
               </fieldset>
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <Field label={f.address}>
                   <Select name="addressId" defaultValue={s.address_id ?? ""}>
                     <option value="">{f.collect}</option>
@@ -318,7 +325,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                   </Select>
                 </Field>
               </div>
-              <div className="sm:col-span-2">
+              <div className="@lg:col-span-2">
                 <SubmitButton pendingLabel={m.common.saving}>{m.common.saveChanges}</SubmitButton>
               </div>
             </ActionForm>
@@ -334,7 +341,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
                 </SubmitButton>
               </ActionForm>
             ) : null}
-            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
               <input type="hidden" name="subscriptionId" value={s.id} />
               <input type="hidden" name="intent" value="pause" />
               <Field label={w.pauseFrom}>
@@ -352,7 +359,7 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
           </Section>
 
           <Section title={w.end}>
-            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <ActionForm action={changeSubscription} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
               <input type="hidden" name="subscriptionId" value={s.id} />
               <input type="hidden" name="intent" value="end" />
               <Field label={w.endOn}>
@@ -370,6 +377,9 @@ async function Subscription({ params, searchParams }: Pick<PageProps<"/app/food/
           </Section>
         </>
       )}
+      </>
+      }
+      />
     </>
   );
 }

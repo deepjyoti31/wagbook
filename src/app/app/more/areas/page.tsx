@@ -33,7 +33,7 @@ async function Areas() {
   const plain = (minor: number | null) => (minor === null ? "" : toDecimalString(minor).replace(/\.00$/, ""));
   // The days food goes to an area (M68), ticked; none ticked is any day.
   const days = (ticked: readonly number[] | null) => (
-    <fieldset className="sm:col-span-3">
+    <fieldset className="@lg:col-span-3">
       <legend className="mb-1 font-semibold">{a.days}</legend>
       <div className="flex flex-wrap gap-x-4">
         {WEEKDAYS.map((d) => (
@@ -55,7 +55,7 @@ async function Areas() {
 
       {canManage ? (
         <Section title={a.add}>
-          <ActionForm action={addArea} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={addArea} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <Field label={a.pin}>
               <Input name="postalCode" inputMode={org.country_code === "IN" ? "numeric" : "text"} maxLength={10} required autoComplete="off" />
             </Field>
@@ -97,7 +97,7 @@ async function Areas() {
                       {m.common.change}
                       <span className="sr-only"> {x.name}</span>
                     </summary>
-                    <ActionForm action={changeArea} className="mt-2 grid items-end gap-4 sm:grid-cols-3">
+                    <ActionForm action={changeArea} className="mt-2 grid items-end gap-4 @lg:grid-cols-3">
                       <input type="hidden" name="areaId" value={x.id} />
                       <p className="sr-only">{fill(a.changeTitle, { name: x.name })}</p>
                       <Field label={a.pin}>

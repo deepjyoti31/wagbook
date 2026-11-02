@@ -6,7 +6,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { HidePanel } from "@/components/hide-panel";
 import { AddVaccinationForm, PetPhotoForm, VaccinationList } from "@/components/pet-panels";
 import { PetAvatar } from "@/components/pet-avatar";
-import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { canUndoPassing, dailyGrams, formatDate, formatKg, formatPhone, portionReviewDue, sizeBand, todayIn, weightChange, type PortionSettings } from "@/lib/core";
@@ -138,6 +138,9 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         />
       ) : null}
 
+      <Columns
+      main={
+      <>
       <Section title={m.pet.incidents} count={incidents.data.length}>
         {incidents.data.length === 0 ? (
           <Empty>{m.pet.noIncidents}</Empty>
@@ -232,6 +235,10 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
         )}
       </Section>
 
+      </>
+      }
+      side={
+      <>
       <Section title={m.pet.photo}>
         <PetPhotoForm t={t} petId={pet.id} hasPhoto={Boolean(pet.photo_path)} />
       </Section>
@@ -242,7 +249,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           <Field label={f.name}>
             <Input name="name" required maxLength={80} defaultValue={pet.name} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={f.animal}>
               <Select name="species" defaultValue={pet.species}>
                 <option value="dog">{m.labels.species.dog}</option>
@@ -297,7 +304,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
           </Field>
           <fieldset>
             <legend className="mb-1 font-semibold">{f.staffShouldKnow}</legend>
-            <div className="grid gap-1 sm:grid-cols-2">
+            <div className="grid gap-1 @lg:grid-cols-2">
               {PET_FLAGS.map((flag) => (
                 <label key={flag} className="flex min-h-12 items-center gap-3">
                   <input type="checkbox" name={`flag_${flag}`} defaultChecked={pet.flags.includes(flag)} className="size-5" />
@@ -306,7 +313,7 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
               ))}
             </div>
           </fieldset>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={f.vet}>
               <Input name="vetName" maxLength={120} defaultValue={pet.vet_name ?? ""} />
             </Field>
@@ -320,6 +327,9 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
 
       {hidden ? null : <HidePanel action={setPetHidden} field="petId" id={pet.id} hidden={false} canManage={canManage} words={hideWords} />}
       {canManage && !passed ? <MarkPassedAway t={t} pet={pet} today={today} /> : null}
+      </>
+      }
+      />
     </>
   );
 }
@@ -391,7 +401,7 @@ function WeightSection({
         <ActionForm action={addWeight} className="space-y-4 border-t border-rule pt-4">
           <p className="font-bold">{w.weigh}</p>
           <input type="hidden" name="petId" value={petId} />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={w.weightKg}>
               <Input name="weightKg" inputMode="decimal" required />
             </Field>
@@ -516,7 +526,7 @@ async function FoodSection({
 
         <details className="border-t border-rule pt-2">
           <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.change}</summary>
-          <ActionForm action={savePetFood} className="mt-2 grid gap-4 sm:grid-cols-2">
+          <ActionForm action={savePetFood} className="mt-2 grid gap-4 @lg:grid-cols-2">
             <input type="hidden" name="petId" value={pet.id} />
             <Field label={w.plan}>
               <Select name="plan" defaultValue={f?.plan ?? "full"}>
@@ -551,7 +561,7 @@ async function FoodSection({
             <Field label={w.startedField}>
               <Input name="startedOn" type="date" defaultValue={f?.started_on ?? ""} />
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <Field label={w.avoidField}>
                 <Input name="avoid" maxLength={300} defaultValue={f?.avoid ?? ""} />
               </Field>
@@ -566,7 +576,7 @@ async function FoodSection({
                 </Field>
               </>
             ) : null}
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.saving}>{m.common.save}</SubmitButton>
             </div>
           </ActionForm>

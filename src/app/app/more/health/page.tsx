@@ -44,7 +44,7 @@ async function Health() {
               ))}
             </Select>
           </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 @lg:grid-cols-3">
             <Field label={w.dewormDays} hint={w.emptyHint}>
               <Input name="dewormDays" type="number" min={1} max={730} defaultValue={org.deworm_days ?? ""} />
             </Field>
@@ -82,7 +82,7 @@ async function Health() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addRequiredVaccine} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={addRequiredVaccine} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <Field label={w.vaccine}>
               <Input name="vaccine" required maxLength={60} placeholder={w.vaccineExample} />
             </Field>

@@ -9,7 +9,7 @@ import { ParentCredit } from "@/components/parent-credit";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
 import { SellForm } from "@/components/sell-form";
-import { Badge, buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
@@ -108,6 +108,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
       {hidden ? <HidePanel action={setParentHidden} field="clientId" id={c.id} hidden canManage={canManage} words={hideWords} /> : null}
       {c.consent_at ? null : <Notice tone="info">{p.noConsent}</Notice>}
 
+      <Columns
+      main={
+      <>
       <Section title={p.pets} count={pets.data.length}>
         {pets.data.length === 0 ? (
           <Empty>{p.noPets}</Empty>
@@ -199,6 +202,10 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
       {org.offers_food_delivery ? <Addresses t={t} org={org} clientId={c.id} canManage={canManage} canDelete={canDelete} /> : null}
 
       <Packs t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
+      </>
+      }
+      side={
+      <>
       <ParentCredit t={t} org={org} clientId={c.id} canManage={canManage && !hidden} />
 
       {c.request_token && !hidden ? <RequestLink t={t} org={org} client={{ id: c.id, name: c.full_name, phone: c.phone, token: c.request_token }} /> : null}
@@ -209,7 +216,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           <Field label={f.name}>
             <Input name="full_name" required maxLength={120} defaultValue={c.full_name} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             {canManage ? (
               <>
                 <Field label={f.mobile} hint={f.mobileHint}>
@@ -220,7 +227,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
                 </Field>
               </>
             ) : (
-              <p className="text-slate sm:col-span-2">{p.phoneByManager}</p>
+              <p className="text-slate @lg:col-span-2">{p.phoneByManager}</p>
             )}
             <Field label={f.email}>
               <Input name="email" type="email" defaultValue={c.email ?? ""} />
@@ -232,7 +239,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           <Field label={f.address}>
             <Textarea name="address" rows={2} maxLength={500} defaultValue={c.address ?? ""} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={f.postalCode}>
               <Input name="postal_code" maxLength={12} defaultValue={c.postal_code ?? ""} />
             </Field>
@@ -349,6 +356,9 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
       ) : null}
 
       {hidden ? null : <HidePanel action={setParentHidden} field="clientId" id={c.id} hidden={false} canManage={canManage} words={hideWords} />}
+      </>
+      }
+      />
     </>
   );
 }
@@ -431,7 +441,7 @@ async function Packs({
         forSale.data.length === 0 ? (
           <p className="mt-3 text-sm text-slate">{w.addFirst}</p>
         ) : (
-          <ActionForm action={sellPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={sellPack} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <input type="hidden" name="clientId" value={clientId} />
             <Field label={w.which}>
               <Select name="packId" required defaultValue={forSale.data[0].id}>
@@ -483,7 +493,7 @@ async function Addresses({
 
   const fields = (x?: (typeof addresses.data)[number]) => (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @lg:grid-cols-2">
         <Field label={w.which}>
           <Select name="kind" defaultValue={x?.kind ?? "home"}>
             {(["home", "work", "other"] as const).map((k) => (
@@ -500,7 +510,7 @@ async function Addresses({
       <Field label={w.line}>
         <Input name="line" maxLength={300} required defaultValue={x?.line ?? ""} />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @lg:grid-cols-2">
         <Field label={w.area}>
           <Input name="area" maxLength={120} defaultValue={x?.area ?? ""} />
         </Field>

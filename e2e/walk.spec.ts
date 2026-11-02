@@ -349,7 +349,7 @@ test("a manager changes a line on a draft bill before issuing it", async ({ page
   await page.getByRole("button", { name: "Make the family bill" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Draft bill" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pepper booking" })).toBeVisible();
-  await page.getByText("Change").first().click();
+  await page.getByText("Change", { exact: true }).first().click();
   await page.getByLabel("Discount").first().fill("500");
   await page.getByRole("button", { name: "Save line" }).first().click();
   await expect(page.getByText("Bill updated.")).toBeVisible();

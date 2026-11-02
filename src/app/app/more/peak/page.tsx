@@ -76,7 +76,7 @@ async function Peaks() {
             <Field label={k.name}>
               <Input name="name" required maxLength={80} placeholder={k.nameExample} />
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={k.firstDay}>
                 <Input name="startDate" type="date" required />
               </Field>

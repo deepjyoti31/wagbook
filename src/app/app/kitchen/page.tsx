@@ -229,8 +229,8 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
       </Section>
 
       <Section title={k.batch}>
-        <ActionForm action={recordBatch} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-          <p className="text-sm text-slate sm:col-span-2">{k.batchAbout}</p>
+        <ActionForm action={recordBatch} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+          <p className="text-sm text-slate @lg:col-span-2">{k.batchAbout}</p>
           <Field label={k.recipe}>
             <Select name="versionId" required defaultValue={plan[0] ? (recipeOf.get(plan[0].recipe_id)?.version_id ?? "") : ""}>
               <option value="" disabled>
@@ -268,12 +268,12 @@ async function Kitchen({ searchParams }: Pick<PageProps<"/app/kitchen">, "search
           <Field label={k.forBoarders} hint={k.forBoardersHint}>
             <Input name="boardersOn" type="date" defaultValue={onKitchen.length > 0 ? day : ""} />
           </Field>
-          <div className="sm:col-span-2">
+          <div className="@lg:col-span-2">
             <Field label={k.note}>
               <Input name="note" maxLength={300} autoComplete="off" />
             </Field>
           </div>
-          <div className="sm:col-span-2">
+          <div className="@lg:col-span-2">
             <SubmitButton pendingLabel={k.recording}>{k.recordBatch}</SubmitButton>
           </div>
         </ActionForm>

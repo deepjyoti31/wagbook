@@ -1420,3 +1420,33 @@ staff agree it with the parent.
 
 **Look again** if a kennel wants a cake on a day its areas do not deliver, delivery days by the kennel's own week
 rather than by area, or the website to ask for an appointment's time.
+
+## D58. Laptop first, and every screen still works on a phone
+
+**Context.** Wagbook was designed at 360 pixels wide (principle 1 in `01`): a laptop got the phone's one column, 768
+pixels wide in the middle of the screen, with five links along the top. The owner tried it on a real Supabase project
+and found that most of the kennel's work (bookings, bills, the day's list at the front desk, settings) is done at a
+laptop, where the phone layout wasted the screen and kept the day's work two clicks away under More.
+
+**Decision.**
+
+- **Laptop first.** A sidebar on the left from `lg` (1024 pixels): the kennel's name, Today, Bookings, Calendar, Care,
+  Pets and More, then the day's work from More (Bills, Forms from parents, Checklists and repairs, and the kitchen,
+  food, shop and orders when offered) and, for owners and managers, the money (Reports, Expenses, History of changes).
+  The links come from one list (`src/lib/menu.ts`) that More uses too. A tablet keeps a bar along the top and a phone
+  the bar along the bottom; only one of the two navigations is on screen at a time.
+- **Two columns where a page has two kinds of work.** `Columns` puts a page in two from `xl` (1280 pixels): the work
+  on the left, and what is looked up or added now and then on the right (a pet's routines, updates and details on a
+  booking; a parent's credit, link and details). Today waits until `2xl`, because its rows of pets need the room. The
+  split is made where the phone's order already moved from the one to the other, so the phone sees the same order.
+- **Forms by their container.** A grid of fields uses a container query (`@lg:`) instead of the screen's width
+  (`sm:`), so the same form is two columns in a wide main column and one in a narrow side column. Pages that are one
+  form are kept to `max-w-3xl`.
+- **48 pixel targets everywhere.** A laptop can have a touch screen, and a tablet is a laptop's size.
+
+**Why.** The front desk is where bookings are taken, bills made and the day read; a wide screen should show more of it
+at once. Keeping the phone order means the yard loses nothing.
+
+**Cost.** Three layouts to look at for every screen instead of one (1366, 820 and 360 pixels, CLAUDE.md rule 23). The
+sidebar is long for a kennel that offers everything and scrolls on its own on a short laptop screen. Pages not split in
+two (Care, Bookings, the setup pages) are one wide column on a laptop; they read well but could use the room better.

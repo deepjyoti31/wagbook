@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { AlertsPhone } from "@/components/alerts-phone";
-import { Loading, Notice, PageTitle, Section } from "@/components/ui";
+import { Loading, Narrow, Notice, PageTitle, Section } from "@/components/ui";
 import { ALERT_KINDS } from "@/lib/alerts";
 import { requireOrg } from "@/lib/auth";
 import { plural } from "@/lib/i18n";
@@ -15,9 +15,11 @@ export const generateMetadata = () => appTitle((m) => m.alerts.title);
 /** Alerts on staff phones (M61): which alerts this person wants, and this phone on or off. */
 export default function AlertsPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Alerts />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <Alerts />
+      </Suspense>
+    </Narrow>
   );
 }
 

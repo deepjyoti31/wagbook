@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Field, Input, Loading, Notice, PageTitle, Select } from "@/components/ui";
+import { Field, Input, Loading, Narrow, Notice, PageTitle, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { CANCEL_OUTCOMES, DEFAULT_CANCEL_RULE, type CancelRule } from "@/lib/core";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
@@ -13,9 +13,11 @@ export const generateMetadata = () => appTitle((m) => m.cancelSetup.title);
 /** The kennel's cancellation rules and how long credit lasts (M38). */
 export default function CancellationPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Rules />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <Rules />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -48,7 +50,7 @@ async function Rules() {
       {canManage ? null : <Notice tone="info">{w.viewOnly}</Notice>}
       <ActionForm action={saveCancellationRules} className="space-y-6">
         <Group title={w.weekend} about={w.weekendHint}>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
             {([1, 2, 3, 4, 5, 6, 7] as const).map((d) => (
               <label key={d} className="flex min-h-12 items-center gap-3">
                 <input type="checkbox" name="weekend" value={d} defaultChecked={org.weekend_days.includes(d)} className="size-5" />
@@ -68,7 +70,7 @@ async function Rules() {
               <Field label={w.noticeHours} hint={w.noticeHoursHint}>
                 <Input name={`${kind}.hours`} type="number" min={0} max={720} required defaultValue={rule.notice_hours} />
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 @lg:grid-cols-2">
                 {FIELDS.map((f) => (
                   <Field key={f} label={w[f]}>
                     <Select name={`${kind}.${f}`} defaultValue={rule[COLUMN[f]]}>

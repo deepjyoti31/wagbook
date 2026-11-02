@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { appointmentsOn, HOLDING, workingPeople } from "@/lib/appointments";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, freeTimes, isISODate, localClock, localDate, todayIn } from "@/lib/core";
@@ -15,9 +15,11 @@ export const generateMetadata = () => appTitle((m) => m.moveAppointment.title);
 
 export default function MoveAppointmentPage({ params, searchParams }: PageProps<"/app/appointments/[id]/move">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <MoveAppointment params={params} searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <MoveAppointment params={params} searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -99,7 +101,7 @@ async function MoveAppointment({ params, searchParams }: Pick<PageProps<"/app/ap
       </p>
       <p className="mb-4 text-slate">{fill(w.now, { date: formatDate(was, locale), from: clock(a.starts_at), to: clock(a.ends_at) })}</p>
 
-      <form action={`/app/appointments/${a.id}/move`} className="mb-6 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+      <form action={`/app/appointments/${a.id}/move`} className="mb-6 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
         <Field label={w.date}>
           <Input type="date" name="date" min={today} defaultValue={day} required />
         </Field>

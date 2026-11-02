@@ -88,7 +88,7 @@ async function Recipes() {
 
       {canManage ? (
         <Section title={r.add}>
-          <ActionForm action={addRecipe} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={addRecipe} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <Field label={r.name}>
               <Input name="name" required maxLength={80} autoComplete="off" />
             </Field>
@@ -101,7 +101,7 @@ async function Recipes() {
             <Field label={r.storage}>
               <Input name="storage" maxLength={200} autoComplete="off" />
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.adding}>{r.addButton}</SubmitButton>
             </div>
           </ActionForm>
