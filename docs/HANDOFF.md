@@ -14,7 +14,8 @@ one list in `src/lib/menu.ts`) and a wide page; Today (from 1536 pixels) and the
 bill, appointment and food subscription (from 1280) are in two columns (`Columns`), split where the phone's order
 already was, so a phone sees the same order; forms lay out by their column's width (container queries, `@lg:` not
 `sm:`); pages that are one form are kept readable (`Narrow`); More is in two columns. A tablet has the bar along the
-top, a phone the bar along the bottom, as before. No database change. M68 (25 October 2026, D57), asked for by the owner: a kennel's own website sends
+top, a phone the bar along the bottom, as before. No database change. Both navigations are in the page and one is
+hidden, so a browser test should find words by role or inside `main`, not with a bare `getByText`. M68 (25 October 2026, D57), asked for by the owner: a kennel's own website sends
 its booking and food forms to Wagbook (`/api/site/{slug}`, Settings, **Your own website**), through the public
 functions that already existed, so the anonymous role still calls thirteen; the website's reference number is kept,
 shown to staff and used as the UPI note, and a resend is kept once; each area can have its own **delivery days**, which
@@ -855,7 +856,8 @@ One line per session, newest first. What changed, in a sentence. Details belong 
   the bottom bar on phones; two columns on Today and the pages of one booking, pet, parent, bill, appointment and
   subscription; forms by container queries; one-form pages narrowed; More in two columns. The links of More moved to
   `src/lib/menu.ts` (6 unit tests). No database change, no new dependency. Every signed-in screen looked at at four
-  widths against the local Supabase. Principle 1 in `01`, rule 23 in `CLAUDE.md` and the design system in `03` now say
+  widths against the local Supabase; the walk (83 steps) passes at 360 pixels after one step was made to look for
+  the exact word "Change" (the hidden sidebar's "History of changes" matched first). Principle 1 in `01`, rule 23 in `CLAUDE.md` and the design system in `03` now say
   laptop first.
 
 - 25 October 2026: M68 (D57), asked for by the owner: requests from a kennel's own website (`/api/site/{slug}`, no new
