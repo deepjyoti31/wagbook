@@ -54,7 +54,11 @@ export function Nav({
   calendar: string;
   /** The groups of More shown in the sidebar, each with its heading and links. */
   groups: { title: string; links: Item[] }[];
-  /** The bookings search, offered at the top of the sidebar. */
+  /**
+   * The bookings search at the top of the sidebar. Its label is one short word ("Search"): it sits in a search
+   * landmark with the placeholder beside it, and a longer label would be found by other fields' names (a label
+   * search for "Name" would find "pet name").
+   */
   search: { label: string; placeholder: string };
   /** Who is signed in, and as what, at the foot of the sidebar. */
   person: { name: string; role: string };

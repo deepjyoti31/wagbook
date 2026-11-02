@@ -46,7 +46,7 @@ async function MainNav() {
       kennelName={org.name}
       calendar={m.bookings.calendar}
       groups={groups}
-      search={{ label: m.bookings.searchLabel, placeholder: m.bookings.searchPlaceholder }}
+      search={{ label: m.bookings.search, placeholder: m.bookings.searchPlaceholder }}
       person={{ name: displayName || org.name, role: m.labels.role[role] }}
     />
   );
