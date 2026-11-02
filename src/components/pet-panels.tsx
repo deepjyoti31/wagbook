@@ -74,7 +74,7 @@ export function AddVaccinationForm({ t, petId }: { t: Words; petId: string }) {
         <Field label={v.vaccine}>
           <Input name="vaccine" required maxLength={60} placeholder={v.vaccineExample} />
         </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @lg:grid-cols-2">
           <Field label={v.givenOn}>
             <Input name="givenOn" type="date" />
           </Field>

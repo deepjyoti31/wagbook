@@ -180,7 +180,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
         {riders.length === 0 ? (
           <Empty>{r.noRiders}</Empty>
         ) : (
-          <ActionForm action={startRun} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+          <ActionForm action={startRun} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
             <input type="hidden" name="date" value={day} />
             <Field label={r.rider}>
               <Select name="riderId" required>
@@ -203,7 +203,7 @@ async function Runs({ searchParams }: Pick<PageProps<"/app/food/runs">, "searchP
             <div className="flex items-end">
               <SubmitButton pendingLabel={m.common.adding}>{r.startRun}</SubmitButton>
             </div>
-            <p className="text-sm text-slate sm:col-span-3">{formatDate(day, locale)}</p>
+            <p className="text-sm text-slate @lg:col-span-3">{formatDate(day, locale)}</p>
           </ActionForm>
         )}
       </Section>

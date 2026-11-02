@@ -78,7 +78,7 @@ async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "se
 
       <Section title={y.howPlayWorks}>
         <ActionForm action={savePlayHours} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 @lg:grid-cols-3">
             <Field label={y.sessions} hint={y.sessionsHint}>
               <Input name="sessions" type="number" min={0} max={12} defaultValue={org.play_sessions_per_day} />
             </Field>
@@ -89,7 +89,7 @@ async function PlayYards({ searchParams }: Pick<PageProps<"/app/more/play">, "se
               <Input name="changeover" type="number" min={0} max={60} defaultValue={org.play_changeover_minutes} />
             </Field>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={y.open}>
               <Input name="dayStart" type="time" required defaultValue={hm(org.play_day_start)} />
             </Field>
@@ -178,7 +178,7 @@ function Calculator({
     <Section title={c.title}>
       <form method="get" className="space-y-4 rounded-xl border border-rule bg-paper p-4">
         <Notice tone={answer.tone}>{answer.text}</Notice>
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 @lg:grid-cols-4">
           <Field label={c.pets}>
             <Input name="dogs" type="number" min={0} max={2000} defaultValue={str("dogs")} />
           </Field>
@@ -192,7 +192,7 @@ function Calculator({
             <Input name="changeover" type="number" min={0} max={60} defaultValue={str("changeover")} />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 @lg:grid-cols-4">
           <Field label={c.open}>
             <Input name="dayStart" type="time" defaultValue={str("dayStart")} />
           </Field>

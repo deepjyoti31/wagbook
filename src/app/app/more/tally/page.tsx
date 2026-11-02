@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Empty, Field, Input, Loading, PageTitle } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -12,9 +12,11 @@ export const generateMetadata = () => appTitle((m) => m.tally.ledgers);
 
 export default function TallyPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <TallyLedgers />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <TallyLedgers />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -43,8 +45,8 @@ async function TallyLedgers() {
     <>
       {title}
       <p className="mb-4 text-slate">{w.settingsAbout}</p>
-      <ActionForm action={saveTallyLedgers} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
+      <ActionForm action={saveTallyLedgers} className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+        <div className="@lg:col-span-2">
           <Field label={w.company} hint={w.companyHint}>
             <Input name="company" maxLength={100} defaultValue={ledgers.company ?? ""} autoComplete="off" />
           </Field>
@@ -54,7 +56,7 @@ async function TallyLedgers() {
             <Input name={column} required maxLength={100} defaultValue={ledgers[key]} autoComplete="off" />
           </Field>
         ))}
-        <div className="sm:col-span-2">
+        <div className="@lg:col-span-2">
           <SubmitButton pendingLabel={m.common.saving}>{w.save}</SubmitButton>
         </div>
       </ActionForm>

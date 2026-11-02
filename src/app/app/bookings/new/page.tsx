@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { NewBookingFields } from "@/components/new-booking-fields";
-import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Textarea } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -15,9 +15,11 @@ export const generateMetadata = () => appTitle((m) => m.newBooking.title);
 
 export default function NewBookingPage({ searchParams }: PageProps<"/app/bookings/new">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <NewBookingForm searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <NewBookingForm searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 

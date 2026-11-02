@@ -39,7 +39,7 @@ export function PaymentForm({
       {bookingId ? <input type="hidden" name="bookingId" value={bookingId} /> : null}
       <p className="font-bold">{refundOnly ? w.recordRefundTitle : bookingId ? w.recordAdvanceTitle : w.recordPaymentTitle}</p>
       {creditMinor > 0 && creditText ? <p className="text-slate">{creditText}</p> : null}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 @lg:grid-cols-3">
         <Field label={w.amount}>
           <Input name="amount" inputMode="decimal" required defaultValue={defaultAmount} />
         </Field>

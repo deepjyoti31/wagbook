@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PetAvatar } from "@/components/pet-avatar";
 import { PhotoInput } from "@/components/photo-input";
-import { buttonStyles, Field, Loading, Notice, PageTitle, Textarea } from "@/components/ui";
+import { buttonStyles, Field, Loading, Narrow, Notice, PageTitle, Textarea } from "@/components/ui";
 import { createUpdate } from "@/app/app/media/actions";
 import { requireOrg } from "@/lib/auth";
 import { dailyUpdateMessage, whatsappLink } from "@/lib/core";
@@ -18,9 +18,11 @@ export const generateMetadata = () => appTitle((m) => m.update.title);
 
 export default function UpdatePage({ params, searchParams }: PageProps<"/app/bookings/[id]/update">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <Update params={params} searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <Update params={params} searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 

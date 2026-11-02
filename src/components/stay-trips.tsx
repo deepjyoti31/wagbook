@@ -103,9 +103,9 @@ export async function StayTrips({
         addresses.data.length === 0 ? (
           <p className="mt-3 text-slate">{w.noAddress}</p>
         ) : (
-          <ActionForm action={addTrip} className="mt-4 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={addTrip} className="mt-4 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <input type="hidden" name="bookingId" value={b.id} />
-            <p className="font-bold sm:col-span-2">{w.add}</p>
+            <p className="font-bold @lg:col-span-2">{w.add}</p>
             <Field label={w.kind}>
               <Select name="kind" defaultValue={missing[0]}>
                 {missing.map((k) => (

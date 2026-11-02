@@ -34,10 +34,12 @@ link shows how their dog is doing.
 
 When two good ideas conflict, the one higher in this list wins.
 
-### 1. The phone in the yard comes first
+### 1. A laptop at the desk, and the phone in the yard
 
-Every screen is designed at 360 pixels wide, for a thumb, in sunlight. Desktop is the same screen with more room. If a
-feature needs a wide table to make sense, it needs redesigning.
+Every screen is designed for a laptop first, where the front desk and the owner do most of the work, and must then work
+on a tablet and on a phone at 360 pixels wide, for a thumb, in sunlight (D58). A wide screen gets more on it (a sidebar,
+two columns), never a different way of working. If a feature needs a wide table to make sense on a phone, it needs
+redesigning.
 
 ### 2. The database says no
 

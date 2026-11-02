@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Narrow, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { formatKg, formatMoney } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -15,9 +15,11 @@ export const generateMetadata = () => appTitle((m) => m.kitchenSettings.title);
 
 export default function KitchenSettingsPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <KitchenSettings />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <KitchenSettings />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -80,8 +82,8 @@ async function KitchenSettings() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addFoodProduct} className="mt-3 grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="font-bold sm:col-span-2">{k.addPrice}</p>
+          <ActionForm action={addFoodProduct} className="mt-3 grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="font-bold @lg:col-span-2">{k.addPrice}</p>
             <Field label={k.kind}>
               <Select name="kind" defaultValue="subscription">
                 {FOOD_PRODUCT_KINDS.map((x) => (
@@ -106,7 +108,7 @@ async function KitchenSettings() {
             <Field label={k.code}>
               <Input name="code" inputMode="numeric" maxLength={8} autoComplete="off" />
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <SubmitButton pendingLabel={m.common.adding}>{k.addPriceButton}</SubmitButton>
             </div>
           </ActionForm>
@@ -116,7 +118,7 @@ async function KitchenSettings() {
       {canManage ? (
         <ActionForm action={saveKitchenSettings} className="space-y-6">
           <Section title={k.portions}>
-            <div className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <div className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
               <Field label={k.small}>
                 <Input name="small" inputMode="decimal" required defaultValue={percentText(org.portion_small_bp)} />
               </Field>
@@ -141,7 +143,7 @@ async function KitchenSettings() {
             </div>
           </Section>
           <Section title={k.packing}>
-            <div className="grid gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+            <div className="grid gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
               <Field label={k.pack}>
                 <Input name="pack" inputMode="numeric" required defaultValue={org.food_pack_g} />
               </Field>
@@ -160,7 +162,7 @@ async function KitchenSettings() {
               <Field label={k.lead}>
                 <Input name="lead" inputMode="numeric" required defaultValue={org.item_lead_hours} />
               </Field>
-              <label className="flex min-h-12 items-start gap-3 sm:col-span-3">
+              <label className="flex min-h-12 items-start gap-3 @lg:col-span-3">
                 <input type="checkbox" name="orders" defaultChecked={org.food_orders_enabled} className="mt-1 size-5" />
                 <span>
                   {k.orders}

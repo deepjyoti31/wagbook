@@ -141,7 +141,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
 
       {canManage && active.length > 0 && people.length > 0 ? (
         <Section title={w.put.title}>
-          <ActionForm action={putOnRota} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={putOnRota} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <Field label={w.put.person}>
               <Select name="userId" required defaultValue="">
                 <option value="" disabled>
@@ -215,7 +215,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
             </ul>
           )}
           {canManage ? (
-            <ActionForm action={addPattern} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={addPattern} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <Field label={w.put.person}>
                 <Select name="userId" required defaultValue="">
                   <option value="" disabled>
@@ -240,9 +240,9 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
                   ))}
                 </Select>
               </Field>
-              <fieldset className="sm:col-span-2">
+              <fieldset className="@lg:col-span-2">
                 <legend className="mb-1 font-semibold">{w.pattern.days}</legend>
-                <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-1 @lg:grid-cols-4">
                   {[1, 2, 3, 4, 5, 6, 7].map((n) => (
                     <label key={n} className="flex min-h-12 items-center gap-3">
                       <input type="checkbox" name="weekday" value={n} className="size-5" />
@@ -275,7 +275,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
                         {w.shifts.change}
                         <span className="sr-only"> {s.name}</span>
                       </summary>
-                      <ActionForm action={changeShift} className="mt-2 grid items-end gap-3 sm:grid-cols-3">
+                      <ActionForm action={changeShift} className="mt-2 grid items-end gap-3 @lg:grid-cols-3">
                         <input type="hidden" name="shiftId" value={s.id} />
                         <Field label={w.shifts.starts}>
                           <Input name="starts" type="time" required defaultValue={s.starts_at.slice(0, 5)} />
@@ -308,7 +308,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
                 <SubmitButton pendingLabel={m.common.adding}>{w.shifts.addUsual}</SubmitButton>
               </ActionForm>
             ) : null}
-            <ActionForm action={addShift} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
+            <ActionForm action={addShift} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-4">
               <Field label={w.shifts.name}>
                 <Input name="name" required maxLength={40} />
               </Field>
@@ -330,7 +330,7 @@ async function Rota({ searchParams }: Pick<PageProps<"/app/more/rota">, "searchP
         <Section title={w.onSite.title}>
           <ActionForm action={saveOnSite} className="space-y-3 rounded-xl border border-rule bg-paper p-4">
             <p className="text-slate">{w.onSite.about}</p>
-            <div className="grid gap-1 sm:grid-cols-2">
+            <div className="grid gap-1 @lg:grid-cols-2">
               {people.map((p) => (
                 <label key={p.user_id} className="flex min-h-12 items-center gap-3">
                   <input type="checkbox" name={`site_${p.user_id}`} defaultChecked={p.lives_on_site} className="size-5" />

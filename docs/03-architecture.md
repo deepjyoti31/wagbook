@@ -331,8 +331,24 @@ prices line up. Headings are heavy and tight; body text is 16 pixels or larger.
 and `buttonStyles` (primary, secondary, quiet, whatsapp). Build screens from these. If a screen needs something new,
 add it to `ui.tsx`; do not style one-off elements in a page.
 
-**Layout.** One column, 48 pixel touch targets, navigation along the bottom on phones and along the top from the `sm`
-breakpoint. Four destinations: Today, Bookings, Pets, More.
+**Layout.** Laptop first, and it works down to a phone (D58). 48 pixel touch targets everywhere.
+
+| Screen | Navigation | Page |
+| --- | --- | --- |
+| Laptop (`lg`, 1024 pixels and up) | A sidebar on the left: Today, Bookings, Calendar, Care, Pets, More, then the day's work from More and, for owners and managers, the money (`SIDEBAR_GROUPS` in `src/lib/menu.ts`) | Up to `max-w-7xl` beside it; `Columns` puts a page in two from `xl` |
+| Tablet (`sm` to `lg`) | A bar along the top with the kennel's name and the five places | The full width |
+| Phone | A bar along the bottom, within thumb reach | One column |
+
+The links under More live in `src/lib/menu.ts`, so More and the sidebar always agree. Pieces for width:
+
+- `Columns` (`main`, `side`): two columns from `xl` (or `2xl` for Today, whose rows need the room), with the side
+  column 24rem wide. On a tablet or phone the side follows the main, so a page split this way keeps its phone order.
+  Used by Today and the pages of one booking, pet, parent, bill, appointment and food subscription.
+- `Narrow`: a page that is one form (a new booking, the settings, a password) kept to `max-w-3xl`.
+- **Forms lay out by their container, not the screen.** `<main>` and each column of `Columns` are containers, so a
+  grid of fields is `@lg:grid-cols-2` (two side by side once the column is 32rem wide), never `sm:grid-cols-2`. The
+  same form then fits the wide main column and the narrow side column. The public pages (`/i`, `/s`, `/book`, `/f`,
+  `/inv`, `/b`) are one narrow column and keep `sm:`.
 
 **Words.** Sentence case. No all-capitals labels. No arrows in buttons. No em dashes. Empty states say what to do next.
 

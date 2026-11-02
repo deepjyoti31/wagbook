@@ -76,7 +76,7 @@ async function House({ searchParams }: Pick<PageProps<"/app/more/house">, "searc
                 <p className="text-sm text-slate">{fill(w.repairs.reportedBy, { date: day(r.reported_at), name: name(r.reported_by) })}</p>
                 <details className="mt-2">
                   <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.repairs.fix}</summary>
-                  <ActionForm action={fixRepair} className="mt-2 grid items-end gap-3 sm:grid-cols-3">
+                  <ActionForm action={fixRepair} className="mt-2 grid items-end gap-3 @lg:grid-cols-3">
                     <input type="hidden" name="repairId" value={r.id} />
                     <Field label={w.repairs.cost}>
                       <Input name="cost" inputMode="decimal" autoComplete="off" />
@@ -168,7 +168,7 @@ async function House({ searchParams }: Pick<PageProps<"/app/more/house">, "searc
               </ActionForm>
             ) : null}
             <ActionForm action={addHouseJob} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 @lg:grid-cols-2">
                 <Field label={w.jobs.list}>
                   <Select name="list" defaultValue="opening">
                     {LISTS.map((l) => (

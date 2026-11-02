@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Empty, Field, Input, Loading, PageTitle, Section } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { typedQuantity } from "@/lib/core";
 import { fill } from "@/lib/i18n";
@@ -16,9 +16,11 @@ export const generateMetadata = () => appTitle((m) => m.orders.newOrder);
 
 export default function NewOrderPage({ searchParams }: PageProps<"/app/more/orders/new">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <NewOrder searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <NewOrder searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 

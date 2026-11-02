@@ -1,6 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Field, Input, Loading, Notice, PageTitle, Select, Textarea } from "@/components/ui";
+import { Field, Input, Loading, Narrow, Notice, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { GST_STATES, toDecimalString } from "@/lib/core";
 import { fill, LANGUAGE_NAMES, LANGUAGES } from "@/lib/i18n";
@@ -25,9 +25,11 @@ function timeZones(current: string): string[] {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Settings />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <Settings />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -77,7 +79,7 @@ async function Settings() {
           <Field label={s.kennel.name}>
             <Input name="name" defaultValue={org.name} required maxLength={80} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.kennel.phone}>
               <Input name="phone" type="tel" defaultValue={org.phone ?? ""} />
             </Field>
@@ -91,7 +93,7 @@ async function Settings() {
           <Field label={s.kennel.address}>
             <Input name="address_line1" defaultValue={org.address_line1 ?? ""} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 @lg:grid-cols-3">
             <Field label={s.kennel.city}>
               <Input name="city" defaultValue={org.city ?? ""} />
             </Field>
@@ -102,7 +104,7 @@ async function Settings() {
               <Input name="postal_code" defaultValue={org.postal_code ?? ""} />
             </Field>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.kennel.dropOff}>
               <Input name="check_in_time" type="time" defaultValue={org.check_in_time.slice(0, 5)} />
             </Field>
@@ -139,7 +141,7 @@ async function Settings() {
         </Group>
 
         <Group title={s.prices.title} about={s.prices.about}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.prices.boarding}>
               <Input name="price_boarding" inputMode="decimal" defaultValue={price("boarding")} />
             </Field>
@@ -156,7 +158,7 @@ async function Settings() {
         </Group>
 
         <Group title={s.paid.title} about={s.paid.about}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.paid.upi} hint={s.paid.upiHint}>
               <Input name="upi_vpa" defaultValue={org.upi_vpa ?? ""} autoCapitalize="none" spellCheck={false} />
             </Field>
@@ -174,7 +176,7 @@ async function Settings() {
               <option value="simple">{s.tax.simple}</option>
             </Select>
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.tax.taxId}>
               <Input name="tax_id" defaultValue={org.tax_id ?? ""} autoCapitalize="characters" spellCheck={false} />
             </Field>
@@ -208,7 +210,7 @@ async function Settings() {
           <div className="space-y-2">
             <p className="font-bold">{s.tax.perStay}</p>
             <p className="text-sm text-slate">{s.tax.perStayAbout}</p>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @lg:grid-cols-2">
               <Field label={s.tax.rateBoarding}>
                 <Input name="tax_rate_boarding" inputMode="decimal" defaultValue={stayRate("boarding")} />
               </Field>
@@ -226,7 +228,7 @@ async function Settings() {
         </Group>
 
         <Group title={s.region.title} about={s.region.about}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Field label={s.region.timeZone} hint={s.region.timeZoneHint}>
               <Select name="time_zone" defaultValue={org.time_zone}>
                 {timeZones(org.time_zone).map((z) => (

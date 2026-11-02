@@ -37,7 +37,7 @@ export async function PetAppointments({ t, petId }: { t: I18n; petId: string }) 
           <p>
             {last ? fill(g.last, { date: formatDate(last, locale) }) : g.never} {last && every ? fill(g.due, { date: formatDate(addDays(last, every * 7), locale) }) : null}
           </p>
-          <ActionForm action={saveGroomingCard} className="grid items-end gap-4 sm:grid-cols-2">
+          <ActionForm action={saveGroomingCard} className="grid items-end gap-4 @lg:grid-cols-2">
             <input type="hidden" name="petId" value={petId} />
             <Field label={g.coat}>
               <Select name="coat" defaultValue={pet.data?.coat ?? ""}>
@@ -93,9 +93,9 @@ export async function PetAppointments({ t, petId }: { t: I18n; petId: string }) 
             </Ledger>
           )}
           {canManage && (training.data ?? []).length > 0 ? (
-            <ActionForm action={sellCourse} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+            <ActionForm action={sellCourse} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
               <input type="hidden" name="petId" value={petId} />
-              <p className="font-bold sm:col-span-2">{c.sell}</p>
+              <p className="font-bold @lg:col-span-2">{c.sell}</p>
               <Field label={c.service}>
                 <Select name="serviceId" defaultValue={training.data![0].id}>
                   {training.data!.map((s) => (

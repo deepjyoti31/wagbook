@@ -80,7 +80,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
       <MonthPicker month={month} href={(x) => `/app/more/reports?month=${x}`} locale={locale} words={m.common} />
 
       <Section title={r.howFull}>
-        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-2 @lg:grid-cols-4">
           <Figure label={r.nightsSold}>{stay.nights}</Figure>
           <Figure label={r.dayBoardingDays}>{stay.days}</Figure>
           <Figure label={r.kennelsUsed}>{stay.percentFull === null ? r.noKennels : fill(r.percent, { n: stay.percentFull })}</Figure>
@@ -93,7 +93,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
       </Section>
 
       <Section title={fill(r.moneyIn, { month: name })}>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3">
           <Figure label={r.billed} hint={charged && thisMonth ? includes(fmt(thisMonth.tax_minor)) : undefined}>
             {fmt((thisMonth?.billed_minor ?? 0) - (thisMonth?.credited_minor ?? 0))}
           </Figure>
@@ -249,7 +249,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
               ))}
             </Select>
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @lg:grid-cols-2">
             <Field label={r.from}>
               <Input name="from" type="date" required defaultValue={first} />
             </Field>
@@ -293,7 +293,7 @@ async function FoodReport({ orgId, currency, first, last, yearStart }: { orgId: 
   return (
     <Section title={f.title}>
       {x ? (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-2 gap-2 @lg:grid-cols-3">
           <Figure label={f.active}>{x.active_subscriptions}</Figure>
           <Figure label={f.started}>{x.subscriptions_started}</Figure>
           <Figure label={f.ended}>{x.subscriptions_ended}</Figure>

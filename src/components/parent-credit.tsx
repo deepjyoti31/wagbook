@@ -48,7 +48,7 @@ export async function ParentCredit({ t, org, clientId, canManage }: { t: I18n; o
         </>
       )}
       {canManage ? (
-        <ActionForm action={giveCredit} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+        <ActionForm action={giveCredit} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
           <input type="hidden" name="clientId" value={clientId} />
           <Field label={w.amount}>
             <Input name="amount" inputMode="decimal" required />

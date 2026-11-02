@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { VaccinationWarnings } from "@/components/pet-panels";
-import { buttonStyles, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { buttonStyles, Empty, Field, Input, Loading, Narrow, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { appointmentsOn, workingPeople } from "@/lib/appointments";
 import { requireOrg } from "@/lib/auth";
 import { appointmentPrice, formatDate, formatMoney, freeTimes, isISODate, todayIn, vaccinationWarnings } from "@/lib/core";
@@ -15,9 +15,11 @@ export const generateMetadata = () => appTitle((m) => m.newAppointment.title);
 
 export default function NewAppointmentPage({ searchParams }: PageProps<"/app/appointments/new">) {
   return (
-    <Suspense fallback={<Loading />}>
-      <NewAppointment searchParams={searchParams} />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <NewAppointment searchParams={searchParams} />
+      </Suspense>
+    </Narrow>
   );
 }
 
@@ -160,7 +162,7 @@ async function NewAppointment({ searchParams }: Pick<PageProps<"/app/appointment
         </Link>
       </p>
 
-      <form action="/app/appointments/new" className="mb-6 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+      <form action="/app/appointments/new" className="mb-6 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
         <input type="hidden" name="pet" value={p.id} />
         {inPackage ? <input type="hidden" name="package" value="1" /> : null}
         <Field label={w.service}>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { HealthAtTheDoor } from "@/components/stay-health";
 import { workingPeople } from "@/lib/appointments";
 import { requireOrg } from "@/lib/auth";
@@ -157,6 +157,9 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
       ) : null}
       {open && !a.booking_id && a.appointment_services?.checks_vaccinations ? <HealthAtTheDoor t={t} petId={a.pet_id} on={day} appointmentId={a.id} /> : null}
 
+      <Columns
+      main={
+      <>
       {open ? (
         <Section title={w.next}>
           <div className="space-y-4">
@@ -262,7 +265,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
 
       {a.kind === "party" ? (
         <Section title={w.party}>
-          <ActionForm action={saveParty} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+          <ActionForm action={saveParty} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
             <input type="hidden" name="appointmentId" value={a.id} />
             <Field label={w.guest}>
               <Select name="guestId" defaultValue={a.guest_pet_id ?? ""}>
@@ -278,9 +281,9 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
               <Input name="people" inputMode="numeric" defaultValue={a.people ?? ""} />
             </Field>
             {a.guest_vaccinations_checked_at ? (
-              <p className="font-semibold text-leaf sm:col-span-2">{w.guestChecked}</p>
+              <p className="font-semibold text-leaf @lg:col-span-2">{w.guestChecked}</p>
             ) : (
-              <label className="flex min-h-12 items-center gap-2 font-semibold sm:col-span-2">
+              <label className="flex min-h-12 items-center gap-2 font-semibold @lg:col-span-2">
                 <input type="checkbox" name="guestSeen" className="size-5" />
                 {w.guestSeen}
               </label>
@@ -301,7 +304,7 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
               {cakes.data.length === 0 ? (
                 <p className="text-slate">{w.cakeNone}</p>
               ) : (
-                <ActionForm action={orderPartyCake} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+                <ActionForm action={orderPartyCake} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
                   <input type="hidden" name="appointmentId" value={a.id} />
                   <Field label={w.cakeItem}>
                     <Select name="productId" defaultValue={cakes.data[0].id}>
@@ -325,6 +328,10 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
         </Section>
       ) : null}
 
+      </>
+      }
+      side={
+      <>
       <Section title={w.notes}>
         <ActionForm action={saveAppointmentNotes} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
           <input type="hidden" name="appointmentId" value={a.id} />
@@ -427,6 +434,9 @@ async function Appointment({ params, searchParams }: Pick<PageProps<"/app/appoin
           </ActionForm>
         ) : null}
       </Section>
+      </>
+      }
+      />
     </>
   );
 }

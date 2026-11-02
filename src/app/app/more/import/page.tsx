@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { buttonStyles, Loading, PageTitle } from "@/components/ui";
+import { buttonStyles, Loading, Narrow, PageTitle } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { ImportForm } from "./import-form";
@@ -10,9 +10,11 @@ export const generateMetadata = () => appTitle((m) => m.importing.title);
 /** Bring in parents, pets and vaccinations from a spreadsheet (M47). Owners and managers. */
 export default function ImportPage() {
   return (
-    <Suspense fallback={<Loading />}>
-      <Import />
-    </Suspense>
+    <Narrow>
+      <Suspense fallback={<Loading />}>
+        <Import />
+      </Suspense>
+    </Narrow>
   );
 }
 

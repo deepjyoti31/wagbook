@@ -43,8 +43,8 @@ async function Kennels({ searchParams }: Pick<PageProps<"/app/more/kennels">, "s
             </Field>
             <SubmitButton pendingLabel={m.common.adding}>{k.addOneButton}</SubmitButton>
           </ActionForm>
-          <ActionForm action={addKennels} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
-            <p className="font-bold sm:col-span-4">{k.addRow}</p>
+          <ActionForm action={addKennels} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-4">
+            <p className="font-bold @lg:col-span-4">{k.addRow}</p>
             <Field label={k.prefix}>
               <Input name="prefix" defaultValue="K" maxLength={20} />
             </Field>

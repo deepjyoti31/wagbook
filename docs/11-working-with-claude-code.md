@@ -79,7 +79,7 @@ Read CLAUDE.md and docs/HANDOFF.md. Then do milestone M2 from docs/08-roadmap.md
 
 Work on a branch called m2-booking-page. Before you finish:
 - npm run check must pass; paste the last lines of its output.
-- Take a screenshot of each new screen at 360 pixels wide.
+- Take a screenshot of each new screen at 1366, 820 and 360 pixels wide (laptop, tablet, phone).
 - Update docs/02-product-spec.md, docs/08-roadmap.md and docs/HANDOFF.md.
 - Open a pull request describing what you built, what you verified and what you could not verify.
 ```

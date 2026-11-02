@@ -69,7 +69,7 @@ export function StayFields({
           <option value="daycare">{words.daycare}</option>
         </Select>
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @lg:grid-cols-2">
         <Field label={words.checkInDate}>
           <Input name="startDate" type="date" required value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>

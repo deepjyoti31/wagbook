@@ -101,8 +101,8 @@ async function Setup() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addPlace} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-4">
-            <div className="sm:col-span-2">
+          <ActionForm action={addPlace} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-4">
+            <div className="@lg:col-span-2">
               <Field label={w.placeName}>
                 <Input name="name" required maxLength={60} placeholder={w.placeNameExample} />
               </Field>
@@ -168,7 +168,7 @@ async function Setup() {
                           <li className="text-sm text-slate">{fill(w.usual, { price: money(s.price_minor) })}</li>
                         </ul>
                         {canManage ? (
-                          <ActionForm action={setServicePrice} className="grid items-end gap-3 sm:grid-cols-3">
+                          <ActionForm action={setServicePrice} className="grid items-end gap-3 @lg:grid-cols-3">
                             <input type="hidden" name="serviceId" value={s.id} />
                             {s.pricing === "by_size" ? (
                               <Field label={w.size}>
@@ -221,8 +221,8 @@ async function Setup() {
           </Ledger>
         )}
         {canManage && places.data.length > 0 ? (
-          <ActionForm action={addService} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="font-bold sm:col-span-2">{w.addService}</p>
+          <ActionForm action={addService} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="font-bold @lg:col-span-2">{w.addService}</p>
             <Field label={w.name}>
               <Input name="name" required maxLength={80} placeholder={w.nameExample} />
             </Field>
@@ -285,11 +285,11 @@ async function Setup() {
                 </Field>
               </>
             ) : null}
-            <label className="flex min-h-12 items-center gap-2 font-semibold sm:col-span-2">
+            <label className="flex min-h-12 items-center gap-2 font-semibold @lg:col-span-2">
               <input type="checkbox" name="checks_vaccinations" defaultChecked className="size-5" />
               {w.checksVaccinations}
             </label>
-            <label className="flex min-h-12 items-center gap-2 font-semibold sm:col-span-2">
+            <label className="flex min-h-12 items-center gap-2 font-semibold @lg:col-span-2">
               <input type="checkbox" name="is_addon" className="size-5" />
               {w.isAddon}
             </label>
@@ -340,7 +340,7 @@ async function Setup() {
                     {canManage ? (
                       <details>
                         <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{fill(w.addPart, { name: p.name })}</summary>
-                        <ActionForm action={addPackagePart} className="mt-2 grid items-end gap-3 sm:grid-cols-2">
+                        <ActionForm action={addPackagePart} className="mt-2 grid items-end gap-3 @lg:grid-cols-2">
                           <input type="hidden" name="packageId" value={p.id} />
                           <Field label={w.partService}>
                             <Select name="serviceId" defaultValue="">
@@ -393,8 +393,8 @@ async function Setup() {
           </Ledger>
         )}
         {canManage ? (
-          <ActionForm action={addPackage} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="font-bold sm:col-span-2">{w.addPackage}</p>
+          <ActionForm action={addPackage} className="mt-4 grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="font-bold @lg:col-span-2">{w.addPackage}</p>
             <Field label={w.packageName}>
               <Input name="name" required maxLength={80} placeholder={w.packageNameExample} />
             </Field>
@@ -417,7 +417,7 @@ async function Setup() {
                 </Field>
               </>
             ) : null}
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <Field label={w.about}>
                 <Textarea name="about" maxLength={500} />
               </Field>

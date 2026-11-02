@@ -148,9 +148,9 @@ export async function StayAppointments({
       ) : null}
 
       {open && !b.package_id && (packages.data ?? []).length > 0 ? (
-        <ActionForm action={applyPackageToStay} className="mt-4 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
+        <ActionForm action={applyPackageToStay} className="mt-4 grid items-end gap-3 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
           <input type="hidden" name="bookingId" value={b.id} />
-          <p className="font-bold sm:col-span-2">{w.addPackage}</p>
+          <p className="font-bold @lg:col-span-2">{w.addPackage}</p>
           <Field label={w.choosePackage}>
             <Select name="packageId" defaultValue={packages.data![0].id}>
               {packages.data!.map((p) => (

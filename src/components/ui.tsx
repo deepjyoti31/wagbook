@@ -3,6 +3,10 @@ import type { ComponentProps, ReactNode } from "react";
 /**
  * Small building blocks shared by every screen. Server-safe (no hooks).
  * Touch targets are at least 48px tall. See docs/03-architecture.md.
+ *
+ * Laptop first, and it works down to a phone: forms inside a page lay out by
+ * the width of their container (`@lg:grid-cols-2`, not `sm:`), so the same
+ * form fits the wide main column of a laptop and its narrow side column.
  */
 
 const BUTTON_BASE =
@@ -39,6 +43,34 @@ export function Section({ title, count, children }: { title: string; count?: num
       {children}
     </section>
   );
+}
+
+/**
+ * A page in two columns on a wide screen: the work in `main`, and what is
+ * looked up or added now and then in `side`, beside it. On a tablet or a
+ * phone the side follows the main, in the same order as before.
+ */
+const COLUMNS_FROM = {
+  xl: "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:items-start xl:gap-8",
+  "2xl": "2xl:grid 2xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] 2xl:items-start 2xl:gap-8",
+} as const;
+
+/** `from` is the screen width the columns start at: later for a page whose main rows need the room (Today). */
+export function Columns({ main, side, from = "xl" }: { main: ReactNode; side: ReactNode; from?: keyof typeof COLUMNS_FROM }) {
+  return (
+    <div className={COLUMNS_FROM[from]}>
+      <div className="@container min-w-0">{main}</div>
+      <div className="@container min-w-0">{side}</div>
+    </div>
+  );
+}
+
+/**
+ * A page that is one form (a new booking, a password, the settings): kept to
+ * a width that reads well on a laptop, instead of fields a screen wide.
+ */
+export function Narrow({ children }: { children: ReactNode }) {
+  return <div className="max-w-3xl">{children}</div>;
 }
 
 /** A ruled list, like lines in a register. */

@@ -87,7 +87,7 @@ async function History({ searchParams }: Pick<PageProps<"/app/more/history">, "s
     <>
       {title}
       <p className="mb-4 text-slate">{h.intro}</p>
-      <form method="get" className="mb-5 grid gap-3 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-3">
+      <form method="get" className="mb-5 grid gap-3 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-3">
         <Field label={h.what}>
           <Select name="table" defaultValue={table}>
             <option value="">{h.everything}</option>

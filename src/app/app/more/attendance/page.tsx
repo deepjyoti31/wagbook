@@ -104,7 +104,7 @@ async function Attendance({ searchParams }: Pick<PageProps<"/app/more/attendance
                                   {canManage ? (
                                     <details>
                                       <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold underline underline-offset-4">{w.change}</summary>
-                                      <ActionForm action={changeStretch} className="mt-2 grid items-end gap-3 sm:grid-cols-2">
+                                      <ActionForm action={changeStretch} className="mt-2 grid items-end gap-3 @lg:grid-cols-2">
                                         <input type="hidden" name="stretchId" value={s.id} />
                                         <input type="hidden" name="day" value={s.work_date} />
                                         <Field label={w.byHand.in}>
@@ -113,7 +113,7 @@ async function Attendance({ searchParams }: Pick<PageProps<"/app/more/attendance
                                         <Field label={w.byHand.out} hint={w.byHand.outHint}>
                                           <Input name="out" type="time" defaultValue={s.clocked_out_at ? clock(s.clocked_out_at) : ""} />
                                         </Field>
-                                        <div className="sm:col-span-2">
+                                        <div className="@lg:col-span-2">
                                           <Field label={w.byHand.note}>
                                             <Input name="note" required maxLength={300} defaultValue={s.note ?? ""} />
                                           </Field>
@@ -144,8 +144,8 @@ async function Attendance({ searchParams }: Pick<PageProps<"/app/more/attendance
 
       {canManage && people.length > 0 ? (
         <Section title={w.byHand.title}>
-          <ActionForm action={addStretch} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 sm:grid-cols-2">
-            <p className="text-slate sm:col-span-2">{w.byHand.about}</p>
+          <ActionForm action={addStretch} className="grid items-end gap-4 rounded-xl border border-rule bg-paper p-4 @lg:grid-cols-2">
+            <p className="text-slate @lg:col-span-2">{w.byHand.about}</p>
             <Field label={w.byHand.person}>
               <Select name="userId" required defaultValue="">
                 <option value="" disabled>
@@ -167,7 +167,7 @@ async function Attendance({ searchParams }: Pick<PageProps<"/app/more/attendance
             <Field label={w.byHand.out} hint={w.byHand.outHint}>
               <Input name="out" type="time" />
             </Field>
-            <div className="sm:col-span-2">
+            <div className="@lg:col-span-2">
               <Field label={w.byHand.note}>
                 <Input name="note" required maxLength={300} />
               </Field>

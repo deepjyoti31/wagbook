@@ -3,9 +3,9 @@
 /*
  * Wagbook's look, in one place. See docs/03-architecture.md, "Design system".
  *
- * The app is used on a phone, in a kennel, often outdoors and one-handed. So:
- * strong contrast, big touch targets, no web fonts to download, and colour
- * that always means the same thing:
+ * The app is used at the front desk on a laptop, and on a phone in the yard,
+ * often outdoors and one-handed (D58). So: strong contrast, big touch targets,
+ * no web fonts to download, and colour that always means the same thing:
  *   marigold  needs attention (arrivals, the kennel door tag)
  *   leaf      done or in house
  *   alert     medication, incidents, things that went wrong

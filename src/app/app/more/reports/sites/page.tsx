@@ -108,7 +108,7 @@ function Figures({ x, t }: { x: SiteSummary; t: I18n }) {
   const r = m.reports;
   const fmt = (minor: number) => formatMoney(minor, { currency: x.currency, locale, trimZeros: true });
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3">
       <Figure label={r.nightsSold}>{x.nights}</Figure>
       <Figure label={r.dayBoardingDays}>{x.days}</Figure>
       <Figure label={r.kennelsUsed}>{x.percentFull === null ? r.noKennels : fill(r.percent, { n: x.percentFull })}</Figure>
