@@ -69,18 +69,16 @@ export function Section({ title, count, action, children }: { title: string; cou
 
 /**
  * Done out of total, as a bar. `tone` colours it: plain work in ink, medicines
- * in red, and all done in green whatever it is.
+ * in red, and all done in green whatever it is. With a `label` it is a meter a
+ * screen reader announces; without one it only repeats the words beside it, so
+ * it is hidden from screen readers.
  */
 export function Meter({ value, total, tone = "ink", label }: { value: number; total: number; tone?: "ink" | "alert" | "leaf"; label?: string }) {
   const share = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
   const fill = { ink: "bg-ink", alert: "bg-alert", leaf: "bg-leaf" }[value >= total && total > 0 ? "leaf" : tone];
   return (
     <span
-      role="meter"
-      aria-valuemin={0}
-      aria-valuemax={total}
-      aria-valuenow={value}
-      aria-label={label}
+      {...(label ? { role: "meter", "aria-valuemin": 0, "aria-valuemax": total, "aria-valuenow": value, "aria-label": label } : { "aria-hidden": true })}
       className="block h-2 overflow-hidden rounded-full bg-black/8"
     >
       <span className={`block h-full rounded-full ${fill}`} style={{ width: `${share}%` }} />

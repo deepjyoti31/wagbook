@@ -59,7 +59,8 @@ async function openBooking(page: Page, pet: string, status: string) {
 
 test("signing in shows today at the kennel", async ({ page }) => {
   await signIn(page, "staff");
-  await expect(page.getByText("4 in house of 12 kennels")).toBeVisible();
+  // Today's first figure (D59): its bar is named with the sentence the page used to show.
+  await expect(page.getByRole("meter", { name: "4 in house of 12 kennels" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Meals 2 of 12/ })).toBeVisible();
   // Nothing on the page is wider than the phone.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
@@ -557,7 +558,7 @@ test("someone with no account joins with an invite link, and is suspended and re
   await kiran.page.getByRole("button", { name: "Create account" }).click();
   await kiran.page.getByRole("button", { name: /Join Wagbook Demo Kennel/ }).click();
   await kiran.page.waitForURL(/\/app$/);
-  await expect(kiran.page.getByText(/in house of 12 kennels/)).toBeVisible();
+  await expect(kiran.page.getByRole("meter", { name: /in house of 12 kennels/ })).toBeVisible();
 
   // The same link does not work twice.
   await page.reload();
@@ -576,7 +577,7 @@ test("someone with no account joins with an invite link, and is suspended and re
   await restore.click();
   await expect(page.getByText("They can use Wagbook here again.")).toBeVisible();
   await kiran.page.goto("/app");
-  await expect(kiran.page.getByText(/in house of 12 kennels/)).toBeVisible();
+  await expect(kiran.page.getByRole("meter", { name: /in house of 12 kennels/ })).toBeVisible();
   await kiran.context.close();
 });
 
