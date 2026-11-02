@@ -114,6 +114,10 @@ The first release will be 0.1.0. Everything below is in it.
   accountant uses. Have your accountant check one month before relying on it.
 - Several sites under one owner: each is a kennel of its own, added from More, and an owner of two or more sees all
   their sites side by side and added up under Reports. An owner may now have up to ten kennels.
+- A new look, laptop first: on a laptop a dark sidebar with icons, a search box and who is signed in, and a wide page;
+  on a tablet a bar along the top, on a phone a bar along the bottom. Sections are white cards, Today opens with four
+  numbers and a bar for each kind of care, stays are bars on the calendar, and the pages parents open (a stay, a bill,
+  the forms) are warmer and carry your kennel's name.
 
 ### For whoever runs it
 
