@@ -3238,7 +3238,8 @@ test("M65: an owner adds a second site and sees both side by side and together; 
   await page.getByRole("link", { name: en.reports.sites.link }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.reports.sites.title })).toBeVisible();
   const section = (name: string) => page.locator("section").filter({ has: page.getByRole("heading", { level: 2, name, exact: true }) });
-  const figure = (name: string, label: string) => section(name).locator("div.p-3").filter({ has: page.getByText(label, { exact: true }) }).locator("p").nth(1);
+  // A figure is a label and its number (Figure in ui.tsx, D59).
+  const figure = (name: string, label: string) => section(name).locator("[data-figure]").filter({ has: page.getByText(label, { exact: true }) }).locator("p").nth(1);
   const together = en.reports.sites.together;
   await expect(section(together).getByText("2 sites")).toBeVisible();
   await expect(section("Demo City Site").getByText(en.reports.sites.here)).toBeVisible();
