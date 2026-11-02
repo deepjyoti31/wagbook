@@ -2,12 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 24 October 2026, after a bug review of the whole code that followed M67.
+Last updated: 25 October 2026, after M68 (orders from a kennel's own website, delivery days by area, cakes).
 
 ## In one paragraph
 
-Every milestone from M2 to M67 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. A bug review of the whole code after M67 (24 October 2026) fixed fourteen bugs,
+Every milestone from M2 to M68 is built, and the launch work in M1 waits for the owner: the roadmap is finished
+except M1 and the ideas not scheduled. M68 (25 October 2026, D57), asked for by the owner: a kennel's own website sends
+its booking and food forms to Wagbook (`/api/site/{slug}`, Settings, **Your own website**), through the public
+functions that already existed, so the anonymous role still calls thirteen; the website's reference number is kept,
+shown to staff and used as the UPI note, and a resend is kept once; each area can have its own **delivery days**, which
+a subscription and a trial then take; and a made-to-order item (a birthday cake) can be ordered once from the order page
+or the website, priced with the area's delivery charge and paid ahead, on a day with notice and with deliveries
+(`WB189`, `WB300`). A bug review of the whole code after M67 (24 October 2026) fixed fourteen bugs,
 each with a test: one parent's money or credit could pay another parent's bill (now `WB058`, and credit spent on
 nothing `WB214`); money paid on a cancelled family, series, appointment, sale or food bill was left on it, and a refund
 on a cancelled bill stopped the next one being issued; a stay made already checked in skipped the health papers at the
@@ -116,6 +122,9 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 
 | Thing | Verified by | Confidence |
 | --- | --- | --- |
+| M68: an area's delivery days decide a subscription's and a trial's days; a cake is priced with delivery, needs notice and a delivery day, and is confirmed into its delivery even after the notice passed; a resend with the same reference is kept once; the website address is an origin | `tests/db/website-orders.test.ts`; the area days, the resend index and the confirm exemption each removed once to see a test fail | High |
+| M68: reading a website's request (`SiteRequest`, `bookingPayload()`, `foodPayload()`, `originAllowed()`, `isWebsiteOrigin()`) | `src/lib/site-request.test.ts` | High |
+| M68 in a browser: a kennel's website (served locally) sent a boarding request, a grooming request, a subscription ("I have paid" too), a cake refused on Sunday and taken on Wednesday, and an order outside the areas to a real Wagbook on the local Supabase; another origin refused; a resend kept once; a cake ordered on `/f/` and confirmed by staff; Orders and requests, Forms from parents, Areas, Settings and `/f/` looked at at 360 pixels | By hand with Playwright, 25 October 2026; the walk (83 steps) passes against the local Supabase. Its first run that day failed once at the booking form for new parents (`/book/`, not changed in M68): the drop-off date typed came back empty, as if the page reset it as it loaded. The second run passed. Watch for it | High for the local stack |
 | Every migration applies in order | `tests/db/smoke.test.ts` on PGlite, and `supabase start` / `supabase db reset` on Supabase's Postgres 17.11 image (CLI 2.120.0) | High |
 | `supabase/seed.sql` applies and builds the demo kennel | `tests/db/seed.test.ts`, and the local Supabase | High |
 | Tenant isolation, role limits, the anonymous surface | `tests/db/security.test.ts`, `hardening.test.ts` | High |
@@ -259,6 +268,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 | Thing | Why not | Risk |
 | --- | --- | --- |
+| A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
 | A hosted Supabase project, and `docs/10-setup-and-deploy.md` followed end to end | Needs a person with a Supabase account | The local stack is the same software, so schema problems are unlikely. Settings screens, email templates and menu names in the guide may be off. |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
@@ -307,6 +317,17 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A parent's ZIP with hundreds of photos | The walk exports one parent with one certificate; the ZIP is checked by `unzip -t` and a reader in the tests | The ZIP is built in memory on the server; a very large export may be slow on a small server |
 
 ## Do this next
+
+**Connecting a kennel's own website (M68)**, once the hosted project exists:
+
+- Make the hosted database from the migrations as they are now (they include M68), then freeze them.
+- Settings, **Your own website**: the website's address, `https://` and the name only. Wagbook then shows the address
+  the website's forms send to; the website's settings must name the same, with the kennel's short name at the end.
+- Kitchen settings, Food prices: the trial, subscription food per kilo and the cake (a made-to-order item), at the
+  website's prices. Settings, the notice for made-to-order items (24 hours unless the kennel says otherwise).
+- Areas you serve: every PIN code delivered to, with its charge and its two delivery days. A PIN code not listed waits
+  for its area, cakes included.
+- Send one booking, one subscription and one cake from the real website, and confirm them in Wagbook.
 
 **Before the first real day at a kennel** (from the pre-launch review, M66; none of it needs code):
 
@@ -516,6 +537,14 @@ are fixed, and the hint under Stay on a booking.
 ## Open questions
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
+
+Chosen in M68 (D57) as the simplest thing:
+
+- A cake may be delivered on any day some area takes deliveries, with the kennel's notice, not only on its own area's
+  days. Should it follow its own area's days?
+- An area's delivery days hold only for orders from the order page and the website; staff making a subscription by
+  hand may choose any days.
+- A booking from a website may come without dates or a pick-up address; staff agree them on the call.
 
 Chosen in the pre-launch review (M66, D56) as the simplest thing:
 
@@ -807,6 +836,15 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 25 October 2026: M68 (D57), asked for by the owner: requests from a kennel's own website (`/api/site/{slug}`, no new
+  public function), delivery days on each area, and a made-to-order item (a cake) ordered once and paid ahead with
+  delivery. Two new error codes (`WB189`, `WB300`, a new range); `service_areas.delivery_weekdays`,
+  `organizations.website_url`, `food_orders` and `intake_submissions` gained `site_ref`; no new dependency. 14 database
+  tests, 15 unit tests; `npm run check`: 816 tests; the walk 83 steps; tried in a browser with a website against the local
+  Supabase. Migrations edited in place (not frozen): the first
+  hosted database must be made from this work. Also fixed `tests/db/sites.test.ts`, which failed every evening after
+  18:30 UTC (it took UTC's date where the bill is dated by the kennel's).
 
 - 24 October 2026: a bug review of the whole code after M67. Fourteen bugs fixed (listed in "In one paragraph"), each
   with a test that fails without the fix: 10 database tests changed or added, 4 unit tests, 1 browser step (the

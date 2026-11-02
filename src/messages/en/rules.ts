@@ -212,6 +212,7 @@ export const rulesArea = {
     linkAbout: "A page where a new parent asks for a stay or an appointment and sees an estimate. It lands here with their details; accepting it also adds the request.",
     review: {
       appointment: "Asks for {service} at {time}. Accepting also adds the appointment as a request.",
+      appointmentNoTime: "Asks for {service}, with no time yet. Agree a time with the parent and book it.",
       stay: "From the booking form. Accepting also adds the stay as a request.",
       pickup: "Asks for pick-up from home.",
       vaccinationsOk: "Says the vaccinations are up to date.",

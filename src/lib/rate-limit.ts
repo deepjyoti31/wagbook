@@ -40,6 +40,8 @@ export const RATE_RULES: RateRule[] = [
   { name: "booking", matches: (p) => p.startsWith("/book/"), limit: 10, windowSeconds: 10 * 60 },
   // An order from the kennel's food order page, and saying it was paid (M32): as the intake form.
   { name: "food", matches: (p) => p.startsWith("/f/"), limit: 10, windowSeconds: 10 * 60 },
+  // Requests from a kennel's own website (M68): a booking or an order, a retry, and "I have paid".
+  { name: "site", matches: (p) => p.startsWith("/api/site/"), limit: 20, windowSeconds: 10 * 60 },
   // Changing a password checks the current one (M45): a stolen session must not be able to guess it.
   { name: "password", matches: (p) => p === "/app/more/password", limit: 10, windowSeconds: 10 * 60 },
 ];

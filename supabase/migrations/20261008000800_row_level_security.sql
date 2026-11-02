@@ -776,7 +776,7 @@ grant execute on function public.batch_cost(uuid, uuid) to authenticated;
 grant execute on function public.batch_recipients(uuid, uuid) to authenticated;
 grant execute on function public.my_runs(date) to authenticated;
 grant execute on function public.rider_mark_stop(uuid, public.delivery_status, text) to authenticated;
-grant execute on function public.first_delivery_day(uuid, smallint[]) to authenticated;
+grant execute on function public.first_delivery_day(uuid, smallint[], date) to authenticated;
 grant execute on function public.org_today(uuid) to authenticated;
 grant execute on function public.confirm_food_order(uuid) to authenticated;
 grant execute on function public.record_purchase(uuid, uuid, bigint, bigint, date, uuid, date, text, text, text) to authenticated;

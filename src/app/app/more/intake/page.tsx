@@ -8,6 +8,7 @@ import { formatDate, formatPhone, intakeInviteMessage, isISODate, whatsappLink }
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { IntakePayload } from "@/lib/intake";
+import { sourceText } from "@/lib/site-request";
 import { signedUrls } from "@/lib/media";
 import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
@@ -189,11 +190,15 @@ async function Intake() {
                     ))}
                   </ul>
                   {stay?.notes ? <p className="mt-3">{fill(k.note, { note: stay.notes })}</p> : null}
+                  {parsed.success && parsed.data.site?.ref ? <p className="mt-3 text-slate">{fill(m.site.ref, { ref: parsed.data.site.ref })}</p> : null}
+                  {parsed.success && parsed.data.site && sourceText(parsed.data.site) ? (
+                    <p className="text-slate">{fill(m.site.came, { source: sourceText(parsed.data.site) ?? "" })}</p>
+                  ) : null}
                   {parsed.success && parsed.data.request ? (
                     <div className="mt-3 space-y-1 rounded-lg bg-ground p-3">
                       <p className="font-semibold">
                         {parsed.data.request.service_id
-                          ? fill(m.bookingForm.review.appointment, {
+                          ? fill(parsed.data.request.time ? m.bookingForm.review.appointment : m.bookingForm.review.appointmentNoTime, {
                               service: services.find((x) => x.id === parsed.data.request?.service_id)?.name ?? "",
                               time: parsed.data.request.time ?? "",
                             })

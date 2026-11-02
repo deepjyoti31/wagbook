@@ -31,6 +31,9 @@ export const beyondArea = {
     saved: "Saved {name}.",
     removed: "Area removed.",
     yesRemove: "Yes, remove this area",
+    days: "Delivery days",
+    daysHint: "Food orders from this area come on these days. Tick none for any day.",
+    daysLine: "Food delivered {days}",
     errors: {
       pin: "Enter a PIN code of six digits.",
       postalCode: "Enter the postal code.",

@@ -940,7 +940,8 @@ begin
     end if;
   end if;
   -- A made-to-order item needs its notice (M36): its slot no sooner than the kennel's lead time.
-  if tg_op = 'INSERT' and new.kind = 'item'
+  -- An order a parent sent in time (M68) was checked then: confirming it later is not refused.
+  if tg_op = 'INSERT' and new.kind = 'item' and coalesce(current_setting('wagbook.confirming_order', true), '') <> 'on'
      and ((new.delivery_date + case new.slot when 'morning' then time '08:00' when 'afternoon' then time '13:00' else time '18:00' end)
           at time zone v_org.time_zone) < now() + make_interval(hours => v_org.item_lead_hours) then
     raise exception 'WB156: a made-to-order item needs % hours'' notice. Choose a later day.', v_org.item_lead_hours using errcode = '23514';
@@ -967,7 +968,7 @@ begin
 end;
 $$;
 comment on function public.deliveries_price() is
-  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel''s lead time (WB156).';
+  'Trigger: a delivery''s unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel''s lead time (WB156), except while confirm_food_order() makes one a parent ordered in time.';
 
 create trigger deliveries_price
   before insert or update of kind, product_id, grams, quantity, unit_price_minor, price_minor, delivery_charge_minor, tax_rate_bp, address_id

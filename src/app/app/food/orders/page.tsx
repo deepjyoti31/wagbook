@@ -29,7 +29,7 @@ async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, 
   const supabase = await createClient();
   const orders = await supabase
     .from("food_orders")
-    .select("id, kind, status, client_id, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot, line, area, postal_code, starts_on, until_date, grams, amount_minor, note, created_at, clients(full_name, phone), subscriptions(pets(name))")
+    .select("id, kind, status, client_id, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot, line, area, postal_code, starts_on, until_date, grams, amount_minor, note, inscription, site_ref, site_source, created_at, clients(full_name, phone), subscriptions(pets(name)), food_products(name)")
     .eq("org_id", org.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -51,6 +51,11 @@ async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, 
       } else {
         lines.push([o.line, o.area, o.postal_code].filter(Boolean).join(", "));
       }
+    } else if (o.kind === "item" && o.starts_on) {
+      // A made-to-order item from outside (M68): what, for whom, when, and the words on it.
+      lines.push(fill(w.itemLine, { item: o.food_products?.name ?? w.kinds.item, pet: o.pet_name ?? "", date: formatDate(o.starts_on, locale), slot: o.slot ? m.slots[o.slot] : "" }));
+      if (o.inscription) lines.push(fill(w.inscription, { words: o.inscription }));
+      lines.push([o.line, o.area, o.postal_code].filter(Boolean).join(", "));
     } else if (o.kind === "more" && o.starts_on) {
       lines.push(fill(w.more, { kg: formatKg(o.grams ?? 0, locale), date: formatDate(o.starts_on, locale) }));
     } else if (o.starts_on) {
@@ -58,6 +63,8 @@ async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, 
     }
     if (o.amount_minor !== null) lines.push(fill(w.amount, { amount: money(o.amount_minor) }));
     if (o.note) lines.push(o.note);
+    if (o.site_ref) lines.push(fill(m.site.ref, { ref: o.site_ref }));
+    if (o.site_source) lines.push(fill(m.site.came, { source: o.site_source }));
     return lines;
   };
 
@@ -88,7 +95,7 @@ async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, 
                     {line}
                   </p>
                 ))}
-                {o.kind === "trial" || o.kind === "subscription" ? <p className="mt-1 text-sm text-slate">{w.confirmHint}</p> : null}
+                {o.kind === "trial" || o.kind === "subscription" || o.kind === "item" ? <p className="mt-1 text-sm text-slate">{w.confirmHint}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <ActionForm action={confirmOrder} className="contents">
                     <input type="hidden" name="orderId" value={o.id} />

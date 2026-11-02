@@ -1,6 +1,6 @@
 "use server";
 
-import { formatMoney, normalizePhone, normalizePostalCode, parseKgToGrams, qrMatrix, qrSvgPath, upiLink } from "@/lib/core";
+import { formatMoney, isISODate, normalizePhone, normalizePostalCode, parseKgToGrams, qrMatrix, qrSvgPath, upiLink } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { sendAlertsAfter } from "@/lib/push";
 import { checked, text } from "@/lib/forms";
@@ -45,7 +45,11 @@ export async function submitFoodOrder(slug: string, language: string, payTo: Pay
   if (await isRateLimited()) return { error: t.m.errors.slowDown };
 
   const kind = form.get("kind");
-  if (kind !== "trial" && kind !== "subscription") return { error: e.kind };
+  if (kind !== "trial" && kind !== "subscription" && kind !== "item") return { error: e.kind };
+  // A made-to-order item (M68) comes on the day the parent chose, with what to write on it.
+  const itemId = kind === "item" ? text(form, "product_id") : null;
+  const day = kind === "item" ? text(form, "starts_on") : null;
+  if (kind === "item" && !(day && isISODate(day))) return { error: e.itemDay };
   const name = text(form, "parent_name");
   if (!name) return { error: e.name };
   const phone = normalizePhone(text(form, "phone") ?? "");
@@ -53,9 +57,10 @@ export async function submitFoodOrder(slug: string, language: string, payTo: Pay
   const dog = text(form, "pet_name");
   if (!dog) return { error: e.dog };
   const weight = parseKgToGrams(text(form, "weight_kg") ?? "");
-  if (weight === null || weight < 500) return { error: e.weight };
+  if (kind !== "item" && (weight === null || weight < 500)) return { error: e.weight };
+  // An area with its own delivery days takes those, and the page asks for none.
   const days = WEEKDAYS.filter((d) => form.get(`day_${d}`) === "on");
-  if (kind === "subscription" && days.length === 0) return { error: e.days };
+  if (kind === "subscription" && days.length === 0 && form.get("area_days") !== "on") return { error: e.days };
   const line = text(form, "line");
   if (!line) return { error: e.line };
   const postal = normalizePostalCode(text(form, "postal_code") ?? "", payTo.country);
@@ -71,7 +76,10 @@ export async function submitFoodOrder(slug: string, language: string, payTo: Pay
       pet_name: dog,
       weight_g: weight,
       plan: form.get("plan") === "topper" ? "topper" : "full",
-      grams_per_day: Number(text(form, "grams_per_day") ?? "0"),
+      grams_per_day: kind === "subscription" ? Number(text(form, "grams_per_day") ?? "0") : null,
+      product_id: itemId,
+      starts_on: day,
+      inscription: kind === "item" ? text(form, "inscription") : null,
       weekdays: days,
       slot: text(form, "slot") ?? "morning",
       line,

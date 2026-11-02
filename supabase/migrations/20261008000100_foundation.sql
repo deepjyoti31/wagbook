@@ -206,6 +206,9 @@ create table public.organizations (
   neuter_months smallint check (neuter_months is null or neuter_months between 1 and 120),
   keeps_rota boolean not null default false,
   review_url text check (review_url is null or (review_url ~ '^https://[^[:space:]]+$' and char_length(review_url) <= 500)),
+  -- The kennel's own website (M68), as an origin: no path, no slash at the end.
+  website_url text constraint organizations_website_is_origin
+    check (website_url is null or (website_url ~ '^(https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+|http://localhost)(:[0-9]{1,5})?$' and char_length(website_url) <= 200)),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Food is delivered from the kennel's own kitchen (D44).
@@ -281,6 +284,8 @@ comment on column public.organizations.deworm_days is 'A pet must have been dewo
 comment on column public.organizations.tick_days is 'A pet must have had tick treatment within this many days (M40). Empty: not required.';
 comment on column public.organizations.neuter_months is 'Above this age in months a pet must be spayed or neutered (M40). Empty: not required.';
 comment on column public.organizations.review_url is 'The kennel''s review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders.';
+comment on column public.organizations.website_url is
+  'The kennel''s own website (M68), as https://name.example: its booking and food forms may send to /api/site/{slug}, and only from there (with or without www). Empty: requests from a website are refused.';
 comment on column public.organizations.keeps_rota is
   'Whether the kennel keeps its rota, leave and attendance in Wagbook (M43): shifts, clocking in and out, Today''s "on now". Off: none of it is shown.';
 comment on column public.organizations.food_orders_enabled is 'Whether the public food order page at /f/{slug} takes orders (M32). It also needs food delivery switched on.';

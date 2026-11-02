@@ -6,14 +6,15 @@ import { requireOrg } from "@/lib/auth";
 import { normalizePostalCode, parseMoney } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
+import { WEEKDAYS } from "@/lib/kitchen";
 import { fill } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
 import type { Messages } from "@/messages";
 import { createClient } from "@/lib/supabase/server";
 
-type Area = { postal_code: string; name: string; delivery_charge_minor: number | null; trip_charge_minor: number | null };
+type Area = { postal_code: string; name: string; delivery_charge_minor: number | null; trip_charge_minor: number | null; delivery_weekdays: number[] | null };
 
-/** Read the area form: a PIN code (six digits in India), a name and an optional charge. */
+/** Read the area form: a PIN code (six digits in India), a name, an optional charge and the days food goes there. */
 function readArea(form: FormData, m: Messages, country: string): { error: string } | { area: Area } {
   const e = m.areas.errors;
   const postal = normalizePostalCode(text(form, "postalCode") ?? "", country);
@@ -28,7 +29,9 @@ function readArea(form: FormData, m: Messages, country: string): { error: string
   const tripTyped = text(form, "tripCharge");
   const trip = tripTyped === null ? null : parseMoney(tripTyped);
   if (tripTyped !== null && (trip === null || trip < 0)) return { error: e.charge };
-  return { area: { postal_code: postal, name: name.data, delivery_charge_minor: charge, trip_charge_minor: trip } };
+  // The days food goes there (M68). None ticked: any day.
+  const days = WEEKDAYS.filter((d) => form.get(`day_${d}`) === "on");
+  return { area: { postal_code: postal, name: name.data, delivery_charge_minor: charge, trip_charge_minor: trip, delivery_weekdays: days.length > 0 ? days : null } };
 }
 
 /** Add a PIN code the kennel delivers to. Owners and managers (the policy decides). */

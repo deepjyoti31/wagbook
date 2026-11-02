@@ -37,6 +37,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | WB240 to WB249 | Running for real: import and the photo archive |
 | WB250 to WB259 | The day: cleaning, house jobs, a pet that passed away, costs as expenses, vet visits |
 | WB260 to WB269 | Stay reports |
+| WB300 to WB309 | Food orders from the website (continued) |
 
 | Code | Message | Raised in |
 | --- | --- | --- |
@@ -140,7 +141,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB153` | a cancelled delivery stays cancelled. Make a new one.<br>this delivery has been to the door. Report a problem instead. | `20261008000550_kitchen.sql` |
 | `WB154` | bill a subscription's deliveries with the subscription, and an order of this parent on its own | `20261008000550_kitchen.sql` |
 | `WB155` | some of these days are on another bill of this subscription | `20261008000550_kitchen.sql` |
-| `WB156` | a made-to-order item needs % hours' notice. Choose a later day. | `20261008000550_kitchen.sql` |
+| `WB156` | a made-to-order item needs % hours' notice. Choose a later day. | `20261008000550_kitchen.sql`<br>`20261008000600_intake_and_public_pages.sql` |
 | `WB160` | this delivery is not that batch's recipe | `20261008000550_kitchen.sql` |
 | `WB161` | batch % is used by %, and this delivery goes on % | `20261008000550_kitchen.sql` |
 | `WB170` | the rider must be working at this kennel | `20261008000550_kitchen.sql` |
@@ -157,6 +158,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB186` | choose one of your food subscriptions | `20261008000600_intake_and_public_pages.sql` |
 | `WB187` | those dates or amounts cannot be asked for. Check them and try again. | `20261008000600_intake_and_public_pages.sql` |
 | `WB188` | this order has already been dealt with | `20261008000600_intake_and_public_pages.sql` |
+| `WB189` | choose the day to deliver it | `20261008000600_intake_and_public_pages.sql` |
 | `WB190` | that service cannot be booked. Choose another. | `20261008000450_appointments.sql` |
 | `WB191` | that place is out of service | `20261008000450_appointments.sql` |
 | `WB192` | % is open from % to %. Choose a time inside its hours. | `20261008000450_appointments.sql` |
@@ -229,3 +231,4 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB291` | that is not on this order | `20261008000580_shop_and_orders.sql` |
 | `WB292` | that is more than is still to come on this order (%). Record the rest as bought in. | `20261008000580_shop_and_orders.sql` |
 | `WB293` | this order's bill is written down already | `20261008000580_shop_and_orders.sql` |
+| `WB300` | there are no deliveries on that day. Choose another day. | `20261008000600_intake_and_public_pages.sql` |

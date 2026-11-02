@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 20. Tables: 89. Views: 9. Functions: 202.
+Migrations applied: 20. Tables: 89. Views: 9. Functions: 203.
 
 ## Contents
 
@@ -36,7 +36,7 @@ Migrations applied: 20. Tables: 89. Views: 9. Functions: 202.
 | `delivery_slot` | `morning`, `afternoon`, `evening` | When a delivery arrives: morning (from 8), afternoon (from 1) or evening (from 6), kennel time. Changes close food_cutoff_hours before the slot starts. |
 | `delivery_status` | `planned`, `packed`, `out`, `delivered`, `not_home`, `refused`, `cancelled` | planned: to be cooked and packed. packed: packed from a batch. out: with the rider. delivered, not_home, refused: what happened at the door. cancelled: not going, with a reason. |
 | `food_goal` | `lose`, `keep`, `gain` | Whether a dog should lose weight, keep it, or gain. Changes the portion by organizations.goal_change_bp. |
-| `food_order_kind` | `trial`, `subscription`, `pause`, `skip`, `more` | trial, subscription: an order from the website order page. pause, skip, more: a known parent's change to their food from their own link (pause for some days, skip one delivery, an extra order). |
+| `food_order_kind` | `trial`, `subscription`, `item`, `pause`, `skip`, `more` | trial, subscription, item: an order from the order page or the kennel's own website (item: a made-to-order item such as a birthday cake, once, M68). pause, skip, more: a known parent's change to their food from their own link (pause for some days, skip one delivery, an extra order). |
 | `food_order_status` | `waiting_area`, `unpaid`, `paid`, `requested`, `confirmed`, `declined` | waiting_area: the PIN code is not served yet; nothing was charged. unpaid: waiting for the parent's UPI payment. paid: the parent says they have paid; staff check the money arrived. requested: a known parent's change, for staff to make. confirmed: made into a subscription, a trial or a change. declined: not taken. |
 | `food_plan` | `full`, `topper` | full: all of a dog's food. topper: a share of the day's food on top of what it already eats (a third by default). |
 | `food_product_kind` | `trial`, `subscription`, `by_kilo`, `item` | trial: a fixed amount at a fixed price, once per pet. subscription: food delivered on set days, priced per kilo. by_kilo: a one-off order priced per kilo. item: made to order, priced per piece (a birthday cake). |
@@ -1594,7 +1594,7 @@ Money the kennel spent: food, staff, repairs, vet bills. Owners and managers onl
 
 ### food_orders
 
-Food asked for from outside: an order from the website order page (a trial or a subscription), or a known parent's change from their own link (pause, skip, more). Written only by submit_food_order() and submit_food_request(); staff confirm or decline it.
+Food asked for from outside: an order from the order page or the kennel's own website (a trial, a subscription or a made-to-order item), or a known parent's change from their own link (pause, skip, more). Written only by submit_food_order() and submit_food_request(); staff confirm or decline it.
 
 | Column | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
@@ -1617,12 +1617,17 @@ Food asked for from outside: an order from the website order page (a trial or a 
 | `area` | `text` |  |  |  |
 | `postal_code` | `text` |  |  |  |
 | `door_note` | `text` |  |  |  |
-| `starts_on` | `date` |  |  | Website orders: the first delivery day asked for. Changes: the first day of a pause, or the delivery to skip. |
+| `starts_on` | `date` |  |  | Website orders: the first delivery day, worked out from the area's delivery days; an item: the day it is delivered. Changes: the first day of a pause, or the delivery to skip. |
 | `until_date` | `date` |  |  | A pause: the last day of it. Empty: until the parent says. |
 | `grams` | `integer` |  |  | More: how much extra food, in grams. |
 | `amount_minor` | `bigint` |  |  | What the order page asked the parent to pay: the trial, or the first week ahead, with delivery. Worked out by the database. |
 | `note` | `text` |  |  |  |
 | `consent_text` | `text` |  |  | The consent wording the parent agreed to, in the language they read it. |
+| `product_id` | `uuid` |  |  | An item order (M68): the made-to-order item in the rate card. |
+| `inscription` | `text` |  |  | An item order: the name or words to write on it. |
+| `site_ref` | `text` |  |  | The reference number the kennel's own website gave the order (M68), also the UPI payment note, so staff can match the money. The same reference from the same phone is the same order sent again, and is not kept twice. |
+| `site_source` | `text` |  |  | Where the website visitor came from (its campaign tags), for knowing which advertising works. |
+| `delivery_id` | `uuid` |  |  | The delivery a confirmed trial or item order made. |
 | `paid_claimed_at` | `timestamp with time zone` |  |  | When the parent said they had paid. Staff check the money before confirming. |
 | `reviewed_by` | `uuid` |  |  |  |
 | `reviewed_at` | `timestamp with time zone` |  |  |  |
@@ -1634,7 +1639,9 @@ Food asked for from outside: an order from the website order page (a trial or a 
 - Unique `food_orders_org_id_id_key`: `UNIQUE (org_id, id)`
 - Unique `food_orders_public_token_key`: `UNIQUE (public_token)`
 - Foreign key `food_orders_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE SET NULL (client_id)`
+- Foreign key `food_orders_org_id_delivery_id_fkey`: `FOREIGN KEY (org_id, delivery_id) REFERENCES deliveries(org_id, id) ON DELETE SET NULL (delivery_id)`
 - Foreign key `food_orders_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
+- Foreign key `food_orders_org_id_product_id_fkey`: `FOREIGN KEY (org_id, product_id) REFERENCES food_products(org_id, id) ON DELETE SET NULL (product_id)`
 - Foreign key `food_orders_org_id_subscription_id_fkey`: `FOREIGN KEY (org_id, subscription_id) REFERENCES subscriptions(org_id, id) ON DELETE SET NULL (subscription_id)`
 - Foreign key `food_orders_reviewed_by_fkey`: `FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) ON DELETE SET NULL`
 - Check `food_orders_amount_minor_check`: `CHECK (((amount_minor IS NULL) OR (amount_minor >= 0)))`
@@ -1642,17 +1649,22 @@ Food asked for from outside: an order from the website order page (a trial or a 
 - Check `food_orders_door_note_check`: `CHECK (((door_note IS NULL) OR (char_length(door_note) <= 300)))`
 - Check `food_orders_grams_check`: `CHECK (((grams IS NULL) OR ((grams >= 10) AND (grams <= 20000))))`
 - Check `food_orders_grams_per_day_check`: `CHECK (((grams_per_day IS NULL) OR ((grams_per_day >= 10) AND (grams_per_day <= 5000))))`
+- Check `food_orders_inscription_check`: `CHECK (((inscription IS NULL) OR ((char_length(inscription) >= 1) AND (char_length(inscription) <= 60))))`
+- Check `food_orders_item_names_product`: `CHECK (((kind <> 'item'::food_order_kind) OR (product_id IS NOT NULL) OR (status = ANY (ARRAY['confirmed'::food_order_status, 'declined'::food_order_status]))))`
 - Check `food_orders_line_check`: `CHECK (((line IS NULL) OR (char_length(line) <= 300)))`
 - Check `food_orders_note_check`: `CHECK (((note IS NULL) OR (char_length(note) <= 1000)))`
 - Check `food_orders_parent_name_check`: `CHECK (((parent_name IS NULL) OR ((char_length(parent_name) >= 1) AND (char_length(parent_name) <= 120))))`
 - Check `food_orders_pet_name_check`: `CHECK (((pet_name IS NULL) OR ((char_length(pet_name) >= 1) AND (char_length(pet_name) <= 80))))`
 - Check `food_orders_phone_check`: `CHECK (((phone IS NULL) OR (phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 - Check `food_orders_postal_code_check`: `CHECK (((postal_code IS NULL) OR (char_length(postal_code) <= 10)))`
+- Check `food_orders_site_ref_check`: `CHECK (((site_ref IS NULL) OR (site_ref ~ '^[A-Za-z0-9-]{4,40}$'::text)))`
+- Check `food_orders_site_source_check`: `CHECK (((site_source IS NULL) OR (char_length(site_source) <= 200)))`
 - Check `food_orders_weekdays_check`: `CHECK (((weekdays IS NULL) OR (((cardinality(weekdays) >= 1) AND (cardinality(weekdays) <= 7)) AND (weekdays <@ ARRAY[(1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint, (7)::smallint]))))`
 - Check `food_orders_weight_g_check`: `CHECK (((weight_g IS NULL) OR ((weight_g >= 1) AND (weight_g <= 199999))))`
 
 **Indexes**
 
+- `CREATE UNIQUE INDEX food_orders_one_per_site_ref ON public.food_orders USING btree (org_id, phone, site_ref) WHERE (site_ref IS NOT NULL)`
 - `CREATE INDEX food_orders_org_status_idx ON public.food_orders USING btree (org_id, status, created_at DESC)`
 
 **Triggers**
@@ -1901,13 +1913,14 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 | `parent_phone` | `text` | yes |  |  |
 | `requested_start` | `date` |  |  |  |
 | `requested_end` | `date` |  |  |  |
-| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), consent}. |
+| `payload` | `jsonb` | yes |  | The whole form as JSON (version 1): {v, parent:{name,phone,email,address,area,postal_code,city,emergency_name,emergency_phone}, pets:[{name,species,breed,sex,is_neutered,date_of_birth,weight_kg,food_notes,medical_notes,allergies,behaviour_notes,vet_name,vet_phone,dewormed_on,tick_treated_on,vaccinations:[{vaccine,given_on,valid_until}]}], stay:{kind,start_date,end_date,notes}, request:{make,service_id,time,pickup,vaccinations_ok} from the booking form for new parents (M41), site:{ref,page,referrer,utm_source,utm_medium,utm_campaign} from the kennel's own website (M68), consent}. |
 | `consent_at` | `timestamp with time zone` | yes |  |  |
 | `consent_text` | `text` | yes |  | The exact consent wording the parent agreed to, kept as evidence. |
 | `client_id` | `uuid` |  |  | The client created or matched when the submission was accepted. |
 | `reviewed_by` | `uuid` |  |  |  |
 | `reviewed_at` | `timestamp with time zone` |  |  |  |
 | `upload_token` | `text` | yes | `new_token()` | Secret returned to whoever sent the form, so the same visitor can add a vaccination certificate per pet within the hour (intake_upload_allowed). Useless after that. |
+| `site_ref` | `text` |  |  | The reference number the kennel's own website gave the request (M68), so staff can find it from a WhatsApp message. The same reference from the same phone is the same request sent again, and is not kept twice. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -1918,9 +1931,11 @@ What a parent typed into the public intake form, kept exactly as sent until staf
 - Foreign key `intake_submissions_org_id_client_id_fkey`: `FOREIGN KEY (org_id, client_id) REFERENCES clients(org_id, id) ON DELETE SET NULL (client_id)`
 - Foreign key `intake_submissions_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Foreign key `intake_submissions_reviewed_by_fkey`: `FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) ON DELETE SET NULL`
+- Check `intake_submissions_site_ref_check`: `CHECK (((site_ref IS NULL) OR (site_ref ~ '^[A-Za-z0-9-]{4,40}$'::text)))`
 
 **Indexes**
 
+- `CREATE UNIQUE INDEX intake_submissions_one_per_site_ref ON public.intake_submissions USING btree (org_id, parent_phone, site_ref) WHERE (site_ref IS NOT NULL)`
 - `CREATE INDEX intake_submissions_org_status_idx ON public.intake_submissions USING btree (org_id, status, created_at DESC)`
 
 **Triggers**
@@ -2508,6 +2523,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 | `neuter_months` | `smallint` |  |  | Above this age in months a pet must be spayed or neutered (M40). Empty: not required. |
 | `keeps_rota` | `boolean` | yes | `false` | Whether the kennel keeps its rota, leave and attendance in Wagbook (M43): shifts, clocking in and out, Today's "on now". Off: none of it is shown. |
 | `review_url` | `text` |  |  | The kennel's review page (an https link, M42), sent to parents after a stay or an appointment. Empty: no review reminders. |
+| `website_url` | `text` |  |  | The kennel's own website (M68), as https://name.example: its booking and food forms may send to /api/site/{slug}, and only from there (with or without www). Empty: requests from a website are refused. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -2553,6 +2569,7 @@ A kennel business. Every other row belongs to exactly one organisation. A self-h
 - Check `organizations_tick_days_check`: `CHECK (((tick_days IS NULL) OR ((tick_days >= 1) AND (tick_days <= 730))))`
 - Check `organizations_topper_share_bp_check`: `CHECK (((topper_share_bp >= 500) AND (topper_share_bp <= 9000)))`
 - Check `organizations_upi_vpa_check`: `CHECK (((upi_vpa IS NULL) OR (upi_vpa ~ '^[a-zA-Z0-9._-]{2,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$'::text)))`
+- Check `organizations_website_is_origin`: `CHECK (((website_url IS NULL) OR ((website_url ~ '^(https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+|http://localhost)(:[0-9]{1,5})?$'::text) AND (char_length(website_url) <= 200))))`
 - Check `organizations_weekend_days_check`: `CHECK ((weekend_days <@ ARRAY[(1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint, (7)::smallint]))`
 - Check `organizations_whatsapp_phone_check`: `CHECK (((whatsapp_phone IS NULL) OR (whatsapp_phone ~ '^\+[1-9][0-9]{7,14}$'::text)))`
 
@@ -3697,6 +3714,7 @@ A PIN code the kennel delivers to and picks up from, with its name and charge. A
 | `name` | `text` | yes |  | What the kennel calls the area, e.g. Indiranagar. |
 | `delivery_charge_minor` | `bigint` |  |  | What a food delivery there costs the parent, in minor units. Empty: free. |
 | `trip_charge_minor` | `bigint` |  |  | What a pick-up or drop of a boarder there costs (M39). Empty: the delivery charge. |
+| `delivery_weekdays` | `smallint[]` |  |  | The days food is delivered there (M68), 1 Monday to 7 Sunday. Orders from the order page and the website take these days. Empty: any day. |
 | `created_at` | `timestamp with time zone` | yes | `now()` |  |
 | `updated_at` | `timestamp with time zone` | yes | `now()` |  |
 
@@ -3706,6 +3724,7 @@ A PIN code the kennel delivers to and picks up from, with its name and charge. A
 - Unique `service_areas_org_id_postal_code_key`: `UNIQUE (org_id, postal_code)`
 - Foreign key `service_areas_org_id_fkey`: `FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE`
 - Check `service_areas_delivery_charge_minor_check`: `CHECK (((delivery_charge_minor IS NULL) OR (delivery_charge_minor >= 0)))`
+- Check `service_areas_delivery_weekdays_check`: `CHECK (((delivery_weekdays IS NULL) OR (((cardinality(delivery_weekdays) >= 1) AND (cardinality(delivery_weekdays) <= 7)) AND (delivery_weekdays <@ ARRAY[(1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint, (7)::smallint]))))`
 - Check `service_areas_name_check`: `CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)))`
 - Check `service_areas_postal_code_check`: `CHECK (((postal_code ~ '^[A-Za-z0-9][A-Za-z0-9 -]{1,8}[A-Za-z0-9]$'::text) AND (postal_code ~ '[0-9]'::text)))`
 - Check `service_areas_trip_charge_minor_check`: `CHECK (((trip_charge_minor IS NULL) OR (trip_charge_minor >= 0)))`
@@ -5191,7 +5210,7 @@ confirm_food_order(p_order uuid) returns uuid
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-Confirms a food order once its money has arrived: a website order makes or matches the parent by phone, the pet by name (with its first weighing), the address, and the trial delivery or the subscription with its first two weeks of deliveries; a parent's change pauses the subscription, skips the delivery, or adds the extra order. Returns the parent. Any member (row level security applies); once only (WB188).
+Confirms a food order once its money has arrived: a website order makes or matches the parent by phone, the pet by name (with its first weighing), the address, and the trial delivery, the made-to-order item on its day (M68, not refused for notice the order already gave) or the subscription with its first two weeks of deliveries; a parent's change pauses the subscription, skips the delivery, or adds the extra order. Returns the parent. Any member (row level security applies); once only (WB188).
 
 ### cost_to_expense
 
@@ -5299,7 +5318,7 @@ deliveries_price() returns trigger
 - Runs as: the caller (row level security applies)
 - Volatility: volatile
 
-Trigger: a delivery's unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel's lead time (WB156).
+Trigger: a delivery's unit price, tax rate and code are copied from the rate card when it is made (WB150 when the food is not sold that way), its packs and price worked out from its grams, and its delivery charge copied from the area of its address (kept when the address is deleted). Only owners and managers give another unit price, kind, delivery charge or tax rate (WB022), and a price typed by hand is worked out again. A replacement costs nothing. A made-to-order item is refused sooner than the kennel's lead time (WB156), except while confirm_food_order() makes one a parent ordered in time.
 
 ### delivery_cutoff
 
@@ -5376,14 +5395,14 @@ Puts each weekly pattern (M60) on the rota up to p_until (four weeks from today 
 ### first_delivery_day
 
 ```
-first_delivery_day(p_org uuid, p_weekdays smallint[]) returns date
+first_delivery_day(p_org uuid, p_weekdays smallint[], p_from date) returns date
 ```
 
 - Who may call: signed-in
 - Runs as: the caller (row level security applies)
 - Volatility: stable
 
-The first day, on one of the given weekdays, whose morning delivery is still before its cut-off.
+The first day from p_from (today when empty), on one of the given weekdays, whose morning delivery is still before its cut-off.
 
 ### first_free_start
 
@@ -5527,7 +5546,7 @@ get_public_food_form(p_slug text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. What the food order page needs: the kennel's name and UPI details, the consent wording, the trial and subscription food with their prices, the kennel's portion settings and pack size, and the PIN codes it delivers to with their charges. Nothing unless the kennel delivers food and takes orders.
+PUBLIC. What the food order page needs: the kennel's name, UPI details and own website, the consent wording, the trial, subscription food and made-to-order items with their prices, the kennel's portion settings, pack size and notice for items, and the PIN codes it delivers to with their charges and delivery days. Nothing unless the kennel delivers food and takes orders.
 
 ### get_public_intake_form
 
@@ -5539,7 +5558,7 @@ get_public_intake_form(p_slug text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate.
+PUBLIC. What the intake form and the booking form for new parents (M41) need to show for a kennel: its name, city, WhatsApp number, usual times, consent wording, whether it delivers (so the form asks for an address with a PIN code), its usual boarding and day boarding prices, and the appointment services it offers with their prices (empty when on quote; "from" when they depend on the dog), for an estimate; and the kennel's own website and country (M68), the only place its forms may send from.
 
 ### get_public_invoice
 
@@ -5756,6 +5775,18 @@ issue_invoice(p_invoice uuid) returns invoices
 - Volatility: volatile
 
 Issues a draft invoice: checks every line and total against the tax rules, assigns the next consecutive number for the financial year, and freezes the seller's and buyer's details (including where to pay). Owners and managers may issue any draft; staff only one whose lines are exactly what its booking (or its family's bookings, its month of a series, its food deliveries, or its sale over the counter) says. Takes in advances paid for those stays, and what was paid or given back on a voided bill for the same thing.
+
+### item_weekdays
+
+```
+item_weekdays(p_org uuid) returns smallint[]
+```
+
+- Who may call: internal
+- Runs as: the caller (row level security applies)
+- Volatility: stable
+
+The weekdays a made-to-order item ordered from outside may be delivered on (M68): every day some area of the kennel takes deliveries. Every day when the kennel lists no areas.
 
 ### job_forget_old_rows
 
@@ -6955,7 +6986,7 @@ submit_food_order(p_slug text, p_payload jsonb) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. An order from the kennel's food order page: a trial, or a subscription with its days and grams a day. Works out what to pay now (the trial, or the first week ahead, with delivery) and returns it with a token for saying it was paid; a PIN code not served is kept as waiting for the area, with nothing to pay. Refused when the kennel takes no orders (WB180), for a malformed order (WB181), missing details or consent (WB182), no weight (WB183), a flood (WB184) or no days or grams (WB185).
+PUBLIC. An order from the kennel's food order page or its own website: a trial, a subscription with its grams a day, or a made-to-order item (M68) for a day with what to write on it. Works out what to pay now (the trial, the first week ahead, or the item, each with delivery) and returns it with a token for saying it was paid; a PIN code not served is kept as waiting for the area, with nothing to pay. The area's delivery days (M68) decide a subscription's days and a trial's first day; an item comes on a day some area takes deliveries (item_weekdays). An order sent again with the same site_ref from the same phone is answered as the first time, with repeat. Refused when the kennel takes no orders (WB180), for a malformed order (WB181), missing details or consent (WB182), no weight (WB183), a flood (WB184), no days or grams (WB185), a day in the past or too far ahead (WB187), an item with no day (WB189), too little notice (WB156) or on a day with no deliveries (WB300).
 
 ### submit_food_request
 
@@ -6979,7 +7010,7 @@ submit_intake(p_slug text, p_payload jsonb) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: volatile
 
-PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed).
+PUBLIC. Receives the intake form. Validates shape and size, records consent, and stores the submission for staff to review. Never creates clients or bookings by itself. Returns {folder, upload_token}: the folder ({org_id}/intake/{submission_id}) for certificates, and the secret that lets this sender put one per pet there within the hour (intake_upload_allowed). A request from the kennel's website sent again with the same reference and phone (site.ref, M68) is not kept twice and returns {repeat: true}.
 
 ### subscriptions_replan
 

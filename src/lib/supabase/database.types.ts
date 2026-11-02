@@ -2124,6 +2124,11 @@ export type Database = {
           amount_minor: number | null;
           note: string | null;
           consent_text: string | null;
+          product_id: string | null;
+          inscription: string | null;
+          site_ref: string | null;
+          site_source: string | null;
+          delivery_id: string | null;
           paid_claimed_at: string | null;
           reviewed_by: string | null;
           reviewed_at: string | null;
@@ -2155,6 +2160,11 @@ export type Database = {
           amount_minor?: number | null;
           note?: string | null;
           consent_text?: string | null;
+          product_id?: string | null;
+          inscription?: string | null;
+          site_ref?: string | null;
+          site_source?: string | null;
+          delivery_id?: string | null;
           paid_claimed_at?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
@@ -2186,6 +2196,11 @@ export type Database = {
           amount_minor?: number | null;
           note?: string | null;
           consent_text?: string | null;
+          product_id?: string | null;
+          inscription?: string | null;
+          site_ref?: string | null;
+          site_source?: string | null;
+          delivery_id?: string | null;
           paid_claimed_at?: string | null;
           reviewed_by?: string | null;
           reviewed_at?: string | null;
@@ -2200,11 +2215,25 @@ export type Database = {
             referencedColumns: ["org_id", "id"];
           },
           {
+            foreignKeyName: "food_orders_org_id_delivery_id_fkey";
+            columns: ["org_id", "delivery_id"];
+            isOneToOne: false;
+            referencedRelation: "deliveries";
+            referencedColumns: ["org_id", "id"];
+          },
+          {
             foreignKeyName: "food_orders_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "food_orders_org_id_product_id_fkey";
+            columns: ["org_id", "product_id"];
+            isOneToOne: false;
+            referencedRelation: "food_products";
+            referencedColumns: ["org_id", "id"];
           },
           {
             foreignKeyName: "food_orders_org_id_subscription_id_fkey";
@@ -2513,6 +2542,7 @@ export type Database = {
           reviewed_by: string | null;
           reviewed_at: string | null;
           upload_token: string;
+          site_ref: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -2531,6 +2561,7 @@ export type Database = {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           upload_token?: string;
+          site_ref?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2549,6 +2580,7 @@ export type Database = {
           reviewed_by?: string | null;
           reviewed_at?: string | null;
           upload_token?: string;
+          site_ref?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3275,6 +3307,7 @@ export type Database = {
           neuter_months: number | null;
           keeps_rota: boolean;
           review_url: string | null;
+          website_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -3346,6 +3379,7 @@ export type Database = {
           neuter_months?: number | null;
           keeps_rota?: boolean;
           review_url?: string | null;
+          website_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3417,6 +3451,7 @@ export type Database = {
           neuter_months?: number | null;
           keeps_rota?: boolean;
           review_url?: string | null;
+          website_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -4877,6 +4912,7 @@ export type Database = {
           name: string;
           delivery_charge_minor: number | null;
           trip_charge_minor: number | null;
+          delivery_weekdays: number[] | null;
           created_at: string;
           updated_at: string;
         };
@@ -4887,6 +4923,7 @@ export type Database = {
           name: string;
           delivery_charge_minor?: number | null;
           trip_charge_minor?: number | null;
+          delivery_weekdays?: number[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -4897,6 +4934,7 @@ export type Database = {
           name?: string;
           delivery_charge_minor?: number | null;
           trip_charge_minor?: number | null;
+          delivery_weekdays?: number[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -6210,7 +6248,7 @@ export type Database = {
         Returns: number;
       };
       first_delivery_day: {
-        Args: { p_org: string; p_weekdays?: number[] };
+        Args: { p_org: string; p_weekdays?: number[]; p_from?: string };
         Returns: string;
       };
       first_free_start: {
@@ -6292,6 +6330,10 @@ export type Database = {
       issue_invoice: {
         Args: { p_invoice: string };
         Returns: Database["public"]["Tables"]["invoices"]["Row"];
+      };
+      item_weekdays: {
+        Args: { p_org: string };
+        Returns: number[];
       };
       job_forget_old_rows: {
         Args: { p_org: string };
@@ -6596,7 +6638,7 @@ export type Database = {
       delivery_slot: "morning" | "afternoon" | "evening";
       delivery_status: "planned" | "packed" | "out" | "delivered" | "not_home" | "refused" | "cancelled";
       food_goal: "lose" | "keep" | "gain";
-      food_order_kind: "trial" | "subscription" | "pause" | "skip" | "more";
+      food_order_kind: "trial" | "subscription" | "item" | "pause" | "skip" | "more";
       food_order_status: "waiting_area" | "unpaid" | "paid" | "requested" | "confirmed" | "declined";
       food_plan: "full" | "topper";
       food_product_kind: "trial" | "subscription" | "by_kilo" | "item";

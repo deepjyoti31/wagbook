@@ -121,7 +121,8 @@ describe("all sites for an owner of two", () => {
   });
 
   it("counts a bill in the month it was issued", async () => {
-    const today = (await db.query<{ d: string }>("select current_date::text as d")).rows[0].d;
+    // The kennel's today: in the evening in UTC it is already tomorrow in India, where the bill is dated.
+    const today = (await db.query<{ d: string }>("select public.org_today($1)::text as d", [north.org])).rows[0].d;
     const month = today.slice(0, 7);
     const rows = await sites(north.owner, `${month}-01`, today);
     expect(rows.map((r) => [r.name, r.billed_minor].map(String))).toEqual([

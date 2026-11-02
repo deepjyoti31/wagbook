@@ -7,6 +7,7 @@ import { friendlyError } from "@/lib/errors";
 import { checked, text, type FormState } from "@/lib/forms";
 import { isLanguage } from "@/lib/i18n";
 import { getAppI18n } from "@/lib/i18n-server";
+import { isWebsiteOrigin } from "@/lib/site-request";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -136,6 +137,11 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
   const reviewUrl = text(form, "review_url");
   if (reviewUrl !== null && !/^https:\/\/\S+$/.test(reviewUrl)) return { error: t.m.reviews.error };
 
+  // The kennel's own website (M68), as an origin. The database checks it again.
+  const typedWebsite = text(form, "website_url");
+  const websiteUrl = typedWebsite === null ? null : typedWebsite.toLowerCase().replace(/\/+$/, "");
+  if (websiteUrl !== null && !isWebsiteOrigin(websiteUrl)) return { error: t.m.site.error };
+
   const update: TablesUpdate<"organizations"> = {
     time_zone: timeZone,
     currency,
@@ -165,6 +171,7 @@ export async function saveSettings(_state: FormState, form: FormData): Promise<F
     requests_enabled: checked(form, "requests_enabled"),
     intake_notice: text(form, "intake_notice"),
     review_url: reviewUrl,
+    website_url: websiteUrl,
     parent_language: parentLanguage,
     // What else the kennel offers (D44). The database refuses delivery without the kitchen.
     offers_appointments: checked(form, "offers_appointments"),

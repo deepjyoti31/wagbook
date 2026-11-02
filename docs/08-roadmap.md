@@ -1522,6 +1522,34 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M68. Orders from the kennel's own website, delivery days by area, and cakes
+
+- [x] Finished 25 October 2026 (H7, H9 and B12 in `02`, D57). Asked for by the owner to connect a kennel's existing
+  website to Wagbook.
+
+**Build**
+
+1. Settings, **Your own website**: the website's address. Wagbook then shows where its forms send.
+2. `/api/site/{slug}`: a booking request (to Forms from parents), a food order or a cake (to Orders and requests, with
+   the amount, UPI link and first delivery day in the answer) and "I have paid", through the existing public functions.
+3. The website's reference number kept on the request, shown to staff, used as the UPI note; a resend kept once.
+4. **Delivery days** on each area; the order page and the website take the area's days.
+5. A made-to-order item (a birthday cake) ordered once from the order page or the website, paid ahead with delivery.
+
+**Rules**
+
+- No new public function: the anonymous role still calls thirteen.
+- The database works out every amount and day; the website's figures are never trusted.
+- An area with no delivery days takes any day, so a kennel that sets none sees no change.
+
+**Done when**
+
+- Database tests fail when the area's days, the resend rule or the cake's notice exemption is taken out (each tried once).
+- The website request reader has unit tests; the route answered a real website in a browser against the local
+  Supabase; the changed screens were checked at 360 pixels.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

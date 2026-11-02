@@ -228,6 +228,21 @@ internet: the form waits in Forms from parents, and only a member accepting it (
 the pet and a booking or appointment with status `requested`, which holds nothing. The estimate on the page is worked
 out in the browser from the published prices and never sent back.
 
+**Requests from the kennel's own website (milestone M68, D57).** `/api/site/{slug}` adds no public function. It turns
+what the website sends into the payload of `submit_intake()` (a booking request) or `submit_food_order()` (a food order or
+a made-to-order item), or calls `food_order_paid()`, all as the anonymous role, so every check of those functions applies
+again and the database works out every amount. It answers only a browser on the kennel's own website
+(`organizations.website_url`, set by an owner or manager, with or without `www.`): the answer is readable there and
+nowhere else, and with no website set every request is refused. That stops other sites using a kennel's forms from
+their pages; it is not a lock, since anyone may call the public functions directly as before. The grams a day of a
+subscription are worked out on the server from the dog's weight with the kennel's own portions, not taken from the
+website. A request with the hidden field filled, or sent faster than a person could fill a form (2.5 seconds), is
+answered as saved and kept nowhere. Posts to `/api/site/` are limited per address (20 in ten minutes, as the other public
+forms are), and a request is read only up to 20,000 characters. The website's reference number (`site_ref`) makes a
+resend the same request: the same reference from the same phone is kept once (a unique index), and its answer is the
+first answer again. What the answer carries is what the visitor sent plus the amount, the UPI link, the first delivery
+day and the token for "I have paid"; never another parent's anything.
+
 **Riders (milestone M31, D45).** A rider is a member whose role leaves them out of `my_org_ids()`, so no policy in the
 access model gives them anything. `my_runs()`, `rider_mark_stop()` and `rider_mark_trip()` (all `security definer`, checking
 the caller is the run's rider, today) are their only way in, and `rider_upload_allowed()` lets them add a photo at the door of their

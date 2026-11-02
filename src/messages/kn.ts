@@ -18,6 +18,7 @@ import { teamArea } from "./kn/team";
 import { runningArea } from "./kn/running";
 import { dayArea } from "./kn/day";
 import { shopArea } from "./kn/shop";
+import { siteArea } from "./kn/site";
 
 export const kn: Messages = {
   ...core,
@@ -34,4 +35,5 @@ export const kn: Messages = {
   ...runningArea,
   ...dayArea,
   ...shopArea,
+  ...siteArea,
 };

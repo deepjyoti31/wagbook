@@ -3,8 +3,9 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Field, Input, Loading, Notice, PageTitle, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { GST_STATES, toDecimalString } from "@/lib/core";
-import { LANGUAGE_NAMES, LANGUAGES } from "@/lib/i18n";
+import { fill, LANGUAGE_NAMES, LANGUAGES } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
+import { siteOrigin } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { saveSettings } from "./actions";
 
@@ -44,6 +45,7 @@ async function Settings() {
   const { org, canManage } = await requireOrg();
   const { m, locale } = await getAppI18n();
   const s = m.settings;
+  const origin = await siteOrigin();
   const supabase = await createClient();
   const [services, issued] = await Promise.all([
     supabase.from("services").select("kind, price_minor, shared_price_minor, tax_rate_bp, sac_code").eq("org_id", org.id).eq("is_default", true).eq("is_active", true),
@@ -286,6 +288,13 @@ async function Settings() {
           <Field label={m.reviews.link} hint={m.reviews.linkHint}>
             <Input name="review_url" type="url" defaultValue={org.review_url ?? ""} maxLength={500} autoCapitalize="none" spellCheck={false} />
           </Field>
+        </Group>
+
+        <Group title={m.site.title}>
+          <Field label={m.site.address} hint={m.site.addressHint}>
+            <Input name="website_url" type="url" defaultValue={org.website_url ?? ""} maxLength={200} autoCapitalize="none" spellCheck={false} />
+          </Field>
+          {org.website_url ? <p className="break-all text-sm text-slate">{fill(m.site.sendTo, { url: `${origin}/api/site/${org.slug}` })}</p> : null}
         </Group>
 
         {canManage ? <SubmitButton pendingLabel={m.common.saving}>{s.save}</SubmitButton> : null}
