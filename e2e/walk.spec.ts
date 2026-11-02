@@ -2343,8 +2343,9 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
 
   // Meena sees her own attendance only, and writes no times by hand.
   await staff.goto(`/app/more/attendance?month=${month}`);
-  await expect(staff.getByText("Meena", { exact: true }).first()).toBeVisible();
-  await expect(staff.getByText("Ravi", { exact: true })).toHaveCount(0);
+  // Inside the page: the sidebar (hidden on a phone) names who is signed in.
+  await expect(staff.locator("main").getByText("Meena", { exact: true }).first()).toBeVisible();
+  await expect(staff.locator("main").getByText("Ravi", { exact: true })).toHaveCount(0);
   await expect(staff.getByRole("button", { name: en.attendance.byHand.button })).toHaveCount(0);
   await narrow(staff);
   await meena.close();
