@@ -120,6 +120,26 @@ describe("credit notes", () => {
     expect((await balance(id)).due).toBe(0);
   });
 
+  it("never take back more at a tax rate than the bill charged at that rate (WB097)", async () => {
+    // A stay at 18% (₹1,000) and food at no tax (₹9,000): ₹1,180 and ₹9,000.
+    const mixed = computeInvoice(
+      [
+        { description: "Boarding: Bruno, 1 night", quantity: 1, unitPriceMinor: 100000, taxRateBp: 1800, sacCode: "998612" },
+        { description: "Food", quantity: 1, unitPriceMinor: 900000, taxRateBp: 0 },
+      ],
+      gst,
+      { roundToWholeUnit: true },
+    );
+    const id = await issuedBill(mixed);
+    // ₹5,000 at 18% is within the bill in all, but the bill charged only ₹1,000 at 18%.
+    expect((await errorOf(() => credit(id, 500000))).message).toContain("WB097");
+    // Two credit notes at 18% may not add up to more than ₹1,000 either.
+    await credit(id, 60000);
+    expect((await errorOf(() => credit(id, 50000))).message).toContain("WB097");
+    await credit(id, 40000);
+    expect((await balance(id)).credited).toBe(118000);
+  });
+
   it("are for owners and managers, with a reason, against an issued bill, at a rate the bill charged", async () => {
     const id = await issuedBill();
     expect((await errorOf(() => credit(id, 10000, staff))).message).toContain("WB002");

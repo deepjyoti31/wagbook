@@ -66,6 +66,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB025` | only an owner or manager can change what an extra costs | `20261008000300_kennels_and_bookings.sql`<br>`20261008000450_appointments.sql` |
 | `WB026` | a pet cannot be moved into or out of a family booking. Book it on its own instead. | `20261008000300_kennels_and_bookings.sql` |
 | `WB027` | a kennel holds two pets at most, both of one parent | `20261008000300_kennels_and_bookings.sql` |
+| `WB028` | only a check-out made today, with no bill issued yet, can be undone | `20261104000100_review_fixes.sql` |
 | `WB030` | an issued invoice cannot be deleted. Void it instead. | `20261008000500_billing.sql` |
 | `WB031` | a void invoice cannot be changed | `20261008000500_billing.sql` |
 | `WB032` | an issued invoice cannot be edited. Void it and issue a new one.<br>lines of an issued invoice cannot be changed<br>a line cannot be moved to another invoice | `20261008000500_billing.sql` |
@@ -114,6 +115,7 @@ Rules: a code is never reused or renumbered. A new error takes the next free num
 | `WB094` | a credit note needs at least one line | `20261008000500_billing.sql` |
 | `WB095` | this bill was issued in an earlier month. Make a credit note instead of cancelling it. | `20261008000500_billing.sql` |
 | `WB096` | this bill has a credit note. Credit what is left instead of cancelling it. | `20261008000500_billing.sql` |
+| `WB097` | a credit note cannot take back more at a tax rate than the bill charged at that rate | `20261104000100_review_fixes.sql` |
 | `WB100` | this link is not taking requests | `20261008000600_intake_and_public_pages.sql` |
 | `WB101` | the request could not be read | `20261008000600_intake_and_public_pages.sql` |
 | `WB102` | choose one or more of your pets | `20261008000600_intake_and_public_pages.sql` |

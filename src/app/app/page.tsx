@@ -575,7 +575,7 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
   const { m, locale } = t;
   const w = m.todayKitchen;
   const supabase = await createClient();
-  const [packing, orders, food, trials, asked, subs, problems] = await Promise.all([
+  const [packing, orders, food, trials, problems] = await Promise.all([
     supabase.from("deliveries").select("status").eq("org_id", org.id).eq("delivery_date", today).neq("status", "cancelled"),
     supabase.from("food_orders").select("id", { count: "exact", head: true }).eq("org_id", org.id).in("status", ["paid", "requested"]),
     supabase.from("pet_food").select("pet_id, started_on, reviewed_on, pets(name)").eq("org_id", org.id).not("started_on", "is", null),
@@ -586,12 +586,18 @@ async function KitchenToday({ t, today }: { t: I18n; today: string }) {
       .eq("kind", "trial")
       .eq("status", "delivered")
       .gte("delivery_date", addDays(today, -14)),
-    supabase.from("reminders_sent").select("subject_id").eq("org_id", org.id).eq("kind", "trial"),
-    supabase.from("subscriptions").select("client_id").eq("org_id", org.id),
     // Delivery problems not dealt with yet, many told by parents from their link (M59).
     supabase.from("delivery_problems").select("id", { count: "exact", head: true }).eq("org_id", org.id).is("outcome", null),
   ]);
   if (packing.error || food.error || trials.error) return null;
+  // Asked already, or subscribed already: read only for these trials, so a
+  // kennel with more than 1,000 reminders or subscriptions is not cut short.
+  const trialIds = trials.data.map((d) => d.id);
+  const trialClients = [...new Set(trials.data.map((d) => d.client_id))];
+  const [asked, subs] = await Promise.all([
+    trialIds.length > 0 ? supabase.from("reminders_sent").select("subject_id").eq("org_id", org.id).eq("kind", "trial").in("subject_id", trialIds) : Promise.resolve({ data: [] }),
+    trialClients.length > 0 ? supabase.from("subscriptions").select("client_id").eq("org_id", org.id).in("client_id", trialClients) : Promise.resolve({ data: [] }),
+  ]);
   const packed = packing.data.filter((d) => d.status !== "planned").length;
   const review = food.data.filter((f) => portionReviewDue(f, today));
   const askedAbout = new Set((asked.data ?? []).map((r) => r.subject_id));

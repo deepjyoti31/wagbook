@@ -3,7 +3,7 @@ import { Badge, buttonStyles, Empty, Field, Input, Ledger, LedgerRow, Section, S
 import { checkIn } from "@/app/app/actions";
 import { addSupply, costToExpense, markPassedAway, recordVetVisit, saveStayReport, saveTrialOutcome, setTrial, undoPassedAway } from "@/app/app/day-actions";
 import { requireOrg } from "@/lib/auth";
-import { addDays, formatDate, formatMoney, stayReport, supplyAmount, todayIn, whatsappLink } from "@/lib/core";
+import { addDays, formatDate, formatMoney, localDate, stayReport, supplyAmount, todayIn, whatsappLink } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { parentI18n, type I18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
@@ -256,7 +256,7 @@ export async function StayReportPanel({
     tasks: tasks.data,
     play: play.count ?? 0,
     weights: weights.data.map((x) => ({ on: x.weighed_on, grams: x.weight_g })),
-    incidents: incidents.data.map((i) => ({ on: i.occurred_at.slice(0, 10), category: i.category })),
+    incidents: incidents.data.map((i) => ({ on: localDate(i.occurred_at, org.time_zone), category: i.category })),
   });
   const photos = [...new Set(updates.data.flatMap((u) => u.media_paths))];
   const urls = await signedUrls(supabase, photos, { small: true });

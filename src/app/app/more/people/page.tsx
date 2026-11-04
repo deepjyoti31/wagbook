@@ -4,7 +4,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
 import { Badge, buttonStyles, Field, Input, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { formatDate, skillsOffered, whatsappLink } from "@/lib/core";
+import { formatDate, localDate, skillsOffered, whatsappLink } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { siteOrigin } from "@/lib/site";
@@ -162,7 +162,7 @@ async function People({ searchParams }: Pick<PageProps<"/app/more/people">, "sea
                       <p className="font-bold">
                         {fill(w.byLink.who, { name: l.display_name, role: w.roleInLine[l.role] })}
                       </p>
-                      <p className="text-sm text-slate">{fill(w.byLink.worksUntil, { date: formatDate(l.expires_at.slice(0, 10), t.locale) })}</p>
+                      <p className="text-sm text-slate">{fill(w.byLink.worksUntil, { date: formatDate(localDate(l.expires_at, org.time_zone), t.locale) })}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <a
                           href={whatsappLink(fill(m.whatsapp.joinInvite, { name: l.display_name, kennel: org.name, url }))}

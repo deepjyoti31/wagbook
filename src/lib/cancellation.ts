@@ -7,9 +7,11 @@ import {
   stayUnits,
   stillToSettle,
   toStayCharges,
+  unitsWithTax,
   type CancelRule,
   type CancelResult,
 } from "./core";
+import { taxContext } from "./billing";
 import type { Tables } from "./supabase/database.types";
 import type { createClient } from "./supabase/server";
 
@@ -19,19 +21,19 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
  * The night-by-night outcome of a cancelled stay (M38), worked out the same
  * way for the stay's page and for the action that confirms it, from the
  * database as it is now: the kennel's rule for the kind of stay, its weekend
- * days and holidays, what each night is worth, and the advance paid. Also
- * what is still to give back, less what was given back since the stay was
- * cancelled, and what that was.
+ * days and holidays, what each night is worth with its tax, and the advance
+ * paid. Also what is still to give back, less what was given back since the
+ * stay was cancelled, and what that was.
  */
 export async function cancelledStayOutcome(
   supabase: Supabase,
-  org: Pick<Tables<"organizations">, "id" | "time_zone" | "check_in_time" | "weekend_days">,
+  org: Pick<Tables<"organizations">, "id" | "time_zone" | "check_in_time" | "weekend_days" | "tax_mode" | "gst_state_code" | "prices_include_tax" | "round_invoice_totals">,
   bookingId: string,
   choice: "refund" | "credit" | null = null,
 ): Promise<{ result: CancelResult; toSettle: { refundMinor: number; creditMinor: number }; givenMinor: number; byKennel: boolean; clientId: string } | null> {
   const b = await supabase
     .from("bookings")
-    .select("id, client_id, kind, status, start_date, end_date, boarding_from, discount_minor, pass_id, cancel_asked_at, cancelled_at, cancelled_by_kennel")
+    .select("id, client_id, kind, status, start_date, end_date, boarding_from, discount_minor, tax_rate_bp, pass_id, cancel_asked_at, cancelled_at, cancelled_by_kennel")
     .eq("org_id", org.id)
     .eq("id", bookingId)
     .maybeSingle();
@@ -45,7 +47,8 @@ export async function cancelledStayOutcome(
   if (charges.error || peaks.error || paid.error) return null;
   const { paidMinor, given } = cancelledStayMoney(paid.data ?? [], b.data.cancelled_at);
   const result = cancellationOutcome({
-    units: stayUnits(b.data, toStayCharges(charges.data)),
+    // Each night as the parent paid for it: with its tax, when prices leave tax out.
+    units: unitsWithTax(stayUnits(b.data, toStayCharges(charges.data)), b.data.tax_rate_bp, taxContext(org)),
     askedAt: new Date(b.data.cancel_asked_at ?? b.data.cancelled_at ?? Date.now()),
     checkInTime: org.check_in_time,
     timeZone: org.time_zone,
