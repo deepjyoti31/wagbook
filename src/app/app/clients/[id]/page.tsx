@@ -12,7 +12,7 @@ import { SellForm } from "@/components/sell-form";
 import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
-import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
+import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, localDate, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
 import { fill, LANGUAGE_NAMES } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { signedUrls } from "@/lib/media";
@@ -278,7 +278,7 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
           </Field>
           {c.consent_at ? (
             <p className="text-sm text-slate">
-              {fill(c.consent_source === "intake_form" ? p.consentFromIntake : p.consentToStaff, { date: formatDate(c.consent_at.slice(0, 10), t.locale) })}
+              {fill(c.consent_source === "intake_form" ? p.consentFromIntake : p.consentToStaff, { date: formatDate(localDate(c.consent_at, org.time_zone), t.locale) })}
             </p>
           ) : (
             <label className="flex min-h-12 items-start gap-3">

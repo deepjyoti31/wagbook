@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zonedInstant } from "./food";
-import { cancellationOutcome, cancelledStayMoney, DEFAULT_CANCEL_RULE, holidayDates, stayUnits, stillToSettle } from "./cancellation";
+import { cancellationOutcome, cancelledStayMoney, DEFAULT_CANCEL_RULE, holidayDates, stayUnits, stillToSettle, unitsWithTax } from "./cancellation";
 
 // Thursday 4 November 2027 to Monday 8 November 2027: Thu, Fri, Sat, Sun nights. Friday the 5th is a holiday.
 const units = ["2027-11-04", "2027-11-05", "2027-11-06", "2027-11-07"].map((date) => ({ date, priceMinor: 100000 }));
@@ -92,5 +92,30 @@ describe("a stay's nights and what each is worth", () => {
       ["2027-11-04", 60000], ["2027-11-05", 120000], ["2027-11-06", 120000],
     ]);
     expect(stayUnits({ kind: "daycare", start_date: "2027-11-04", end_date: "2027-11-04", discount_minor: 0, pass_id: "p" }, []).map((u) => u.priceMinor)).toEqual([0]);
+  });
+});
+
+describe("a cancelled stay's nights with their tax", () => {
+  const gst = { mode: "gst_india" as const, sellerStateCode: "29", placeOfSupplyStateCode: "29", pricesIncludeTax: false };
+
+  it("refunds the tax paid with the nights, so a stay cancelled in time keeps nothing", () => {
+    // Three nights at 1,000 with 18% GST: the parent paid 3,540 ahead.
+    const nights = ["2027-11-08", "2027-11-09", "2027-11-10"].map((date) => ({ date, priceMinor: 100000 }));
+    const taxed = unitsWithTax(nights, 1800, gst);
+    expect(taxed.map((u) => u.priceMinor)).toEqual([118000, 118000, 118000]);
+    const r = cancellationOutcome({ ...base, units: taxed, paidMinor: 354000, askedAt: at("2027-11-01", "09:00") });
+    expect([r.refundMinor, r.creditMinor, r.keptMinor]).toEqual([354000, 0, 0]);
+  });
+
+  it("puts the odd paise on the last night that costs something, so the nights add up to the whole stay's tax", () => {
+    // Night by night the tax is 2 x 900 paise; on the whole stay of 30,009 paise it is 2 x 2,701.
+    const nights = [10003, 10003, 10003, 0].map((priceMinor, k) => ({ date: `2027-11-0${k + 4}`, priceMinor }));
+    expect(unitsWithTax(nights, 1800, gst).map((u) => u.priceMinor)).toEqual([11803, 11803, 11805, 0]);
+  });
+
+  it("leaves prices that include tax, and a kennel that charges none, as they are", () => {
+    expect(unitsWithTax(units, 1800, { ...gst, pricesIncludeTax: true })).toEqual(units);
+    expect(unitsWithTax(units, 1800, { mode: "none" })).toEqual(units);
+    expect(unitsWithTax(units, 0, gst)).toEqual(units);
   });
 });

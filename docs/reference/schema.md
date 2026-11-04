@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 20. Tables: 89. Views: 9. Functions: 203.
+Migrations applied: 21. Tables: 89. Views: 9. Functions: 205.
 
 ## Contents
 
@@ -766,6 +766,7 @@ One pet's stay: overnight boarding or day boarding. Siblings booked together are
 - `bookings_check_package` (before insert or update of package_id, package_price_minor) runs `bookings_check_package()`
 - `bookings_check_pass` (before insert or update of pass_id, status, start_date, end_date, kind, client_id) runs `bookings_check_pass()`
 - `bookings_check_shared_price` (after insert) runs `bookings_check_shared_price()`
+- `bookings_check_undo_check_out` (before update of status) runs `bookings_check_undo_check_out()`
 - `bookings_end_care_at_check_out` (after update of status) runs `bookings_end_care_at_check_out()`
 - `bookings_follow_appointments` (after update of status, start_date, end_date) runs `bookings_follow_appointments()`
 - `bookings_follow_trips` (after update of status, start_date, end_date) runs `bookings_follow_trips()`
@@ -1143,6 +1144,7 @@ The lines of a credit note: what is taken back, with its tax worked out as on th
 **Triggers**
 
 - `credit_note_lines_forbid_org_change` (before update) runs `forbid_org_change()`
+- `credit_note_lines_within_rate` (after insert) runs `credit_note_lines_within_rate()`
 
 **Access**
 
@@ -5008,6 +5010,18 @@ bookings_check_shared_price() returns trigger
 
 Trigger: a new booking made by staff at the shared kennel price must share its kennel with another pet of the same parent on overlapping days (WB023 otherwise).
 
+### bookings_check_undo_check_out
+
+```
+bookings_check_undo_check_out() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: a checked out stay goes back to checked in (Undo check-out, M66) only on the kennel's day of the check-out and while no bill for it (its own, its family's or its month of a series) is issued (WB028).
+
 ### bookings_end_care_at_check_out
 
 ```
@@ -5247,6 +5261,18 @@ create_organization(p_name text, p_slug text, p_display_name text) returns uuid
 - Volatility: volatile
 
 Creates an organisation and makes the signed-in user its owner. The only way an organisation comes into being. A person owns ten at most (WB012, D55).
+
+### credit_note_lines_within_rate
+
+```
+credit_note_lines_within_rate() returns trigger
+```
+
+- Who may call: internal (trigger)
+- Runs as: the caller (row level security applies)
+- Volatility: volatile
+
+Trigger: the credit notes of a bill never take back more taxable value at a tax rate than the bill's lines at that rate (WB097), so no credit note gives back tax the bill did not charge.
 
 ### credits_check
 

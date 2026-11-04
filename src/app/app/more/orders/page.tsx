@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Badge, buttonStyles, Empty, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { formatDate } from "@/lib/core";
+import { formatDate, localDate } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { quantityText } from "@/lib/kitchen";
@@ -47,7 +47,7 @@ async function Orders() {
             {x.expense_id ? <Badge tone="good">{o.billed}</Badge> : null}
           </p>
           <p className="text-sm text-slate">
-            {fill(o.orderedOn, { date: formatDate(x.ordered_on, locale) })}, {x.sent_at ? fill(o.sentOn, { when: formatDate(x.sent_at.slice(0, 10), locale) }) : o.notSent}
+            {fill(o.orderedOn, { date: formatDate(x.ordered_on, locale) })}, {x.sent_at ? fill(o.sentOn, { when: formatDate(localDate(x.sent_at, org.time_zone), locale) }) : o.notSent}
           </p>
           <ul className="mt-1">
             {lines.map((l) => (

@@ -2,12 +2,18 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 2 November 2026, after M70 (a finished look).
+Last updated: 4 November 2026, after M1 was finished by the owner and a bug review.
 
 ## In one paragraph
 
-Every milestone from M2 to M70 is built, and the launch work in M1 waits for the owner: the roadmap is finished
-except M1 and the ideas not scheduled. M70 (2 November 2026, D59), asked for by the owner: the screens looked basic, so
+Every milestone from M0 to M70 is built: the roadmap is finished but for the ideas not scheduled. The owner finished
+M1 (a hosted Supabase project, reported on 4 November 2026), so **the migrations are frozen**: a change to the database
+is a new file (the first is `20261104000100_review_fixes.sql`). The Hindi and Kannada have been read by native
+speakers. A bug review on 4 November 2026 fixed five things, each with a test: a cancelled stay's refund and credit
+left out the tax paid on its nights when prices leave tax out (`unitsWithTax()`); a credit note could take back more
+at a tax rate than the bill charged at it (`WB097`); Undo check-out was held to its day and an unissued bill only by the
+app (`WB028`, now the database); the food orders page and Today's trial follow-ups read a capped list and could leave
+orders and parents out; and a few dates were shown in UTC. Next.js went to 16.4.5 and zod to 4.6.7. M70 (2 November 2026, D59), asked for by the owner: the screens looked basic, so
 twelve were designed and agreed first, then built into the shared pieces so every screen changed together. A dark
 sidebar with icons, a bookings search and who is signed in; sections are cards with a count pill, and a list straight
 in a section runs to its edges; Today opens with four figures and a bar for each kind of care; stays are bars on the
@@ -121,7 +127,7 @@ recipe, closing to changes at a cut-off; food bills checked by the database like
 deliveries; batches that take stock out and answer who received them; riders, a fourth role that reaches no table
 (D45); and twelve public functions now, four for food (`05`). The owner's earlier answers (boarders' food, riders,
 monthly payment, credit reminders) are built in. Nothing is left on the roadmap but M1's launch work and the ideas
-not scheduled. What has still never happened: a **hosted** Supabase project (the rest of M1) and a real phone. **The Hindi and Kannada are first drafts.**
+not scheduled. What has still never happened in the code's own checks: a real phone.
 
 Before Phase 1: M25 added what the kennel offers, parents' addresses matched to the areas served by PIN code, people's
 skills, and weights in grams. M20 to M24: going home early and refunds (D40), the waiting list (D42), requests on the
@@ -288,7 +294,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | Thing | Why not | Risk |
 | --- | --- | --- |
 | A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
-| A hosted Supabase project, and `docs/10-setup-and-deploy.md` followed end to end | Needs a person with a Supabase account | The local stack is the same software, so schema problems are unlikely. Settings screens, email templates and menu names in the guide may be off. |
+| The hosted project's settings against `docs/10-setup-and-deploy.md` | The owner made the hosted project (M1, reported 4 November 2026); no session here has seen it | Email templates, redirects, the nightly job and alerts are set by hand on the hosted project: step 1 of "Do this next" |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
 | M70 on the real signed-in pages with data, looked at by a person at 1366, 820 and 360 pixels | The local Supabase could not start in the session that built M70: Docker Hub refused image pulls (too many requests) and the other registries' download hosts were blocked. The walk did run them, in CI (below) | Low for logic (no query or action changed), medium for looks: a screen with its own boxes inside a section shows a box in a card |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
@@ -338,6 +344,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 ## Do this next
 
+**Apply the new migration to the hosted database first.** The hosted project was made before
+`20261104000100_review_fixes.sql` (two checks added, no row changed). With the Supabase CLI linked to the project:
+`npx -y supabase@2.120.0 db push`. Deploy the app from the same commit afterwards, as `16-releasing.md` says.
+
 **Look at M70 with real data** on the local Supabase (`npx -y supabase@2.120.0 start`; the walk already passes in
 CI): Today, the calendar, a booking, Care, New booking, Reports, More, a stay page and a bill at 1366, 820 and 360
 pixels. Expect some screens with their own
@@ -348,9 +358,8 @@ Say which pages still feel like a phone on a laptop. Not split in two yet, and c
 Bills, the kitchen and the setup pages (a list on the left and the form to add on the right). Not looked at on a real
 tablet or a touch laptop.
 
-**Connecting a kennel's own website (M68)**, once the hosted project exists:
+**Connecting a kennel's own website (M68)** on the hosted project:
 
-- Make the hosted database from the migrations as they are now (they include M68), then freeze them.
 - Settings, **Your own website**: the website's address, `https://` and the name only. Wagbook then shows the address
   the website's forms send to; the website's settings must name the same, with the kennel's short name at the end.
 - Kitchen settings, Food prices: the trial, subscription food per kilo and the cake (a made-to-order item), at the
@@ -361,8 +370,8 @@ tablet or a touch laptop.
 
 **Before the first real day at a kennel** (from the pre-launch review, M66; none of it needs code):
 
-- **Host it on Supabase's paid plan** (daily backups, never paused), in Mumbai, and finish M1 (item 1 below). Take your
-  own copy every week from day one ([15-backup-and-restore.md](15-backup-and-restore.md)).
+- **Keep the hosted project on Supabase's paid plan** (daily backups, never paused). Take your own copy every week from
+  day one ([15-backup-and-restore.md](15-backup-and-restore.md)).
 - **Write the kennel's terms into Consent wording** (More, Settings, Intake form): the boarding terms, permission to take
   a pet to a vet in an emergency (and up to what cost), and the cancellation terms. Every new parent ticks it on the
   intake form, and the date and wording are kept. Wagbook has no separate terms page or vet permission per stay.
@@ -382,12 +391,14 @@ tablet or a touch laptop.
 
 Then, in order:
 
-1. **Finish M1** (needs the owner), if the kennel will run on a hosted Supabase: create a project (Mumbai), follow
-   [10-setup-and-deploy.md](10-setup-and-deploy.md) Part 1 exactly, fix the guide where it is wrong, sign up with real
-   email confirmation, and walk the first run. Check the script policy header and the rate limits on the hosted deploy
-   (`10`, "Looking after it"). Then record the migration freeze below.
+1. **Check the hosted project's settings** from `10`, if not done in M1: the "Reset Password" email template and the
+   `/auth/confirm**` redirect (step 1.4), Google if wanted ("Sign in with Google"), `cron.job` has `wagbook-nightly`,
+   an uptime service on `/api/health`, the script policy header and the rate limits ("Looking after it"), and alerts on
+   phones if wanted ("Alerts on phones"), allowed on a real Android phone and an iPhone added to the home screen. Write
+   down where `10` was wrong, and fix it.
 2. **Switch on "Private vulnerability reporting"** in the GitHub repository's settings, so `SECURITY.md` works.
-3. **Have the Hindi and Kannada read by native speakers**, ideally kennel staff, on a phone (list below).
+3. **Send any corrections from the native speakers' reading** of the Hindi and Kannada, if they had some: they go
+   into `src/messages/hi/` and `src/messages/kn/`. One sentence was added after the reading (list below).
 4. **Run the hosted backup round trip once** ([15-backup-and-restore.md](15-backup-and-restore.md)) and log it.
 5. **Ask a person outside the project for a security review.**
 6. **Take the questions in `06` to an accountant** (rate and SAC for boarding, which the kennel can now set itself;
@@ -398,26 +409,14 @@ Then, in order:
    cancellation charge, with tax), whether a monthly bill for a regular's days is issued in time, and when credit kept
    from a cancellation carries tax (kept, spent, or run out).
 
-8. **Upgrade Next.js.** `npm audit` lists two advisories for `next` 16.4.0 (a critical one in image optimization with
-   SVG files, and a denial of service through Server Actions), and `next build` sometimes stops once with an upgrade
-   notice (it builds on a second try). Upgrade to the first patched release and run the gate and the walk again.
-
-9. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
+8. **Before a GST kennel uploads the GSTR-1 files**, load one month into the GST offline tool and fix any column
    name it rejects (`src/lib/core/gstr1.ts`).
 
-**Building: nothing is scheduled.** Phases 5 to 9 (M45 to M65) are built, so the roadmap is finished but for M1. The
-next milestone comes from the owner, or from an idea under "Ideas not scheduled" in `08` once it has an issue and a
-kennel reason. Before a kennel relies on the file for Tally, the accountant imports one month (`06`, questions 16 and
-17). Alongside, steps 1 to 9 above still
-need the owner, then the migration freeze; and when the hosted project exists, also: set the "Reset Password" email
-template and the `/auth/confirm**` redirect (`10`, step 1.4), set up Google if wanted (`10`, "Sign in with Google"),
-check `cron.job` has `wagbook-nightly`, point an uptime service at `/api/health`, and if the kennel wants alerts on
-phones, set them up (`10`, "Alerts on phones") and allow them on a real Android phone and an iPhone added to the home
-screen.
-Ideas beyond M65 wait for a kennel reason (the roadmap's "Ideas not scheduled", each with an issue first). The
-owner has said production is not soon, so migrations stay editable in place until then. Worth doing before
-production without the owner: have a person read the Phase 1 to 4 Hindi and Kannada, and walk the team screens on a
-real phone at a shift change. The
+**Building: nothing is scheduled.** The roadmap is finished. The next milestone comes from the owner, or from an idea
+under "Ideas not scheduled" in `08` once it has an issue and a kennel reason. Before a kennel relies on the file for
+Tally, the accountant imports one month (`06`, questions 16 and 17). Steps 1 to 8 above need the owner. **The
+migrations are frozen** (below): any database change is a new timestamped file, and the hosted database takes it with
+`supabase db push`. Worth doing without the owner: walk the team screens on a real phone at a shift change. The
 accountant should also give the SAC codes and rates for grooming, swimming and training (question 1 in `06`). Before a kennel sells food, the accountant should answer questions
 13 and 14 in `06` (the food's HSN code and rate, the delivery charge, and any kitchen licence or label wording).
 
@@ -438,10 +437,10 @@ mirror.gcr.io/library/node:22-alpine node:22-alpine`.
 
 ## Migration freeze
 
-**Not frozen.** No production database exists. Migrations in `supabase/migrations/` may be edited in place.
-
-When the first production project is created, replace this paragraph with: "Frozen on (date). Never edit an existing
-migration. Add new files."
+**Frozen on 4 November 2026**, when the owner reported M1 finished and the hosted database made. Never edit an
+existing migration. Add new files, named by the date and time they were written (`20261104000100_review_fixes.sql` is
+the first). Row level security, grants and policies for a new table go in the migration that makes it (`CLAUDE.md`,
+rule 2).
 
 ## Decisions waiting for the owner
 
@@ -467,11 +466,15 @@ downloads a month and then removes it, never by themselves; a trial day is offer
 away the kennel sends flowers; several sites stay separate kennels with combined reports; online payment through a
 provider is for later, and messaging many parents at once is not wanted.
 
-## Translations waiting for a native speaker
+## Translations
 
-Hindi (`src/messages/hi/`) and Kannada (`src/messages/kn/`) were drafted without a native speaker. Every message is
-there, but the words need checking, starting with the screens staff use most (Today, Care, the booking page) and what
-parents see (intake form, stay page, bill, WhatsApp messages). The drafts were least sure of:
+Hindi (`src/messages/hi/`) and Kannada (`src/messages/kn/`) were drafted without a native speaker and **have been read
+by native speakers** (the owner, 4 November 2026). Corrections they asked for, if any, still need to go into the message
+files. Added after the reading, and so not yet read: `errors.codes.WB097` (a credit note at a tax rate the bill did not
+charge that much at), only seen by owners and managers. `WB028` reuses the sentence of `errors.notUndoable`, which was
+read.
+
+What the drafts were least sure of, kept for whoever makes the corrections:
 
 - **Both:** "WhatsApp" is in Latin letters in most places and in the local script in a few; choose one. Pets of
   unknown sex get masculine verbs in Hindi. Kannada avoids case endings on names ("{pet} ಬಗ್ಗೆ"); check it reads
@@ -792,6 +795,11 @@ Found in the pre-launch review (M66), not built; each wants an owner's yes first
   for 31 days is 930 rows), the stock page (asks for 2,000 moves), and Reports' "owed today" (only past 1,000 unpaid
   bills). Bills was fixed in M66.
 - A new kennel's owner gets no checklist of what to set up first; `17` and the More menu are the guide.
+- Undo check-out after "Bill to today" keeps the shortened end date: the pet is back in house going home today. Extend
+  the stay if it is staying on (found in the review of 4 November 2026).
+- A cancelled stay's refund counts only its nights (with their tax). Extras, appointments and pick-ups paid ahead with
+  the stay's advance are kept unless refunded by hand.
+- The food orders page counts orders waiting for an area from the 1,000 newest of them.
 
 - Food: pick-ups and drops of boarders do not join runs yet (M39). The shopping list does not know what is already ordered from a supplier. Labels have no barcode. Pack all
   takes the newest batch in date of each recipe; to use another, pack one at a time. Stock has no units other than
@@ -869,6 +877,12 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 4 November 2026: the owner finished M1 and had the Hindi and Kannada read; migrations frozen. A bug review fixed
+  five things, each with a test: tax left out of a cancelled stay's refund (unit test), credit notes past a rate's
+  billed value (`WB097`, database test), Undo check-out held only by the app (`WB028`, database test), capped lists on
+  the food orders page and Today's trial follow-ups, and dates shown in UTC. Both rules in the first migration after
+  the freeze, `20261104000100_review_fixes.sql`. Next.js 16.4.5, zod 4.6.7. The walk (83 steps) passed on the new
+  Next.js against the local Supabase (images pulled through `mirror.gcr.io` where Docker Hub answered 429).
 - 2 November 2026: M70 (D59), asked for by the owner: a finished look. Twelve screens designed on a canvas and agreed,
   then built: tokens, icons, section cards, figures, meters, the dark sidebar, Today's figures, calendar bars, a stay's
   header, Care's rows, form cards, the chart, More, `AuthShell` for sign in and onboarding, warmer parents' pages and

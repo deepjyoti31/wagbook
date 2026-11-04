@@ -24,7 +24,7 @@ The first release will be 0.1.0. Everything below is in it.
 - Pets and parents with vaccinations and warnings, incidents, search, merging duplicates.
 - People: invite by link or email, roles, suspend and restore.
 - Reports, expenses with receipts, CSV downloads, and the history of changes.
-- English, Hindi and Kannada (the Hindi and Kannada are drafts until native speakers check them).
+- English, Hindi and Kannada, read by native speakers.
 - The intake form parents fill in themselves, now with a vaccination certificate per pet.
 - A parent's details: download everything held about them, and erase it on request, keeping only what tax law needs.
 - Two-step sign-in with an authenticator app, enforced by the database.
@@ -119,6 +119,19 @@ The first release will be 0.1.0. Everything below is in it.
   numbers and a bar for each kind of care, stays are bars on the calendar, and the pages parents open (a stay, a bill,
   the forms) are warmer and carry your kennel's name.
 
+### Fixed after the hosted database was made (4 November 2026)
+
+- A cancelled stay's refund and credit now include the tax paid on its nights. Before, when your prices leave tax out,
+  the tax on nights refunded or kept as credit was counted as money the kennel kept.
+- A credit note can no longer take back more at a tax rate than the bill charged at that rate, so it never gives back
+  tax the bill did not charge.
+- A check-out can be undone only on its day and before its bill is issued, now held to by the database for everyone.
+- Food orders still to deal with are always listed, however many orders came after them, and Today's list of parents
+  to ask about a subscription after a trial is no longer cut short in a busy kitchen.
+- Dates of things that happened late at night (an incident, a bill started, an order sent, a parent's consent) are
+  shown as your kennel's date, not the date in London.
+- Next.js 16.4.5 and zod 4.6.7, for their security fixes.
+
 ### For whoever runs it
 
 - Limits on how often one address may sign in or send forms, and a Content Security Policy with a fresh nonce for
@@ -133,4 +146,6 @@ The first release will be 0.1.0. Everything below is in it.
 
 ### Database changes
 
-All of them: this is the first release. Apply every file in `supabase/migrations`.
+All of them: this is the first release. Apply every file in `supabase/migrations`. A hosted database made before 4
+November 2026 needs `20261104000100_review_fixes.sql` applied (`supabase db push`): two new checks, no change to any
+row.

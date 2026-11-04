@@ -5,7 +5,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PhotoInput } from "@/components/photo-input";
 import { Badge, buttonStyles, Field, Input, Loading, Notice, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
-import { formatDate, formatMoney, todayIn, typedQuantity, whatsappLink } from "@/lib/core";
+import { formatDate, formatMoney, localDate, todayIn, typedQuantity, whatsappLink } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { quantityText } from "@/lib/kitchen";
@@ -66,7 +66,7 @@ async function Order({ params, searchParams }: Pick<PageProps<"/app/more/orders/
       <p className="mb-2 flex flex-wrap items-center gap-2">
         {x.status === "closed" ? <Badge>{o.closed}</Badge> : open ? <Badge tone="attention">{o.open}</Badge> : <Badge tone="good">{o.receivedInFull}</Badge>}
         <span className="text-slate">
-          {fill(o.orderedOn, { date: formatDate(x.ordered_on, locale) })}, {x.sent_at ? fill(o.sentOn, { when: formatDate(x.sent_at.slice(0, 10), locale) }) : o.notSent}
+          {fill(o.orderedOn, { date: formatDate(x.ordered_on, locale) })}, {x.sent_at ? fill(o.sentOn, { when: formatDate(localDate(x.sent_at, org.time_zone), locale) }) : o.notSent}
         </span>
       </p>
       {x.note ? <p className="mb-2 text-slate">{x.note}</p> : null}

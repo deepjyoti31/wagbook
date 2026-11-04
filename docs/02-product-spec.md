@@ -1322,7 +1322,7 @@ joins one kennel's rows to another's.
 | A finished look (M70, D59) | Built: a dark sidebar with icons and search on a laptop, cards for every section, Today opening with four figures and a bar for each kind of care, stays drawn as bars on the calendar, one frame for sign in and the pages around it, and parents' pages in warmer colours with the kennel's name, the pet's photo and a WhatsApp button in reach. |
 | Install to the phone's home screen (web app manifest, icons) | Built |
 | Works offline or on a bad connection | Built: Today and Care open from the last copy on the phone; ticking a care task offline is saved and sent when the connection is back (D22). Everything else waits for the connection. |
-| Languages other than English | Built: English, Hindi and Kannada (drafts until reviewed). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |
+| Languages other than English | Built: English, Hindi and Kannada (read by native speakers). Each person chooses their own under More; owners and managers choose the language of parents' pages and messages in Settings (D21). |
 | Audit log of every change to bookings, money, settings and people | Built: History of changes (E6) |
 | Daily reminders (arrivals tomorrow, vaccinations expiring) | Built: "Send me tomorrow's summary" on Today, for owners and managers, opens WhatsApp with tomorrow's arrivals, who goes home, and vaccinations running out within 30 days for pets staying. |
 | Demo data for trying Wagbook | Built: `supabase/seed.sql`, for a local Supabase; `npm run setup:local` points the app at it (README, "Try it on your own computer"). No public demo (D28). |

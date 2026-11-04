@@ -137,6 +137,40 @@ describe("a pet that has gone home", () => {
     await q(db, staff, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
     expect(await toClean(k.kennels[5])).toHaveLength(1);
   });
+
+  it("is undone only on the day of the check-out and before its bill is issued (WB028)", async () => {
+    const checkedOut = async () => {
+      const pet = await strangerPet(db, k);
+      const stay = await book(db, k, { pet, start: await dayFromToday(db, k, -3), end: await today() });
+      await q(db, staff, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
+      await q(db, staff, "update public.bookings set status = 'checked_out' where id = $1", [stay]);
+      return stay;
+    };
+    const undo = (stay: string, actor = staff) => q(db, actor, "update public.bookings set status = 'checked_in' where id = $1", [stay]);
+
+    // Checked out two days ago: it went home, and stays gone, whoever asks.
+    const old = await checkedOut();
+    await as(db, admin, async () => {
+      await db.query("set session_replication_role = replica");
+      await db.query("update public.bookings set checked_out_at = now() - interval '2 days' where id = $1", [old]);
+      await db.query("set session_replication_role = default");
+    });
+    expect((await errorOf(() => undo(old))).message).toContain("WB028");
+    expect((await errorOf(() => undo(old, k.owner))).message).toContain("WB028");
+
+    // Checked out today, but its bill is out: the bill is history.
+    const billed = await checkedOut();
+    await as(db, admin, async () => {
+      await db.query("set session_replication_role = replica");
+      await db.query(
+        `insert into public.invoices (org_id, client_id, booking_id, status, number, fiscal_year, seq, issued_on)
+         select b.org_id, b.client_id, b.id, 'issued', 'T/99-00/0001', '1999-00', 1, current_date from public.bookings b where b.id = $1`,
+        [billed],
+      );
+      await db.query("set session_replication_role = default");
+    });
+    expect((await errorOf(() => undo(billed))).message).toContain("WB028");
+  });
 });
 
 describe("jobs that are not about a pet (M51)", () => {

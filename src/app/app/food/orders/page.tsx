@@ -27,20 +27,23 @@ async function FoodOrders({ searchParams }: Pick<PageProps<"/app/food/orders">, 
   const { m, locale } = t;
   const w = m.foodOrders;
   const supabase = await createClient();
-  const orders = await supabase
-    .from("food_orders")
-    .select("id, kind, status, client_id, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot, line, area, postal_code, starts_on, until_date, grams, amount_minor, note, inscription, site_ref, site_source, created_at, clients(full_name, phone), subscriptions(pets(name)), food_products(name)")
-    .eq("org_id", org.id)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (orders.error) throw new Error("Could not load orders.");
-  const waiting = orders.data.filter((o) => ["unpaid", "paid", "requested"].includes(o.status));
-  const finished = orders.data.filter((o) => ["confirmed", "declined"].includes(o.status)).slice(0, 30);
+  const ORDER =
+    "id, kind, status, client_id, parent_name, phone, pet_name, weight_g, plan, grams_per_day, weekdays, slot, line, area, postal_code, starts_on, until_date, grams, amount_minor, note, inscription, site_ref, site_source, created_at, clients(full_name, phone), subscriptions(pets(name)), food_products(name)" as const;
+  // Each list read on its own: orders still to deal with are never pushed off
+  // the page by newer ones, however many came after them.
+  const [open, done30, areas] = await Promise.all([
+    supabase.from("food_orders").select(ORDER).eq("org_id", org.id).in("status", ["unpaid", "paid", "requested"]).order("created_at", { ascending: false }),
+    supabase.from("food_orders").select(ORDER).eq("org_id", org.id).in("status", ["confirmed", "declined"]).order("created_at", { ascending: false }).limit(30),
+    supabase.from("food_orders").select("postal_code").eq("org_id", org.id).eq("status", "waiting_area"),
+  ]);
+  if (open.error || done30.error || areas.error) throw new Error("Could not load orders.");
+  const waiting = open.data;
+  const finished = done30.data;
   const areaCounts = new Map<string, number>();
-  for (const o of orders.data.filter((x) => x.status === "waiting_area")) areaCounts.set(o.postal_code ?? "", (areaCounts.get(o.postal_code ?? "") ?? 0) + 1);
+  for (const o of areas.data) areaCounts.set(o.postal_code ?? "", (areaCounts.get(o.postal_code ?? "") ?? 0) + 1);
   const money = (minor: number) => formatMoney(minor, { currency: org.currency, locale, trimZeros: true });
 
-  const describe = (o: (typeof orders.data)[number]) => {
+  const describe = (o: (typeof open.data)[number]) => {
     const parent = o.parent_name ?? o.clients?.full_name ?? "";
     const phone = o.phone ?? o.clients?.phone ?? "";
     const lines: string[] = [fill(w.from, { parent, phone: phone ? formatPhone(phone) : "" })];

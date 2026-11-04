@@ -66,7 +66,8 @@ is a document of its own, counted in the month it is made.
 - **Its tax** is worked out as on the bill when the bill was issued: the seller's tax mode and state frozen on the bill,
   and whether its prices included tax (`invoices.prices_include_tax`, frozen at issue). `issue_credit_note()` checks
   every line with the same function as a bill (`check_bill_line`, `WB037`).
-- **Never more than is left** on the bill, in all or in value taxed (`WB092`).
+- **Never more than is left** on the bill, in all or in value taxed (`WB092`), and never more at a tax rate than the
+  bill's lines at that rate (`WB097`), so a credit note never gives back tax the bill did not charge.
 - **Its number** is the next in its own series for the financial year, `CN/27-28/0001`, from the same counter table as
   bills (`invoice_counters.series`). A bill prefix cannot be `CN`. Nobody can change or delete a credit note.
 - **What is owed** on a bill is its total, less credit notes, less payments (`invoice_balances`). Below zero, the parent
@@ -380,8 +381,9 @@ training are services; their SAC codes and rates are for the accountant, as for 
 
 When a stay is cancelled, its advance is shared out night by night by the kennel's rule (`cancellationOutcome()`): a
 night's outcome is refund, credit or keep, by whether it is a weekday or a weekend or holiday night and whether the
-parent asked with enough notice. The money paid goes to the refunds first, then to credit; the rest is kept. When the
-kennel cancels, the parent chooses all as refund or all as credit. An owner or manager confirms it on the stay's page:
+parent asked with enough notice. Each night is worth what the parent paid for it: with its tax when the kennel's
+prices leave tax out (`unitsWithTax()`), so the tax on a night refunded or kept as credit goes back with it. The money
+paid goes to the refunds first, then to credit; the rest is kept. When the kennel cancels, the parent chooses all as refund or all as credit. An owner or manager confirms it on the stay's page:
 the refund is an ordinary refund payment, and the credit a refund paid "as credit" (`payments.method = 'credit'`,
 direction out), which makes a credit lot ending after the kennel's months (12 by default). Kept money stays as an
 advance on a cancelled stay with no bill (D40, question 11). The advance shared out is the one the stay held when it was

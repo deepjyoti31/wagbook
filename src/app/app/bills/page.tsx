@@ -4,7 +4,7 @@ import { Rich } from "@/components/rich";
 import { Badge, Empty, Loading, PageTitle, Section } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { BILLABLE_IN_FAMILY } from "@/lib/billing";
-import { formatDate, formatMoney } from "@/lib/core";
+import { formatDate, formatMoney, localDate } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
@@ -88,7 +88,7 @@ async function Bills() {
             {petsOf(i) ? `, ${petsOf(i)}` : ""}
           </span>
           <span className="w-full text-sm text-slate">
-            {i.issued_on ? formatDate(i.issued_on, locale) : fill(m.bills.started, { date: formatDate(i.created_at.slice(0, 10), locale) })}
+            {i.issued_on ? formatDate(i.issued_on, locale) : fill(m.bills.started, { date: formatDate(localDate(i.created_at, org.time_zone), locale) })}
           </span>
         </Link>
       </li>

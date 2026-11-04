@@ -2,6 +2,7 @@ import { addDays, eachDate, type ISODate } from "./dates";
 import { isoWeekday, zonedInstant } from "./food";
 import type { Minor } from "./money";
 import { chargeableUnits, type BookingKind, type StayCharge } from "./stay";
+import { computeLine, type TaxContext } from "./tax";
 
 /**
  * Cancellation rules and credit (M38, D47). Each night of a stay (each day of
@@ -172,4 +173,22 @@ export function stayUnits(
     discount -= off;
   }
   return dates.map((date, k) => ({ date, priceMinor: prices[k] }));
+}
+
+/**
+ * A stay's nights with the tax on them, as the parent paid it. When the
+ * kennel's prices leave tax out, an advance paid for the stay carries the tax
+ * as well, so a night refunded or kept as credit gives its tax back with it:
+ * otherwise the kennel would keep the tax on nights it never sold. The odd
+ * paise go on the last night, so the nights add up to the tax on the whole
+ * stay. Prices that include tax, or no tax, are left as they are.
+ */
+export function unitsWithTax(units: readonly CancelUnit[], taxRateBp: number, ctx: TaxContext): CancelUnit[] {
+  if (ctx.mode === "none" || ctx.pricesIncludeTax || taxRateBp <= 0 || units.length === 0) return [...units];
+  const line = (priceMinor: Minor) => computeLine({ description: "", quantity: 1, unitPriceMinor: priceMinor, taxRateBp }, ctx).totalMinor;
+  const taxed = units.map((u) => ({ ...u, priceMinor: line(u.priceMinor) }));
+  const whole = line(units.reduce((a, u) => a + u.priceMinor, 0));
+  const last = taxed.findLastIndex((u) => u.priceMinor > 0);
+  if (last >= 0) taxed[last].priceMinor += whole - taxed.reduce((a, u) => a + u.priceMinor, 0);
+  return taxed;
 }

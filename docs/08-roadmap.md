@@ -23,11 +23,10 @@ settings, security review and fixes, documentation.
 
 ## M1. Prove it against a real Supabase
 
-- [ ] Partly done, 13 October 2026. Done: every migration and the seed apply on Supabase's own Postgres 17 (the local
+- [x] Finished 4 November 2026, as the owner reported: the hosted Supabase project exists and the migrations are frozen
+  from that day. Done on 13 October 2026: every migration and the seed apply on Supabase's own Postgres 17 (the local
   stack from the Supabase CLI); `supabase/seed.sql` and `supabase/config.toml`; the whole walk below runs as Playwright
-  tests (`npm run test:e2e`, 13 tests) against that local stack, and a second CI job runs it. Still to do, and it needs a
-  person: follow `10-setup-and-deploy.md` on a hosted Supabase project, try the real sign-up email and the
-  `/auth/confirm` round trip, and record the migration freeze when production exists. See `HANDOFF.md`.
+  tests (`npm run test:e2e`) against that local stack, and a second CI job runs it.
 
 **Build**
 
@@ -231,7 +230,7 @@ settings, security review and fixes, documentation.
 
 ## M8. Works anywhere, in any language
 
-- [x] Finished 15 October 2026, with Hindi and Kannada as drafts until native speakers review them. Languages: D21.
+- [x] Finished 15 October 2026. Hindi and Kannada read by native speakers (reported 4 November 2026). Languages: D21.
   Offline: D22 (Next.js's experimental offline retry is left off, because it would replay a booking).
 
 **Build**
