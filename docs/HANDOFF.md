@@ -296,7 +296,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 | A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
 | The hosted project's settings against `docs/10-setup-and-deploy.md` | The owner made the hosted project (M1, reported 4 November 2026); no session here has seen it | Email templates, redirects, the nightly job and alerts are set by hand on the hosted project: step 1 of "Do this next" |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
-| M70 on the real signed-in pages with data, looked at by a person at 1366, 820 and 360 pixels | The local Supabase could not start in the session that built M70: Docker Hub refused image pulls (too many requests) and the other registries' download hosts were blocked. The walk did run them, in CI (below) | Low for logic (no query or action changed), medium for looks: a screen with its own boxes inside a section shows a box in a card |
+| M70's bill pages with data | Looked at on 4 November 2026 with the demo seed at 1366, 820 and 360 pixels: Today, the calendar, a booking, Care, New booking, Reports, More, Bills and a stay page. No sideways scroll and no browser errors at any width. The seed has no issued bill, so the bill and the parent's bill were not looked at (the walk covers them) | Low. Forms inside a section card (Add an extra, Record an advance, Brought from home's Add, Vet visit) are still white boxes with a border inside a white card; change them to `bg-wash` when next touching `ui.tsx` |
 | Anything on a real phone | Only Chromium at 360 pixels | Touch, keyboard covering fields, date and time pickers |
 | "A full meal round for twenty dogs in under two minutes" (M3), "billed, sent, paid and marked paid from a phone in under a minute" (M4), "today's photo within seconds on a slow connection" (M5) | Not timed on a phone or a throttled connection | Each step is one round trip; the stay page loads small copies (480 pixels) of photos. Probably fine; slow networks are M8 |
 | The CSV downloads opened in Excel, Google Sheets and LibreOffice | Checked as text in tests: byte order mark, quoting, CRLF | Low; an accountant opening one would settle it |
@@ -347,11 +347,6 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 **Apply the new migration to the hosted database first.** The hosted project was made before
 `20261104000100_review_fixes.sql` (two checks added, no row changed). With the Supabase CLI linked to the project:
 `npx -y supabase@2.120.0 db push`. Deploy the app from the same commit afterwards, as `16-releasing.md` says.
-
-**Look at M70 with real data** on the local Supabase (`npx -y supabase@2.120.0 start`; the walk already passes in
-CI): Today, the calendar, a booking, Care, New booking, Reports, More, a stay page and a bill at 1366, 820 and 360
-pixels. Expect some screens with their own
-white boxes inside a section card; change those to `bg-wash` or a `Ledger` as you meet them.
 
 **Try the laptop layout (M69)** on the real Supabase project: a laptop (1366 or 1440 pixels), a tablet, and a phone.
 Say which pages still feel like a phone on a laptop. Not split in two yet, and candidates if they do: Care, Bookings,
