@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 4 November 2026, after M1 was finished by the owner and a bug review.
+Last updated: 5 November 2026, after the front page was removed (D60).
 
 ## In one paragraph
 
@@ -832,7 +832,7 @@ Found in the pre-launch review (M66), not built; each wants an owner's yes first
 - The bills list puts the parent and pets on their own line under the number, so a phone row is taller than before.
 - People shows names and roles but not email addresses (the app cannot read `auth.users`).
 - The calendar's top row counts kennels in use; when siblings share, the number of pets is shown under it.
-- No favicon beyond `icon.svg`; no social preview image. The landing page is a single screen of text.
+- No favicon beyond `icon.svg`; no social preview image.
 - A pet that overstays counts in the occupancy report only up to its check-out date unless someone pressed Extend.
 - Bill line descriptions ("Boarding, 3 nights") and the amount in words stay in English on bills in every language.
 - The service worker runs only in production builds, so `npm run dev` never shows the offline behaviour.
@@ -871,6 +871,10 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 5 November 2026: the front page is gone (D60), asked for by the owner: "/" goes to `/app`, which opens the kennel
+  for someone signed in and the sign-in page (with "Create an account") for anyone else. A redirect in
+  `next.config.ts`; its unused word ("Set up your kennel") taken out of the three message files. No database change.
 
 - 4 November 2026: the owner finished M1 and had the Hindi and Kannada read; migrations frozen. A bug review fixed
   five things, each with a test: tax left out of a cancelled stay's refund (unit test), credit notes past a rate's

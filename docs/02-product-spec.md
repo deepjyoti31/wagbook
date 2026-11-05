@@ -23,7 +23,7 @@ One person can belong to several kennels, with a different role in each.
 ## Map of the app
 
 ```
-/                     Landing page                                   public
+/                     Opens /app; signed out, that is the sign-in page public
 /login                Sign in, create account                        public
 /setup                Shown when the database settings are missing   public
 /auth/confirm         Where email links land                         public

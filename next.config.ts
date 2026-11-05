@@ -37,6 +37,12 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // There is no front page. "/" opens the kennel, and /app sends anyone not
+  // signed in to the sign-in page (requireUser in src/lib/auth.ts), which also
+  // offers "Create an account". Temporary (307), so it can be changed later.
+  async redirects() {
+    return [{ source: "/", destination: "/app", permanent: false }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
