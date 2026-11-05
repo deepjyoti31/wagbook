@@ -1,4 +1,4 @@
-/** English words for more, settings, kennels, extras, peak periods, forms from parents, the public intake form, signing in, onboarding, setup and the landing page. Part of en.ts. */
+/** English words for more, settings, kennels, extras, peak periods, forms from parents, the public intake form, signing in, onboarding, setup, and what Wagbook is (beside the sign-in form). Part of en.ts. */
 export const kennelArea = {
   more: {
     title: "More",
@@ -570,12 +570,12 @@ export const kennelArea = {
     step4: "Restart the app.",
     walkthrough: "The full walkthrough is in {path}.",
   },
+  // What Wagbook is: the panel beside the sign-in form (AuthShell). There is no front page; "/" opens /app.
   landing: {
     headline: "The register for your kennel, on your phone.",
     about:
       "Take bookings without double-booking a kennel. Know who arrives and leaves today. Keep every dog's food, medicine and vaccinations in one place. Send updates from your own WhatsApp.",
     free: "Wagbook is free and open source. Run it for one kennel or sixty.",
-    setUp: "Set up your kennel",
   },
   notFound: {
     title: "This page does not exist",

@@ -1490,3 +1490,20 @@ left until someone works on the screen.
 
 **Look again** if a kennel asks for a light sidebar, or the icons start being needed without words.
 
+## D60. No front page: "/" opens the app
+
+**Context.** Wagbook had a front page at "/" saying what it is, with "Sign in" and "Set up your kennel". A kennel that
+was already set up opened it every day on the way to the app and took it for a setup screen. The sign-in page already
+says what Wagbook is (the panel in `AuthShell`) and has "Create an account".
+
+**Decision.** No front page. "/" is a temporary redirect (307) to `/app` in `next.config.ts`. Signed in, that is the
+kennel's Today; signed out, `requireUser()` sends the visitor to `/login`; with the database settings missing, to
+`/setup`. The words the panel beside the sign-in form uses stay under `landing` in the message files.
+
+**Why.** The people who open Wagbook are the kennel's own staff, nearly every time. One page fewer to keep in three
+languages, and nobody has to choose between two buttons before work.
+
+**Cost.** Nothing at the bare address tells a stranger what Wagbook is before they are asked to sign in, apart from
+the panel beside the form. The project's README does that job.
+
+**Look again** if Wagbook is offered as a hosted service to kennels that do not know it yet.

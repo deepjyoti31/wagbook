@@ -62,7 +62,7 @@ src/
   proxy.ts                     Next.js 16's name for middleware
   app/
     layout.tsx globals.css     Root shell and the design tokens
-    page.tsx                   Landing page
+    (no page.tsx)              "/" goes to /app (next.config.ts, D60)
     login/ auth/confirm/       Sign in, sign up, email link landing
     onboarding/                Accept an invitation or create a kennel
     setup/                     Shown when env vars are missing

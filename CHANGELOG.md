@@ -10,6 +10,8 @@ The first release will be 0.1.0. Everything below is in it.
 
 ### For the kennel
 
+- Opening Wagbook's address takes you straight to your kennel, or to sign in if you are not signed in. There is no
+  front page to click through.
 - Bookings for boarding and day boarding, with no double booking and no overfilling, enforced by the database.
   Families booked together, requests, peak periods, a calendar, extras and prices.
 - Only an owner can delete anything (an expense with its receipt, a draft bill, an extra, a person, a parent's
