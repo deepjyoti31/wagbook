@@ -38,6 +38,8 @@ export function PhotoInput({
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
   async function prepare(files: FileList) {
+    // The small copies of an earlier choice must not go with these photos, should this choice fail or be a PDF.
+    if (small.current) small.current.value = "";
     const chosen = Array.from(files).slice(0, max);
     const photos = chosen.filter((f) => f.type.startsWith("image/"));
     // Certificates may be PDFs: those go as they are.

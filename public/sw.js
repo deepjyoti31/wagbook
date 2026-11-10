@@ -13,7 +13,7 @@
  * Wagbook, signed in, for the newest alerts (/api/alerts) and shows each,
  * once; tapping one opens its page.
  */
-const VERSION = "wb-3";
+const VERSION = "wb-4";
 const ALERTS_SEEN = "wb-alerts-seen";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
@@ -66,7 +66,8 @@ self.addEventListener("fetch", (event) => {
     fetch(request)
       .then((res) => {
         // Keep the newest copy of Today and Care, signed in and complete.
-        if (kept && res.ok && !res.redirected) {
+        // Not a copy with a one-time sentence in its address ("?done=checked_in"), which would be said again offline.
+        if (kept && res.ok && !res.redirected && url.search === "") {
           const copy = res.clone();
           caches.open(PAGES).then((c) => c.put(url.pathname, copy));
         }

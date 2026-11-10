@@ -14,6 +14,12 @@ The first release will be 0.1.0. Everything below is in it.
   could come out a paisa different from the database's sum and then never be issued. Crediting what changed on a
   visitor's appointment bill said "nothing changed". And a booking's "What it costs", with the total sent to the
   parent on WhatsApp, left out pick-ups, drops and things sold over the counter on the stay. No database change.
+- Four more (10 November 2026). At a kennel outside India, a phone number typed without its country code on the
+  intake form, the booking form for new parents or the food order page was kept as an Indian number: now the parent is
+  asked for the country code, as on the signed-in pages. A second tap on "Flowers sent" could write the cost as an
+  expense twice, and on a delivery problem could make two replacement deliveries. The copy of Today kept for when
+  there is no connection could repeat an old "Checked in". And photos chosen a second time could go with the small
+  copies of the first choice. No database change.
 - Opening Wagbook's address takes you straight to your kennel, or to sign in if you are not signed in. There is no
   front page to click through.
 - Bookings for boarding and day boarding, with no double booking and no overfilling, enforced by the database.

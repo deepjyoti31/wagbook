@@ -884,6 +884,16 @@ One line per session, newest first. What changed, in a sentence. Details belong 
   includes (`tripAndSaleLines()`). No database change, no new message. `npm run check` passes; the walk (83 steps)
   passes against the local Supabase.
 
+- 10 November 2026, later: four more from the same review. (4) The public forms (`/i/`, `/book/`, `/f/`) read a phone
+  number without + as Indian at every kennel, so a British "07911 123456" was kept as +91 79111 23456: they now read it
+  by the kennel's country (`normalizePhoneIn()`, unit tested; the pages bind `country_code` from
+  `get_public_intake_form`), and the postal code likewise. (5) A second tap on "Flowers sent" wrote the expense
+  again, and on a delivery problem made a second replacement: both now happen once (the replacement of a lost race is
+  cancelled with the reason "Made twice", stored in English). (6) The service worker kept `/app?done=...` as the
+  offline copy of Today, repeating its sentence: only the plain address is kept now (`wb-4`). (7) `PhotoInput` clears
+  the small copies of an earlier choice. No database change. Not looked at in a browser beyond the walk: a kennel
+  outside India, and the double taps.
+
 - 5 November 2026: the front page is gone (D60), asked for by the owner: "/" goes to `/app`, which opens the kennel
   for someone signed in and the sign-in page (with "Create an account") for anyone else. A redirect in
   `next.config.ts`; its unused word ("Set up your kennel") taken out of the three message files. No database change.

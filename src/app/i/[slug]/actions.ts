@@ -1,7 +1,7 @@
 "use server";
 
 import type { z } from "zod";
-import { isISODate, normalizePhone, normalizePostalCode } from "@/lib/core";
+import { isISODate, normalizePhoneIn, normalizePostalCode } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { sendAlertsAfter } from "@/lib/push";
 import { checked, text, type FormState } from "@/lib/forms";
@@ -33,16 +33,17 @@ function issueText(issue: z.core.$ZodIssue, m: I18n["m"]): string {
 /**
  * The public intake form. Runs with no signed-in user: it can only call
  * submit_intake(), which validates everything again inside the database.
- * Bound by the page to the kennel's slug and its language for parents (which
- * only decides the language of the sentences sent back).
+ * Bound by the page to the kennel's slug, its language for parents (which
+ * only decides the language of the sentences sent back) and its country (what
+ * a phone number without + and a postal code mean).
  */
-export async function submitIntake(slug: string, kennelName: string, language: string, _state: FormState, form: FormData): Promise<FormState> {
+export async function submitIntake(slug: string, kennelName: string, language: string, country: string, _state: FormState, form: FormData): Promise<FormState> {
   const t = parentI18n(language);
   const e = t.m.intakeForm.errors;
   if (!isSupabaseConfigured()) return { error: e.unavailable };
   if (await isRateLimited()) return { error: t.m.errors.slowDown };
 
-  const phone = normalizePhone(text(form, "parent_phone") ?? "");
+  const phone = normalizePhoneIn(text(form, "parent_phone") ?? "", country);
   if (!phone) return { error: e.phone };
 
   const pets = [];
@@ -91,7 +92,7 @@ export async function submitIntake(slug: string, kennelName: string, language: s
 
   // A PIN code, when the kennel asked for one (M25). Six digits in India; the database checks again.
   const pinTyped = text(form, "parent_postal_code");
-  const postalCode = pinTyped === null ? null : (normalizePostalCode(pinTyped, "IN") ?? normalizePostalCode(pinTyped, ""));
+  const postalCode = pinTyped === null ? null : normalizePostalCode(pinTyped, country);
   if (pinTyped !== null && postalCode === null) return { error: e.pin };
 
   const start = text(form, "start_date");

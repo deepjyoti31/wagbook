@@ -3,7 +3,7 @@ import { en } from "../../messages/en";
 import {
   addDays, amountInWords, billMessage, bookingConfirmedMessage, spaceFreeMessage, dailySummaryMessage, chargeableUnits, computeInvoice, computeLine,
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
-  isValidGstin, isValidVpa, multiply, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
+  isValidGstin, isValidVpa, multiply, nightsBetween, normalizePhone, normalizePhoneIn, numberToIndianWords, parseMoney, planPlaySessions,
   quoteStay, todayIn, toDecimalString, upiLink, whatsappLink, yardsNeeded,
   calendarDays, calendarGrid, isOverstaying, peaksTouching, playMinutesOn, playWindows,
 } from "./index";
@@ -103,6 +103,18 @@ describe("phone", () => {
   });
   it("formats for reading", () => {
     expect(formatPhone("+919876543210")).toBe("98765 43210");
+  });
+});
+
+describe("a phone number typed at a kennel outside India", () => {
+  it("is Indian without + only at a kennel in India", () => {
+    expect(normalizePhoneIn("98765 43210", "IN")).toBe("+919876543210");
+    // A British mobile typed the British way must not be kept as an Indian number.
+    expect(normalizePhoneIn("07911 123456", "GB")).toBeNull();
+    expect(normalizePhoneIn("9876543210", "US")).toBeNull();
+    expect(normalizePhoneIn("+44 7911 123456", "GB")).toBe("+447911123456");
+    expect(normalizePhoneIn("+91 98765 43210", "GB")).toBe("+919876543210");
+    expect(normalizePhoneIn("98765 43210", null)).toBeNull();
   });
 });
 
