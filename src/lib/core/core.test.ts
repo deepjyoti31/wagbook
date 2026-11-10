@@ -3,7 +3,7 @@ import { en } from "../../messages/en";
 import {
   addDays, amountInWords, billMessage, bookingConfirmedMessage, spaceFreeMessage, dailySummaryMessage, chargeableUnits, computeInvoice, computeLine,
   diffDays, eachDate, fiscalYear, formatInvoiceNumber, formatMoney, formatPhone, gstinStateCode, isISODate,
-  isValidGstin, isValidVpa, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
+  isValidGstin, isValidVpa, multiply, nightsBetween, normalizePhone, numberToIndianWords, parseMoney, planPlaySessions,
   quoteStay, todayIn, toDecimalString, upiLink, whatsappLink, yardsNeeded,
   calendarDays, calendarGrid, isOverstaying, peaksTouching, playMinutesOn, playWindows,
 } from "./index";
@@ -53,6 +53,23 @@ describe("money", () => {
   });
   it("refuses floats", () => {
     expect(() => formatMoney(12.5)).toThrow();
+  });
+  it("multiplies a price by a part quantity as the database does, half a paisa going up", () => {
+    // 0.35 x 449.50 is 157.325 exactly. As floats the product is just under the half and would round down.
+    expect(multiply(44950, 0.35)).toBe(15733);
+    expect(multiply(1250, 0.57)).toBe(713);
+    expect(multiply(150, 0.41)).toBe(62);
+    expect(multiply(-44950, 0.35)).toBe(-15733);
+    expect(multiply(99999, 1.5)).toBe(149999);
+    expect(multiply(120000, 3)).toBe(360000);
+    expect(multiply(33333, 0)).toBe(0);
+    // Every quantity to two decimals, against whole-number arithmetic.
+    for (const price of [1250, 44950, 12350, 105, 99, 4999]) {
+      for (let hundredths = 1; hundredths <= 1500; hundredths++) {
+        const exact = (BigInt(price) * BigInt(hundredths) + BigInt(50)) / BigInt(100);
+        expect(multiply(price, hundredths / 100)).toBe(Number(exact));
+      }
+    }
   });
 });
 
@@ -143,6 +160,12 @@ describe("tax", () => {
     expect(l.taxableMinor).toBe(756000);
     expect(l.totalMinor).toBe(756000 + 2 * 68040);
     expect(() => computeLine({ description: "x", quantity: 1, unitPriceMinor: 100, discountMinor: 101 }, karnataka)).toThrow();
+  });
+  it("works out a line with a part quantity to the paisa the database expects", () => {
+    const l = computeLine({ description: "Food by the kilo", quantity: 0.35, unitPriceMinor: 44950, taxRateBp: 500 }, { mode: "simple" });
+    expect(l).toMatchObject({ taxableMinor: 15733, taxMinor: 787, totalMinor: 16520 });
+    const inv = computeInvoice([{ description: "Food by the kilo", quantity: 0.35, unitPriceMinor: 44950 }], { mode: "none" });
+    expect([inv.subtotalMinor, inv.totalMinor]).toEqual([15733, 15733]);
   });
   it("totals an invoice and can round to a whole rupee", () => {
     const inv = computeInvoice(

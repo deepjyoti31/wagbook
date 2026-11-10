@@ -10,6 +10,10 @@ The first release will be 0.1.0. Everything below is in it.
 
 ### For the kennel
 
+- Three bugs fixed (10 November 2026). A bill with a part quantity at a price with paise (0.35 kg at ₹449.50 a kilo)
+  could come out a paisa different from the database's sum and then never be issued. Crediting what changed on a
+  visitor's appointment bill said "nothing changed". And a booking's "What it costs", with the total sent to the
+  parent on WhatsApp, left out pick-ups, drops and things sold over the counter on the stay. No database change.
 - Opening Wagbook's address takes you straight to your kennel, or to sign in if you are not signed in. There is no
   front page to click through.
 - Bookings for boarding and day boarding, with no double booking and no overfilling, enforced by the database.

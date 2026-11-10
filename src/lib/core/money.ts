@@ -64,10 +64,27 @@ export function toDecimalString(minor: Minor): string {
   return `${sign}${Math.trunc(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
 }
 
-/** Multiply an amount by a quantity (which may be fractional), rounding half up. */
+/**
+ * Multiply an amount by a quantity (which may be fractional), rounding half up.
+ *
+ * Quantities are kept to two decimals (numeric(10, 2) in the database), so the
+ * sum is done in whole hundredths. 0.35 x 449.50 is 157.325 exactly; as floats
+ * the product comes out just under the half and rounds down, where the
+ * database's exact arithmetic rounds up (check_bill_line), and a bill a paisa
+ * out is never issued (WB037). A quantity with more decimals is not a stored
+ * quantity, and is multiplied as it is.
+ */
 export function multiply(minor: Minor, quantity: number): Minor {
   assertMinor(minor);
   if (!Number.isFinite(quantity)) throw new RangeError("quantity must be finite");
+  const hundredths = Math.round(quantity * 100);
+  const exact = minor * hundredths;
+  if (Math.abs(quantity * 100 - hundredths) < 1e-4 && Number.isSafeInteger(exact)) {
+    const abs = Math.abs(exact);
+    const rest = abs % 100;
+    const whole = (abs - rest) / 100 + (rest >= 50 ? 1 : 0);
+    return exact < 0 ? -whole : whole;
+  }
   return roundHalfUp(minor * quantity);
 }
 

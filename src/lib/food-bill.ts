@@ -1,4 +1,4 @@
-import { roundHalfUp, type LineInput } from "./core";
+import { multiply, roundHalfUp, type LineInput } from "./core";
 
 /**
  * The lines of a food bill (M29): a subscription's deliveries in a week or a
@@ -48,7 +48,7 @@ export function foodLines(petName: string, deliveries: readonly BillableDelivery
       description: `Fresh food for ${petName}: ${kg(grams)} kg, ${n} ${n === 1 ? "delivery" : "deliveries"} (${dates.map(day).join(", ")})`.slice(0, 300),
       quantity,
       unitPriceMinor: d.unit_price_minor,
-      discountMinor: roundHalfUp((roundHalfUp(quantity * d.unit_price_minor) * monthlyDiscountBp) / 10_000),
+      discountMinor: roundHalfUp((multiply(d.unit_price_minor, quantity) * monthlyDiscountBp) / 10_000),
       taxRateBp: d.tax_rate_bp,
       sacCode: d.sac_code,
     };

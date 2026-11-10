@@ -27,7 +27,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
-import { monthOf } from "@/lib/stay-bill";
+import { monthOf, tripAndSaleLines } from "@/lib/stay-bill";
 import { StayAppointments } from "@/components/stay-appointments";
 import { StayCancellation } from "@/components/stay-cancellation";
 import { HealthAtTheDoor } from "@/components/stay-health";
@@ -181,6 +181,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
     stayAppointments.data.flatMap((a) => a.appointment_items),
     org.time_zone,
   );
+  // Pick-ups, drops (M39) and things sold on the stay (M62) are lines of its bill too, after the appointments.
+  const tripAndSaleCharges = await tripAndSaleLines(supabase, org.id, b.id, pet?.name ?? w.pet);
+  if (!tripAndSaleCharges) throw new Error("Could not load the booking.");
   const place = (waiting.data ?? []).findIndex((x) => x.booking_id === b.id);
   const waitPlace = b.waitlisted_at ? { place: place + 1, hasSpace: place >= 0 && (waiting.data ?? [])[place].has_space } : null;
   const paidFrom = b.pass_id ? (packs.data ?? []).find((x) => x.pass_id === b.pass_id) : undefined;
@@ -212,6 +215,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       addOns: [
         ...billedItems.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPriceMinor: i.unit_price_minor, taxRateBp: i.tax_rate_bp })),
         ...appointmentCharges,
+        ...tripAndSaleCharges,
       ],
     },
     { mode: org.tax_mode, sellerStateCode: org.gst_state_code, placeOfSupplyStateCode: org.gst_state_code, pricesIncludeTax: org.prices_include_tax },

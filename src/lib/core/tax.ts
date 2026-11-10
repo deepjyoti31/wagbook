@@ -1,4 +1,4 @@
-import { assertMinor, percentBp, roundHalfUp, sum, type Minor } from "./money";
+import { assertMinor, multiply, percentBp, roundHalfUp, sum, type Minor } from "./money";
 
 /**
  * Tax on invoice lines.
@@ -84,7 +84,8 @@ export function computeLine(line: LineInput, ctx: TaxContext): LineResult {
   const rateBp = ctx.mode === "none" ? 0 : (line.taxRateBp ?? 0);
   if (!Number.isInteger(rateBp) || rateBp < 0) throw new RangeError("tax rate must be a non-negative integer of basis points");
 
-  const gross = roundHalfUp(line.unitPriceMinor * line.quantity);
+  // In whole hundredths of the quantity, as the database multiplies (see multiply).
+  const gross = multiply(line.unitPriceMinor, line.quantity);
   if (discountMinor < 0 || discountMinor > gross) throw new RangeError("discount must be between zero and the line amount");
   const afterDiscount = gross - discountMinor;
 
@@ -153,7 +154,7 @@ export function computeInvoice(
   const totalMinor = options.roundToWholeUnit ? roundHalfUp(exact / 100) * 100 : exact;
   return {
     lines: results,
-    subtotalMinor: sum(results.map((l) => roundHalfUp(l.unitPriceMinor * l.quantity))),
+    subtotalMinor: sum(results.map((l) => multiply(l.unitPriceMinor, l.quantity))),
     discountMinor,
     taxableMinor,
     cgstMinor,
