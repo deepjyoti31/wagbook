@@ -4,10 +4,10 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Badge, buttonStyles, Columns, DoorTag, Empty, Figure, Ledger, LedgerRow, Loading, Meter, Notice, PageTitle, Section, Select } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { requireOrg } from "@/lib/auth";
-import { datesText, flagText } from "@/lib/bookings";
+import { flagText, shortStayText } from "@/lib/bookings";
 import { CARE_KINDS } from "@/lib/care";
 import {
-  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
+  addDays, dailySummaryMessage, EXPIRES_SOON_DAYS, formatDate, formatDay, formatMoney, formatWeekday, isOverstaying, leavingEarly, remindersToSend, sharedWith, spaceFreeMessage, todayIn,
   UNPAID_REMINDER_DAYS, VACCINATION_REMINDER_DAYS, CREDIT_REMINDER_DAYS, REVIEW_REMINDER_DAYS, zonedInstant, vaccinationWarnings, whatsappLink, portionReviewDue, trialsToFollowUp, localClock, localDate, type GroomCard,
 } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
@@ -18,6 +18,7 @@ import { signedUrls } from "@/lib/media";
 import { OnNow } from "@/components/on-now";
 import { FlowersToSend, HouseJobs, SuppliesRunningOut, ToClean, TrialBadge, trialResults } from "@/components/today-day";
 import { PetAvatar } from "@/components/pet-avatar";
+import { FoldList } from "@/components/fold-list";
 import { ReminderLink } from "@/components/reminder-link";
 import { owedFor } from "@/lib/owed";
 import { siteOrigin } from "@/lib/site";
@@ -64,7 +65,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     // Incidents still open that matter now: serious ones, and any the parent has not been told about.
     supabase
       .from("incidents")
-      .select("id, severity, category, description, parent_notified_at, pets(id, name)")
+      .select("id, severity, category, description, parent_notified_at, pets(id, name, clients(phone))")
       .eq("org_id", org.id)
       .is("resolved_at", null)
       .in("severity", ["medium", "high"])
@@ -146,56 +147,134 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
   // Going home today (M67): due out today or past the check-out date, each with what its parent owes.
   const goingHome = inHouse.filter((b) => b.end_date <= today);
   const stayingIn = inHouse.filter((b) => b.end_date > today);
-  const inHouseRow = (b: BookingCard, leaving: boolean) => (
+  // What each parent owes: asked once, and read by the pet's row and by the figure at the top. Neither holds Today up.
+  const owed = new Map(goingHome.map((b) => [b.id, owedFor(supabase, org, b).catch(() => null)]));
+  const noKennel = arrivals.filter((b) => !b.kennel_id).length;
+  const careDone = care.reduce((sum, c) => sum + c.done, 0);
+  const careTotal = care.reduce((sum, c) => sum + c.total, 0);
+  const medicinesLeft = care.filter((c) => c.kind === "medication").reduce((sum, c) => sum + c.total - c.done, 0);
+  const photoOf = (b: BookingCard) => (b.pets?.photo_path ? photos.get(b.pets.photo_path) : null);
+  const petLink = (b: BookingCard) => (
+    <Link href={`/app/bookings/${b.id}`} className="text-[16.5px] font-bold underline-offset-4 hover:underline">
+      {b.pets?.name ?? m.today.unknownPet}
+    </Link>
+  );
+  const checkOutButton = (b: BookingCard, grow: string) =>
+    leavingEarly({ status: b.status, endDate: b.end_date }, today) ? (
+      // Going home early: the booking page asks whether to bill to today or as booked (D40).
+      <Link href={`/app/bookings/${b.id}`} className={buttonStyles.secondary}>
+        {m.today.checkOutEarly}
+      </Link>
+    ) : (
+      <ActionForm action={checkOut} className="contents">
+        <input type="hidden" name="bookingId" value={b.id} />
+        <input type="hidden" name="from" value="today" />
+        <SubmitButton pendingLabel={m.today.checkingOut} variant="primary" className={grow}>
+          {m.today.checkOut}
+        </SubmitButton>
+      </ActionForm>
+    );
+  const incidentLink = (b: BookingCard, show: string) =>
+    b.pets ? (
+      <Link href={`/app/dogs/${b.pets.id}/incident`} className={`${buttonStyles.quiet} ${show}`}>
+        {m.today.incident}
+      </Link>
+    ) : null;
+
+  const goingHomeRow = (b: BookingCard) => (
     <LedgerRow key={b.id}>
-      <BookingSummary t={t} booking={b} today={today} photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null} />
-      <div className="flex w-full flex-col gap-1 sm:w-auto">
-      {leaving ? (
-        <Suspense fallback={null}>
-          <OwedAtCheckOut t={t} booking={b} />
-        </Suspense>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
+      <span className="hidden lg:block">
+        <PetAvatar name={b.pets?.name ?? "?"} url={photoOf(b)} />
+      </span>
+      <div className="min-w-0 flex-[1_1_240px]">
+        <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
+          {petLink(b)}
+          {b.pets?.breed ? <span className="hidden text-sm text-slate lg:inline">{b.pets.breed}</span> : null}
+          {b.clients ? <span className="text-sm text-slate lg:hidden">· {b.clients.full_name}</span> : null}
+          <StayBadges t={t} booking={b} today={today} />
+        </p>
+        <p className="mt-0.5 text-sm text-slate max-sm:mt-2 max-sm:text-[14.5px]">
+          {b.clients ? <span className="hidden lg:inline">{b.clients.full_name} · </span> : null}
+          <Suspense fallback={null}>
+            <OwedAtCheckOut t={t} booking={b} found={owed.get(b.id)} />
+          </Suspense>
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 max-sm:w-full">
         {isOverstaying({ status: b.status, endDate: b.end_date }, today) ? (
           <ActionForm action={extendToToday} className="contents">
             <input type="hidden" name="bookingId" value={b.id} />
             <input type="hidden" name="from" value="today" />
-            <SubmitButton variant="secondary" pendingLabel={m.today.extending}>
+            <SubmitButton variant="secondary" pendingLabel={m.today.extending} className="max-sm:w-full">
               {m.today.extend}
             </SubmitButton>
           </ActionForm>
         ) : null}
-        <Link href={`/app/bookings/${b.id}/update`} className={buttonStyles.whatsapp}>
+        <Link href={`/app/bookings/${b.id}/update`} className={`${buttonStyles.quiet} max-sm:flex-1 max-sm:bg-ground`}>
           {m.today.writeUpdate}
         </Link>
-        {b.pets ? (
-          <Link href={`/app/dogs/${b.pets.id}/incident`} className={buttonStyles.quiet}>
-            {m.today.incident}
-          </Link>
-        ) : null}
-        {leavingEarly({ status: b.status, endDate: b.end_date }, today) ? (
-          // Going home early: the booking page asks whether to bill to today or as booked (D40).
-          <Link href={`/app/bookings/${b.id}`} className={buttonStyles.secondary}>
-            {m.today.checkOutEarly}
-          </Link>
-        ) : (
-          <ActionForm action={checkOut} className="contents">
-            <input type="hidden" name="bookingId" value={b.id} />
-            <input type="hidden" name="from" value="today" />
-            <SubmitButton pendingLabel={m.today.checkingOut} variant="primary">
-              {m.today.checkOut}
-            </SubmitButton>
-          </ActionForm>
-        )}
-      </div>
+        {incidentLink(b, "max-lg:hidden")}
+        {checkOutButton(b, "max-sm:flex-1")}
       </div>
     </LedgerRow>
   );
 
+  const stayingRow = (b: BookingCard) => (
+    <LedgerRow key={b.id}>
+      <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
+      <p className="min-w-0 flex-[1_1_200px]">
+        <Link href={`/app/bookings/${b.id}`} className="font-bold underline-offset-4 hover:underline">
+          {b.pets?.name ?? m.today.unknownPet}
+        </Link>{" "}
+        <span className="text-sm text-slate">
+          {b.clients ? `· ${b.clients.full_name} ` : ""}· {fill(m.today.until, { date: formatDay(b.end_date, locale) })}
+        </span>
+      </p>
+      <span className="flex flex-wrap gap-1.5">
+        {b.end_date === addDays(today, 1) ? <Badge>{m.today.leavesTomorrow}</Badge> : null}
+        <StayBadges t={t} booking={b} today={today} />
+      </span>
+      <div className="flex flex-wrap gap-1 max-sm:w-full">
+        <Link href={`/app/bookings/${b.id}/update`} className={`${buttonStyles.quiet} max-sm:flex-1 max-sm:bg-ground`}>
+          {m.today.writeUpdate}
+        </Link>
+        {incidentLink(b, "max-sm:hidden")}
+        {checkOutButton(b, "")}
+      </div>
+    </LedgerRow>
+  );
+
+  // A notice with its icon, and its link kept at the right.
+  const waiting = (icon: "form" | "bookings", text: string, href: string, link: string) => (
+    <Link href={href} className="mb-2.5 flex items-center gap-3 rounded-[14px] bg-marigold-soft px-4 py-3.5 text-[#3d2a00] max-sm:text-[15px]">
+      <Icon name={icon} className="size-5 max-sm:hidden" />
+      <span className="flex-1">{text}</span>
+      <strong className="underline underline-offset-4">{link}</strong>
+    </Link>
+  );
+  const notices =
+    newForms > 0 || (requestsRes.count ?? 0) > 0 ? (
+      <div className="mb-(--wb-gap) flex flex-col [&>a:last-child]:mb-0">
+        {newForms > 0 ? waiting("form", plural(language, newForms, m.today.newForms), "/app/more/intake", m.today.review) : null}
+        {(requestsRes.count ?? 0) > 0 ? waiting("bookings", plural(language, requestsRes.count ?? 0, m.today.parentRequests), "/app/bookings", m.today.seeRequests) : null}
+      </div>
+    ) : null;
+
+  // On a phone the kinds of care are chips in a row: medicines first, and what is finished last.
+  const careChips = [...care].sort((a, b) => Number(a.done === a.total) - Number(b.done === b.total) || Number(b.kind === "medication") - Number(a.kind === "medication"));
+
   return (
     <>
-      <PageTitle eyebrow={m.today.title} title={formatDate(today, locale)}>
-        <Link href="/app/bookings/new" className={buttonStyles.primary}>
+      <PageTitle eyebrow={m.today.title} title={formatWeekday(today, locale)}>
+        <form action="/app/bookings" role="search" className="hidden h-12 min-w-[260px] items-center gap-2 rounded-[10px] border border-rule-strong bg-paper px-3.5 text-slate focus-within:border-ink lg:flex">
+          <Icon name="search" />
+          <label htmlFor="today-search" className="sr-only">
+            {m.bookings.searchLabel}
+          </label>
+          <input id="today-search" name="q" type="search" placeholder={m.bookings.searchPlaceholder} className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-slate" />
+        </form>
+        <Link href="/app/bookings/new" className={`${buttonStyles.primary} max-sm:hidden`}>
           <Icon name="plus" />
           {m.today.newBooking}
         </Link>
@@ -215,26 +294,32 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         </Notice>
       ) : null}
 
-      {/* The day in four numbers (D59). The sentence under the title said the same in words. */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      {/* The day in four numbers (D59). */}
+      <div className="mb-(--wb-gap) grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:gap-3.5">
         <Figure
           label={m.today.inHouseTitle}
           hint={capacity > 0 ? <Meter value={inHouse.length} total={capacity} tone="leaf" label={fill(m.today.inHouseOf, { inHouse: inHouse.length, capacity })} /> : undefined}
         >
           {inHouse.length}
-          {capacity > 0 ? <span className="ml-1.5 text-base font-semibold tracking-normal text-slate">{fill(m.today.ofKennels, { capacity })}</span> : null}
+          {capacity > 0 ? <span className="ml-1 text-sm font-[650] tracking-normal text-slate lg:text-base">{fill(m.today.ofKennels, { capacity })}</span> : null}
         </Figure>
-        <Figure label={m.today.arriving}>{arrivals.length}</Figure>
-        <Figure label={m.today.goingHome}>{goingHome.length}</Figure>
+        <Figure label={m.today.toArriveTitle} tone="attention" hint={noKennel > 0 ? plural(language, noKennel, m.today.noKennelCount) : undefined}>
+          {arrivals.length}
+        </Figure>
         <Figure
-          label={m.today.careLeft}
-          tone={care.some((c) => c.kind === "medication" && c.done < c.total) ? "alert" : undefined}
-          hint={care
-            .filter((c) => c.kind === "medication" && c.done < c.total)
-            .map((c) => fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total }))
-            .join("")}
+          label={m.today.goingHomeShort}
+          hint={
+            goingHome.length > 0 ? (
+              <Suspense fallback={null}>
+                <ToCollect t={t} owed={[...owed.values()]} />
+              </Suspense>
+            ) : undefined
+          }
         >
-          {care.reduce((sum, c) => sum + c.total - c.done, 0)}
+          {goingHome.length}
+        </Figure>
+        <Figure label={m.today.careLeft} tone="alert" hint={medicinesLeft > 0 ? plural(language, medicinesLeft, m.today.medicinesDue) : undefined}>
+          {careTotal - careDone}
         </Figure>
       </div>
 
@@ -245,244 +330,347 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
       ) : null}
 
       {capacity === 0 ? (
-        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
+        <p className="mb-(--wb-gap) rounded-[14px] bg-marigold-soft px-4 py-3.5">
           {m.today.noKennels}{" "}
           <Link href="/app/more/kennels" className="font-semibold underline underline-offset-4">
             {m.today.addKennels}
           </Link>
         </p>
       ) : null}
+
       {care.length > 0 ? (
-        <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {care.map((c) => {
-            const done = c.done === c.total;
-            const medicine = c.kind === "medication" && !done;
-            return (
-              <Link
-                key={c.kind}
-                href={`/app/care?kind=${c.kind}&show=pending`}
-                className={`flex min-h-12 flex-col justify-center gap-2 rounded-xl border px-4 py-3 font-bold ${
-                  done ? "border-leaf-soft bg-leaf-soft text-leaf-ink" : medicine ? "border-alert-soft bg-alert-soft text-alert-ink" : "border-rule bg-paper hover:bg-wash"
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  {done ? <Icon name="check" className="size-4.5" /> : null}
-                  {fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
-                </span>
-                <Meter value={c.done} total={c.total} tone={medicine ? "alert" : "ink"} />
+        <>
+          {/* Phone: chips to swipe along. */}
+          <div className="-mx-4 mb-(--wb-gap) flex gap-2 overflow-x-auto px-4 sm:hidden">
+            {careChips.map((c) => {
+              const finished = c.done === c.total;
+              const medicine = c.kind === "medication" && !finished;
+              return (
+                <Link
+                  key={c.kind}
+                  href={`/app/care?kind=${c.kind}&show=pending`}
+                  className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-bold ${
+                    finished ? "bg-leaf-soft text-leaf-ink" : medicine ? "bg-alert-soft text-alert-ink" : "border border-rule bg-paper text-ink"
+                  }`}
+                >
+                  {finished
+                    ? fill(m.today.kindDone, { kind: m.labels.careKindPlural[c.kind] })
+                    : fill(m.today.careCount, { kind: m.labels.careKindPlural[c.kind], done: c.done, total: c.total })}
+                </Link>
+              );
+            })}
+          </div>
+          {/* Tablet: a tile for each kind. Laptop: the tiles in a card, with the whole round counted. */}
+          <section aria-labelledby="care-round" className="mb-(--wb-gap) hidden sm:block lg:rounded-2xl lg:border lg:border-rule lg:bg-paper lg:px-5 lg:pb-5 lg:pt-[18px]">
+            <div className="mb-3.5 hidden flex-wrap items-center gap-2.5 lg:flex">
+              <h2 id="care-round" className="text-lg font-[750]">
+                {m.today.careRound}
+              </h2>
+              <span className="text-sm text-slate">{fill(m.today.careDone, { done: careDone, total: careTotal })}</span>
+              <Link href="/app/care" className={`${buttonStyles.quiet} -my-2 ml-auto`}>
+                {m.today.openCare}
               </Link>
-            );
-          })}
-        </div>
+            </div>
+            <div className="grid gap-2 lg:gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(4, Math.min(care.length, 6))}, minmax(0, 1fr))` }}>
+              {care.map((c) => {
+                const finished = c.done === c.total;
+                const medicine = c.kind === "medication" && !finished;
+                return (
+                  <Link
+                    key={c.kind}
+                    href={`/app/care?kind=${c.kind}&show=pending`}
+                    className={`flex flex-col gap-1.5 rounded-xl p-3 lg:gap-2 lg:p-3.5 ${
+                      finished
+                        ? "bg-leaf-soft text-leaf-ink [--wb-track:#c3e5cf]"
+                        : medicine
+                          ? "bg-alert-soft text-alert-ink [--wb-track:#f5cbc7]"
+                          : "border border-rule bg-paper text-ink lg:border-transparent lg:bg-wash"
+                    }`}
+                  >
+                    <span className="flex justify-between gap-2 text-[14.5px] font-bold lg:text-base">
+                      <span className="inline-flex items-center gap-1.5">
+                        {finished ? <Icon name="check" className="size-[18px]" /> : null}
+                        {m.labels.careKindPlural[c.kind]}
+                      </span>
+                      <span>{fill(m.today.doneOf, { done: c.done, total: c.total })}</span>
+                    </span>
+                    <Meter value={c.done} total={c.total} tone={medicine ? "alert" : "ink"} />
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        </>
       ) : null}
 
       <Columns
-      from="2xl"
-      main={
-      <>
-      {incidents.length > 0 ? (
-        <Section title={m.today.incidents} count={incidents.length}>
-          <ul className="space-y-2">
-            {incidents.map((i) => (
-              <li key={i.id}>
-                <Link href={`/app/dogs/${i.pets?.id}`} className="flex gap-3 rounded-xl border-2 border-alert bg-alert-soft px-4 py-3 text-ink">
-                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-alert text-paper">
-                    <Icon name="warning" />
-                  </span>
-                  <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2 font-bold">
-                    {i.pets?.name}
-                    <Badge tone="alert">{m.labels.severityShort[i.severity]}</Badge>
-                    {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
-                  </span>
-                  <span className="mt-1 line-clamp-2 block">{i.description}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
+        from="wide"
+        main={
+          <>
+            {incidents.length > 0 ? (
+              <section aria-labelledby="incidents" className="mb-(--wb-gap) rounded-2xl border-2 border-alert bg-alert-soft px-4 py-3.5 lg:px-5 lg:py-4">
+                <h2 id="incidents" className="text-[15px] font-bold text-alert-ink">
+                  {m.today.incidents}
+                </h2>
+                <ul className="divide-y divide-alert/20">
+                  {incidents.map((i) => (
+                    <li key={i.id} className="flex flex-wrap items-start gap-x-3.5 gap-y-2.5 py-2.5 first:pt-1 last:pb-0">
+                      <span className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-alert text-paper lg:inline-flex">
+                        <Icon name="warning" />
+                      </span>
+                      <div className="min-w-0 flex-[1_1_280px]">
+                        <p className="flex flex-wrap items-center gap-2">
+                          <strong className="text-[16.5px] lg:text-[17px]">{i.pets?.name}</strong>
+                          <span className="inline-flex min-h-6 items-center rounded-full bg-paper px-[9px] text-[12.5px] font-[650] text-alert-ink">{m.labels.severityShort[i.severity]}</span>
+                          {i.parent_notified_at ? null : <Badge tone="attention">{m.today.parentNotTold}</Badge>}
+                        </p>
+                        <p className="mt-1 line-clamp-2 max-sm:text-[15px]">{i.description}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-sm:w-full">
+                        {!i.parent_notified_at && i.pets?.clients?.phone ? (
+                          <a href={whatsappLink("", i.pets.clients.phone)} target="_blank" rel="noreferrer" className={`${buttonStyles.whatsapp} max-sm:flex-1`}>
+                            {m.today.tellParent}
+                          </a>
+                        ) : null}
+                        <Link href={`/app/dogs/${i.pets?.id}`} className={buttonStyles.secondary}>
+                          {m.today.open}
+                        </Link>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
-      <Section title={m.today.arriving} count={arrivals.length}>
-        {arrivals.length === 0 ? (
-          <Empty>{m.today.nobodyArriving}</Empty>
-        ) : (
-          <Ledger>
-            {arrivals.map((b, i) => (
-              <LedgerRow key={b.id}>
-                <BookingSummary
-                  t={t}
-                  booking={b}
-                  today={today}
-                  photo={b.pets?.photo_path ? photos.get(b.pets.photo_path) : null}
-                  vaccineWarning={(vaccineWarnings.get(b.id) ?? []).length > 0}
-                  trial={b.pets ? trials.get(b.pets.id)?.outcome : undefined}
-                />
-                <ActionForm action={checkIn} className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-                  <input type="hidden" name="bookingId" value={b.id} />
-                    <input type="hidden" name="from" value="today" />
-                  <label className="min-w-36 flex-1">
-                    <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
-                    <Select name="kennelId" defaultValue={b.kennel_id ?? ""}>
-                      <option value="">{m.today.noKennelYet}</option>
-                      {b.kennels ? <option value={b.kennels.id}>{kennelLabel(b, b.kennels)}</option> : null}
-                      {freeKennels[i]
-                        .filter((k) => k.id !== b.kennel_id)
-                        .map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {kennelLabel(b, k)}
-                          </option>
-                        ))}
-                    </Select>
-                  </label>
-                  <SubmitButton pendingLabel={m.today.checkingIn}>{m.today.checkIn}</SubmitButton>
-                </ActionForm>
-              </LedgerRow>
-            ))}
-          </Ledger>
-        )}
-      </Section>
+            {/* Beside the lists on a laptop; above them on a tablet and a phone. */}
+            <div className="min-[1200px]:hidden">{notices}</div>
 
-      {goingHome.length > 0 ? (
-        <Section title={m.today.goingHome} count={goingHome.length}>
-          <Ledger>{goingHome.map((b) => inHouseRow(b, true))}</Ledger>
-        </Section>
-      ) : null}
+            <Section title={m.today.arriving} count={arrivals.length}>
+              {arrivals.length === 0 ? (
+                <Empty>{m.today.nobodyArriving}</Empty>
+              ) : (
+                <FoldList limit={3} count={arrivals.length} more={fill(m.today.seeMore, { n: arrivals.length - 3 })}>
+                  {arrivals.map((b, i) => {
+                    const vaccineWarning = (vaccineWarnings.get(b.id) ?? []).length > 0;
+                    const trial = b.pets ? trials.get(b.pets.id)?.outcome : undefined;
+                    return (
+                      <LedgerRow key={b.id}>
+                        <PetAvatar name={b.pets?.name ?? "?"} url={photoOf(b)} />
+                        <div className="min-w-0 flex-[1_1_180px] lg:flex-[1_1_240px]">
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {petLink(b)}
+                            {b.pets?.breed ? <span className="text-sm text-slate">{b.pets.breed}</span> : null}
+                            {trial ? <TrialBadge t={t} outcome={trial} /> : null}
+                            {vaccineWarning ? (
+                              <span className="max-sm:hidden">
+                                <Badge tone="attention">{m.today.checkVaccinations}</Badge>
+                              </span>
+                            ) : null}
+                            <StayBadges t={t} booking={b} today={today} />
+                          </p>
+                          <p className="text-sm text-slate">
+                            {b.clients ? `${b.clients.full_name} · ` : ""}
+                            {shortStayText(t, b.kind, b.start_date, b.end_date, today)}
+                          </p>
+                        </div>
+                        {vaccineWarning ? (
+                          <span className="flex min-h-[30px] w-full items-center rounded-lg bg-marigold-soft px-[9px] text-[12.5px] font-[650] text-marigold-ink sm:hidden">{m.today.checkVaccinations}</span>
+                        ) : null}
+                        <ActionForm action={checkIn} className="flex flex-wrap items-center gap-2 max-sm:w-full">
+                          <input type="hidden" name="bookingId" value={b.id} />
+                          <input type="hidden" name="from" value="today" />
+                          <label className="max-sm:flex-1">
+                            <span className="sr-only">{fill(m.today.kennelFor, { pet: b.pets?.name ?? "" })}</span>
+                            <Select name="kennelId" defaultValue={b.kennel_id ?? ""} className="px-3! sm:w-[150px] lg:w-auto lg:min-w-[170px]">
+                              <option value="">{m.today.noKennelYet}</option>
+                              {b.kennels ? <option value={b.kennels.id}>{kennelLabel(b, b.kennels)}</option> : null}
+                              {freeKennels[i]
+                                .filter((k) => k.id !== b.kennel_id)
+                                .map((k) => (
+                                  <option key={k.id} value={k.id}>
+                                    {kennelLabel(b, k)}
+                                  </option>
+                                ))}
+                            </Select>
+                          </label>
+                          <SubmitButton pendingLabel={m.today.checkingIn} className="max-sm:flex-1">
+                            {m.today.checkIn}
+                          </SubmitButton>
+                        </ActionForm>
+                      </LedgerRow>
+                    );
+                  })}
+                </FoldList>
+              )}
+            </Section>
 
-      {inHouse.length === 0 ? (
-        <Section title={m.today.inHouseTitle} count={0}>
-          <Empty>{m.today.noneInHouse}</Empty>
-        </Section>
-      ) : stayingIn.length > 0 ? (
-        <Section title={m.today.inHouseTitle} count={stayingIn.length}>
-          <Ledger>{stayingIn.map((b) => inHouseRow(b, false))}</Ledger>
-        </Section>
-      ) : null}
+            {goingHome.length > 0 ? (
+              <Section title={m.today.goingHome} count={goingHome.length}>
+                <FoldList limit={2} count={goingHome.length} more={fill(m.today.seeMore, { n: goingHome.length - 2 })}>
+                  {goingHome.map(goingHomeRow)}
+                </FoldList>
+              </Section>
+            ) : null}
 
-      </>
-      }
-      side={
-      <>
-      {newForms > 0 ? (
-        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
-          {plural(language, newForms, m.today.newForms)}{" "}
-          <Link href="/app/more/intake" className="font-semibold underline underline-offset-4">
-            {m.today.review}
-          </Link>
-        </p>
-      ) : null}
+            {inHouse.length === 0 ? (
+              <Section title={m.today.inHouseTitle} count={0}>
+                <Empty>{m.today.noneInHouse}</Empty>
+              </Section>
+            ) : stayingIn.length > 0 ? (
+              <Section
+                title={m.today.inHouseTitle}
+                count={stayingIn.length}
+                action={
+                  <Link href="/app/bookings" className={buttonStyles.quiet}>
+                    {fill(m.today.seeAll, { n: stayingIn.length })}
+                  </Link>
+                }
+              >
+                <Ledger>{stayingIn.map(stayingRow)}</Ledger>
+              </Section>
+            ) : null}
+          </>
+        }
+        side={
+          <>
+            <div className="max-[1199px]:hidden">{notices}</div>
 
-      {(requestsRes.count ?? 0) > 0 ? (
-        <p className="mb-6 rounded-xl bg-marigold-soft px-4 py-3.5">
-          {plural(language, requestsRes.count ?? 0, m.today.parentRequests)}{" "}
-          <Link href="/app/bookings" className="font-semibold underline underline-offset-4">
-            {m.today.seeRequests}
-          </Link>
-        </p>
-      ) : null}
+            {freeForWaiting.length > 0 ? (
+              <Section title={m.today.waitlist.title} count={freeForWaiting.length}>
+                <p className="mb-3 text-sm text-slate">{m.today.waitlist.about}</p>
+                <Ledger>
+                  {freeForWaiting.map((b) => (
+                    <LedgerRow key={b.id}>
+                      <div className="min-w-0 flex-[1_1_160px]">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {petLink(b)}
+                          {b.pets?.breed ? <span className="text-sm text-slate">{b.pets.breed}</span> : null}
+                        </p>
+                        <p className="text-sm text-slate">
+                          {b.clients ? `${b.clients.full_name} · ` : ""}
+                          {shortStayText(t, b.kind, b.start_date, b.end_date, today)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-sm:w-full">
+                        {b.clients ? (
+                          <a
+                            href={whatsappLink(
+                              spaceFreeMessage(
+                                parentWords.m.whatsapp,
+                                { kennelName: org.name, parentName: b.clients.full_name, petName: b.pets?.name ?? parentWords.m.whatsapp.yourPet, startDate: b.start_date, endDate: b.end_date },
+                                parentWords.locale,
+                              ),
+                              b.clients.phone,
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={buttonStyles.whatsapp}
+                          >
+                            {m.today.waitlist.tell}
+                          </a>
+                        ) : null}
+                        <ActionForm action={confirmRequest} className="contents">
+                          <input type="hidden" name="bookingId" value={b.id} />
+                          <SubmitButton variant="secondary" pendingLabel={m.booking.step.confirming}>
+                            {m.booking.step.confirm}
+                          </SubmitButton>
+                        </ActionForm>
+                      </div>
+                    </LedgerRow>
+                  ))}
+                </Ledger>
+              </Section>
+            ) : null}
 
-      {freeForWaiting.length > 0 ? (
-        <Section title={m.today.waitlist.title} count={freeForWaiting.length}>
-          <p className="mb-3 text-sm text-slate">{m.today.waitlist.about}</p>
-          <Ledger>
-            {freeForWaiting.map((b) => (
-              <LedgerRow key={b.id}>
-                <BookingSummary t={t} booking={b} today={today} />
-                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                  {b.clients ? (
-                    <a
-                      href={whatsappLink(
-                        spaceFreeMessage(
-                          parentWords.m.whatsapp,
-                          { kennelName: org.name, parentName: b.clients.full_name, petName: b.pets?.name ?? parentWords.m.whatsapp.yourPet, startDate: b.start_date, endDate: b.end_date },
-                          parentWords.locale,
-                        ),
-                        b.clients.phone,
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={buttonStyles.whatsapp}
-                    >
-                      {m.today.waitlist.tell}
-                    </a>
-                  ) : null}
-                  <ActionForm action={confirmRequest} className="contents">
-                    <input type="hidden" name="bookingId" value={b.id} />
-                    <SubmitButton variant="secondary" pendingLabel={m.booking.step.confirming}>
-                      {m.booking.step.confirm}
-                    </SubmitButton>
-                  </ActionForm>
-                </div>
-              </LedgerRow>
-            ))}
-          </Ledger>
-        </Section>
-      ) : null}
+            {/* On a tablet the short lists sit two to a row. */}
+            <div className="sm:max-[1199px]:grid sm:max-[1199px]:grid-cols-2 sm:max-[1199px]:items-start sm:max-[1199px]:gap-x-[18px]">
+              {reminders.length > 0 ? (
+                <Section title={m.today.toSend} count={reminders.length}>
+                  <p className="mb-3 text-sm text-slate">{m.today.toSendHint}</p>
+                  <Ledger>
+                    {reminders.slice(0, 20).map((r) => (
+                      <LedgerRow key={`${r.kind}-${r.subjectId}`}>
+                        <div className="min-w-0 flex-[1_1_160px]">
+                          <p className="text-sm font-[650] text-slate">{m.today.reminderKinds[r.kind]}</p>
+                          <p className="font-[650]">
+                            {r.kind === "unpaid" || r.kind === "credit" ? `${r.parentName}, ${r.about}` : fill(m.today.forPet, { parent: r.parentName, pet: r.about })}
+                          </p>
+                        </div>
+                        <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} words={sentWords(t)} />
+                      </LedgerRow>
+                    ))}
+                  </Ledger>
+                </Section>
+              ) : null}
 
-      <Suspense fallback={null}>
-        <FlowersToSend t={t} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <ToClean t={t} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <HouseJobs t={t} today={today} lists={["opening", "closing"]} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <SuppliesRunningOut t={t} />
-      </Suspense>
+              <Suspense fallback={null}>
+                <ToClean t={t} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <HouseJobs t={t} today={today} lists={["opening", "closing"]} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <FlowersToSend t={t} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <SuppliesRunningOut t={t} />
+              </Suspense>
 
-      {org.offers_appointments ? (
-        <Suspense fallback={null}>
-          <AppointmentsToday t={t} today={today} />
-        </Suspense>
-      ) : null}
+              {org.offers_appointments ? (
+                <Suspense fallback={null}>
+                  <AppointmentsToday t={t} today={today} />
+                </Suspense>
+              ) : null}
 
-      {org.offers_kitchen ? (
-        <Suspense fallback={null}>
-          <KitchenToday t={t} today={today} />
-        </Suspense>
-      ) : null}
+              {org.offers_kitchen ? (
+                <Suspense fallback={null}>
+                  <KitchenToday t={t} today={today} />
+                </Suspense>
+              ) : null}
+            </div>
 
-      {reminders.length > 0 ? (
-        <Section title={m.today.toSend} count={reminders.length}>
-          <p className="mb-3 text-sm text-slate">{m.today.toSendAbout}</p>
-          <Ledger>
-            {reminders.slice(0, 20).map((r) => (
-              <LedgerRow key={`${r.kind}-${r.subjectId}`}>
-                <span className="min-w-0 flex-1">
-                  <span className="font-bold">{r.about}</span> <Badge tone={r.kind === "unpaid" || r.kind === "vaccination" || r.kind === "health" ? "attention" : "neutral"}>{m.today.reminderKinds[r.kind]}</Badge>
-                  <span className="block text-sm text-slate">{r.parentName}</span>
-                </span>
-                <ReminderLink href={whatsappLink(r.text, r.phone)} kind={r.kind} subjectId={r.subjectId} label={m.today.send} title={fill(m.today.sendTo, { name: r.parentName })} words={sentWords(t)} />
-              </LedgerRow>
-            ))}
-          </Ledger>
-        </Section>
-      ) : null}
-
-      {canManage ? (
-        <Suspense fallback={null}>
-          <TomorrowSummary t={t} today={today} />
-        </Suspense>
-      ) : null}
-      </>
-      }
+            {canManage ? (
+              <Suspense fallback={null}>
+                <TomorrowSummary t={t} today={today} />
+              </Suspense>
+            ) : null}
+          </>
+        }
       />
     </>
   );
 }
+
+/** What is still to collect from the pets going home today, under the figure: bills owed and what unbilled stays come to. */
+async function ToCollect({ t, owed }: { t: I18n; owed: Promise<Owed | null>[] }) {
+  const { org } = await requireOrg();
+  const found = await Promise.all(owed);
+  // A family's bill is found once for each of its pets: count it once.
+  const seen = new Set<string>();
+  let total = 0;
+  for (const f of found) {
+    if (!f || !("amountMinor" in f.owed)) continue;
+    if (f.invoiceId) {
+      if (seen.has(f.invoiceId)) continue;
+      seen.add(f.invoiceId);
+    }
+    total += f.owed.amountMinor;
+  }
+  if (total <= 0) return null;
+  return <>{fill(t.m.today.toCollect, { amount: formatMoney(total, { currency: org.currency, locale: t.locale, trimZeros: true }) })}</>;
+}
+
+type Owed = NonNullable<Awaited<ReturnType<typeof owedFor>>>;
 
 /**
  * What the parent owes, on a pet going home today (M67): from its bill, or
  * what the stay comes to now less what was paid ahead. Loaded on its own, so
  * Today is not held up; it links to the bill when there is one.
  */
-async function OwedAtCheckOut({ t, booking }: { t: I18n; booking: BookingCard }) {
+async function OwedAtCheckOut({ t, booking, found: asked }: { t: I18n; booking: BookingCard; found?: Promise<Owed | null> }) {
   const { org } = await requireOrg();
   const { m, locale } = t;
-  const found = await owedFor(await createClient(), org, booking);
+  const found = await asked;
   if (!found) return null;
   const { owed, invoiceId, family } = found;
   const w = m.today.owed;
@@ -500,13 +688,12 @@ async function OwedAtCheckOut({ t, booking }: { t: I18n; booking: BookingCard })
                 .filter(Boolean)
                 .join(" ");
   const text = family && owed.kind !== "monthly" ? `${sentence} ${w.family}` : sentence;
-  const tone = owed.kind === "due" || owed.kind === "draft" || owed.kind === "estimate" ? "font-semibold text-alert" : "text-leaf";
+  // Owed on a bill stands out; a bill that is paid is green; an estimate is said plainly.
+  const tone = owed.kind === "due" ? "font-bold text-marigold-ink" : owed.kind === "paid" ? "font-bold text-leaf-ink" : "";
   return (
-    <p>
-      <Link href={invoiceId ? `/app/bills/${invoiceId}` : `/app/bookings/${booking.id}`} className={`inline-flex min-h-12 items-center underline underline-offset-4 ${tone}`}>
-        {text}
-      </Link>
-    </p>
+    <Link href={invoiceId ? `/app/bills/${invoiceId}` : `/app/bookings/${booking.id}`} className={`underline-offset-4 hover:underline ${tone}`}>
+      {text}
+    </Link>
   );
 }
 
@@ -721,63 +908,23 @@ async function TomorrowSummary({ t, today }: { t: I18n; today: string }) {
   );
 }
 
-function BookingSummary({
-  t,
-  booking: b,
-  today,
-  photo,
-  vaccineWarning,
-  trial,
-}: {
-  t: I18n;
-  booking: BookingCard;
-  today: string;
-  photo?: string | null;
-  vaccineWarning?: boolean;
-  /** How the pet settled on its last trial day (M56). */
-  trial?: "settled" | "anxious" | "reactive";
-}) {
+/** What to know about a stay at a glance, as badges after the pet's name. */
+function StayBadges({ t, booking: b, today }: { t: I18n; booking: BookingCard; today: string }) {
   const { m, locale } = t;
-  const leavesToday = b.status === "checked_in" && b.end_date === today;
   const overdue = b.status === "checked_in" && b.end_date < today;
   const late = b.status === "confirmed" && b.start_date < today;
   return (
-    <div className="flex min-w-0 flex-1 basis-64 gap-3">
-      <PetAvatar name={b.pets?.name ?? "?"} url={photo} />
-      <div className="min-w-0 flex-1">
-      <p className="flex flex-wrap items-center gap-2">
-        <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
-        <Link href={`/app/bookings/${b.id}`} className="text-lg font-bold underline-offset-4 hover:underline">
-          {b.pets?.name ?? m.today.unknownPet}
-        </Link>
-        {b.pets?.breed ? <span className="text-slate">{b.pets.breed}</span> : null}
-        {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
-        {b.is_trial ? <Badge tone="attention">{m.trial.badge}</Badge> : null}
-        {trial ? <TrialBadge t={t} outcome={trial} /> : null}
-        {leavesToday ? <Badge tone="attention">{m.today.leavesToday}</Badge> : null}
-        {overdue ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
-        {late ? <Badge tone="alert">{fill(m.today.wasDue, { date: formatDate(b.start_date, locale) })}</Badge> : null}
-        {vaccineWarning ? <Badge tone="attention">{m.today.checkVaccinations}</Badge> : null}
-        {(b.pets?.flags ?? []).map((f) => (
-          <Badge key={f} tone="alert">
-            {flagText(m, f)}
-          </Badge>
-        ))}
-      </p>
-      <p className="mt-1 text-slate">
-        {b.clients ? (
-          <>
-            {b.clients.full_name},{" "}
-            <a href={`tel:${b.clients.phone}`} className="underline underline-offset-4">
-              {formatPhone(b.clients.phone)}
-            </a>
-            .{" "}
-          </>
-        ) : null}
-        {datesText(t, b.start_date, b.end_date)}
-      </p>
-      </div>
-    </div>
+    <>
+      {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+      {b.is_trial ? <Badge tone="attention">{m.trial.badge}</Badge> : null}
+      {overdue ? <Badge tone="attention">{fill(m.today.wasDueToLeave, { date: formatDay(b.end_date, locale) })}</Badge> : null}
+      {late ? <Badge tone="attention">{fill(m.today.wasDue, { date: formatDay(b.start_date, locale) })}</Badge> : null}
+      {(b.pets?.flags ?? []).map((f) => (
+        <Badge key={f} tone="alert">
+          {flagText(m, f)}
+        </Badge>
+      ))}
+    </>
   );
 }
 

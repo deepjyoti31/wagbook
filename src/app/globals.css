@@ -20,6 +20,13 @@
   --color-paper: #ffffff;
   --color-rule: #e2e6ee;
   --color-rule-strong: #c3cad8;
+  /* The line between two rows of a list inside a card: quieter than the card's own edge. */
+  --color-rule-soft: #eef1f5;
+  /* A count pill, a plain badge, a quiet button under the pointer; and the text that reads on it. */
+  --color-fog: #eef1f6;
+  --color-steel: #3d4863;
+  /* The empty part of a meter. */
+  --color-track: #e7ebf2;
   /* A confirmed stay on the calendar: there, but not yet in the house. */
   --color-mist: #e6ecf7;
   /* The bars of a chart: a calmer blue than ink, so a busy month is not a black wall. */
@@ -75,15 +82,14 @@ body {
   display: inline-flex;
   align-items: center;
   min-width: 3.25rem;
-  padding: 0.2rem 0.65rem 0.2rem 1.4rem;
+  padding: 3px 10px 3px 22px;
   background: var(--color-marigold);
   color: var(--color-ink);
   font-weight: 800;
   font-size: 0.9375rem;
-  letter-spacing: 0.01em;
   line-height: 1.4;
   white-space: nowrap;
-  clip-path: polygon(0.55rem 0, 100% 0, 100% 100%, 0.55rem 100%, 0 50%);
+  clip-path: polygon(9px 0, 100% 0, 100% 100%, 9px 100%, 0 50%);
   position: relative;
 }
 .door-tag::before {
@@ -100,7 +106,7 @@ body {
 .door-tag[data-empty="true"] {
   background: var(--color-rule);
   color: var(--color-slate);
-  font-weight: 600;
+  font-weight: 650;
 }
 
 /* A pet with no photo: its first letter on one of seven soft colours (see PetAvatar). */
@@ -129,26 +135,59 @@ html:has(.wb-parent) {
 
 
 /*
+ * The room between and inside the cards, by the width of the screen: tighter
+ * on a phone, as drawn. --wb-gap is the space between two cards, --wb-pad a
+ * card's side padding, --wb-head the space above a card's heading and
+ * --wb-head-gap the space under it.
+ */
+:root {
+  --wb-gap: 14px;
+  --wb-pad: 16px;
+  --wb-head: 14px;
+  --wb-head-gap: 10px;
+}
+@media (width >= 40rem) {
+  :root {
+    --wb-gap: 18px;
+    --wb-pad: 18px;
+    --wb-head: 16px;
+    --wb-head-gap: 12px;
+  }
+}
+@media (width >= 64rem) {
+  :root {
+    --wb-gap: 22px;
+    --wb-pad: 20px;
+    --wb-head: 18px;
+    --wb-head-gap: 14px;
+  }
+}
+
+/*
  * A section is a card with its heading inside. A ruled list placed straight
  * in a section runs to the card's edges, so the rows line up with the heading
  * and no card sits inside another.
  */
-.wb-section {
-  --wb-pad: 1rem;
-}
-@media (width >= 40rem) {
-  .wb-section {
-    --wb-pad: 1.25rem;
-  }
-}
 .wb-section > .wb-ledger {
   margin-inline: calc(-1 * var(--wb-pad));
-  border-width: 1px 0 0;
+  border-width: 0;
   border-radius: 0;
+  background: transparent;
+}
+.wb-section > .wb-ledger > li {
+  border-top: 1px solid var(--color-rule-soft);
 }
 .wb-section > .wb-ledger:last-child {
   margin-bottom: calc(-1 * var(--wb-pad));
   border-radius: 0 0 1rem 1rem;
+}
+
+/* A list folded on a phone to its first rows (see FoldList). */
+@media (width < 40rem) {
+  [data-fold="2"] > li:nth-child(n + 3):not(.wb-fold-more),
+  [data-fold="3"] > li:nth-child(n + 4):not(.wb-fold-more) {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
