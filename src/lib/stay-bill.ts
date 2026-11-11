@@ -21,17 +21,22 @@ export type BillScope =
   | { appointment: string }
   | { sale: string };
 
-interface ScopeColumns {
+/**
+ * The columns of a bill that say what it covers. All of them are required, so
+ * that a query that leaves one out does not compile: a bill read without its
+ * appointment_id would look like a one-off bill that covers nothing.
+ */
+export interface ScopeColumns {
   booking_id: string | null;
   group_id: string | null;
   series_id: string | null;
   series_month: string | null;
-  subscription_id?: string | null;
-  period_start?: string | null;
-  period_end?: string | null;
-  delivery_id?: string | null;
-  appointment_id?: string | null;
-  sale_id?: string | null;
+  subscription_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  delivery_id: string | null;
+  appointment_id: string | null;
+  sale_id: string | null;
 }
 
 /** The scope of a bill, from its row. Null for a one-off bill that covers no stay. */
@@ -162,6 +167,24 @@ export async function stayBillLines(supabase: Supabase, orgId: string, scope: Bi
     lines = [...bookingLines(name(billable[0]), billable[0], itemsOf(billable[0].id)), ...appointmentsOf(billable[0].id, name(billable[0]))];
   }
   return { stays: stays.data, lines };
+}
+
+/**
+ * A stay's pick-ups and drops (M39) and the things sold on it over the
+ * counter (M62), as its bill takes them after its appointments. For the
+ * booking page's estimate, which says what the bill will be made from. Null
+ * when they could not be read.
+ */
+export async function tripAndSaleLines(supabase: Supabase, orgId: string, bookingId: string, petName: string): Promise<LineInput[] | null> {
+  const [trips, sold] = await Promise.all([
+    supabase.from("trips").select("booking_id, kind, status, trip_date, at_time, price_minor, tax_rate_bp, sac_code").eq("org_id", orgId).eq("booking_id", bookingId).neq("status", "cancelled"),
+    supabase.from("sale_lines").select(SALE_LINE).eq("org_id", orgId).eq("sales.booking_id", bookingId).eq("sales.status", "sold").order("sort_order"),
+  ]);
+  if (trips.error || sold.error) return null;
+  const sales = sold.data
+    .filter((l) => l.sales)
+    .sort((a, b) => (a.sales?.created_at ?? "").localeCompare(b.sales?.created_at ?? "") || a.sort_order - b.sort_order);
+  return [...tripLines(petName, trips.data), ...saleLines(sales)];
 }
 
 const DELIVERY = "kind, status, delivery_date, grams, quantity, unit_price_minor, delivery_charge_minor, tax_rate_bp, sac_code, pets(name), food_products(name), subscriptions(pay_period)" as const;

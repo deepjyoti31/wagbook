@@ -350,12 +350,19 @@ export async function resolveProblem(_state: FormState, form: FormData): Promise
   const supabase = await createClient();
   const problem = await supabase
     .from("delivery_problems")
-    .select("id, deliveries!delivery_problems_org_id_delivery_id_fkey(id, client_id, pet_id, subscription_id, grams, recipe_id, version_id, address_id, slot)")
+    .select("id, resolved_at, deliveries!delivery_problems_org_id_delivery_id_fkey(id, client_id, pet_id, subscription_id, grams, recipe_id, version_id, address_id, slot)")
     .eq("org_id", org.id)
     .eq("id", id.data)
     .maybeSingle();
   const original = problem.data?.deliveries;
   if (!problem.data || !original) return { error: t.m.food.errors.notFound };
+  const dealtWith = () => {
+    revalidatePath("/app", "layout");
+    if (original.subscription_id) redirect(`/app/food/subscriptions/${original.subscription_id}?done=resolved`);
+    redirect("/app/food?done=resolved");
+  };
+  // Dealt with already (a second tap, or someone else): no second replacement is made.
+  if (problem.data.resolved_at) dealtWith();
   let replacement: string | null = null;
   if (outcome.data === "replaced") {
     const on = text(form, "on") ?? "";
@@ -380,12 +387,19 @@ export async function resolveProblem(_state: FormState, form: FormData): Promise
     if (made.error) return { error: friendlyError(made.error, t) };
     replacement = made.data.id;
   }
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("delivery_problems")
     .update({ outcome: outcome.data, replacement_id: replacement, resolved_at: new Date().toISOString() })
     .eq("org_id", org.id)
-    .eq("id", id.data);
+    .eq("id", id.data)
+    .is("resolved_at", null)
+    .select("id");
   if (error) return { error: friendlyError(error, t) };
+  if (data.length === 0) {
+    // Someone dealt with it in the same moment: the replacement just made here is one too many.
+    if (replacement) await supabase.from("deliveries").update({ status: "cancelled", cancel_reason: "Made twice" }).eq("org_id", org.id).eq("id", replacement);
+    dealtWith();
+  }
   revalidatePath("/app", "layout");
   // The problem's form goes away once it is dealt with, so the sentence is shown by the page instead.
   if (original.subscription_id) redirect(`/app/food/subscriptions/${original.subscription_id}?done=${outcome.data === "replaced" ? "replaced" : "resolved"}`);

@@ -11,11 +11,11 @@ import { submitBookingForm } from "./actions";
 import { BookingForm, type BookingFormKennel } from "./booking-form";
 
 /** The kennel behind a booking form link, from get_public_intake_form(): nothing private. Read once per request. */
-const loadKennel = cache(async (slug: string): Promise<(BookingFormKennel & { intake_enabled: boolean; language: string }) | null> => {
+const loadKennel = cache(async (slug: string): Promise<(BookingFormKennel & { intake_enabled: boolean; language: string; country_code?: string }) | null> => {
   if (!isSupabaseConfigured() || !/^[a-z0-9-]{3,40}$/i.test(slug)) return null;
   const { data, error } = await createAnonClient().rpc("get_public_intake_form", { p_slug: slug });
   if (error || !data) return null;
-  return data as unknown as BookingFormKennel & { intake_enabled: boolean; language: string };
+  return data as unknown as BookingFormKennel & { intake_enabled: boolean; language: string; country_code?: string };
 });
 
 export async function generateMetadata({ params }: PageProps<"/book/[slug]">): Promise<Metadata> {
@@ -53,7 +53,7 @@ async function Book({ params }: Pick<PageProps<"/book/[slug]">, "params">) {
       <p className="mb-6 mt-2 text-lg text-slate">{w.intro}</p>
       {kennel.intake_enabled ? (
         <BookingForm
-          action={submitBookingForm.bind(null, slug.toLowerCase(), language)}
+          action={submitBookingForm.bind(null, slug.toLowerCase(), language, kennel.country_code ?? "IN")}
           kennel={kennel}
           words={w}
           intake={m.intakeForm}

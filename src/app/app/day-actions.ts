@@ -79,9 +79,17 @@ export async function markFlowersSent(_state: FormState, form: FormData): Promis
     .eq("org_id", org.id)
     .eq("id", id.data)
     .not("passed_away_on", "is", null)
+    // Once only: a second tap must not write the cost as an expense again.
+    .is("flowers_sent_at", null)
     .select("name");
   if (error) return { error: friendlyError(error, t) };
-  if (data.length === 0) return { error: t.m.errors.petNotFound };
+  if (data.length === 0) {
+    // Marked already (a second tap, or someone else): nothing more to write. Anything else is a pet that is not there.
+    const sent = await supabase.from("pets").select("id").eq("org_id", org.id).eq("id", id.data).not("flowers_sent_at", "is", null).maybeSingle();
+    if (!sent.data) return { error: t.m.errors.petNotFound };
+    revalidatePath("/app", "layout");
+    redirect("/app?done=flowers");
+  }
   if (cost && canManage) {
     const expense = await supabase.from("expenses").insert({
       org_id: org.id,

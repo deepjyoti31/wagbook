@@ -19,6 +19,8 @@ interface PublicKennel {
   notice: string;
   check_in_time: string;
   check_out_time: string;
+  /** ISO country code: decides what a phone number typed without + means. */
+  country_code?: string;
   /** Whether the kennel delivers food, so the form asks for an address with a PIN code (M25). */
   delivers?: boolean;
 }
@@ -62,7 +64,7 @@ async function Intake({ params }: Pick<PageProps<"/i/[slug]">, "params">) {
       <p className="mb-6 mt-2 text-lg text-slate">{w.intro}</p>
       {kennel.intake_enabled ? (
         <IntakeForm
-          action={submitIntake.bind(null, slug.toLowerCase(), kennel.name, language)}
+          action={submitIntake.bind(null, slug.toLowerCase(), kennel.name, language, kennel.country_code ?? "IN")}
           kennelName={kennel.name}
           notice={kennel.notice}
           askAddress={kennel.delivers === true}

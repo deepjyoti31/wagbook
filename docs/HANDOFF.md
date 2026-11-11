@@ -2,7 +2,7 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 5 November 2026, after the front page was removed (D60).
+Last updated: 10 November 2026, after a bug review that fixed three things (session log).
 
 ## In one paragraph
 
@@ -142,6 +142,8 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 
 | Thing | Verified by | Confidence |
 | --- | --- | --- |
+| The bug review of 10 November 2026: a price times a part quantity is worked out in whole hundredths, as the database does (`multiply()`), so the app and the database agree where the exact product ends in half a paisa; a bill's scope columns are all required (`ScopeColumns`), so a query that leaves one out does not compile | `src/lib/core/core.test.ts` (every quantity to two decimals against whole-number arithmetic), `tests/db/bills.test.ts` (two such lines issued in all eight tax cases; they failed with `WB037` before the fix), `src/lib/stay-bill.test.ts` | High |
+| The same review in a browser | The walk (83 steps) passes against the local Supabase with the three fixes. Not looked at on screen: "Credit the difference" on a cancelled visitor's appointment bill, and a booking's "What it costs" with a pick-up or a sale on it (no layout changed: more rows in a list that was there) | Medium |
 | M69: every signed-in screen at 1366, 1024, 820 and 360 pixels (all 50 pages without an id, and a booking, a pet and a parent), as owner with everything offered switched on, against the local Supabase: no sideways scroll; the sidebar and the tablet's top bar stay in place as the page scrolls | By hand with Playwright, 2 November 2026 | Medium: desktop Chromium, not a real tablet or a laptop's touch screen |
 | M70: the new shell and pieces (sidebar, tablet bar, phone bar, figures, care bars, section cards with lists, a form card with an error) and the sign-in frame, at 1366, 820 and 360 pixels: no sideways scroll | A page of sample data in the real shell and pieces, and `/login`, screenshotted with Playwright on `next dev`, 2 November 2026 (the page was not committed) | Medium: the signed-in pages were not opened with real data, see below |
 | M70: a pet with no photo always gets the same of seven colours (`avatarTone()`) | `src/components/pet-avatar.test.ts` | High |
@@ -871,6 +873,26 @@ All of it should pass on a clean clone with no environment variables set. With D
 ## Session log
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
+
+- 10 November 2026: a bug review fixed three things. (1) A price times a part quantity was multiplied as floats, so
+  where the exact product ends in half a paisa (0.35 x 449.50) the app rounded down and the database up, and the bill
+  was refused for good (`WB037`): now in whole hundredths (`multiply()` in `src/lib/core/money.ts`, used by
+  `computeLine()`, the food bill's monthly discount and the draft line check). (2) "Credit the difference" on a
+  visitor's appointment bill always said nothing had changed, because the action read the bill without
+  `appointment_id` and `sale_id`: read now, and `ScopeColumns` requires every column. (3) A booking's "What it costs",
+  and the total in the WhatsApp confirmation, left out pick-ups, drops and things sold on the stay, which its bill
+  includes (`tripAndSaleLines()`). No database change, no new message. `npm run check` passes; the walk (83 steps)
+  passes against the local Supabase.
+
+- 10 November 2026, later: four more from the same review. (4) The public forms (`/i/`, `/book/`, `/f/`) read a phone
+  number without + as Indian at every kennel, so a British "07911 123456" was kept as +91 79111 23456: they now read it
+  by the kennel's country (`normalizePhoneIn()`, unit tested; the pages bind `country_code` from
+  `get_public_intake_form`), and the postal code likewise. (5) A second tap on "Flowers sent" wrote the expense
+  again, and on a delivery problem made a second replacement: both now happen once (the replacement of a lost race is
+  cancelled with the reason "Made twice", stored in English). (6) The service worker kept `/app?done=...` as the
+  offline copy of Today, repeating its sentence: only the plain address is kept now (`wb-4`). (7) `PhotoInput` clears
+  the small copies of an earlier choice. No database change. Not looked at in a browser beyond the walk: a kennel
+  outside India, and the double taps.
 
 - 5 November 2026: the front page is gone (D60), asked for by the owner: "/" goes to `/app`, which opens the kennel
   for someone signed in and the sign-in page (with "Create an account") for anyone else. A redirect in

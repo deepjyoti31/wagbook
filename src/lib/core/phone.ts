@@ -31,6 +31,17 @@ export function normalizePhone(input: string, defaultCountry: "IN" | null = "IN"
   return indianMobile(digits);
 }
 
+/**
+ * Normalise a phone number typed at a kennel in `countryCode` (the kennel's
+ * organizations.country_code). A number typed without + is an Indian mobile
+ * only at a kennel in India. Anywhere else it must carry its country code:
+ * read as Indian, a British "07911 123456" would be kept, wrongly, as
+ * +91 79111 23456, and the kennel's messages would go to a stranger.
+ */
+export function normalizePhoneIn(input: string, countryCode: string | null | undefined): string | null {
+  return normalizePhone(input, countryCode === "IN" ? "IN" : null);
+}
+
 /** Indian mobiles are ten digits and start with 6, 7, 8 or 9. */
 function indianMobile(national: string): string | null {
   return /^[6-9]\d{9}$/.test(national) ? `+91${national}` : null;

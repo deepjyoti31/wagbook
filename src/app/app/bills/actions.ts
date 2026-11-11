@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOrg } from "@/lib/auth";
 import { billFor, billFromLines, creditPayload, draftPayload, partCredit, PAYMENT_METHODS, type CreditableBill } from "@/lib/billing";
-import { isISODate, parseMoney, todayIn, type LineInput } from "@/lib/core";
+import { isISODate, multiply, parseMoney, todayIn, type LineInput } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { text, type FormState } from "@/lib/forms";
 import { fill } from "@/lib/i18n";
@@ -146,7 +146,7 @@ export async function editLine(_state: FormState, form: FormData): Promise<FormS
       taxRateBp: Number.isInteger(index) && lines[index] ? lines[index].taxRateBp : org.default_tax_rate_bp,
       sacCode: Number.isInteger(index) && lines[index] ? lines[index].sacCode : null,
     };
-    if (Math.round(line.unitPriceMinor * line.quantity) < discount) return { error: e.discountTooBig };
+    if (multiply(line.unitPriceMinor, line.quantity) < discount) return { error: e.discountTooBig };
     if (Number.isInteger(index) && index >= 0 && lines[index]) lines[index] = line;
     else lines.push(line);
   }
@@ -219,7 +219,7 @@ export async function creditBill(_state: FormState, form: FormData): Promise<For
   const [bill, lines, balance] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, number, status, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, taxable_minor, total_minor")
+      .select("id, number, status, booking_id, group_id, series_id, series_month, subscription_id, period_start, period_end, delivery_id, appointment_id, sale_id, is_tax_invoice, prices_include_tax, place_of_supply_state_code, seller, taxable_minor, total_minor")
       .eq("org_id", org.id)
       .eq("id", invoiceId.data)
       .maybeSingle(),

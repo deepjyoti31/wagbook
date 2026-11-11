@@ -1,6 +1,6 @@
 "use server";
 
-import { isISODate, normalizePhone, normalizePostalCode } from "@/lib/core";
+import { isISODate, normalizePhoneIn, normalizePostalCode } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { sendAlertsAfter } from "@/lib/push";
 import { checked, text, type FormState } from "@/lib/forms";
@@ -17,15 +17,16 @@ const SERVICE = /^[0-9a-f-]{36}$/;
  * like the intake form, can only call submit_intake(): the form lands in
  * Intake forms with `request.make`, and accepting it there also makes the
  * stay or appointment as a request (accept_intake). Nothing is charged.
- * Bound by the page to the kennel's slug and its language for parents.
+ * Bound by the page to the kennel's slug, its language for parents and its
+ * country (what a phone number without + and a postal code mean).
  */
-export async function submitBookingForm(slug: string, language: string, _state: FormState, form: FormData): Promise<FormState> {
+export async function submitBookingForm(slug: string, language: string, country: string, _state: FormState, form: FormData): Promise<FormState> {
   const t = parentI18n(language);
   const e = t.m.bookingForm.errors;
   if (!isSupabaseConfigured()) return { error: t.m.intakeForm.errors.unavailable };
   if (await isRateLimited()) return { error: t.m.errors.slowDown };
 
-  const phone = normalizePhone(text(form, "parent_phone") ?? "");
+  const phone = normalizePhoneIn(text(form, "parent_phone") ?? "", country);
   if (!phone) return { error: t.m.intakeForm.errors.phone };
   const name = text(form, "parent_name");
   if (!name || name.length < 2) return { error: t.m.intakeForm.errors.name };
@@ -44,7 +45,7 @@ export async function submitBookingForm(slug: string, language: string, _state: 
 
   const pickup = checked(form, "pickup");
   const pinTyped = text(form, "parent_postal_code");
-  const postalCode = pinTyped === null ? null : (normalizePostalCode(pinTyped, "IN") ?? normalizePostalCode(pinTyped, ""));
+  const postalCode = pinTyped === null ? null : normalizePostalCode(pinTyped, country);
   if (pinTyped !== null && postalCode === null) return { error: t.m.intakeForm.errors.pin };
   if (pickup && !text(form, "parent_address")) return { error: e.address };
 

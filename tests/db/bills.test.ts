@@ -69,6 +69,9 @@ describe("TypeScript and the database agree on every awkward bill", () => {
     { description: "Zero rate", quantity: 1, unitPriceMinor: 50001, taxRateBp: 0 },
     { description: "High rate", quantity: 1, unitPriceMinor: 199, taxRateBp: 2800 },
     { description: "Free", quantity: 1, unitPriceMinor: 0, taxRateBp: 1800 },
+    // Part quantities at prices with paise, where the exact product ends in half a paisa (0.35 x 449.50 = 157.325).
+    { description: "Food by the kilo", quantity: 0.35, unitPriceMinor: 44950, taxRateBp: 500 },
+    { description: "Part of an hour", quantity: 0.57, unitPriceMinor: 1250, discountMinor: 3, taxRateBp: 1800 },
   ];
   const cases: { name: string; mode: "none" | "simple" | "gst_india"; inclusive: boolean; round: boolean; interState?: boolean }[] = [
     { name: "no tax, rounded", mode: "none", inclusive: false, round: true },

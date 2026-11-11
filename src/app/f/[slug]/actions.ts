@@ -1,6 +1,6 @@
 "use server";
 
-import { formatMoney, isISODate, normalizePhone, normalizePostalCode, parseKgToGrams, qrMatrix, qrSvgPath, upiLink } from "@/lib/core";
+import { formatMoney, isISODate, normalizePhoneIn, normalizePostalCode, parseKgToGrams, qrMatrix, qrSvgPath, upiLink } from "@/lib/core";
 import { friendlyError } from "@/lib/errors";
 import { sendAlertsAfter } from "@/lib/push";
 import { checked, text } from "@/lib/forms";
@@ -52,7 +52,7 @@ export async function submitFoodOrder(slug: string, language: string, payTo: Pay
   if (kind === "item" && !(day && isISODate(day))) return { error: e.itemDay };
   const name = text(form, "parent_name");
   if (!name) return { error: e.name };
-  const phone = normalizePhone(text(form, "phone") ?? "");
+  const phone = normalizePhoneIn(text(form, "phone") ?? "", payTo.country);
   if (!phone) return { error: e.phone };
   const dog = text(form, "pet_name");
   if (!dog) return { error: e.dog };
