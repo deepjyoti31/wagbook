@@ -4,7 +4,7 @@ import type { createClient } from "./supabase/server";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
-/** A pet as New booking's picker needs it. Must match PickablePet in src/components/family-picker.tsx. */
+/** A pet as New booking's picker needs it. Must match PickablePet in src/components/new-booking-fields.tsx. */
 export interface PetChoice {
   id: string;
   name: string;

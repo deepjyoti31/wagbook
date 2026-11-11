@@ -65,6 +65,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* A ticked box and a chosen circle are ink, like the buttons. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-ink);
+}
+
 :focus-visible {
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;

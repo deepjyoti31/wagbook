@@ -192,7 +192,7 @@ export function Nav({
         </nav>
         <Link
           href="/app/bookings"
-          aria-label={words.find}
+          aria-label={search.label}
           className="inline-flex min-h-12 items-center justify-center rounded-[10px] border border-rule-strong bg-paper px-3 text-ink hover:bg-ground"
         >
           <Icon name="search" />
@@ -204,7 +204,7 @@ export function Nav({
         <header className="wb-dark no-print flex items-center gap-2.5 bg-ink px-4 py-2.5 text-paper sm:hidden">
           <BrandMark className="size-8 rounded-[9px]" />
           <p className="min-w-0 flex-1 truncate text-base font-extrabold">{kennelName}</p>
-          <Link href="/app/bookings" aria-label={words.find} className="inline-flex size-12 items-center justify-center rounded-[10px] text-paper">
+          <Link href="/app/bookings" aria-label={search.label} className="inline-flex size-12 items-center justify-center rounded-[10px] text-paper">
             <Icon name="search" />
           </Link>
           <Link href="/app/bookings/new" aria-label={words.newBooking} className="inline-flex size-12 items-center justify-center rounded-[10px] bg-paper text-ink">
