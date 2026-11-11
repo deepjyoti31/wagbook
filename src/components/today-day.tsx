@@ -170,7 +170,7 @@ export async function SuppliesRunningOut({ t }: { t: I18n }) {
                   </a>
                 ) : null}
                 {s.kind === "food" ? (
-                  <Link href={`/app/bookings/${s.booking_id}#extras`} className={buttonStyles.quiet}>
+                  <Link href={`/app/bookings/${s.booking_id}?tab=extras`} className={buttonStyles.quiet}>
                     {w.useOurs}
                   </Link>
                 ) : null}
