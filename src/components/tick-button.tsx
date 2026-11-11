@@ -18,12 +18,15 @@ export function TickButton({
   words,
   label,
   pendingLabel,
+  ariaLabel,
 }: {
   taskId: string;
   action: (state: FormState, form: FormData) => Promise<FormState>;
   words: Messages["offline"];
   label: string;
   pendingLabel: string;
+  /** For a screen reader, when the row has several buttons that say Done. */
+  ariaLabel?: string;
 }) {
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function TickButton({
 
   if (queued) {
     return (
-      <span role="status" className="inline-flex min-h-12 min-w-28 items-center rounded-[0.625rem] bg-marigold-soft px-3 font-semibold text-marigold-ink" title={words.queued}>
+      <span role="status" className="inline-flex min-h-12 min-w-[92px] items-center rounded-[10px] bg-marigold-soft px-3 text-[15px] font-[650] text-marigold-ink" title={words.queued}>
         {words.doneNotSent}
       </span>
     );
@@ -72,7 +75,7 @@ export function TickButton({
     >
       <input type="hidden" name="taskId" value={taskId} />
       {error ? <Notice tone="error">{error}</Notice> : null}
-      <button type="submit" disabled={pending} className={`${buttonStyles.primary} min-w-28`}>
+      <button type="submit" disabled={pending} aria-label={pending ? undefined : ariaLabel} className={`${buttonStyles.primary} min-w-[92px]`}>
         {pending ? `${pendingLabel}…` : label}
       </button>
     </form>

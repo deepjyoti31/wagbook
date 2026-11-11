@@ -92,6 +92,46 @@ export function calendarGrid<B extends CalendarStay>(kennelIds: readonly string[
   return { byKennel, unassigned };
 }
 
+/** One stay drawn on a row of the calendar: from day `from` to day `to` (both counted, as indexes into the days), on lane `lane` of `lanes`. */
+export interface CalendarBar<B> {
+  stay: B;
+  from: number;
+  to: number;
+  lane: number;
+  lanes: number;
+}
+
+/**
+ * Turn one row of the calendar (the stays on each day) into bars: a bar for
+ * each unbroken run of days a stay is on. Bars that share a day are put on
+ * lanes, one above the other (two siblings in a kennel, or several stays with
+ * no kennel yet); `lanes` is how many lanes the row needs.
+ */
+export function calendarBars<B extends { id: string }>(row: readonly (readonly B[])[]): CalendarBar<B>[] {
+  const bars: Omit<CalendarBar<B>, "lanes">[] = [];
+  const open = new Map<string, Omit<CalendarBar<B>, "lanes">>();
+  row.forEach((cell, day) => {
+    const here = new Set(cell.map((s) => s.id));
+    for (const id of [...open.keys()]) if (!here.has(id)) open.delete(id);
+    for (const stay of cell) {
+      const bar = open.get(stay.id);
+      if (bar) {
+        bar.to = day;
+        continue;
+      }
+      // The lowest lane no bar still open is on.
+      const taken = new Set([...open.values()].map((b) => b.lane));
+      let lane = 0;
+      while (taken.has(lane)) lane += 1;
+      const started = { stay, from: day, to: day, lane };
+      open.set(stay.id, started);
+      bars.push(started);
+    }
+  });
+  const lanes = bars.reduce((most, b) => Math.max(most, b.lane + 1), 1);
+  return bars.map((b) => ({ ...b, lanes }));
+}
+
 /**
  * Which of `days` a stay would hold a kennel on, for drawing a request on the
  * calendar (it holds nothing yet). The same days as calendarGrid uses.

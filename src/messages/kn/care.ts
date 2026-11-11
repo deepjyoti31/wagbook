@@ -25,6 +25,12 @@ export const careArea: typeof English = {
     // {task} is the routine's own name as the kennel typed it, like "breakfast".
     skipTask: "{task} ಬಿಟ್ಟುಬಿಡಿ",
     noteTooLong: "ನೋಟ್ 500 ಅಕ್ಷರಗಳಿಗಿಂತ ಕಡಿಮೆ ಇರಲಿ.",
+    leftToDo: "ಇನ್ನೂ ಬಾಕಿ",
+    late: "ತಡವಾಗಿದೆ",
+    due: "{time} ಕ್ಕೆ ಆಗಬೇಕಿತ್ತು",
+    all: "ಎಲ್ಲಾ",
+    doneToday: "ಇಂದು ಆಗಿದೆ ({n})",
+    doneLabel: "{pet} ಗಾಗಿ {task} ಆಗಿದೆ ಎಂದು ಗುರುತಿಸಿ",
   },
   play: {
     clearWarning: "ಇಂದು ಇನ್ನೂ ನಡೆಯಬೇಕಿರುವ ಎಲ್ಲಾ ಸೆಷನ್‌ಗಳು ಹೋಗುತ್ತವೆ. ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ.",

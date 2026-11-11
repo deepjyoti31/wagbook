@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysCovered, freeKennels, leavingEarly, payFromPacks, petMatches, seriesDates, sharedWith, shortenedEnd, stayFromForm, type KennelHold } from "./bookings";
+import { calendarBars, daysCovered, freeKennels, leavingEarly, payFromPacks, petMatches, seriesDates, sharedWith, shortenedEnd, stayFromForm, type KennelHold } from "./bookings";
 
 describe("the stay a booking form describes", () => {
   it("reads an empty check-out as one day of day boarding", () => {
@@ -148,5 +148,32 @@ describe("a request on the calendar", () => {
   });
   it("covers every day of day boarding, the last one too", () => {
     expect(daysCovered({ kind: "daycare", startDate: "2027-04-16", endDate: "2027-04-17" }, days)).toEqual([false, false, false, true, true]);
+  });
+});
+
+describe("calendarBars", () => {
+  const a = { id: "a" };
+  const b = { id: "b" };
+
+  it("draws one bar for each unbroken run of days", () => {
+    expect(calendarBars([[a], [a], [], [b]])).toEqual([
+      { stay: a, from: 0, to: 1, lane: 0, lanes: 1 },
+      { stay: b, from: 3, to: 3, lane: 0, lanes: 1 },
+    ]);
+  });
+
+  it("puts stays that share a day on lanes of their own", () => {
+    expect(calendarBars([[a], [a, b], [b]])).toEqual([
+      { stay: a, from: 0, to: 1, lane: 0, lanes: 2 },
+      { stay: b, from: 1, to: 2, lane: 1, lanes: 2 },
+    ]);
+  });
+
+  it("starts a new bar when a stay comes back after a gap, on the lowest free lane", () => {
+    expect(calendarBars([[a, b], [b], [a, b]]).map((x) => [x.stay.id, x.from, x.to, x.lane])).toEqual([
+      ["a", 0, 0, 0],
+      ["b", 0, 2, 1],
+      ["a", 2, 2, 0],
+    ]);
   });
 });

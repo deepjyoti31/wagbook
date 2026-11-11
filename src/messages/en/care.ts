@@ -23,6 +23,12 @@ export const careArea = {
     // {task} is the routine's own name as the kennel typed it, like "breakfast".
     skipTask: "Skip {task}",
     noteTooLong: "Keep the note under 500 characters.",
+    leftToDo: "still to do",
+    late: "Late",
+    due: "due {time}",
+    all: "All",
+    doneToday: "Done today ({n})",
+    doneLabel: "Mark {task} done for {pet}",
   },
   play: {
     clearWarning: "Every session still to happen today goes. This cannot be undone.",
