@@ -33,7 +33,8 @@ async function choosePet(page: Page, name: string) {
   const chosen = page.getByText(`Book with ${pet}`);
   const radio = page.getByRole("radio", { name, exact: true });
   await expect(chosen.or(radio).first()).toBeVisible();
-  if (!(await chosen.isVisible())) await radio.check();
+  // A tap, not check(): the list gives way to the chosen pet's card as soon as it is tapped.
+  if (!(await chosen.isVisible())) await radio.click();
   await expect(chosen).toBeVisible();
 }
 
