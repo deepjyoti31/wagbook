@@ -165,7 +165,15 @@ export function NewBookingFields({
                     <p className="text-[16.5px] font-bold">{fill(w.picker.bookWith, { pet: chosen.name })}</p>
                     <p className="text-sm text-slate">{[chosen.breed, chosen.parentName, chosen.parentPhone ? formatPhone(chosen.parentPhone) : null].filter(Boolean).join(" · ")}</p>
                   </div>
-                  <button type="button" className={buttonStyles.quiet} onClick={() => choose("")}>
+                  <button
+                    type="button"
+                    className={buttonStyles.quiet}
+                    onClick={() => {
+                      // Start the search again, so every pet is offered and not only what was typed before.
+                      setQuery("");
+                      choose("");
+                    }}
+                  >
                     {w.change}
                   </button>
                 </div>
