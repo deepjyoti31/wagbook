@@ -733,7 +733,8 @@ test("a person reads Wagbook in Hindi, and parents read the kennel's pages in Ka
   const parent = await privateWindow(browser);
   await parent.page.goto(link.trim());
   await expect(parent.page.getByText(kn.stayPage.status.checked_in)).toBeVisible();
-  expect(await parent.page.evaluate(() => document.documentElement.lang)).toBe("kn");
+  // Set once the page has woken up in the browser, so it is waited for.
+  await expect(parent.page.locator("html")).toHaveAttribute("lang", "kn");
   await parent.context.close();
 
   // Back to English for whoever runs next.
