@@ -49,6 +49,8 @@ function day(offset = 0): string {
 
 async function signIn(page: Page, who: string, password = PASSWORD) {
   await page.goto("/login");
+  // Put back after a step that cleared the cookies: the walk reads a booking's long page (see beforeEach).
+  await page.context().addCookies([{ name: "wb_stay_view", value: "all", url: new URL(page.url()).origin }]);
   await page.getByLabel("Email").fill(who.includes("@") ? who : `${who}@demo.wagbook.test`);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
