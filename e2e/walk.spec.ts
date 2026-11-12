@@ -113,6 +113,7 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
   await expect(page.getByLabel("Check-out date")).toHaveValue(day(3));
 
   // Found by typing part of the parent's phone number.
+  await page.getByRole("button", { name: "Change", exact: true }).click();
   await page.getByLabel("Find a pet").fill("00105");
   await expect(page.getByText("Book with Tofu")).toBeVisible();
   await page.getByLabel("Check-in date").fill(day(1));
