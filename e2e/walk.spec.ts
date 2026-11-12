@@ -2760,7 +2760,7 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await expect(page.getByRole("heading", { name: en.cleaning.title })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: kennelName }).getByRole("button", { name: en.cleaning.cleaned })).toBeVisible();
   await page.goto(`/app/calendar?from=${day(0)}`);
-  await expect(page.getByRole("link", { name: en.calendar.clean, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: en.calendar.clean, exact: true }).first()).toBeVisible();
   await addPet(page, "9800000602", "Asha Sample Two", "Pip");
   await page.goto("/app/bookings/new");
   await choosePet(page, "Pip (Asha Sample Two)");
