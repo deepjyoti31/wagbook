@@ -1179,7 +1179,7 @@ test("a parent asks for a stay through their own link, and it waits as a request
   await parent.context.close();
 
   await page.goto("/app");
-  await expect(page.getByText("One request from a parent is waiting.")).toBeVisible();
+  await expect(page.getByText("One request from a parent is waiting.").first()).toBeVisible();
   // A new link, and the old one stops working.
   await openPet(page, "Rocky");
   await page.getByRole("link", { name: "Vikram Mock" }).click();
