@@ -1463,6 +1463,8 @@ test("a kennel with a kitchen delivers: areas served, a parent's address, weight
   await shot(page, "m25-settings");
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.areas.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.areas.title) }).click();
   await page.getByLabel(en.areas.pin).fill("560 038");
   await page.getByLabel(en.areas.name).fill("Indiranagar");
@@ -1540,6 +1542,8 @@ const narrow = async (page: Page) => expect(await page.evaluate(() => document.d
 test("a manager sets up the kitchen: stock, a supplier, a recipe in the rotation and food prices", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.kitchen.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.kitchen.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.kitchen.title })).toBeVisible();
   await page.getByRole("link", { name: en.kitchen.links.stock }).click();
@@ -1896,6 +1900,8 @@ test("appointments: a manager sets up places, services priced by coat, an add-on
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.appointmentSetup.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.appointmentSetup.title) }).click();
   const s = en.appointmentSetup;
   const placeForm = page.locator("form").filter({ has: page.getByRole("button", { name: s.addPlaceButton }) });
@@ -2093,6 +2099,8 @@ test("appointments: a stay with a package is billed as one line, its swim and gr
 test("cancellation: the kennel cancels a paid stay, the parent keeps it as credit, and a manager adds goodwill", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.cancellation.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.cancellation.title) }).click();
   await page.locator("input[name='boarding.hours']").fill("48");
   await page.getByRole("button", { name: en.cancelSetup.save }).click();
@@ -2266,6 +2274,8 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.rota.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.rota.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.rota.title })).toBeVisible();
   await page.getByRole("button", { name: en.rota.shifts.addUsual }).click();
@@ -2506,6 +2516,8 @@ test("M45: a person who forgot their password chooses a new one from an emailed 
 test("M47: a manager brings in parents and pets from a spreadsheet; staff cannot", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.import.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.import.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.importing.title })).toBeVisible();
   const template = await page.request.get("/app/more/import/template");
@@ -3016,6 +3028,8 @@ test("M61: a person chooses alerts, and a push wakes the phone with what happene
     await navigator.serviceWorker.ready;
   });
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.alerts.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.alerts.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.alerts.title })).toBeVisible();
   await expect(page.getByText(en.alerts.off)).toBeVisible();
@@ -3070,6 +3084,8 @@ test("M62: a walk-in buys the last chew bones, more than is left is refused, and
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.shop.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.shop.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.shop.title })).toBeVisible();
   const add = page.locator("form").filter({ has: page.getByRole("button", { name: en.shop.addButton }) });
