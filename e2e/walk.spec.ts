@@ -481,7 +481,7 @@ test("a pet's details change, and an incident shows on Today until it is dealt w
 
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: /Incidents to deal with/ })).toBeVisible();
-  await page.getByRole("link", { name: /Bruno.*High/ }).click();
+  await page.getByRole("listitem").filter({ hasText: "Bruno" }).filter({ hasText: "High" }).getByRole("link", { name: "Open", exact: true }).click();
   await page.getByRole("button", { name: "Parent has been told" }).click();
   await expect(page.getByText("Marked as told.")).toBeVisible();
   await page.getByRole("button", { name: "Dealt with" }).click();
