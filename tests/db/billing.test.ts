@@ -355,3 +355,35 @@ describe("financial year labels", () => {
     }
   });
 });
+
+describe("the stay's bill on the parent's stay page (M72)", () => {
+  it("shows an issued bill with what is due and its link, never a draft, and who wrote an update by first name only", async () => {
+    const stay = await book(db, k, { pet: k.pets[0], start: "2028-02-01", end: "2028-02-04", kennel: k.kennels[0], status: "checked_in" });
+    const token = (await db.query<{ public_token: string }>("select public_token from public.bookings where id = $1", [stay])).rows[0].public_token;
+    type Stay = { bill: { number: string; total_minor: number; due_minor: number; currency: string; token: string } | null; updates: { by: string | null }[]; care_until: string | null };
+    const open = () => as(db, anon, async () => (await db.query<{ v: Stay }>("select public.get_public_stay($1) as v", [token])).rows[0].v);
+
+    // A draft is the kennel's working copy: the parent is not shown it.
+    const id = await draft(threeNights(), manager, stay);
+    expect((await open()).bill).toBeNull();
+
+    const issued = await as(db, user(manager), async () => (await db.query<{ number: string }>("select number from public.issue_invoice($1)", [id])).rows[0]);
+    const bill = (await open()).bill;
+    const link = (await db.query<{ public_token: string }>("select public_token from public.invoices where id = $1", [id])).rows[0].public_token;
+    expect(bill).toEqual({ number: issued.number, total_minor: 360000, due_minor: 360000, currency: "INR", token: link });
+
+    // A payment brings down what is due.
+    await as(db, user(manager), () =>
+      db.query("insert into public.payments (org_id, invoice_id, client_id, amount_minor, method, received_on) values ($1, $2, $3, 100000, 'upi', current_date)", [k.org, id, k.client]),
+    );
+    expect((await open()).bill?.due_minor).toBe(260000);
+
+    // An update says who wrote it by the first name the kennel gave them, and nothing more.
+    await db.query("update public.memberships set display_name = 'Ravi Kumar' where org_id = $1 and user_id = $2", [k.org, staff]);
+    await as(db, user(staff), () => db.query("insert into public.stay_updates (org_id, booking_id, pet_id, body) values ($1, $2, $3, 'Ate well')", [k.org, stay, k.pets[0]]));
+    const seen = await open();
+    expect(seen.updates[0].by).toBe("Ravi");
+    expect(JSON.stringify(seen)).not.toContain("Kumar");
+    expect(JSON.stringify(seen)).not.toContain(staff);
+  });
+});

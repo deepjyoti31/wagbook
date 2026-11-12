@@ -6,7 +6,7 @@
 This is the exact shape of the database after every migration has run. For the reasoning behind it, read
 [04-data-model.md](../04-data-model.md) and [05-security-and-privacy.md](../05-security-and-privacy.md).
 
-Migrations applied: 21. Tables: 89. Views: 9. Functions: 205.
+Migrations applied: 22. Tables: 89. Views: 9. Functions: 205.
 
 ## Contents
 
@@ -5608,7 +5608,7 @@ get_public_stay(p_token text) returns jsonb
 - Runs as: the database owner (SECURITY DEFINER), so it performs its own permission checks
 - Volatility: stable
 
-PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths, a count of care done, and once the pet has gone home the stay report (M53): the kennel's words and picked photos, meals and medicines by label and whether done, play sessions done, weighings around the stay, and the kinds of incident the parent was told of. No notes, prices, incident accounts or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).
+PUBLIC. The parent's stay page for one booking, found by its secret token: kennel contact, pet name and photo path, dates, status, parent-visible updates with their photo paths and the first name of who wrote each, a count of care done and when care was last ticked, the stay's issued bill if it has one (number, total, what is due, currency and the token of its own page; never a draft or a cancelled bill), and once the pet has gone home the stay report (M53): the kennel's words and picked photos, meals and medicines by label and whether done, play sessions done, weighings around the stay, and the kinds of incident the parent was told of. No notes, prices of lines, incident accounts or other pets. Stops working when the booking is cancelled and 30 days after check-out. The photos themselves are fetched through Storage with the same token (stay_media_visible).
 
 ### guard_hiding
 
