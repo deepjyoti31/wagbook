@@ -2801,7 +2801,7 @@ test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed 
   await shot(page, "m51-house");
 
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Opening 0 of 4" })).toBeVisible();
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Opening", exact: true }) }).getByText("0 of 4", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Mark Lights on done" }).click();
   await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Opening", exact: true }) }).getByText("1 of 4", { exact: true })).toBeVisible();
   await narrow(page);
