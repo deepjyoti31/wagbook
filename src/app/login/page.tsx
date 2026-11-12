@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Rich } from "@/components/rich";
+import { PasswordInput } from "@/components/password-input";
 import { buttonStyles, Field, Input, Loading } from "@/components/ui";
 import { getVisitorI18n } from "@/lib/i18n-server";
 import { googleSignInOn } from "@/lib/site";
@@ -37,7 +38,7 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
     <>
       <HtmlLang lang={language} />
       <ForgetOfflineCopies />
-      <h1 className="mb-6 text-[1.875rem] font-extrabold leading-tight tracking-tight">{signup ? a.signUpHeading : a.signInHeading}</h1>
+      <h1 className="mb-[18px] text-[30px] font-extrabold leading-tight tracking-[-0.02em]">{signup ? a.signUpHeading : a.signInHeading}</h1>
       {params.error === "link" ? (
         <p role="alert" className="mb-4 rounded-xl bg-alert-soft px-4 py-3 font-semibold text-alert-ink">
           {a.linkExpired}
@@ -48,7 +49,7 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
           {m.account.google.failed}
         </p>
       ) : null}
-      {next?.startsWith("/join/") ? <p className="mb-4 rounded-xl bg-marigold-soft px-4 py-3">{signup ? a.invitedSignUp : a.invitedSignIn}</p> : null}
+      {next?.startsWith("/join/") ? <p className="mb-[18px] rounded-xl bg-marigold-soft px-3.5 py-3 text-[15px] text-[#3d2a00]">{signup ? a.invitedSignUp : a.invitedSignIn}</p> : null}
       {googleSignInOn() ? (
         <>
           {/* A plain link: the route sends the browser on to Google (src/app/auth/google/route.ts). */}
@@ -64,20 +65,20 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/login">, "searchPara
           <Input name="email" type="email" autoComplete="email" required />
         </Field>
         <Field label={a.password} hint={signup ? a.passwordHint : undefined}>
-          <Input name="password" type="password" autoComplete={signup ? "new-password" : "current-password"} required minLength={8} />
+          <PasswordInput name="password" autoComplete={signup ? "new-password" : "current-password"} required minLength={8} words={{ show: a.show, hide: a.hide }} />
         </Field>
+        {signup ? null : (
+          <p className="-mt-2.5!">
+            <Link href="/login/forgot" className="inline-flex min-h-11 items-center text-[15px] font-semibold underline underline-offset-4">
+              {m.account.forgotLink}
+            </Link>
+          </p>
+        )}
         <SubmitButton pendingLabel={signup ? a.creatingAccount : a.signingIn} className="w-full">
           {signup ? a.createAccount : a.signIn}
         </SubmitButton>
       </ActionForm>
-      {signup ? null : (
-        <p className="mt-4">
-          <Link href="/login/forgot" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
-            {m.account.forgotLink}
-          </Link>
-        </p>
-      )}
-      <p className="mt-6 text-slate">
+      <p className="mt-[18px] border-t border-rule pt-4 text-center text-[15px]">
         <Rich
           text={signup ? a.haveAccount : a.newHere}
           parts={{

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { MonthPicker } from "@/components/month-picker";
+import { Icon } from "@/components/icons";
 import { OccupancyChart } from "@/components/occupancy-chart";
 import { Rich } from "@/components/rich";
-import { buttonStyles, Empty, Field, Figure, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Figure, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
 import { getMemberships, requireOrg } from "@/lib/auth";
 import { taxLabel } from "@/lib/billing";
-import { formatDate, formatMoney, GSTR1_PARTS, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
+import { formatDate, formatDay, formatMoney, GSTR1_PARTS, nightsBetween, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n } from "@/lib/i18n-server";
 import { DOWNLOADS } from "@/lib/reports";
@@ -47,7 +47,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
     supabase.rpc("report_money", { p_org: org.id, p_from: yearStart, p_to: last }),
     supabase.rpc("report_tax", args),
     supabase.rpc("report_extras", args),
-    supabase.from("invoice_balances").select("due_minor").eq("org_id", org.id).eq("status", "issued").gt("due_minor", 0).limit(5000),
+    supabase.from("invoice_balances").select("invoice_id, due_minor, total_minor, issued_on").eq("org_id", org.id).eq("status", "issued").gt("due_minor", 0).order("issued_on").limit(5000),
   ]);
   if (occupancy.error || money.error || tax.error || extras.error || owed.error) throw new Error("Could not add up the reports.");
 
@@ -64,12 +64,36 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
   const net = thisMonth ? thisMonth.received_minor - thisMonth.refunded_minor - thisMonth.spent_minor : 0;
   const name = monthName(month, locale);
 
+  // The five bills that have waited longest, with whose they are.
+  const oldest = owed.data.slice(0, 5);
+  const oldestIds = oldest.flatMap((b) => (b.invoice_id ? [b.invoice_id] : []));
+  const oldestBills = oldestIds.length > 0 ? ((await supabase.from("invoices").select("id, number, clients(full_name)").eq("org_id", org.id).in("id", oldestIds)).data ?? []) : [];
+  const capacity = days.reduce((most, d) => Math.max(most, d.capacity), 0);
+  const moneyLine = (label: string, value: string, strong = true) => (
+    <div className="flex justify-between gap-3 border-b border-rule-soft py-2.5 last:border-0">
+      <dt className={strong ? "" : "text-slate"}>{label}</dt>
+      <dd className={`tabular-nums ${strong ? "font-bold" : ""}`}>{value}</dd>
+    </div>
+  );
+
   // An owner of several kennels also sees them side by side (M65).
   const ownsSeveral = (await getMemberships()).filter((x) => x.role === "owner").length > 1;
 
   return (
     <>
-      {title}
+      <PageTitle eyebrow={r.title} title={name}>
+        <nav aria-label={m.common.month} className="flex gap-1.5">
+          <Link href={`/app/more/reports?month=${shiftMonth(month, -1)}`} aria-label={m.common.previousMonth} className={`${buttonStyles.secondary} px-3!`}>
+            <Icon name="back" />
+          </Link>
+          <Link href="/app/more/reports" className={buttonStyles.secondary}>
+            {r.thisMonth}
+          </Link>
+          <Link href={`/app/more/reports?month=${shiftMonth(month, 1)}`} aria-label={m.common.nextMonth} className={`${buttonStyles.secondary} px-3!`}>
+            <Icon name="forward" />
+          </Link>
+        </nav>
+      </PageTitle>
       {ownsSeveral ? (
         <p className="mb-4">
           <Link href={`/app/more/reports/sites?month=${month}`} className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
@@ -77,79 +101,126 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
           </Link>
         </p>
       ) : null}
-      <MonthPicker month={month} href={(x) => `/app/more/reports?month=${x}`} locale={locale} words={m.common} />
 
+      {owed.data.length === 0 ? (
+        <p className="mb-(--wb-gap) flex items-center gap-3 rounded-[14px] bg-leaf-soft px-4 py-3.5 text-leaf-ink">
+          <Icon name="check" />
+          {r.nothingOwed}
+        </p>
+      ) : (
+        <Link href="/app/bills" className="mb-(--wb-gap) flex items-center gap-3 rounded-[14px] bg-marigold-soft px-4 py-3.5 text-[#3d2a00]">
+          <Icon name="bill" />
+          <span className="flex-1">
+            <Rich text={plural(language, owed.data.length, r.owedToday)} parts={{ amount: <strong className="font-extrabold">{fmt(owedTotal)}</strong> }} />
+          </span>
+          <strong className="underline underline-offset-4">{r.seeBills}</strong>
+        </Link>
+      )}
+
+      <div className="mb-(--wb-gap) grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3.5">
+        <Figure label={r.kennelsUsed} hint={capacity > 0 ? fill(r.ofKennels, { n: capacity }) : undefined}>
+          {stay.percentFull === null ? r.noKennels : fill(r.percent, { n: stay.percentFull })}
+        </Figure>
+        <Figure label={r.nightsSold}>{stay.nights}</Figure>
+        <Figure label={r.dayBoardingDays}>{stay.days}</Figure>
+        <Figure label={r.busiestDay} hint={stay.busiest ? plural(language, stay.busiest.pets, r.pets) : undefined}>
+          {stay.busiest ? new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "short", day: "numeric" }).format(new Date(`${stay.busiest.day}T00:00:00Z`)) : m.common.none}
+        </Figure>
+      </div>
+
+      <Columns
+        from="wide"
+        main={
+          <>
       <Section title={r.howFull}>
-        <div className="mb-3 grid grid-cols-2 gap-3 @lg:grid-cols-4">
-          <Figure label={r.nightsSold}>{stay.nights}</Figure>
-          <Figure label={r.dayBoardingDays}>{stay.days}</Figure>
-          <Figure label={r.kennelsUsed}>{stay.percentFull === null ? r.noKennels : fill(r.percent, { n: stay.percentFull })}</Figure>
-          <Figure label={r.busiestDay} hint={stay.busiest ? plural(language, stay.busiest.pets, r.pets) : undefined}>
-            {stay.busiest ? formatDate(stay.busiest.day, locale).replace(/ \d{4}$/, "") : m.common.none}
-          </Figure>
-        </div>
+        {capacity > 0 ? <p className="mb-3 text-sm text-slate">{fill(r.chartNote, { n: capacity })}</p> : null}
         <OccupancyChart days={days} locale={locale} language={language} words={r.chart} />
         <p className="mt-2 text-sm text-slate">{r.countsNote}</p>
       </Section>
 
-      <Section title={fill(r.moneyIn, { month: name })}>
-        <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
-          <Figure label={r.billed} hint={charged && thisMonth ? includes(fmt(thisMonth.tax_minor)) : undefined}>
-            {fmt((thisMonth?.billed_minor ?? 0) - (thisMonth?.credited_minor ?? 0))}
-          </Figure>
-          {thisMonth && thisMonth.credited_minor > 0 ? <Figure label={r.credited}>{fmt(-thisMonth.credited_minor)}</Figure> : null}
-          <Figure label={r.received}>{fmt(thisMonth?.received_minor ?? 0)}</Figure>
-          {thisMonth && thisMonth.refunded_minor > 0 ? <Figure label={r.refunded}>{fmt(thisMonth.refunded_minor)}</Figure> : null}
-          <Figure label={r.spent}>{fmt(thisMonth?.spent_minor ?? 0)}</Figure>
-          <Figure label={r.net}>{fmt(net)}</Figure>
-        </div>
-        <p className="mt-3">
-          {owed.data.length === 0 ? (
-            r.nothingOwed
-          ) : (
-            <>
-              <Rich text={plural(language, owed.data.length, r.owedToday)} parts={{ amount: <strong className="font-extrabold">{fmt(owedTotal)}</strong> }} />{" "}
-              <Link href="/app/bills" className="font-semibold underline underline-offset-4">
-                {r.seeBills}
-              </Link>
-            </>
-          )}
-        </p>
-        <p className="mt-1">
-          <Link href={`/app/more/expenses?month=${month}`} className="font-semibold underline underline-offset-4">
-            {r.seeExpenses}
-          </Link>
-        </p>
-      </Section>
+      {oldest.length > 0 ? (
+        <Section
+          title={r.notPaid.title}
+          meta={r.notPaid.oldest}
+          action={
+            <Link href="/app/bills" className={buttonStyles.quiet}>
+              {plural(language, owed.data.length, r.notPaid.seeAll)}
+            </Link>
+          }
+        >
+          <div className="-mx-(--wb-pad) -mb-(--wb-pad) overflow-x-auto">
+            <table className="w-full text-left text-[15px]">
+              <thead>
+                <tr className="bg-wash text-sm text-slate">
+                  <th className="py-2.5 pl-(--wb-pad) pr-3 font-[650]">{r.notPaid.bill}</th>
+                  <th className="px-3 py-2.5 font-[650]">{r.notPaid.parent}</th>
+                  <th className="px-3 py-2.5 font-[650]">{r.notPaid.billDate}</th>
+                  <th className="px-3 py-2.5 text-right font-[650]">{r.notPaid.total}</th>
+                  <th className="px-3 py-2.5 text-right font-[650]">{r.notPaid.due}</th>
+                  <th className="px-3 py-2.5 font-[650]">{r.notPaid.waiting}</th>
+                  <th className="py-2.5 pl-3 pr-(--wb-pad)" />
+                </tr>
+              </thead>
+              <tbody>
+                {oldest.map((x) => {
+                  const bill = oldestBills.find((i) => i.id === x.invoice_id);
+                  const waited = x.issued_on ? nightsBetween(x.issued_on, today) : 0;
+                  return (
+                    <tr key={x.invoice_id} className="border-t border-rule-soft">
+                      <th scope="row" className="whitespace-nowrap py-2 pl-(--wb-pad) pr-3 font-bold">
+                        <Link href={`/app/bills/${x.invoice_id}`} className="underline underline-offset-4">
+                          {bill?.number ?? ""}
+                        </Link>
+                      </th>
+                      <td className="px-3 py-2">{bill?.clients?.full_name ?? ""}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{x.issued_on ? formatDay(x.issued_on, locale) : ""}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmt(x.total_minor ?? 0)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums">{fmt(x.due_minor ?? 0)}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <Badge tone={waited >= 7 ? "attention" : "neutral"}>{waited > 0 ? plural(language, waited, r.notPaid.days) : r.notPaid.today}</Badge>
+                      </td>
+                      <td className="py-2 pl-3 pr-(--wb-pad) text-right">
+                        <Link href={`/app/bills/${x.invoice_id}`} className={buttonStyles.secondary}>
+                          {r.notPaid.open}
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      ) : null}
 
       <Section title={r.monthByMonth}>
-        <div className="relative overflow-x-auto rounded-xl border border-rule bg-paper">
-          <table className="w-full text-left text-sm">
+        <div className="-mx-(--wb-pad) overflow-x-auto">
+          <table className="w-full text-left text-[15px]">
             <thead>
-              <tr className="border-b border-rule text-slate">
-                <th className="px-3 py-2 font-semibold">{m.common.month}</th>
-                <th className="px-2 py-2 text-right font-semibold">{r.billed}</th>
-                <th className="px-2 py-2 text-right font-semibold">{r.received}</th>
-                <th className="px-2 py-2 text-right font-semibold">{r.spent}</th>
+              <tr className="bg-wash text-sm text-slate">
+                <th className="py-2.5 pl-(--wb-pad) pr-3 font-[650]">{m.common.month}</th>
+                <th className="px-3 py-2.5 text-right font-[650]">{r.billed}</th>
+                <th className="px-3 py-2.5 text-right font-[650]">{r.received}</th>
+                <th className="py-2.5 pl-3 pr-(--wb-pad) text-right font-[650]">{r.spent}</th>
               </tr>
             </thead>
             <tbody>
               {[...money.data].reverse().map((x) => (
-                <tr key={x.month} className="border-b border-rule last:border-0">
-                  <th scope="row" className="whitespace-nowrap px-3 py-2 font-semibold">
+                <tr key={x.month} className={`border-t border-rule-soft ${x.month.slice(0, 7) === month ? "font-bold" : ""}`}>
+                  <th scope="row" className="whitespace-nowrap py-2.5 pl-(--wb-pad) pr-3 font-[inherit]">
                     <Link href={`/app/more/reports?month=${x.month.slice(0, 7)}`} className="underline underline-offset-4">
                       {fill(r.shortMonth, { month: shortMonthName(x.month.slice(0, 7), locale), year: x.month.slice(2, 4) })}
                     </Link>
                   </th>
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.billed_minor - x.credited_minor)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.received_minor - x.refunded_minor)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{fmt(x.spent_minor)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{fmt(x.billed_minor - x.credited_minor)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{fmt(x.received_minor - x.refunded_minor)}</td>
+                  <td className="whitespace-nowrap py-2.5 pl-3 pr-(--wb-pad) text-right tabular-nums">{fmt(x.spent_minor)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-sm text-slate">{r.billedNote}</p>
+        <p className="mt-3 text-sm text-slate">{r.billedNote}</p>
       </Section>
 
       {charged ? (
@@ -211,6 +282,28 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         </Suspense>
       ) : null}
 
+          </>
+        }
+        side={
+          <>
+      <Section title={fill(r.moneyIn, { month: name })}>
+        <dl className="text-[15px]">
+          {moneyLine(r.billed, fmt((thisMonth?.billed_minor ?? 0) - (thisMonth?.credited_minor ?? 0)))}
+          {charged && thisMonth ? <p className="-mt-1.5 border-b border-rule-soft pb-2.5 text-sm text-slate">{includes(fmt(thisMonth.tax_minor))}</p> : null}
+          {moneyLine(r.received, fmt(thisMonth?.received_minor ?? 0))}
+          {thisMonth && thisMonth.refunded_minor > 0 ? moneyLine(r.refunded, fmt(thisMonth.refunded_minor), false) : null}
+          {thisMonth && thisMonth.credited_minor > 0 ? moneyLine(r.credited, fmt(-thisMonth.credited_minor), false) : null}
+          {moneyLine(r.spent, fmt(thisMonth?.spent_minor ?? 0))}
+        </dl>
+        <div data-figure className={`mt-2 flex items-center justify-between gap-3 rounded-xl px-4 py-3.5 ${net >= 0 ? "bg-leaf-soft text-leaf-ink" : "bg-alert-soft text-alert-ink"}`}>
+          <p className="font-bold">{r.net}</p>
+          <p className="text-2xl font-extrabold tracking-[-0.01em] tabular-nums">{fmt(net)}</p>
+        </div>
+        <Link href={`/app/more/expenses?month=${month}`} className={`${buttonStyles.quiet} -mx-3 mt-2`}>
+          {r.seeExpenses}
+        </Link>
+      </Section>
+
       {gst ? (
         <Section title={r.gstr1.title}>
           <p className="mb-3 text-slate">{r.gstr1.about}</p>
@@ -239,7 +332,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
       </Section>
 
       <Section title={r.downloadTitle}>
-        <form action="/app/more/reports/download" method="get" className="space-y-4 rounded-xl border border-rule bg-paper p-4">
+        <form action="/app/more/reports/download" method="get" className="space-y-4">
           <Field label={r.what}>
             <Select name="what" defaultValue="bills">
               {DOWNLOADS.map((key) => (
@@ -258,7 +351,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
             </Field>
           </div>
           <p className="text-sm text-slate">{r.downloadNote}</p>
-          <button type="submit" className={buttonStyles.primary}>
+          <button type="submit" className={`${buttonStyles.primary} w-full`}>
             {r.download}
           </button>
         </form>
@@ -269,6 +362,9 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
           {r.seeHistory}
         </Link>
       </p>
+          </>
+        }
+      />
     </>
   );
 }

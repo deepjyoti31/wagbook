@@ -50,6 +50,12 @@ export const kennelArea: typeof English = {
     twoStepOn: "चालू",
     twoStepOff: "बंद",
     ownerNudge: "आप इस केनेल के मालिक हैं। दो-चरण साइन इन चालू करें, ताकि चोरी हुआ पासवर्ड अंदर आने के लिए काफ़ी न हो।",
+    findPage: "पेज खोजें",
+    noPage: "इससे कोई पेज नहीं मिलता।",
+    you: "आप",
+    roleAt: "{kennel} में {role}",
+    switch: "बदलें",
+    andMore: "{list} और {n} और",
   },
   twoStep: {
     recovery: {
@@ -521,6 +527,15 @@ export const kennelArea: typeof English = {
       lostPhone: "फ़ोन और रिकवरी कोड दोनों खो गए? आपका Wagbook चलाने वाले से अपने अकाउंट का दो-चरण साइन इन बंद करने को कहें।",
       signOut: "साइन आउट करें",
     },
+    panel: {
+      headline: "आपके केनल के लिए बुकिंग, रोज़ की देखभाल, बिल और पेरेंट को अपडेट।",
+      desk: "फ़्रंट डेस्क पर लैपटॉप में, और आँगन में फ़ोन पर।",
+      parents: "पेरेंट को अपडेट, फ़ोटो और बिल WhatsApp पर मिलते हैं।",
+      open: "ओपन सोर्स। आपके रिकॉर्ड आपके अपने डेटाबेस में रहते हैं।",
+      language: "भाषा",
+    },
+    show: "दिखाएँ",
+    hide: "छिपाएँ",
   },
   onboarding: {
     title: "अपना केनेल सेट करें",
