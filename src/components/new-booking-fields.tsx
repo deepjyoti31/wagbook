@@ -90,6 +90,9 @@ export function NewBookingFields({
   const chosen = pets.find((p) => p.id === petId);
   const matches = pets.filter((p) => petMatches(p, query));
   const choose = (id: string) => {
+    // A search still on its way is for a choice already made: its answer must not choose again.
+    if (timer.current) clearTimeout(timer.current);
+    asked.current += 1;
     setPetId(id);
     // Another pet may have another parent, so the ticks start again.
     setAlso([]);
