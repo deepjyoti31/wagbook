@@ -338,6 +338,21 @@ export const petsArea: typeof English = {
       other: "{total} ರಲ್ಲಿ {done} ಬೇರೆ ಆರೈಕೆ",
     },
     message: "{kennel} ಗೆ WhatsApp ನಲ್ಲಿ ಮೆಸೇಜ್ ಮಾಡಿ",
+    careToday: "ಇಂದು ನೀಡಿದ ಆರೈಕೆ",
+    careKinds: {
+      meal: "ಊಟ",
+      medication: "ಔಷಧಿಗಳು",
+      walk: "ನಡಿಗೆ",
+      play: "ಆಟ",
+      cleaning: "ಸ್ವಚ್ಛತೆ",
+      other: "ಇತರ ಆರೈಕೆ",
+    },
+    doneOf: "{total} ರಲ್ಲಿ {done}",
+    earlierDays: "ಹಿಂದಿನ ದಿನಗಳು",
+    earlierUpdates: "ಹಿಂದಿನ ಅಪ್‌ಡೇಟ್‌ಗಳನ್ನು ನೋಡಿ ({n})",
+    madeWith: "Wagbook ನಿಂದ ಮಾಡಲಾಗಿದೆ",
+    language: "ಭಾಷೆ",
+    photoOf: "{pet} ನ ಫೋಟೋ",
   },
   // Photos and vaccinations: the pet photo form, the vaccination list and form, updates with photos.
   media: {

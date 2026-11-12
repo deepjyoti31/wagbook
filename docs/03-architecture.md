@@ -307,8 +307,9 @@ The whole look is in two files: tokens in `src/app/globals.css`, pieces in `src/
 
 **Idea.** Wagbook is a register, so screens are ledgers: rows in white cards on a cool grey ground, with a dark ink
 sidebar on a laptop. The one piece of decoration is the kennel door tag, a marigold tag with a punched hole, which is
-how a kennel is shown everywhere. The look was redesigned in M70 (D59); the twelve agreed screens are the reference for
-any new one.
+how a kennel is shown everywhere. The look was redesigned in M70 (D59), and the twelve agreed screens were then matched board for
+board in M71 (D61); they are the reference for any new one. A booking's page is in tabs, chosen by `?tab=`; `?tab=all`
+is every part on one page, which the browser walk uses.
 
 **Colour always means the same thing.**
 

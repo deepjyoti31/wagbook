@@ -338,6 +338,21 @@ export const petsArea = {
       other: "{done} of {total} other care",
     },
     message: "Message {kennel} on WhatsApp",
+    careToday: "Care given today",
+    careKinds: {
+      meal: "Meals",
+      medication: "Medicines",
+      walk: "Walks",
+      play: "Play sessions",
+      cleaning: "Cleaning",
+      other: "Other care",
+    },
+    doneOf: "{done} of {total}",
+    earlierDays: "Earlier days",
+    earlierUpdates: "See earlier updates ({n})",
+    madeWith: "Made with Wagbook",
+    language: "Language",
+    photoOf: "Photo of {pet}",
   },
   // Photos and vaccinations: the pet photo form, the vaccination list and form, updates with photos.
   media: {

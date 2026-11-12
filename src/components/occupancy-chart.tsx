@@ -36,7 +36,7 @@ export function OccupancyChart({
   };
 
   return (
-    <figure className="rounded-2xl border border-rule bg-paper p-5">
+    <figure>
       <figcaption className="mb-3 text-sm text-slate">{fill(words.caption, { n: capacity })}</figcaption>
       <div aria-hidden="true" className="relative h-44 border-t-[1.5px] border-dashed border-slate/50 lg:h-56">
         <div className="flex h-full items-end gap-[2px] border-b border-rule-strong sm:gap-1">

@@ -206,6 +206,9 @@ export const moneyArea = {
     igst: "IGST",
     roundOff: "Round off",
     total: "Total",
+    lineNumber: "#",
+    what: "What",
+    amount: "Amount",
   },
   reports: {
     title: "Reports",
@@ -299,7 +302,6 @@ export const moneyArea = {
     },
     thisMonth: "This month",
     ofKennels: "of {n} kennels over the month",
-    chartNote: "Pets in each day. The top line is all {n} kennels full.",
     notPaid: {
       title: "Not paid yet",
       oldest: "oldest first",

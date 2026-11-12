@@ -324,6 +324,21 @@ export const petsArea: typeof English = {
       other: "{total} में से {done} दूसरी देखभाल",
     },
     message: "WhatsApp पर {kennel} को मैसेज करें",
+    careToday: "आज की गई देखभाल",
+    careKinds: {
+      meal: "भोजन",
+      medication: "दवाएँ",
+      walk: "सैर",
+      play: "खेल",
+      cleaning: "सफ़ाई",
+      other: "अन्य देखभाल",
+    },
+    doneOf: "{total} में से {done}",
+    earlierDays: "पिछले दिन",
+    earlierUpdates: "पुराने अपडेट देखें ({n})",
+    madeWith: "Wagbook से बना",
+    language: "भाषा",
+    photoOf: "{pet} की फ़ोटो",
   },
   media: {
     photo: {

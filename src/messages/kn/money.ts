@@ -194,6 +194,9 @@ export const moneyArea: typeof English = {
     igst: "IGST",
     roundOff: "ರೌಂಡ್ ಆಫ್",
     total: "ಒಟ್ಟು",
+    lineNumber: "#",
+    what: "ವಿವರ",
+    amount: "ಮೊತ್ತ",
   },
   reports: {
     title: "ವರದಿಗಳು",
@@ -280,7 +283,6 @@ export const moneyArea: typeof English = {
     },
     thisMonth: "ಈ ತಿಂಗಳು",
     ofKennels: "ತಿಂಗಳಲ್ಲಿ {n} ಕೆನಲ್‌ಗಳಲ್ಲಿ",
-    chartNote: "ಪ್ರತಿ ದಿನದ ಸಾಕುಪ್ರಾಣಿಗಳು. ಮೇಲಿನ ಗೆರೆ ಎಂದರೆ ಎಲ್ಲಾ {n} ಕೆನಲ್‌ಗಳು ಭರ್ತಿ.",
     notPaid: {
       title: "ಇನ್ನೂ ಪಾವತಿಯಾಗಿಲ್ಲ",
       oldest: "ಹಳೆಯದು ಮೊದಲು",

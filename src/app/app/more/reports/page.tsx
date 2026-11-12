@@ -133,7 +133,6 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         main={
           <>
       <Section title={r.howFull}>
-        {capacity > 0 ? <p className="mb-3 text-sm text-slate">{fill(r.chartNote, { n: capacity })}</p> : null}
         <OccupancyChart days={days} locale={locale} language={language} words={r.chart} />
         <p className="mt-2 text-sm text-slate">{r.countsNote}</p>
       </Section>
@@ -304,6 +303,32 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
         </Link>
       </Section>
 
+      <Section title={r.downloadTitle}>
+        <form action="/app/more/reports/download" method="get" className="space-y-4">
+          <Field label={r.what}>
+            <Select name="what" defaultValue="bills">
+              {DOWNLOADS.map((key) => (
+                <option key={key} value={key}>
+                  {m.downloads.kinds[key]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="grid gap-3 @lg:grid-cols-2">
+            <Field label={r.from}>
+              <Input name="from" type="date" required defaultValue={first} />
+            </Field>
+            <Field label={r.to}>
+              <Input name="to" type="date" required defaultValue={last} />
+            </Field>
+          </div>
+          <p className="text-sm text-slate">{r.downloadNote}</p>
+          <button type="submit" className={`${buttonStyles.primary} w-full`}>
+            {r.download}
+          </button>
+        </form>
+      </Section>
+
       {gst ? (
         <Section title={r.gstr1.title}>
           <p className="mb-3 text-slate">{r.gstr1.about}</p>
@@ -329,32 +354,6 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
             {m.tally.ledgers}
           </Link>
         </p>
-      </Section>
-
-      <Section title={r.downloadTitle}>
-        <form action="/app/more/reports/download" method="get" className="space-y-4">
-          <Field label={r.what}>
-            <Select name="what" defaultValue="bills">
-              {DOWNLOADS.map((key) => (
-                <option key={key} value={key}>
-                  {m.downloads.kinds[key]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div className="grid gap-3 @lg:grid-cols-2">
-            <Field label={r.from}>
-              <Input name="from" type="date" required defaultValue={first} />
-            </Field>
-            <Field label={r.to}>
-              <Input name="to" type="date" required defaultValue={last} />
-            </Field>
-          </div>
-          <p className="text-sm text-slate">{r.downloadNote}</p>
-          <button type="submit" className={`${buttonStyles.primary} w-full`}>
-            {r.download}
-          </button>
-        </form>
       </Section>
 
       <p>

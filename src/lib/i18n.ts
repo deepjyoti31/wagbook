@@ -15,6 +15,9 @@
 export const LANGUAGES = ["en", "hi", "kn"] as const;
 export type Language = (typeof LANGUAGES)[number];
 
+/** Each language in a letter or two of its own script, for a switch with little room (a parent's page on a phone). */
+export const LANGUAGE_SHORT: Record<Language, string> = { en: "EN", hi: "हि", kn: "ಕ" };
+
 /** Each language named in itself, so a person can find their own. */
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",

@@ -10,6 +10,12 @@ The first release will be 0.1.0. Everything below is in it.
 
 ### For the kennel
 
+- The screens now match the design that was agreed (12 November 2026). A booking's page has the pet, the stay and the
+  next step at the top and its parts in tabs, opening on today's care, the bill so far, the health papers and the
+  parent. The calendar shows how many kennels are free under each day. New booking shows what is being booked and the
+  kennels free for the dates beside the form. Care opens on what is still to do, with what is late first. The menu
+  counts what is waiting: requests from parents, care still to do, and new forms. Sign in lets you pick your language
+  and show the password as you type it. No database change.
 - Three bugs fixed (10 November 2026). A bill with a part quantity at a price with paise (0.35 kg at ₹449.50 a kilo)
   could come out a paisa different from the database's sum and then never be issued. Crediting what changed on a
   visitor's appointment bill said "nothing changed". And a booking's "What it costs", with the total sent to the

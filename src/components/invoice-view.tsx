@@ -86,22 +86,29 @@ export function InvoiceView({
 
   return (
     <div className="invoice">
-      <ul className="divide-y divide-rule rounded-2xl border border-rule bg-paper print:rounded-none print:border-x-0">
+      {/* The lines, numbered, under a ruled heading: what, and the amount at the right. */}
+      <div className="flex gap-4 border-b border-ink px-2.5 pb-2 text-[13px] font-[650] text-slate">
+        <span className="w-6 shrink-0">{w.lineNumber}</span>
+        <span className="flex-1">{w.what}</span>
+        <span>{w.amount}</span>
+      </div>
+      <ul className="divide-y divide-rule-strong border-b border-rule-strong">
         {lines.map((l, i) => (
-          <li key={i} className="px-4 py-3">
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-              <div className="min-w-0 flex-1 basis-48">
-                <p className="font-semibold">{l.description}</p>
-                <p className="text-sm text-slate">{lineText(l)}</p>
+          <li key={i} className="px-2.5 py-3">
+            <div className="flex items-start gap-4">
+              <span className="w-6 shrink-0 tabular-nums">{i + 1}</span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">{l.description}</p>
+                <p className="mt-0.5 text-[13px] text-slate">{lineText(l)}</p>
               </div>
-              <p className="font-semibold tabular-nums">{money(l.totalMinor)}</p>
+              <p className="tabular-nums">{money(l.totalMinor)}</p>
             </div>
-            {lineActions ? lineActions(i) : null}
+            {lineActions ? <div className="pl-10">{lineActions(i)}</div> : null}
           </li>
         ))}
       </ul>
 
-      <dl className="mt-3 space-y-1 rounded-2xl border border-rule bg-wash px-4 py-3 tabular-nums print:bg-paper">
+      <dl className="ml-auto mt-5 max-w-[280px] space-y-2 text-[15px] tabular-nums">
         {totals.discountMinor > 0 || showTax ? <Row label={w.beforeDiscount} value={money(totals.subtotalMinor)} /> : null}
         {totals.discountMinor > 0 ? <Row label={w.discount} value={`- ${money(totals.discountMinor)}`} /> : null}
         {showTax ? <Row label={w.taxableValue} value={money(totals.taxableMinor)} /> : null}
@@ -110,11 +117,11 @@ export function InvoiceView({
         {showTax && gst && totals.igstMinor > 0 ? <Row label={w.igst} value={money(totals.igstMinor)} /> : null}
         {showTax && !gst && totals.taxMinor > 0 ? <Row label={name} value={money(totals.taxMinor)} /> : null}
         {totals.roundOffMinor !== 0 ? <Row label={w.roundOff} value={money(totals.roundOffMinor)} /> : null}
-        <div className="flex justify-between gap-4 border-t border-rule pt-2 text-lg font-extrabold">
+        <div className="flex justify-between gap-4 border-t border-ink pt-2.5 text-lg font-extrabold">
           <dt>{w.total}</dt>
           <dd>{money(totals.totalMinor)}</dd>
         </div>
-        {currency === "INR" ? <p className="pt-1 text-sm text-slate">{amountInWords(totals.totalMinor)}</p> : null}
+        {currency === "INR" ? <p className="text-[13px] text-slate">{amountInWords(totals.totalMinor)}</p> : null}
       </dl>
     </div>
   );
@@ -123,7 +130,7 @@ export function InvoiceView({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-slate">{label}</dt>
+      <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
   );
