@@ -307,7 +307,10 @@ export const moneyArea: typeof English = {
       },
       today: "ಇಂದು",
       open: "ತೆರೆಯಿರಿ",
+      remind: "ನೆನಪಿಸಿ",
+      remindTo: "{name} ಅವರಿಗೆ WhatsApp ನಲ್ಲಿ ನೆನಪಿಸಿ",
     },
+    nightsShort: "ರಾತ್ರಿಗಳು",
   },
   expenses: {
     deleteWarning: "ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ. ರಸೀದಿಯೂ ಅಳಿಯುತ್ತದೆ.",

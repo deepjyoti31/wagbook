@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { freeKennels, petMatches, stayFromForm, type KennelHold } from "@/lib/core/bookings";
-import { formatDay } from "@/lib/core/dates";
+import { formatDate, formatDay } from "@/lib/core/dates";
+import { vaccinationWarnings } from "@/lib/core/vaccinations";
+import { whatsappLink } from "@/lib/core/whatsapp";
 import { formatPhone } from "@/lib/core/phone";
 import { nightsBetween } from "@/lib/core/stay";
 import { fill, plural, type Language } from "@/lib/i18n";
@@ -40,6 +42,9 @@ const SHOWN = 8;
 export function NewBookingFields({
   pets: initialPets,
   search,
+  facts,
+  healthWords,
+  reminder,
   defaultPetId,
   words,
   language,
@@ -58,6 +63,11 @@ export function NewBookingFields({
 }: {
   pets: PickablePet[];
   search?: (query: string) => Promise<PickablePet[]>;
+  /** Stays before and vaccinations of a chosen pet, for the side column. */
+  facts?: (petId: string) => Promise<{ staysBefore: number; vaccinations: { vaccine: string; valid_until: string | null }[] } | null>;
+  /** The vaccination warning words (m.vaccinations), and the reminder to the parent (in the kennel's language for parents). */
+  healthWords?: { noneOnRecord: string; aVaccine: string; expiredBefore: string; runsOutDuring: string };
+  reminder?: { none: string; lapses: string; kennel: string; locale: string };
   defaultPetId?: string;
   /** m.newBooking */
   words: Messages["newBooking"];
@@ -118,6 +128,19 @@ export function NewBookingFields({
       pickOnly(q, merged);
     }, 250);
   };
+  // What is known about the chosen pet, asked for once it is chosen.
+  const [known, setKnown] = useState<{ id: string; staysBefore: number; vaccinations: { vaccine: string; valid_until: string | null }[] } | null>(null);
+  useEffect(() => {
+    if (!facts || !petId) return;
+    let live = true;
+    facts(petId).then((f) => {
+      if (live && f) setKnown({ id: petId, ...f });
+    });
+    return () => {
+      live = false;
+    };
+  }, [facts, petId]);
+  const factsOf = known && known.id === petId ? known : null;
   const siblings = chosen ? pets.filter((p) => p.clientId === chosen.clientId && p.id !== chosen.id) : [];
   const withBreed = (p: PickablePet) => (p.breed ? fill(w.picker.withBreed, { name: p.name, breed: p.breed }) : p.name);
   const fullName = (p: PickablePet) => (p.parentName ? fill(w.picker.withParent, { name: withBreed(p), parent: p.parentName }) : withBreed(p));
@@ -146,6 +169,32 @@ export function NewBookingFields({
   const datesRight = stay !== null && !endTooEarly && (kind === "daycare" || end !== "");
   const units = datesRight && stay ? (kind === "boarding" ? nightsBetween(stay.startDate, stay.endDate) : nightsBetween(stay.startDate, stay.endDate) + 1) : null;
   const usual = kind === "boarding" ? usualPrice.boarding : usualPrice.daycare;
+  // Vaccinations that will not last the stay typed, for the card beside the form.
+  const warnings = factsOf && stay && datesRight ? vaccinationWarnings(factsOf.vaccinations, stay) : [];
+  const fillIn = (text: string, vars: Record<string, string>) => text.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
+  const warningText = (x: (typeof warnings)[number]) =>
+    !healthWords
+      ? ""
+      : x.kind === "none_on_record"
+        ? healthWords.noneOnRecord
+        : fillIn(x.kind === "expired_before_arrival" ? healthWords.expiredBefore : healthWords.runsOutDuring, {
+            vaccine: (x.vaccine ?? healthWords.aVaccine).replaceAll("_", " "),
+            date: x.date ? formatDate(x.date, locale) : "",
+          });
+  const firstName = (chosen?.parentName ?? "").trim().split(/\s+/)[0] ?? "";
+  const reminderText =
+    reminder && chosen && stay && warnings.length > 0
+      ? warnings[0].kind === "none_on_record"
+        ? fillIn(reminder.none, { parent: firstName, pet: chosen.name, kennel: reminder.kennel, date: formatDay(stay.startDate, reminder.locale) })
+        : fillIn(reminder.lapses, {
+            parent: firstName,
+            pet: chosen.name,
+            kennel: reminder.kennel,
+            date: formatDay(stay.startDate, reminder.locale),
+            vaccine: (warnings[0].vaccine ?? "").replaceAll("_", " "),
+            until: warnings[0].date ? formatDay(warnings[0].date, reminder.locale) : "",
+          })
+      : null;
   const typed = price.canSet && rate.trim() !== "" ? `${price.symbol}${rate.trim()}` : null;
   const shownPrice = typed ?? usual;
   const heading = "text-lg font-[750] tracking-[-0.01em]";
@@ -166,7 +215,16 @@ export function NewBookingFields({
                   <PetAvatar name={chosen.name} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[16.5px] font-bold">{fill(w.picker.bookWith, { pet: chosen.name })}</p>
-                    <p className="text-sm text-slate">{[chosen.breed, chosen.parentName, chosen.parentPhone ? formatPhone(chosen.parentPhone) : null].filter(Boolean).join(" · ")}</p>
+                    <p className="text-sm text-slate">
+                      {[
+                        chosen.breed,
+                        chosen.parentName,
+                        chosen.parentPhone ? formatPhone(chosen.parentPhone) : null,
+                        factsOf ? (factsOf.staysBefore > 0 ? plural(language, factsOf.staysBefore, w.staysBefore) : w.firstStay) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -400,6 +458,21 @@ export function NewBookingFields({
                 {offered.length > 18 ? <li className="self-center text-sm text-slate">{fill(w.free.more, { n: offered.length - 18 })}</li> : null}
               </ul>
             )}
+          </section>
+        ) : null}
+        {warnings.length > 0 && chosen ? (
+          <section aria-labelledby="nb-health" className="rounded-2xl bg-marigold-soft p-5 text-[#3d2a00]">
+            <h2 id="nb-health" className="text-[17px] font-bold">
+              {w.health.title}
+            </h2>
+            <p className="mt-1.5 text-[15px]">
+              {warnings.map(warningText).join(" ")} {w.health.door} {chosen.parentName ? fill(w.health.ask, { parent: firstName }) : null}
+            </p>
+            {reminderText && chosen.parentPhone ? (
+              <a href={whatsappLink(reminderText, chosen.parentPhone)} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center text-[15px] font-bold underline underline-offset-4">
+                {w.health.send}
+              </a>
+            ) : null}
           </section>
         ) : null}
       </aside>

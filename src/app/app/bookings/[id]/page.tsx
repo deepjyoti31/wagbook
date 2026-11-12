@@ -22,10 +22,10 @@ import { requireOrg } from "@/lib/auth";
 import { flagText, shortDatesText, shortStayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  addDays, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, localDate, peaksTouching, quoteStay,
+  addDays, ageOn, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, localDate, peaksTouching, quoteStay,
   sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
@@ -50,7 +50,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, is_trial, trial_outcome, trial_note, packages(name), pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, is_trial, trial_outcome, trial_note, packages(name), pets(id, name, breed, species, sex, date_of_birth, weight_g, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -884,6 +884,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const lastUpdate = updates.data.find((u) => u.is_visible_to_parent) ?? null;
   const paidOnBill = bill.data ? (bill.data.total_minor ?? 0) - (bill.data.due_minor ?? 0) : 0;
   const dueNow = bill.data ? (bill.data.due_minor ?? 0) : quote.totalMinor - advanceMinor;
+  const age = pet?.date_of_birth ? ageOn(pet.date_of_birth, today) : null;
   const dateTime = (at: string) =>
     new Intl.DateTimeFormat(locale, { timeZone: org.time_zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(at));
 
@@ -892,7 +893,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       {showNext ? sNext : null}
       {b.status === "checked_out" ? billSection : null}
       {sUndo}
-      {pet ? <StayIncidents t={t} incidents={openIncidents.data ?? []} phone={parent?.phone ?? null} timeZone={org.time_zone} /> : null}
+      {pet ? <StayIncidents
+          t={t}
+          incidents={openIncidents.data ?? []}
+          phone={parent?.phone ?? null}
+          timeZone={org.time_zone}
+          opener={fill(p.m.whatsapp.incident, { parent: parent?.full_name.split(" ")[0] ?? "", kennel: org.name, pet: pet.name })}
+        /> : null}
       {b.status === "checked_in" ? (
         <StayCareToday t={t} tasks={careToday.data ?? []} names={doneBy} timeZone={org.time_zone} skipId={skipId} href={here} />
       ) : null}
@@ -960,7 +967,13 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
         </BillSoFar>
       ) : null}
       {pet ? <HealthCard t={t} vaccinations={vaccinations.data} allergies={pet.allergies} stayEnds={b.end_date} href={`${here}?tab=health`} /> : null}
-      {parent ? <ParentCard t={t} parent={parent} notes={b.notes} stayUrl={hasStayPage ? stayUrl : null} /> : null}
+      {parent ? <ParentCard
+          t={t}
+          parent={parent}
+          notes={b.notes}
+          stayUrl={hasStayPage ? stayUrl : null}
+          hello={fill(p.m.whatsapp.hello, { parent: parent.full_name.split(" ")[0], kennel: org.name, pet: pet?.name ?? p.m.whatsapp.yourPet })}
+        /> : null}
     </>
   );
 
@@ -993,7 +1006,18 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
                 </Badge>
               ))}
             </div>
-            {pet?.breed ? <p className="mt-1.5 text-[15px] text-slate">{pet.breed}</p> : null}
+            {pet ? (
+              <p className="mt-1.5 text-[15px] text-slate">
+                {[
+                  pet.breed,
+                  pet.sex !== "unknown" ? m.labels.sex[pet.sex].toLowerCase() : null,
+                  age ? ("years" in age ? plural(t.language, age.years, w.aboutPet.years) : plural(t.language, age.months, w.aboutPet.months)) : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                {pet.weight_g ? ` · ${fill(w.aboutPet.kg, { kg: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(pet.weight_g / 1000) })}` : null}
+              </p>
+            ) : null}
             <p className="mt-1.5 text-[15px]">
               <strong>{shortDatesText(t, b.start_date, b.end_date, today)}</strong>
               {shortStayText(t, b.kind, b.start_date, b.end_date, today).slice(shortDatesText(t, b.start_date, b.end_date, today).length)}

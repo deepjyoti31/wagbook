@@ -520,6 +520,13 @@ export const core = {
     leavesTomorrow: "Leaves tomorrow",
     forPet: "{parent}, for {pet}",
     toSendHint: "Send opens WhatsApp with the message typed.",
+    short: {
+      of: "of {capacity}",
+      careLeft: "Care to do",
+      noKennel: "{n} has no kennel",
+      toCollect: "{amount} to collect",
+      doneOf: "{done}/{total}",
+    },
   },
   // Messages that open in WhatsApp, ready to send. Those to parents use the kennel's parent language.
   whatsapp: {
@@ -561,6 +568,8 @@ export const core = {
       credit: "Hi {parent}, you have {amount} of credit with {kennel} that ends on {date}. Book a stay or a visit before then to use it.",
       review: "Hi {parent}, thank you for trusting {kennel} with {pet}. If you have a minute, a review helps other parents find us: {url}",
     },
+    incident: "Hi {parent}, this is {kennel}. We want to tell you about {pet}: ",
+    hello: "Hi {parent}, this is {kennel}, about {pet}. ",
   },
   copy: {
     link: "Copy link",

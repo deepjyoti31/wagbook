@@ -353,6 +353,15 @@ export const petsArea: typeof English = {
     madeWith: "Wagbook ನಿಂದ ಮಾಡಲಾಗಿದೆ",
     language: "ಭಾಷೆ",
     photoOf: "{pet} ನ ಫೋಟೋ",
+    fromWho: "{when} · {who} ಅವರಿಂದ",
+    upTo: "{time} ರವರೆಗೆ",
+    bill: {
+      title: "ನಿಮ್ಮ ಬಿಲ್",
+      see: "ಬಿಲ್ ನೋಡಿ",
+      due: "ಬಿಲ್ {number}, ಬಾಕಿ",
+      paid: "ಬಿಲ್ {number} ಪಾವತಿಯಾಗಿದೆ. ಧನ್ಯವಾದಗಳು.",
+      pay: "UPI ಮೂಲಕ ಪಾವತಿಸಿ",
+    },
   },
   // Photos and vaccinations: the pet photo form, the vaccination list and form, updates with photos.
   media: {

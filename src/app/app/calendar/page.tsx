@@ -13,7 +13,7 @@ import { fill } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { bookingCards, type BookingCard } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
-import { confirmRequest } from "../bookings/actions";
+import { confirmRequest, declineRequest } from "../bookings/actions";
 
 export const generateMetadata = () => appTitle((m) => m.calendar.title);
 
@@ -337,10 +337,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
                     <p className="text-sm text-slate">{who(r, true)}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {/* Declining asks for a reason, on the booking's own page. */}
-                    <Link href={`/app/bookings/${r.id}`} className={buttonStyles.quiet}>
-                      {w.answer.decline}
-                    </Link>
+                    <ActionForm action={declineRequest} className="contents">
+                      <input type="hidden" name="bookingId" value={r.id} />
+                      <SubmitButton variant="quiet" pendingLabel={w.answer.declining}>
+                        {w.answer.decline}
+                      </SubmitButton>
+                    </ActionForm>
                     <ActionForm action={confirmRequest} className="contents">
                       <input type="hidden" name="bookingId" value={r.id} />
                       <SubmitButton pendingLabel={m.booking.step.confirming}>{w.answer.confirm}</SubmitButton>

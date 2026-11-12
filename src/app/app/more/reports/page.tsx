@@ -6,9 +6,10 @@ import { Rich } from "@/components/rich";
 import { Badge, buttonStyles, Columns, Empty, Field, Figure, Input, Loading, PageTitle, Section, Select } from "@/components/ui";
 import { getMemberships, requireOrg } from "@/lib/auth";
 import { taxLabel } from "@/lib/billing";
-import { formatDate, formatDay, formatMoney, GSTR1_PARTS, nightsBetween, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn } from "@/lib/core";
+import { formatDate, formatDay, formatMoney, GSTR1_PARTS, nightsBetween, isYearMonth, monthBounds, monthName, shiftMonth, shortMonthName, summariseOccupancy, todayIn, whatsappLink } from "@/lib/core";
 import { fill, plural } from "@/lib/i18n";
-import { appTitle, getAppI18n } from "@/lib/i18n-server";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
+import { siteOrigin } from "@/lib/site";
 import { DOWNLOADS } from "@/lib/reports";
 import { createClient } from "@/lib/supabase/server";
 
@@ -67,7 +68,33 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
   // The five bills that have waited longest, with whose they are.
   const oldest = owed.data.slice(0, 5);
   const oldestIds = oldest.flatMap((b) => (b.invoice_id ? [b.invoice_id] : []));
-  const oldestBills = oldestIds.length > 0 ? ((await supabase.from("invoices").select("id, number, clients(full_name)").eq("org_id", org.id).in("id", oldestIds)).data ?? []) : [];
+  const [oldestRes, origin, yearDays] = await Promise.all([
+    oldestIds.length > 0 ? supabase.from("invoices").select("id, number, public_token, clients(full_name, phone)").eq("org_id", org.id).in("id", oldestIds) : Promise.resolve({ data: [] }),
+    siteOrigin(),
+    // The year's days, for kennels used and nights in each month of Month by month.
+    supabase.rpc("report_occupancy", { p_org: org.id, p_from: yearStart, p_to: last }),
+  ]);
+  const oldestBills = oldestRes.data ?? [];
+  const parentWords = parentI18n(org.parent_language, org.locale);
+  const reminderFor = (bill: (typeof oldestBills)[number], dueMinor: number) =>
+    bill.clients?.phone
+      ? whatsappLink(
+          fill(parentWords.m.whatsapp.reminders.unpaid, {
+            parent: bill.clients.full_name.split(" ")[0],
+            kennel: org.name,
+            number: bill.number ?? "",
+            amount: formatMoney(dueMinor, { currency: org.currency, locale: parentWords.locale, trimZeros: true }),
+            url: `${origin}/inv/${bill.public_token}`,
+          }),
+          bill.clients.phone,
+        )
+      : null;
+  const monthStay = (ym: string) =>
+    summariseOccupancy(
+      (yearDays.data ?? [])
+        .filter((d) => d.day.slice(0, 7) === ym)
+        .map((d) => ({ day: d.day, boarding: d.boarding, dayBoarding: d.day_boarding, capacity: d.capacity, kennelsUsed: d.kennels_used })),
+    );
   const capacity = days.reduce((most, d) => Math.max(most, d.capacity), 0);
   const moneyLine = (label: string, value: string, strong = true) => (
     <div className="flex justify-between gap-3 border-b border-rule-soft py-2.5 last:border-0">
@@ -179,9 +206,21 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
                         <Badge tone={waited >= 7 ? "attention" : "neutral"}>{waited > 0 ? plural(language, waited, r.notPaid.days) : r.notPaid.today}</Badge>
                       </td>
                       <td className="py-2 pl-3 pr-(--wb-pad) text-right">
-                        <Link href={`/app/bills/${x.invoice_id}`} className={buttonStyles.secondary}>
-                          {r.notPaid.open}
-                        </Link>
+                        {bill && reminderFor(bill, x.due_minor ?? 0) ? (
+                          <a
+                            href={reminderFor(bill, x.due_minor ?? 0)!}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={fill(r.notPaid.remindTo, { name: bill.clients?.full_name ?? "" })}
+                            className={buttonStyles.whatsapp}
+                          >
+                            {r.notPaid.remind}
+                          </a>
+                        ) : (
+                          <Link href={`/app/bills/${x.invoice_id}`} className={buttonStyles.secondary}>
+                            {r.notPaid.open}
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   );
@@ -198,6 +237,8 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
             <thead>
               <tr className="bg-wash text-sm text-slate">
                 <th className="py-2.5 pl-(--wb-pad) pr-3 font-[650]">{m.common.month}</th>
+                <th className="px-3 py-2.5 text-right font-[650]">{r.kennelsUsed}</th>
+                <th className="px-3 py-2.5 text-right font-[650]">{r.nightsShort}</th>
                 <th className="px-3 py-2.5 text-right font-[650]">{r.billed}</th>
                 <th className="px-3 py-2.5 text-right font-[650]">{r.received}</th>
                 <th className="py-2.5 pl-3 pr-(--wb-pad) text-right font-[650]">{r.spent}</th>
@@ -211,6 +252,15 @@ async function Reports({ searchParams }: Pick<PageProps<"/app/more/reports">, "s
                       {fill(r.shortMonth, { month: shortMonthName(x.month.slice(0, 7), locale), year: x.month.slice(2, 4) })}
                     </Link>
                   </th>
+                  {(() => {
+                    const used = monthStay(x.month.slice(0, 7));
+                    return (
+                      <>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{used.percentFull === null ? "" : fill(r.percent, { n: used.percentFull })}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{used.nights}</td>
+                      </>
+                    );
+                  })()}
                   <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{fmt(x.billed_minor - x.credited_minor)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{fmt(x.received_minor - x.refunded_minor)}</td>
                   <td className="whitespace-nowrap py-2.5 pl-3 pr-(--wb-pad) text-right tabular-nums">{fmt(x.spent_minor)}</td>

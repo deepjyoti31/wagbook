@@ -334,6 +334,17 @@ export const bookingsArea: typeof English = {
       copy: "स्टे पेज का लिंक कॉपी करें",
       notes: "स्टाफ़ के लिए नोट: {notes}",
     },
+    aboutPet: {
+      years: {
+        one: "{n} साल",
+        other: "{n} साल",
+      },
+      months: {
+        one: "{n} महीना",
+        other: "{n} महीने",
+      },
+      kg: "{kg} किलो",
+    },
   },
   newBooking: {
     waitlistNote: "वेटिंग लिस्ट में होने पर, केनेल खाली होते ही आज वाला पेज बताएगा।",
@@ -423,6 +434,17 @@ export const bookingsArea: typeof English = {
       none: "इन तारीख़ों पर कोई केनल खाली नहीं है। इसे अनुरोध के रूप में सेव करें, या प्रतीक्षा सूची में जोड़ें।",
       more: "और {n} और",
     },
+    staysBefore: {
+      one: "पहले {n} बार ठहरा",
+      other: "पहले {n} बार ठहरा",
+    },
+    firstStay: "पहली बार",
+    health: {
+      title: "सेहत के काग़ज़",
+      door: "चेक-इन पर दरवाज़े पर चेतावनी मिलेगी।",
+      ask: "{parent} से नया कार्ड माँगें।",
+      send: "अभी याद दिलाएँ",
+    },
   },
   calendar: {
     moreRequests: "सिर्फ़ पहले {n} अनुरोध दिखाए गए हैं।",
@@ -473,6 +495,8 @@ export const bookingsArea: typeof English = {
       aNight: "{price} प्रति रात",
       aDay: "{price} प्रति दिन",
       confirm: "पक्का करें",
+      declineReason: "मना किया: केनल यह ठहराव नहीं ले सका।",
+      declining: "मना कर रहे हैं",
     },
     waitlist: {
       title: "प्रतीक्षा सूची",

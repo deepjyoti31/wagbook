@@ -348,6 +348,22 @@ export async function confirmRequest(_state: FormState, form: FormData): Promise
 }
 
 /**
+ * Decline a request in one tap, from the calendar's "Waiting for an answer"
+ * (M72). Only a request: it holds no space and no money, so the reason is the
+ * kennel's own sentence, and nothing is owed back. A confirmed booking is
+ * cancelled from its page, with a reason.
+ */
+export async function declineRequest(_state: FormState, form: FormData): Promise<FormState> {
+  const { m } = await getAppI18n();
+  return moveStatus(form, ["requested"], "cancelled", {
+    cancel_reason: m.calendar.answer.declineReason,
+    cancel_asked_at: new Date().toISOString(),
+    // Not "cancelled by the kennel" (M38): that asks the parent to choose a refund or credit, and a request holds no money.
+    cancelled_by_kennel: false,
+  });
+}
+
+/**
  * Put a request on the waiting list, or take it off (D42). Anyone may: staff
  * take the calls. The database stamps the time it joined, which is its place
  * in line, and clears it when the request is answered.
@@ -513,6 +529,25 @@ export async function findPets(query: string): Promise<PetChoice[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * What New booking shows beside the form about the pet just chosen: how many
+ * stays it had here before, and its vaccinations, to warn before the stay is
+ * booked. Read only; the warning itself is worked out on the phone as the
+ * dates are typed (vaccinationWarnings()).
+ */
+export async function petFacts(petId: string): Promise<{ staysBefore: number; vaccinations: { vaccine: string; valid_until: string | null }[] } | null> {
+  const { org } = await requireOrg();
+  const id = Id.safeParse(petId);
+  if (!id.success) return null;
+  const supabase = await createClient();
+  const [stays, vaccinations] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("pet_id", id.data).eq("status", "checked_out"),
+    supabase.from("vaccinations").select("vaccine, valid_until").eq("org_id", org.id).eq("pet_id", id.data),
+  ]);
+  if (stays.error || vaccinations.error) return null;
+  return { staysBefore: stays.count ?? 0, vaccinations: vaccinations.data };
 }
 
 /**

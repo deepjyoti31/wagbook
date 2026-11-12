@@ -361,6 +361,17 @@ export const bookingsArea = {
       copy: "Copy the stay page link",
       notes: "Notes for staff: {notes}",
     },
+    aboutPet: {
+      years: {
+        one: "{n} year",
+        other: "{n} years",
+      },
+      months: {
+        one: "{n} month",
+        other: "{n} months",
+      },
+      kg: "{kg} kg",
+    },
   },
   newBooking: {
     title: "New booking",
@@ -456,6 +467,17 @@ export const bookingsArea = {
       none: "No kennel is free on these dates. Save it as a request, or add it to the waiting list.",
       more: "and {n} more",
     },
+    staysBefore: {
+      one: "{n} stay before",
+      other: "{n} stays before",
+    },
+    firstStay: "first stay",
+    health: {
+      title: "Health papers",
+      door: "The door will warn at check-in.",
+      ask: "Ask {parent} for the new card.",
+      send: "Send the reminder now",
+    },
   },
   calendar: {
     title: "Calendar",
@@ -509,6 +531,8 @@ export const bookingsArea = {
       aNight: "{price} a night",
       aDay: "{price} a day",
       confirm: "Confirm",
+      declineReason: "Declined: the kennel could not take this stay.",
+      declining: "Declining",
     },
     waitlist: {
       title: "Waiting list",

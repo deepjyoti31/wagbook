@@ -30,6 +30,9 @@ import { confirmRequest, extendToToday } from "./bookings/actions";
 
 export const generateMetadata = () => appTitle((m) => m.today.title);
 
+/** How many pets staying on are listed under In house on Today. */
+const IN_HOUSE_SHOWN = 4;
+
 export default function TodayPage({ searchParams }: PageProps<"/app">) {
   return (
     <Suspense fallback={<Loading />}>
@@ -65,7 +68,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     // Incidents still open that matter now: serious ones, and any the parent has not been told about.
     supabase
       .from("incidents")
-      .select("id, severity, category, description, parent_notified_at, pets(id, name, clients(phone))")
+      .select("id, severity, category, description, parent_notified_at, pets(id, name, clients(full_name, phone))")
       .eq("org_id", org.id)
       .is("resolved_at", null)
       .in("severity", ["medium", "high"])
@@ -262,6 +265,12 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
     ) : null;
 
   // On a phone the kinds of care are chips in a row: medicines first, and what is finished last.
+  const wide = (long: string, short: string) => (
+    <>
+      <span className="hidden lg:inline">{long}</span>
+      <span className="lg:hidden">{short}</span>
+    </>
+  );
   const careChips = [...care].sort((a, b) => Number(a.done === a.total) - Number(b.done === b.total) || Number(b.kind === "medication") - Number(a.kind === "medication"));
 
   return (
@@ -301,9 +310,11 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
           hint={capacity > 0 ? <Meter value={inHouse.length} total={capacity} tone="leaf" label={fill(m.today.inHouseOf, { inHouse: inHouse.length, capacity })} /> : undefined}
         >
           {inHouse.length}
-          {capacity > 0 ? <span className="ml-1 text-sm font-[650] tracking-normal text-slate lg:text-base">{fill(m.today.ofKennels, { capacity })}</span> : null}
+          {capacity > 0 ? (
+            <span className="ml-1 text-sm font-[650] tracking-normal text-slate lg:text-base">{wide(fill(m.today.ofKennels, { capacity }), fill(m.today.short.of, { capacity }))}</span>
+          ) : null}
         </Figure>
-        <Figure label={m.today.toArriveTitle} tone="attention" hint={noKennel > 0 ? plural(language, noKennel, m.today.noKennelCount) : undefined}>
+        <Figure label={m.today.toArriveTitle} tone="attention" hint={noKennel > 0 ? wide(plural(language, noKennel, m.today.noKennelCount), fill(m.today.short.noKennel, { n: noKennel })) : undefined}>
           {arrivals.length}
         </Figure>
         <Figure
@@ -318,7 +329,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
         >
           {goingHome.length}
         </Figure>
-        <Figure label={m.today.careLeft} tone="alert" hint={medicinesLeft > 0 ? plural(language, medicinesLeft, m.today.medicinesDue) : undefined}>
+        <Figure label={wide(m.today.careLeft, m.today.short.careLeft)} tone="alert" hint={medicinesLeft > 0 ? plural(language, medicinesLeft, m.today.medicinesDue) : undefined}>
           {careTotal - careDone}
         </Figure>
       </div>
@@ -392,7 +403,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                         {finished ? <Icon name="check" className="size-[18px]" /> : null}
                         {m.labels.careKindPlural[c.kind]}
                       </span>
-                      <span>{fill(m.today.doneOf, { done: c.done, total: c.total })}</span>
+                      <span>{wide(fill(m.today.doneOf, { done: c.done, total: c.total }), fill(m.today.short.doneOf, { done: c.done, total: c.total }))}</span>
                     </span>
                     <Meter value={c.done} total={c.total} tone={medicine ? "alert" : "ink"} />
                   </Link>
@@ -428,7 +439,7 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                       </div>
                       <div className="flex flex-wrap gap-2 max-sm:w-full">
                         {!i.parent_notified_at && i.pets?.clients?.phone ? (
-                          <a href={whatsappLink("", i.pets.clients.phone)} target="_blank" rel="noreferrer" className={`${buttonStyles.whatsapp} max-sm:flex-1`}>
+                          <a href={whatsappLink(fill(parentWords.m.whatsapp.incident, { parent: (i.pets.clients.full_name ?? "").split(" ")[0], kennel: org.name, pet: i.pets.name }), i.pets.clients.phone)} target="_blank" rel="noreferrer" className={`${buttonStyles.whatsapp} max-sm:flex-1`}>
                             {m.today.tellParent}
                           </a>
                         ) : null}
@@ -526,7 +537,8 @@ async function Today({ searchParams }: Pick<PageProps<"/app">, "searchParams">) 
                   </Link>
                 }
               >
-                <Ledger>{stayingIn.map(stayingRow)}</Ledger>
+                {/* The pets leaving soonest; the rest are on Bookings, behind See all. */}
+                <Ledger>{stayingIn.slice(0, IN_HOUSE_SHOWN).map(stayingRow)}</Ledger>
               </Section>
             ) : null}
           </>
@@ -657,7 +669,13 @@ async function ToCollect({ t, owed }: { t: I18n; owed: Promise<Owed | null>[] })
     total += f.owed.amountMinor;
   }
   if (total <= 0) return null;
-  return <>{fill(t.m.today.toCollect, { amount: formatMoney(total, { currency: org.currency, locale: t.locale, trimZeros: true }) })}</>;
+  const amount = formatMoney(total, { currency: org.currency, locale: t.locale, trimZeros: true });
+  return (
+    <>
+      <span className="hidden lg:inline">{fill(t.m.today.toCollect, { amount })}</span>
+      <span className="lg:hidden">{fill(t.m.today.short.toCollect, { amount })}</span>
+    </>
+  );
 }
 
 type Owed = NonNullable<Awaited<ReturnType<typeof owedFor>>>;

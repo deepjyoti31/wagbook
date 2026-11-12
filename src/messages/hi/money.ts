@@ -322,7 +322,10 @@ export const moneyArea: typeof English = {
       },
       today: "आज",
       open: "खोलें",
+      remind: "याद दिलाएँ",
+      remindTo: "{name} को WhatsApp पर याद दिलाएँ",
     },
+    nightsShort: "रातें",
   },
   expenses: {
     deleteWarning: "इसे वापस नहीं लाया जा सकता। रसीद भी मिट जाएगी।",

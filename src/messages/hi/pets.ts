@@ -339,6 +339,15 @@ export const petsArea: typeof English = {
     madeWith: "Wagbook से बना",
     language: "भाषा",
     photoOf: "{pet} की फ़ोटो",
+    fromWho: "{when} · {who} की ओर से",
+    upTo: "{time} तक",
+    bill: {
+      title: "आपका बिल",
+      see: "बिल देखें",
+      due: "बिल {number}, बाकी",
+      paid: "बिल {number} चुका दिया गया है। धन्यवाद।",
+      pay: "UPI से चुकाएँ",
+    },
   },
   media: {
     photo: {

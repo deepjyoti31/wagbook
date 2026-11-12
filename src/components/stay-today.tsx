@@ -22,7 +22,7 @@ import type { Enums } from "@/lib/supabase/database.types";
 type Incident = { id: string; occurred_at: string; severity: Enums<"incident_severity">; description: string; action_taken: string | null; parent_notified_at: string | null };
 
 /** Incidents of this pet that are still open, each with Tell the parent and Mark resolved. */
-export function StayIncidents({ t, incidents, phone, timeZone }: { t: I18n; incidents: Incident[]; phone: string | null; timeZone: string }) {
+export function StayIncidents({ t, incidents, phone, timeZone, opener }: { t: I18n; incidents: Incident[]; phone: string | null; timeZone: string; /** The first words of the message to the parent, in their language. */ opener: string }) {
   const { m, locale } = t;
   const w = m.booking.incidentCard;
   if (incidents.length === 0) return null;
@@ -48,7 +48,7 @@ export function StayIncidents({ t, incidents, phone, timeZone }: { t: I18n; inci
           </div>
           <div className="flex flex-wrap gap-2">
             {!i.parent_notified_at && phone ? (
-              <a href={whatsappLink("", phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
+              <a href={whatsappLink(opener, phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
                 {m.today.tellParent}
               </a>
             ) : null}
@@ -309,6 +309,7 @@ export function ParentCard({
   parent,
   notes,
   stayUrl,
+  hello,
 }: {
   t: I18n;
   parent: { id: string; full_name: string; phone: string };
@@ -316,6 +317,8 @@ export function ParentCard({
   notes: string | null;
   /** Null when the stay has no page for the parent (cancelled, or the pet did not come). */
   stayUrl: string | null;
+  /** The first words of a message to the parent, in their language. */
+  hello: string;
 }) {
   const { m } = t;
   const w = m.booking.parentCard;
@@ -333,7 +336,7 @@ export function ParentCard({
       </p>
       {notes ? <p className="mt-3 whitespace-pre-line rounded-xl bg-wash px-3.5 py-3 text-sm">{fill(w.notes, { notes })}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <a href={whatsappLink("", parent.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
+        <a href={whatsappLink(hello, parent.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
           {w.whatsapp}
         </a>
         {stayUrl ? <CopyButton text={stayUrl} words={m.copy} label={w.copy} /> : null}

@@ -142,7 +142,7 @@ export function LedgerRow({ children }: { children: ReactNode }) {
  * it. `fit` sizes the number by the room its column has, for money that would
  * not fit two to a row on a phone at the usual size.
  */
-export function Figure({ label, children, hint, tone, fit }: { label: string; children: ReactNode; hint?: ReactNode; tone?: "attention" | "alert"; fit?: boolean }) {
+export function Figure({ label, children, hint, tone, fit }: { label: ReactNode; children: ReactNode; hint?: ReactNode; tone?: "attention" | "alert"; fit?: boolean }) {
   const hintColour = tone === "attention" ? "font-semibold text-marigold-ink" : tone === "alert" ? "font-semibold text-alert-ink" : "text-slate";
   const size = fit ? "text-[clamp(1.125rem,5.5cqi,2.125rem)] leading-tight" : "text-[26px] leading-[1.1] sm:text-[28px] sm:leading-none lg:text-[34px]";
   return (

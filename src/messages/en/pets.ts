@@ -353,6 +353,15 @@ export const petsArea = {
     madeWith: "Made with Wagbook",
     language: "Language",
     photoOf: "Photo of {pet}",
+    fromWho: "{when} · from {who}",
+    upTo: "up to {time}",
+    bill: {
+      title: "Your bill",
+      see: "See the bill",
+      due: "Bill {number}, due",
+      paid: "Bill {number} is paid. Thank you.",
+      pay: "Pay with UPI",
+    },
   },
   // Photos and vaccinations: the pet photo form, the vaccination list and form, updates with photos.
   media: {

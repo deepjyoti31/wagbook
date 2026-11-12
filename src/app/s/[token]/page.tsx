@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { buttonStyles, Loading, Meter, Section } from "@/components/ui";
 import { datesText, shortStayText } from "@/lib/bookings";
-import { formatDate, stayReport, todayIn, whatsappLink, type ISODate } from "@/lib/core";
+import { formatDate, formatMoney, localClock, localDate, stayReport, todayIn, whatsappLink, type ISODate } from "@/lib/core";
 import { ReportFigures } from "@/components/report-figures";
 import { fill, isLanguage, LANGUAGE_NAMES, LANGUAGE_SHORT, LANGUAGES } from "@/lib/i18n";
 import { parentI18n } from "@/lib/i18n-server";
@@ -16,7 +16,11 @@ interface PublicStay {
   kennel: { name: string; time_zone?: string; locale?: string; language?: string; whatsapp_phone: string | null; phone: string | null; check_in_time: string; check_out_time: string };
   pet: { name: string; species: string; breed: string | null; photo: string | null };
   booking: { kind: "boarding" | "daycare"; status: string; start_date: ISODate; end_date: ISODate; checked_in_at: string | null; checked_out_at: string | null };
-  updates: { at: string; body: string; photos: string[] | null }[];
+  updates: { at: string; body: string; photos: string[] | null; by?: string | null }[];
+  /** The stay's issued bill (M72), if it has one. */
+  bill?: { number: string; total_minor: number; due_minor: number; currency: string; token: string } | null;
+  /** When care was last ticked on this stay. */
+  care_until?: string | null;
   care: { date: ISODate; kind: string; done: number; total: number }[];
   /** Once the pet has gone home (M53): the kennel's words and photos, and the records the report is worked out from. */
   report: {
@@ -111,7 +115,7 @@ async function Stay({ params, searchParams }: Pick<PageProps<"/s/[token]">, "par
   const FIRST_UPDATES = 3;
   const update = (u: PublicStay["updates"][number], i: number) => (
     <li key={i} className="rounded-2xl border border-rule bg-paper px-[18px] py-4">
-      <p className="text-[13.5px] font-[650] text-slate">{when.format(new Date(u.at))}</p>
+      <p className="text-[13.5px] font-[650] text-slate">{u.by ? fill(w.fromWho, { when: when.format(new Date(u.at)), who: u.by }) : when.format(new Date(u.at))}</p>
       <p className="mt-2 whitespace-pre-line">{u.body}</p>
       {(u.photos ?? []).some((p) => links.get(p)?.small) ? (
         <div className={`mt-3 grid gap-2 ${(u.photos ?? []).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -174,7 +178,13 @@ async function Stay({ params, searchParams }: Pick<PageProps<"/s/[token]">, "par
             <h2 id="care-given" className="text-[17px] font-[750]">
               {latest[0] === today ? w.careToday : w.careGiven}
             </h2>
-            {latest[0] === today ? null : <span className="text-sm text-slate">{formatDate(latest[0], t.locale)}</span>}
+            {latest[0] === today ? (
+              stay.care_until && localDate(stay.care_until, stay.kennel.time_zone ?? "Asia/Kolkata") === today ? (
+                <span className="text-sm text-slate">{fill(w.upTo, { time: localClock(stay.care_until, stay.kennel.time_zone ?? "Asia/Kolkata") })}</span>
+              ) : null
+            ) : (
+              <span className="text-sm text-slate">{formatDate(latest[0], t.locale)}</span>
+            )}
           </div>
           <ul className="mt-1 divide-y divide-rule">
             {latest[1].map((c) => (
@@ -266,6 +276,33 @@ async function Stay({ params, searchParams }: Pick<PageProps<"/s/[token]">, "par
           </>
         )}
       </section>
+
+      {stay.bill ? (
+        <section aria-labelledby="your-bill" className="mb-6 rounded-2xl border border-rule bg-paper px-[18px] py-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="your-bill" className="text-[17px] font-[750]">
+              {w.bill.title}
+            </h2>
+            <a href={`/inv/${stay.bill.token}`} className="inline-flex min-h-11 items-center text-[15px] font-[650] underline underline-offset-4">
+              {w.bill.see}
+            </a>
+          </div>
+          {stay.bill.due_minor > 0 ? (
+            <>
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-marigold-soft px-4 py-3.5 text-[#3d2a00]">
+                <span className="font-bold">{fill(w.bill.due, { number: stay.bill.number })}</span>
+                <strong className="text-2xl font-extrabold tabular-nums">{formatMoney(stay.bill.due_minor, { currency: stay.bill.currency, locale: t.locale, trimZeros: true })}</strong>
+              </div>
+              {/* The bill's page has the code to scan and the UPI link for exactly what is due. */}
+              <a href={`/inv/${stay.bill.token}`} className={`${buttonStyles.primary} mt-3 w-full`}>
+                {w.bill.pay}
+              </a>
+            </>
+          ) : (
+            <p className="mt-2 rounded-xl bg-leaf-soft px-4 py-3.5 font-bold text-leaf-ink">{fill(w.bill.paid, { number: stay.bill.number })}</p>
+          )}
+        </section>
+      ) : null}
 
       <p className="pb-6 text-center text-[13px] text-slate">{w.madeWith}</p>
 

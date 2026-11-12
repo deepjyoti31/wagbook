@@ -102,6 +102,19 @@ export function shortRange(startDate: ISODate, endDate: ISODate, thisYear: numbe
 }
 
 /**
+ * How old something born on `born` is on `on`, in whole years, or in whole
+ * months while under a year: { years: 4 } or { months: 7 }. Null when it is
+ * not born yet.
+ */
+export function ageOn(born: ISODate, on: ISODate): { years: number } | { months: number } | null {
+  const [by, bm, bd] = born.split("-").map(Number);
+  const [oy, om, od] = on.split("-").map(Number);
+  const months = (oy - by) * 12 + (om - bm) - (od < bd ? 1 : 0);
+  if (months < 0) return null;
+  return months >= 12 ? { years: Math.floor(months / 12) } : { months };
+}
+
+/**
  * Financial year label for a date.
  * India's financial year runs 1 April to 31 March, so 14 Apr 2027 is in
  * "2027-28" and 2 Feb 2027 is in "2026-27". `startMonth` is 1-based and lets

@@ -516,6 +516,13 @@ export const core: typeof English = {
     leavesTomorrow: "ನಾಳೆ ಹೋಗುತ್ತದೆ",
     forPet: "{parent}, {pet} ಗಾಗಿ",
     toSendHint: "ಕಳುಹಿಸಿ ಒತ್ತಿದರೆ WhatsApp ತೆರೆಯುತ್ತದೆ, ಸಂದೇಶ ಬರೆದಿರುತ್ತದೆ.",
+    short: {
+      of: "{capacity} ರಲ್ಲಿ",
+      careLeft: "ಬಾಕಿ ಆರೈಕೆ",
+      noKennel: "{n} ಕ್ಕೆ ಕೆನಲ್ ಇಲ್ಲ",
+      toCollect: "{amount} ಪಡೆಯಬೇಕು",
+      doneOf: "{done}/{total}",
+    },
   },
   // Messages that open in WhatsApp, ready to send. Those to parents use the kennel's parent language.
   whatsapp: {
@@ -556,6 +563,8 @@ export const core: typeof English = {
       credit: "ನಮಸ್ಕಾರ {parent}, {kennel} ನಲ್ಲಿ ನಿಮ್ಮ {amount} ಕ್ರೆಡಿಟ್ {date} ರಂದು ಮುಗಿಯುತ್ತದೆ. ಅದಕ್ಕೂ ಮೊದಲು ವಾಸ್ತವ್ಯ ಅಥವಾ ಭೇಟಿ ಬುಕ್ ಮಾಡಿ ಬಳಸಿಕೊಳ್ಳಿ.",
       review: "ನಮಸ್ಕಾರ {parent}, {pet} ಅನ್ನು {kennel} ಗೆ ನಂಬಿ ಒಪ್ಪಿಸಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದ. ಒಂದು ನಿಮಿಷ ಇದ್ದರೆ, ನಿಮ್ಮ ರಿವ್ಯೂ ಬೇರೆ ಪೋಷಕರಿಗೆ ನಮ್ಮನ್ನು ಹುಡುಕಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ: {url}",
     },
+    incident: "ನಮಸ್ತೆ {parent}, {kennel} ನಿಂದ. ನಾವು {pet} ಬಗ್ಗೆ ನಿಮಗೆ ತಿಳಿಸಲು ಬಯಸುತ್ತೇವೆ: ",
+    hello: "ನಮಸ್ತೆ {parent}, {kennel} ನಿಂದ, {pet} ಬಗ್ಗೆ. ",
   },
   copy: {
     link: "ಲಿಂಕ್ ಕಾಪಿ ಮಾಡಿ",

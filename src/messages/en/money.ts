@@ -326,7 +326,10 @@ export const moneyArea = {
       },
       today: "Today",
       open: "Open",
+      remind: "Remind",
+      remindTo: "Remind {name} on WhatsApp",
     },
+    nightsShort: "Nights",
   },
   expenses: {
     deleteWarning: "This cannot be undone. The receipt is deleted too.",

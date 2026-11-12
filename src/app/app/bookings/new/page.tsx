@@ -7,10 +7,10 @@ import { Icon } from "@/components/icons";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
-import { appTitle, getAppI18n } from "@/lib/i18n-server";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { hasPets, startingPets } from "@/lib/pet-search";
-import { createBooking, findPets } from "../actions";
+import { createBooking, findPets, petFacts } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.newBooking.title);
 
@@ -81,6 +81,8 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           ? fill(w.usualDaycare, { daycare })
           : "";
 
+  // The reminder goes to the parent, in the kennel's language for parents.
+  const parent = parentI18n(org.parent_language, org.locale);
   const symbol = new Intl.NumberFormat(locale, { style: "currency", currency: org.currency }).formatToParts(0).find((part) => part.type === "currency")?.value ?? "";
 
   return (
@@ -98,6 +100,9 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           defaultPetId={askedPet}
           pets={pets}
           search={findPets}
+          facts={petFacts}
+          healthWords={{ noneOnRecord: m.vaccinations.noneOnRecord, aVaccine: m.vaccinations.aVaccine, expiredBefore: m.vaccinations.expiredBefore, runsOutDuring: m.vaccinations.runsOutDuring }}
+          reminder={{ none: parent.m.whatsapp.reminders.vaccinationNone, lapses: parent.m.whatsapp.reminders.vaccinationLapses, kennel: org.name, locale: parent.locale }}
           kennels={kennels.data}
           holds={holds.data.map((h) => ({ kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date }))}
           defaultKind={pick(params.kind) === "daycare" ? "daycare" : "boarding"}

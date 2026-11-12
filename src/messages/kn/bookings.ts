@@ -350,6 +350,17 @@ export const bookingsArea: typeof English = {
       copy: "ಸ್ಟೇ ಪುಟದ ಲಿಂಕ್ ಕಾಪಿ ಮಾಡಿ",
       notes: "ಸಿಬ್ಬಂದಿಗೆ ಟಿಪ್ಪಣಿ: {notes}",
     },
+    aboutPet: {
+      years: {
+        one: "{n} ವರ್ಷ",
+        other: "{n} ವರ್ಷಗಳು",
+      },
+      months: {
+        one: "{n} ತಿಂಗಳು",
+        other: "{n} ತಿಂಗಳುಗಳು",
+      },
+      kg: "{kg} ಕೆಜಿ",
+    },
   },
   newBooking: {
     waitlistNote: "ಕಾಯುವ ಪಟ್ಟಿಯಲ್ಲಿದ್ದರೆ, ಕೆನೆಲ್ ಖಾಲಿಯಾದಾಗ ಇಂದಿನ ಪುಟ ತಿಳಿಸುತ್ತದೆ.",
@@ -441,6 +452,17 @@ export const bookingsArea: typeof English = {
       none: "ಈ ದಿನಾಂಕಗಳಲ್ಲಿ ಯಾವ ಕೆನಲ್ ಖಾಲಿ ಇಲ್ಲ. ಇದನ್ನು ವಿನಂತಿಯಾಗಿ ಉಳಿಸಿ, ಅಥವಾ ಕಾಯುವ ಪಟ್ಟಿಗೆ ಸೇರಿಸಿ.",
       more: "ಮತ್ತು ಇನ್ನೂ {n}",
     },
+    staysBefore: {
+      one: "ಹಿಂದೆ {n} ಬಾರಿ ತಂಗಿದೆ",
+      other: "ಹಿಂದೆ {n} ಬಾರಿ ತಂಗಿದೆ",
+    },
+    firstStay: "ಮೊದಲ ಬಾರಿ",
+    health: {
+      title: "ಆರೋಗ್ಯ ಕಾಗದಗಳು",
+      door: "ಚೆಕ್-ಇನ್ ವೇಳೆ ಎಚ್ಚರಿಕೆ ಬರುತ್ತದೆ.",
+      ask: "{parent} ಅವರಿಂದ ಹೊಸ ಕಾರ್ಡ್ ಕೇಳಿ.",
+      send: "ಈಗ ನೆನಪಿಸಿ",
+    },
   },
   calendar: {
     moreRequests: "ಮೊದಲ {n} ವಿನಂತಿಗಳನ್ನು ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ.",
@@ -492,6 +514,8 @@ export const bookingsArea: typeof English = {
       aNight: "ಪ್ರತಿ ರಾತ್ರಿಗೆ {price}",
       aDay: "ಪ್ರತಿ ದಿನಕ್ಕೆ {price}",
       confirm: "ಖಚಿತಪಡಿಸಿ",
+      declineReason: "ನಿರಾಕರಿಸಲಾಗಿದೆ: ಕೆನಲ್ ಈ ವಾಸ್ತವ್ಯವನ್ನು ತೆಗೆದುಕೊಳ್ಳಲಾಗಲಿಲ್ಲ.",
+      declining: "ನಿರಾಕರಿಸಲಾಗುತ್ತಿದೆ",
     },
     waitlist: {
       title: "ಕಾಯುವ ಪಟ್ಟಿ",
