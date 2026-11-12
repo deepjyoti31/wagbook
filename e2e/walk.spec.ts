@@ -16,16 +16,11 @@ test.describe.configure({ mode: "serial" });
 
 // Each test is a different visitor to the app's rate limits (src/lib/rate-limit.ts),
 // as the kennel's staff on their own phones would be. One test below shares an address on purpose.
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, baseURL }) => {
   await context.setExtraHTTPHeaders({ "x-real-ip": `198.51.100.${Math.floor(Math.random() * 250) + 1}` });
-  // A booking's page is in tabs (D61). The walk reads it as one long page, which the app offers as ?tab=all, so
-  // every request for a booking's page that names no tab is asked for that way. The tabs have a step of their own.
-  await context.route(/\/app\/bookings\/[0-9a-f-]{36}(\?[^#]*)?$/, (route) => {
-    const url = new URL(route.request().url());
-    if (url.searchParams.has("tab")) return route.continue();
-    url.searchParams.set("tab", "all");
-    return route.continue({ url: url.toString() });
-  });
+  // A booking's page is in tabs (D61). The walk reads it as one long page, which the app shows to a browser that
+  // carries this cookie (the same page as ?tab=all). The tabs have a step of their own.
+  await context.addCookies([{ name: "wb_stay_view", value: "all", url: baseURL ?? "http://localhost:3100" }]);
 });
 
 /** Choose a pet on New booking by its full name, like "Coco, Beagle (Kavya Example)". */

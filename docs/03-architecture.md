@@ -309,7 +309,8 @@ The whole look is in two files: tokens in `src/app/globals.css`, pieces in `src/
 sidebar on a laptop. The one piece of decoration is the kennel door tag, a marigold tag with a punched hole, which is
 how a kennel is shown everywhere. The look was redesigned in M70 (D59), and the twelve agreed screens were then matched board for
 board in M71 (D61); they are the reference for any new one. A booking's page is in tabs, chosen by `?tab=`; `?tab=all`
-is every part on one page, which the browser walk uses.
+is every part on one page; a browser carrying the cookie `wb_stay_view=all` opens on it, which is how the browser walk
+reads the page (a way of looking at it, not a permission).
 
 **Colour always means the same thing.**
 

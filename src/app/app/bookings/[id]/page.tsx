@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -352,7 +353,9 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   // The page in parts (D61): Today is what the front desk needs now, and the rest is one tap away. `?tab=all` is
   // every part on one long page, as it was before the tabs (the browser walk reads it that way).
   const TABS = ["today", "updates", "bill", "health", "extras", "page", "change"] as const;
-  const tab = query.tab === "all" ? "all" : (TABS.find((x) => x === query.tab) ?? "today");
+  // A browser that carries the cookie wb_stay_view=all opens on the long page (the walk does); a tab asked for still wins.
+  const longPage = (await cookies()).get("wb_stay_view")?.value === "all";
+  const tab = query.tab === "all" || (longPage && query.tab === undefined) ? "all" : (TABS.find((x) => x === query.tab) ?? "today");
   const sNext = (
     <>
       {open ? (

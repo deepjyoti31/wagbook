@@ -1525,7 +1525,8 @@ summary beside them, and Today, Care, Reports, More, sign in and the parent's st
   read and its rules are called, and sixty-five screens have no board.
 - **A stay's page is in tabs**: Today, Updates, Bill, Health, Extras and trips, Stay page, and Change booking (the
   board has six; changing and cancelling a booking needed a place, so there are seven). Every section the long page had
-  is under a tab. `?tab=all` is the whole page at once, which the browser walk reads.
+  is under a tab. `?tab=all` is the whole page at once; the browser walk reads it that way, by a cookie
+  (`wb_stay_view=all`).
 - **Lists fold on a phone** (`FoldList`): Today's Arriving shows three and Going home two, with "See 2 more".
 - **Care opens on what is still to do**, with what is late in a group of its own (`isLate()`, more than half an hour
   past its time) and the rest grouped by time and task. Skip is on late tasks and medicines; any task can be skipped
