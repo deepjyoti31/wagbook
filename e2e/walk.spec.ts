@@ -3343,3 +3343,25 @@ test("the bug review: a discount above the stay is refused, and a cancelled stay
   await expect(page.getByRole("heading", { name: en.cancelRules.title })).toHaveCount(0);
   await expect(settle).toHaveCount(0);
 });
+
+// ---------------------------------------------------------------------------
+// M71 (D61): a booking's page in tabs.
+// ---------------------------------------------------------------------------
+
+test("a booking's page opens on Today, and its other parts are a tab away", async ({ page }) => {
+  await signIn(page, "manager");
+  // Without the walk's cookie, as a kennel sees the page.
+  await page.context().clearCookies({ name: "wb_stay_view" });
+  await page.goto("/app/bookings");
+  await page.locator("main").getByRole("link").filter({ hasText: en.labels.bookingStatus.confirmed }).first().click();
+  const tabs = page.getByRole("navigation", { name: en.booking.tabs.label });
+  await expect(tabs.getByRole("link", { name: en.booking.tabs.today })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: en.booking.parentCard.title, exact: true })).toBeVisible();
+  // Changing the booking is not on Today; it has a tab of its own.
+  await expect(page.getByRole("heading", { name: en.booking.change.title })).toHaveCount(0);
+  await tabs.getByRole("link", { name: en.booking.tabs.change }).click();
+  await expect(page.getByRole("heading", { name: en.booking.change.title })).toBeVisible();
+  await tabs.getByRole("link", { name: en.booking.tabs.extras }).click();
+  await expect(page.getByRole("heading", { name: en.booking.costs.title })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
