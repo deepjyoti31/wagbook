@@ -2,9 +2,17 @@
 
 The state of Wagbook right now. Read this first; rewrite it last. Keep it a description of the present, not a diary.
 
-Last updated: 10 November 2026, after a bug review that fixed three things (session log).
+Last updated: 12 November 2026, after the twelve design boards were matched board for board (M71, D61).
 
 ## In one paragraph
+
+**M71 (12 November 2026, D61), asked for by the owner:** the screens built in M70 did not match the design boards they
+were built from, so the twelve boards (Today at 1440, 820 and 390 pixels, the calendar, a stay, Care, New booking,
+Reports, sign in, the printed bill, the parent's stay page and More) were rebuilt against them, each page keeping its
+queries and Server Actions. The frontend was not deleted and rebuilt: the page files are where the data is read, and
+sixty-five screens have no board. A booking's page is now in tabs (`?tab=`; `?tab=all`, or the cookie
+`wb_stay_view=all`, is the long page the walk reads). No database change, no new dependency. What the boards show and
+was not built is under "What is NOT verified" and "Open questions". The paragraph below is the state before M71.
 
 Every milestone from M0 to M70 is built: the roadmap is finished but for the ideas not scheduled. The owner finished
 M1 (a hosted Supabase project, reported on 4 November 2026), so **the migrations are frozen**: a change to the database
@@ -142,6 +150,10 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 
 | Thing | Verified by | Confidence |
 | --- | --- | --- |
+| M71: the twelve screens beside their boards | Each board rendered to an image from the design's own files, and the screen screenshotted with Playwright on `next dev` against the local Supabase with the demo seed, at the board's width: Today at 1440, 820 and 390, the calendar, a stay, New booking (a pet chosen, a wrong check-out date), Reports and sign in at 1440, Care, More and the parent's stay page at 390. 12 November 2026 | High for layout, sizes and colours; the demo seed is small, so busy states (a full calendar, To send, an open incident, a bill owed) were built from the boards' markup and not seen with data |
+| M71: no sideways scroll and no browser errors | Today, the calendar, Care (both views), Bookings, New booking, More, Reports, Bills, Pets, Settings, Checklists and every tab of a stay opened at 1366, 820 and 360 pixels with a script, 12 November 2026 | High in Chromium |
+| M71: lint, typecheck and tests | The dash check, lint, typecheck and all 847 tests pass, 12 November 2026. The production build is made by the walk | High |
+| M71: the browser walk | Being brought through the changed screens: 41 of its 84 steps pass so far, and each stop until now was a step that needed updating for a screen's new shape, not a fault in the app | Medium until the whole walk passes |
 | The bug review of 10 November 2026: a price times a part quantity is worked out in whole hundredths, as the database does (`multiply()`), so the app and the database agree where the exact product ends in half a paisa; a bill's scope columns are all required (`ScopeColumns`), so a query that leaves one out does not compile | `src/lib/core/core.test.ts` (every quantity to two decimals against whole-number arithmetic), `tests/db/bills.test.ts` (two such lines issued in all eight tax cases; they failed with `WB037` before the fix), `src/lib/stay-bill.test.ts` | High |
 | The same review in a browser | The walk (83 steps) passes against the local Supabase with the three fixes. Not looked at on screen: "Credit the difference" on a cancelled visitor's appointment bill, and a booking's "What it costs" with a pick-up or a sale on it (no layout changed: more rows in a list that was there) | Medium |
 | M69: every signed-in screen at 1366, 1024, 820 and 360 pixels (all 50 pages without an id, and a booking, a pet and a parent), as owner with everything offered switched on, against the local Supabase: no sideways scroll; the sidebar and the tablet's top bar stay in place as the page scrolls | By hand with Playwright, 2 November 2026 | Medium: desktop Chromium, not a real tablet or a laptop's touch screen |
@@ -295,6 +307,10 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 | Thing | Why not | Risk |
 | --- | --- | --- |
+| M71: the printed bill beside its board | Only the lines and totals (`InvoiceView`) were rebuilt: numbered lines under a ruled heading, totals at the right. The head of the bill (kennel, "Tax invoice", billed to, place of supply), the UPI box beside the totals and the foot were left as they were, and no bill was looked at on screen or printed | Medium: the bill is the board least matched. Rebuild `src/app/app/bills/[id]/page.tsx` and `src/app/inv/[token]/page.tsx` against `Invoice` next |
+| M71: the sixty-five screens with no board | They use the same pieces, so their cards, buttons, badges and spacing changed with them; opened in the walk but not looked at one by one | Low to medium: a screen with its own boxes inside a card still shows a box in a card |
+| M71: the new words in Hindi and Kannada | About 150 new messages (navigation, Today, Care, the calendar, a stay's tabs and cards, New booking, Reports, sign in, More, the parent's stay page) were written without a native speaker | Medium: have them read, as the rest was |
+| M71: a real phone | Looked at in desktop Chromium at phone width only | Low |
 | A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
 | The hosted project's settings against `docs/10-setup-and-deploy.md` | The owner made the hosted project (M1, reported 4 November 2026); no session here has seen it | Email templates, redirects, the nightly job and alerts are set by hand on the hosted project: step 1 of "Do this next" |
 | Sign-up email confirmation and the `/auth/confirm` round trip | Locally, email confirmation is off (`supabase/config.toml`) | The email template in the setup guide is from documentation, not tried |
@@ -569,6 +585,31 @@ are fixed, and the hint under Stay on a booking.
 ## Open questions
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
+
+Chosen in M71 (D61), where a board and the app could not both be followed:
+
+- A booking's page has seven tabs, not the board's six: changing and cancelling a booking needed a place ("Change
+  booking"). Should it sit under another tab instead?
+- The boards show things the data does not hold, which were left out: who wrote each update ("from Ravi"), "3 stays
+  before" on New booking, the pet's age, sex and weight in a stay's head, "up to 10:30" on the parent's care card, and
+  the yard beside a play time on Care. Each needs a small change to what is read, and the first a change to what the
+  public stay function returns.
+- The parent's stay page has no "Your bill" card with Pay with UPI: the public stay function does not return the bill,
+  and changing an anonymous function is a security change (rule 6). Wanted?
+- The health papers card beside New booking ("Coco's rabies vaccination ends on 4 Nov") is not built; the warning
+  still shows on the booking's page after it is saved.
+- "Decline" on the calendar's "Waiting for an answer" opens the booking, where cancelling asks for a reason, instead
+  of declining in one tap.
+- "Tell the parent" on an incident opens WhatsApp to the parent with nothing typed (there is no incident message to
+  parents yet); marking the parent as told is still done on the pet's page.
+- Today's In house shows every pet, not the board's four; the phone board has no In house section at all, and it was
+  kept. The laptop sidebar stays put while the page scrolls, where the board draws it the height of the page.
+- Skip on the care round is offered on late tasks and medicines only; any task can be skipped from its stay's Today
+  tab. Care now opens on "Still to do" (`?show=all` is everything).
+- The tablet and phone boards shorten some words ("14/18", "of 24", "Care to do"); the app uses the laptop's words at
+  every width.
+- Reports: "Not paid yet" ends each row with Open, not the board's Remind; "Month by month" has no kennels used or
+  nights columns (the months are read from the money report only); "See each day" is the chart's own link.
 
 Chosen in M68 (D57) as the simplest thing:
 
@@ -874,6 +915,12 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 12 November 2026: M71 (D61). The twelve design boards matched board for board: the shell (counts beside links, the
+  phone's dark bar), Today, Care, the calendar as a grid of bars, a stay's page in tabs with its Today cards, New
+  booking in two columns, Reports, sign in (language choice, Show password), More (find a page), the parent's stay
+  page and a bill's lines. New pure logic with tests: `formatDay()`, `formatWeekday()`, `shortRange()`,
+  `calendarBars()`, `isLate()`. Found and fixed on the way: the calendar left out a pet still in house after its
+  check-out date. The walk was updated for the screens that changed shape. No database change.
 - 10 November 2026: a bug review fixed three things. (1) A price times a part quantity was multiplied as floats, so
   where the exact product ends in half a paisa (0.35 x 449.50) the app rounded down and the database up, and the bill
   was refused for good (`WB037`): now in whole hundredths (`multiply()` in `src/lib/core/money.ts`, used by
