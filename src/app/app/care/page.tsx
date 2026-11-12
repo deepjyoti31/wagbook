@@ -336,7 +336,6 @@ function TaskRow({
                 words={m.offline}
                 label={m.care.markDone}
                 pendingLabel={m.common.saving}
-                ariaLabel={fill(m.care.doneLabel, { task: t.label, pet: pet?.name ?? m.care.pet })}
               />
             )}
             {/* Skip is offered on what is late and on medicines, which need a reason; any task can be skipped from its stay's page. */}

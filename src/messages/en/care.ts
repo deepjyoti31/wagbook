@@ -28,7 +28,6 @@ export const careArea = {
     due: "due {time}",
     all: "All",
     doneToday: "Done today ({n})",
-    doneLabel: "Mark {task} done for {pet}",
   },
   play: {
     clearWarning: "Every session still to happen today goes. This cannot be undone.",

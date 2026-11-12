@@ -30,7 +30,6 @@ export const careArea: typeof English = {
     due: "{time} बजे होना था",
     all: "सब",
     doneToday: "आज हो गए ({n})",
-    doneLabel: "{pet} के लिए {task} हो गया चिह्नित करें",
   },
   play: {
     clearWarning: "आज के बचे हुए सभी सेशन हट जाएंगे। इसे वापस नहीं लाया जा सकता।",

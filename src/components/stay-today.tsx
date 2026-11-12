@@ -139,7 +139,7 @@ export function StayCareToday({
                           {m.care.markDone}
                         </Link>
                       ) : (
-                        <TickButton taskId={x.id} action={markDone} words={m.offline} label={m.care.markDone} pendingLabel={m.common.saving} ariaLabel={fill(m.care.doneLabel, { task: x.label, pet: "" }).trim()} />
+                        <TickButton taskId={x.id} action={markDone} words={m.offline} label={m.care.markDone} pendingLabel={m.common.saving} />
                       )}
                     </div>
                   ) : (

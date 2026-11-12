@@ -30,7 +30,6 @@ export const careArea: typeof English = {
     due: "{time} ಕ್ಕೆ ಆಗಬೇಕಿತ್ತು",
     all: "ಎಲ್ಲಾ",
     doneToday: "ಇಂದು ಆಗಿದೆ ({n})",
-    doneLabel: "{pet} ಗಾಗಿ {task} ಆಗಿದೆ ಎಂದು ಗುರುತಿಸಿ",
   },
   play: {
     clearWarning: "ಇಂದು ಇನ್ನೂ ನಡೆಯಬೇಕಿರುವ ಎಲ್ಲಾ ಸೆಷನ್‌ಗಳು ಹೋಗುತ್ತವೆ. ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ.",

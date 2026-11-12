@@ -51,7 +51,7 @@ const BAR = {
 } as const;
 const BAR_BASE = "z-[1] flex items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[9px] px-2.5 text-[13.5px] font-[650]";
 
-type Drawn = { id: string; pet: string; parent: string | null; look: keyof typeof BAR; label?: string };
+type Drawn = { id: string; pet: string; parent: string | null; look: keyof typeof BAR; label?: string; title?: string };
 
 async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "searchParams">) {
   const params = await searchParams;
@@ -124,6 +124,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
           parent: r.clients?.full_name ?? null,
           look: "request" as keyof typeof BAR,
           label: fill(w.asked, { pet }),
+          title: fill(r.waitlisted_at ? w.waitingFor : w.requestFor, { pet }),
         };
       }),
     ],
@@ -147,7 +148,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/app/calendar">, "sear
       <Link
         key={key}
         href={`/app/bookings/${b.stay.id}`}
-        title={b.stay.parent ? `${b.stay.pet} · ${b.stay.parent}` : b.stay.pet}
+        title={b.stay.title ?? (b.stay.parent ? `${b.stay.pet} · ${b.stay.parent}` : b.stay.pet)}
         className={`${BAR_BASE} ${BAR[b.stay.look]}`}
         style={{
           gridRow: row,

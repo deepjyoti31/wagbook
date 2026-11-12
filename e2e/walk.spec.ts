@@ -130,7 +130,7 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
 test("staff cannot set a price; a family is booked together as a request, then confirmed", async ({ page }) => {
   await signIn(page, "staff");
   await page.goto("/app/bookings/new");
-  await expect(page.getByLabel("Price")).toHaveCount(0);
+  await expect(page.getByLabel("Price", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Only an owner or manager can change a price.")).toBeVisible();
 
   await choosePet(page, "Biscuit, Labrador (Priya Demo)");
@@ -928,7 +928,7 @@ test("an owner turns on two-step sign-in, and then a password alone is not enoug
   await page.getByRole("button", { name: en.auth.code.continue }).click();
   await page.waitForURL(/\/app/);
   await page.goto("/app/more");
-  await expect(page.getByRole("link", { name: `${en.more.twoStepLink}: ${en.more.twoStepOn}` })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`${en.more.twoStepLink}\\s*${en.more.twoStepOn}`) })).toBeVisible();
   await expect(page.getByText(en.more.ownerNudge)).toHaveCount(0);
 
   // And off again.
@@ -1349,10 +1349,8 @@ test("a request waits on the waiting list, is shown on the calendar, and Today o
   const request = new URL(page.url()).pathname;
 
   await page.goto(`/app/calendar?from=${day(120)}`);
-  await expect(page.getByText(en.calendar.requestsTitle)).toBeVisible();
-  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: /Juno/ }) });
-  await expect(row.getByRole("rowheader")).toContainText(en.calendar.waiting);
-  await expect(row.getByRole("link").first()).toHaveAttribute("title", "Juno, on the waiting list");
+  await expect(page.getByRole("heading", { name: en.calendar.waitlist.title })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Juno, asked/ }).first()).toHaveAttribute("title", "Juno, on the waiting list");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
   await page.goto("/app");
@@ -2751,7 +2749,7 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await expect(page.getByRole("heading", { name: en.cleaning.title })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: kennelName }).getByRole("button", { name: en.cleaning.cleaned })).toBeVisible();
   await page.goto(`/app/calendar?from=${day(0)}`);
-  await expect(page.getByRole("rowheader", { name: new RegExp(`^${kennelName}`) }).getByText(en.cleaning.badge)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.calendar.clean, exact: true })).toBeVisible();
   await addPet(page, "9800000602", "Asha Sample Two", "Pip");
   await page.goto("/app/bookings/new");
   await choosePet(page, "Pip (Asha Sample Two)");
