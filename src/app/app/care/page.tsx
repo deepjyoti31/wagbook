@@ -321,7 +321,8 @@ function TaskRow({
               </Badge>
             ))}
           </p>
-          {showLabel ? <p className={`font-[650] ${medicine ? "text-alert-ink" : ""}`}>{t.label}</p> : null}
+          {/* Under a heading that already names the task, it is still said for a screen reader, which reads row by row. */}
+          {showLabel ? <p className={`font-[650] ${medicine ? "text-alert-ink" : ""}`}>{t.label}</p> : <p className="sr-only">{t.label}</p>}
           {food ? <p className="text-sm font-[650]">{food}</p> : null}
           {t.details ? <p className="text-sm text-slate">{t.details}</p> : null}
           {t.note ? <p className="text-sm text-slate">{fill(m.care.note, { note: t.note })}</p> : null}

@@ -165,14 +165,14 @@ test("two pets of one parent share a kennel, the second at the shared kennel pri
 
   await page.getByRole("link", { name: /Luna/ }).first().click();
   await expect(page.getByText("Shares K09 with Rocky.")).toBeVisible();
-  await expect(page.getByText(/₹900 a night/)).toBeVisible();
+  await expect(page.getByText(/₹900 a night/).first()).toBeVisible();
 
   // Both are in K09's square on the calendar.
   await page.goto(`/app/calendar?from=${day(50)}`);
-  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) });
-  // One link a night for each of them, three nights.
-  await expect(row.getByRole("link", { name: "Rocky" })).toHaveCount(3);
-  await expect(row.getByRole("link", { name: "Luna" })).toHaveCount(3);
+  const calendar = page.getByRole("region", { name: "Kennels by day" });
+  // One bar across the three nights for each of them, one above the other.
+  await expect(calendar.getByRole("link", { name: /^Rocky/ })).toHaveCount(1);
+  await expect(calendar.getByRole("link", { name: /^Luna/ })).toHaveCount(1);
 });
 
 test("a pet that overstays is extended to today", async ({ page }) => {
@@ -185,12 +185,12 @@ test("a pet that overstays is extended to today", async ({ page }) => {
 
 test("the care round: one tap, and safe to tap twice", async ({ page }) => {
   await signIn(page, "staff");
-  await page.goto("/app/care?kind=medication");
+  await page.goto("/app/care?kind=medication&show=all");
   const tablet = page.getByRole("listitem").filter({ hasText: "Thyroid tablet" });
   await tablet.getByRole("button", { name: "Done" }).dblclick();
   await expect(tablet.getByText("Done", { exact: true }).first()).toBeVisible();
   await page.goto("/app");
-  await expect(page.getByRole("link", { name: /Medicines 1 of 1/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Medicines done/ })).toBeVisible();
 
   await page.goto("/app/care?kind=meal&show=pending");
   const lunch = page.getByRole("listitem").filter({ hasText: "Mango" }).filter({ hasText: "Lunch" });
@@ -1029,7 +1029,7 @@ test("a sibling leaves early, and the pet left on its own pays the usual price f
   // Rocky and Luna share K09 for three nights (booked above); Rocky goes home a night early.
   await page.goto(`/app/calendar?from=${day(50)}`);
   // Followed by its address: on a phone the sticky kennel column and the bottom bar can sit over the square.
-  const rocky = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) }).getByRole("link", { name: "Rocky" }).first();
+  const rocky = page.getByRole("region", { name: "Kennels by day" }).getByRole("link", { name: /^Rocky/ }).first();
   await page.goto((await rocky.getAttribute("href"))!);
   await expect(page.getByRole("heading", { level: 1, name: "Rocky" })).toBeVisible();
   await page.getByLabel("Check-out date").fill(day(52));
@@ -2680,7 +2680,7 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await routine.locator("input[name=needsPhoto]").check();
   await routine.getByRole("button", { name: en.routines.add }).click();
   await expect(page.getByText(/^Added Clean the wound at 09:00/)).toBeVisible();
-  await page.goto("/app/care?kind=medication");
+  await page.goto("/app/care?kind=medication&show=all");
   const task = page.getByRole("listitem").filter({ hasText: "Nori" }).filter({ hasText: "Clean the wound" });
   // No plain Done on a task that asks for a photo: only "Done with photo". The row first, so the check is not made
   // before the list has loaded.
@@ -2787,7 +2787,7 @@ test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed 
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: "Opening 0 of 4" })).toBeVisible();
   await page.getByRole("button", { name: "Mark Lights on done" }).click();
-  await expect(page.getByRole("heading", { name: "Opening 1 of 4" })).toBeVisible();
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Opening", exact: true }) }).getByText("1 of 4", { exact: true })).toBeVisible();
   await narrow(page);
   await shot(page, "m51-today");
   await page.goto("/app/care");
