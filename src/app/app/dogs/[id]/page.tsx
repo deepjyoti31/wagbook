@@ -6,7 +6,7 @@ import { ConfirmStep } from "@/components/confirm-step";
 import { HidePanel } from "@/components/hide-panel";
 import { AddVaccinationForm, PetPhotoForm, VaccinationList } from "@/components/pet-panels";
 import { PetAvatar } from "@/components/pet-avatar";
-import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { canUndoPassing, dailyGrams, formatDate, formatKg, formatPhone, portionReviewDue, sizeBand, todayIn, weightChange, type PortionSettings } from "@/lib/core";
@@ -87,38 +87,40 @@ async function Pet({ params, searchParams }: Pick<PageProps<"/app/dogs/[id]">, "
 
   return (
     <>
-      <div className="mb-3">
+      {/* The head of a pet's page, as a stay's (the design boards): photo, name, what it is, and its parent. */}
+      <header className="mb-(--wb-gap) flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border border-rule bg-paper px-(--wb-pad) py-5 lg:px-6 lg:py-6">
         <PetAvatar name={pet.name} url={pet.photo_path ? photo.get(pet.photo_path) : null} size="lg" />
-      </div>
-      <PageTitle title={pet.name}>
+        <div className="min-w-0 flex-[1_1_320px]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-[28px] font-extrabold leading-[1.1] tracking-[-0.02em] lg:text-[34px]">{pet.name}</h1>
+            {passed ? <Badge>{m.passing.badge}</Badge> : null}
+            {pet.flags.map((f) => (
+              <Badge key={f} tone="alert">
+                {flagText(m, f)}
+              </Badge>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[15px] text-slate">
+            {[pet.breed, pet.species !== "dog" ? ((m.pet.speciesInLine as Record<string, string>)[pet.species] ?? pet.species) : null, pet.weight_g ? fill(m.pet.weight, { kg: formatKg(pet.weight_g, t.locale) }) : null].filter(Boolean).join(", ")}
+          </p>
+          {pet.clients ? (
+            <p className="mt-1.5 text-[15px]">
+              <Link href={`/app/clients/${pet.clients.id}`} className="font-bold underline underline-offset-4">
+                {pet.clients.full_name}
+              </Link>
+              ,{" "}
+              <a href={`tel:${pet.clients.phone}`} className="underline-offset-4 hover:underline">
+                {formatPhone(pet.clients.phone)}
+              </a>
+            </p>
+          ) : null}
+        </div>
         {hidden || passed ? null : (
           <Link href={`/app/bookings/new?pet=${pet.id}`} className={buttonStyles.primary}>
             {m.pet.bookStay}
           </Link>
         )}
-      </PageTitle>
-      <div className="mb-5 space-y-1">
-        <p className="flex flex-wrap items-center gap-2">
-          {[pet.breed, pet.species !== "dog" ? ((m.pet.speciesInLine as Record<string, string>)[pet.species] ?? pet.species) : null, pet.weight_g ? fill(m.pet.weight, { kg: formatKg(pet.weight_g, t.locale) }) : null].filter(Boolean).join(", ")}
-          {passed ? <Badge>{m.passing.badge}</Badge> : null}
-          {pet.flags.map((f) => (
-            <Badge key={f} tone="alert">
-              {flagText(m, f)}
-            </Badge>
-          ))}
-        </p>
-        {pet.clients ? (
-          <p className="text-slate">
-            <Link href={`/app/clients/${pet.clients.id}`} className="font-semibold text-ink underline underline-offset-4">
-              {pet.clients.full_name}
-            </Link>
-            ,{" "}
-            <a href={`tel:${pet.clients.phone}`} className="underline underline-offset-4">
-              {formatPhone(pet.clients.phone)}
-            </a>
-          </p>
-        ) : null}
-      </div>
+      </header>
 
       {done ? <Notice tone="ok">{done}</Notice> : null}
       {doneKey === "passed" && passed ? <Notice tone="ok">{fill(m.passing.marked, { pet: pet.name })}</Notice> : null}

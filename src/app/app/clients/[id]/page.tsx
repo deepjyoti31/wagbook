@@ -9,7 +9,7 @@ import { ParentCredit } from "@/components/parent-credit";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Rich } from "@/components/rich";
 import { SellForm } from "@/components/sell-form";
-import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, PageTitle, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Empty, Field, Input, Loading, Notice, Section, Select, Textarea } from "@/components/ui";
 import { requireOrg } from "@/lib/auth";
 import { flagText, stayText } from "@/lib/bookings";
 import { areaFor, formatDate, formatMoney, formatPhone, GST_STATES, localDate, normalizePhone, todayIn, whatsappLink } from "@/lib/core";
@@ -84,23 +84,27 @@ async function Parent({ params, searchParams }: Pick<PageProps<"/app/clients/[id
 
   return (
     <>
-      <PageTitle title={c.full_name}>
+      {/* The head of a parent's page, in the same card as a pet's and a stay's. */}
+      <header className="mb-(--wb-gap) flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border border-rule bg-paper px-(--wb-pad) py-5 lg:px-6 lg:py-6">
+        <span aria-hidden="true" className="inline-flex size-[76px] shrink-0 items-center justify-center rounded-full bg-[#dfe6f3] text-[30px] font-extrabold text-ink">
+          {c.full_name.trim().charAt(0).toUpperCase() || "?"}
+        </span>
+        <div className="min-w-0 flex-[1_1_320px]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-[28px] font-extrabold leading-[1.1] tracking-[-0.02em] lg:text-[34px]">{c.full_name}</h1>
+            {owed > 0 ? <Badge tone="attention">{fill(p.owed, { amount: money(owed) })}</Badge> : null}
+          </div>
+          <p className="mt-1.5 text-[15px]">
+            <a href={`tel:${c.phone}`} className="font-bold underline-offset-4 hover:underline">
+              {formatPhone(c.phone)}
+            </a>
+            {c.alt_phone ? <span className="text-slate">{fill(p.alsoPhone, { phone: formatPhone(c.alt_phone) })}</span> : null}
+          </p>
+        </div>
         <a href={whatsappLink(fill(parentI18n(org.parent_language, org.locale).m.whatsapp.greeting, { name: c.full_name }), c.phone)} target="_blank" rel="noreferrer" className={buttonStyles.whatsapp}>
           {m.common.whatsapp}
         </a>
-      </PageTitle>
-      <p className="mb-5 text-lg">
-        <a href={`tel:${c.phone}`} className="underline underline-offset-4">
-          {formatPhone(c.phone)}
-        </a>
-        {c.alt_phone ? <span className="text-slate">{fill(p.alsoPhone, { phone: formatPhone(c.alt_phone) })}</span> : null}
-        {owed > 0 ? (
-          <>
-            {" "}
-            <Badge tone="attention">{fill(p.owed, { amount: money(owed) })}</Badge>
-          </>
-        ) : null}
-      </p>
+      </header>
 
       {query.done === "merged" ? <Notice tone="ok">{p.merged}</Notice> : null}
       {query.done === "hidden" ? <Notice tone="ok">{m.hiding.doneHidden}</Notice> : null}
