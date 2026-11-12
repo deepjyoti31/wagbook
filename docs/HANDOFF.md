@@ -6,6 +6,15 @@ Last updated: 12 November 2026, after the twelve design boards were matched boar
 
 ## In one paragraph
 
+**M72 (12 November 2026, D61), asked for by the owner ("finish everything"):** the printed bill now matches its board,
+the parent's stay page shows the stay's bill with Pay with UPI (a new migration after the freeze,
+`20261112000100_stay_page_bill.sql`: `get_public_stay()` also returns the issued bill, who wrote each update by first
+name, and when care was last given), and the rest of what the boards show is built: the pet's sex, age and weight in a
+stay's head, "N stays before" and a health papers card on New booking, Remind and the months' kennels used and nights on
+Reports, one-tap Decline on the calendar, WhatsApp messages that open with their first words typed, and the boards'
+shorter words on a tablet and a phone. Every other screen was checked at three widths, and a box inside a card is now a
+quiet fill everywhere. **Apply the new migration to the hosted database before deploying** (`db push`).
+
 **M71 (12 November 2026, D61), asked for by the owner:** the screens built in M70 did not match the design boards they
 were built from, so the twelve boards (Today at 1440, 820 and 390 pixels, the calendar, a stay, Care, New booking,
 Reports, sign in, the printed bill, the parent's stay page and More) were rebuilt against them, each page keeping its
@@ -154,6 +163,10 @@ walked in a real browser at 360 pixels wide against a **local** Supabase (`npm r
 | M71: no sideways scroll and no browser errors | Today, the calendar, Care (both views), Bookings, New booking, More, Reports, Bills, Pets, Settings, Checklists and every tab of a stay opened at 1366, 820 and 360 pixels with a script, 12 November 2026 | High in Chromium |
 | M71: `npm run check` | Passes on the final code: the dash check, lint, typecheck, 847 tests and the production build, 12 November 2026 | High |
 | M71: the browser walk | `npm run test:e2e` against the local Supabase: 84 steps passing on the final code, 12 November 2026. The walk was updated where a screen changed shape (the new booking form's pet card and stay cards, the calendar's bars, Care opening on what is still to do, More's find box, a checklist's count beside its heading) and reads a booking's long page by the cookie `wb_stay_view=all`; a new last step checks the tabs without it. It found two faults in the new code, both fixed: Change on New booking kept the old search text, and a late search answer could choose the earlier pet again. One run in three stopped once on a step this work did not touch (the public booking form's estimate at step 64, and the parent page's language at step 30, now waited for): timing, and it passed on the next run | High for the local stack; the estimate step can still be early on a slow machine |
+| M72: the printed bill beside its board | A bill made and issued in the demo kennel, opened from its link at 794 pixels with the print style on: the head over the marigold rule, billed to and place of supply, numbered lines, the UPI code in a box beside the totals, Paid and Due, and the foot. 12 November 2026 | High for a bill without tax; a GST bill's tax rows were not seen |
+| M72: what the boards show that was left out in M71 | Seen with data made in the demo kennel: the bill card on the parent's stay page, who wrote an update, "up to 22:05" on care, a stay's head with sex and weight, New booking with "first stay" and the health papers card with the reminder, Remind on an unpaid bill, Month by month with kennels used and nights, Tell the parent with the first words typed, the shorter words on a tablet. 12 November 2026 | High for the local stack |
+| M72: the 51 screens with no board | Every other signed-in page (49, plus a pet and a parent) opened at 1366, 820 and 360 pixels by a script: no browser errors, no sideways scroll, and no white box left inside a card (one rule in `globals.css`). Looked at at 1366 pixels as contact sheets. 12 November 2026 | Medium: looked at, not used step by step beyond what the walk does |
+| M72: the stay page's bill, in the database | `tests/db/billing.test.ts`: a draft bill is not shown, an issued one is with what is due and its link, a payment brings what is due down, and an update's writer is shown by first name only | High |
 | The bug review of 10 November 2026: a price times a part quantity is worked out in whole hundredths, as the database does (`multiply()`), so the app and the database agree where the exact product ends in half a paisa; a bill's scope columns are all required (`ScopeColumns`), so a query that leaves one out does not compile | `src/lib/core/core.test.ts` (every quantity to two decimals against whole-number arithmetic), `tests/db/bills.test.ts` (two such lines issued in all eight tax cases; they failed with `WB037` before the fix), `src/lib/stay-bill.test.ts` | High |
 | The same review in a browser | The walk (83 steps) passes against the local Supabase with the three fixes. Not looked at on screen: "Credit the difference" on a cancelled visitor's appointment bill, and a booking's "What it costs" with a pick-up or a sale on it (no layout changed: more rows in a list that was there) | Medium |
 | M69: every signed-in screen at 1366, 1024, 820 and 360 pixels (all 50 pages without an id, and a booking, a pet and a parent), as owner with everything offered switched on, against the local Supabase: no sideways scroll; the sidebar and the tablet's top bar stay in place as the page scrolls | By hand with Playwright, 2 November 2026 | Medium: desktop Chromium, not a real tablet or a laptop's touch screen |
@@ -307,9 +320,7 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 | Thing | Why not | Risk |
 | --- | --- | --- |
-| M71: the printed bill beside its board | Only the lines and totals (`InvoiceView`) were rebuilt: numbered lines under a ruled heading, totals at the right. The head of the bill (kennel, "Tax invoice", billed to, place of supply), the UPI box beside the totals and the foot were left as they were, and no bill was looked at on screen or printed | Medium: the bill is the board least matched. Rebuild `src/app/app/bills/[id]/page.tsx` and `src/app/inv/[token]/page.tsx` against `Invoice` next |
-| M71: the sixty-five screens with no board | They use the same pieces, so their cards, buttons, badges and spacing changed with them; opened in the walk but not looked at one by one | Low to medium: a screen with its own boxes inside a card still shows a box in a card |
-| M71: the new words in Hindi and Kannada | About 150 new messages (navigation, Today, Care, the calendar, a stay's tabs and cards, New booking, Reports, sign in, More, the parent's stay page) were written without a native speaker | Medium: have them read, as the rest was |
+| M71 and M72: the new words in Hindi and Kannada | About 180 new messages (navigation, Today, Care, the calendar, a stay's tabs and cards, New booking, Reports, sign in, More, the parent's stay page) were written without a native speaker | Medium: have them read, as the rest was |
 | M71: a real phone | Looked at in desktop Chromium at phone width only | Low |
 | A kennel's real website sending to a hosted Wagbook (M68) | Tried with the website served locally and Wagbook on the local Supabase; no hosted project yet | The browser's origin must match Settings exactly: `https://name` with or without `www.`, and a preview address of the website is a different origin |
 | The hosted project's settings against `docs/10-setup-and-deploy.md` | The owner made the hosted project (M1, reported 4 November 2026); no session here has seen it | Email templates, redirects, the nightly job and alerts are set by hand on the hosted project: step 1 of "Do this next" |
@@ -362,8 +373,9 @@ certificate field (English and Kannada), More in Hindi, the demo sign-in page; a
 
 ## Do this next
 
-**Apply the new migration to the hosted database first.** The hosted project was made before
-`20261104000100_review_fixes.sql` (two checks added, no row changed). With the Supabase CLI linked to the project:
+**Apply the new migrations to the hosted database first.** The hosted project was made before
+`20261104000100_review_fixes.sql` (two checks added, no row changed) and `20261112000100_stay_page_bill.sql` (the
+parent's stay page also returns the stay's issued bill; no table changes). With the Supabase CLI linked to the project:
 `npx -y supabase@2.120.0 db push`. Deploy the app from the same commit afterwards, as `16-releasing.md` says.
 
 **Try the laptop layout (M69)** on the real Supabase project: a laptop (1366 or 1440 pixels), a tablet, and a phone.
@@ -586,30 +598,21 @@ are fixed, and the hint under Stay on a booking.
 
 Product behaviours that were chosen as the simplest thing and may need the owner's view.
 
-Chosen in M71 (D61), where a board and the app could not both be followed:
+Chosen in M71 and M72 (D61), where a board and the app could not both be followed:
 
 - A booking's page has seven tabs, not the board's six: changing and cancelling a booking needed a place ("Change
   booking"). Should it sit under another tab instead?
-- The boards show things the data does not hold, which were left out: who wrote each update ("from Ravi"), "3 stays
-  before" on New booking, the pet's age, sex and weight in a stay's head, "up to 10:30" on the parent's care card, and
-  the yard beside a play time on Care. Each needs a small change to what is read, and the first a change to what the
-  public stay function returns.
-- The parent's stay page has no "Your bill" card with Pay with UPI: the public stay function does not return the bill,
-  and changing an anonymous function is a security change (rule 6). Wanted?
-- The health papers card beside New booking ("Coco's rabies vaccination ends on 4 Nov") is not built; the warning
-  still shows on the booking's page after it is saved.
-- "Decline" on the calendar's "Waiting for an answer" opens the booking, where cancelling asks for a reason, instead
-  of declining in one tap.
-- "Tell the parent" on an incident opens WhatsApp to the parent with nothing typed (there is no incident message to
-  parents yet); marking the parent as told is still done on the pet's page.
-- Today's In house shows every pet, not the board's four; the phone board has no In house section at all, and it was
-  kept. The laptop sidebar stays put while the page scrolls, where the board draws it the height of the page.
+- The yard beside a play time on Care ("11:00 Play, yard 2") is not shown: play on the care round comes from a
+  routine and has no yard. The yards are on the Play page, with each pet's session in them.
+- "Decline" on the calendar declines a request in one tap with the kennel's own sentence as the reason
+  (`declineRequest`), not marked "cancelled by the kennel", since a request holds no money. A confirmed booking is still
+  cancelled from its page, with a reason.
 - Skip on the care round is offered on late tasks and medicines only; any task can be skipped from its stay's Today
-  tab. Care now opens on "Still to do" (`?show=all` is everything).
-- The tablet and phone boards shorten some words ("14/18", "of 24", "Care to do"); the app uses the laptop's words at
-  every width.
-- Reports: "Not paid yet" ends each row with Open, not the board's Remind; "Month by month" has no kennels used or
-  nights columns (the months are read from the money report only); "See each day" is the chart's own link.
+  tab. Care opens on "Still to do" (`?show=all` is everything).
+- Today's In house lists the four pets staying longest-ago first, with See all; the rest are on Bookings. The phone
+  board has no In house section; it was kept, folded the same way.
+- The parent's stay page shows the bill with "Pay with UPI", which opens the bill's own page (the code and the UPI
+  link are there), rather than paying from the stay page itself.
 
 Chosen in M68 (D57) as the simplest thing:
 
@@ -915,6 +918,8 @@ All of it should pass on a clean clone with no environment variables set. With D
 
 One line per session, newest first. What changed, in a sentence. Details belong in commits and pull requests.
 
+- 12 November 2026: M72. The printed bill, the bill on the parent's stay page (migration
+  `20261112000100_stay_page_bill.sql`), and the rest of what the boards show; every other screen swept at three widths.
 - 12 November 2026: M71 (D61). The twelve design boards matched board for board: the shell (counts beside links, the
   phone's dark bar), Today, Care, the calendar as a grid of bars, a stay's page in tabs with its Today cards, New
   booking in two columns, Reports, sign in (language choice, Show password), More (find a page), the parent's stay

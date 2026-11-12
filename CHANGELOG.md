@@ -10,6 +10,11 @@ The first release will be 0.1.0. Everything below is in it.
 
 ### For the kennel
 
+- The rest of the design (12 November 2026). The printed bill has the UPI code beside the totals and a box for what
+  is due. A parent's stay page shows their bill with Pay with UPI, who wrote each update, and when care was last
+  given. New booking says how many stays a pet had before and warns about vaccination papers, with the reminder to
+  send. Reports has Remind on each unpaid bill. The calendar declines a request in one tap. **Database change:** a new
+  migration, `20261112000100_stay_page_bill.sql`; apply it before deploying this app.
 - The screens now match the design that was agreed (12 November 2026). A booking's page has the pet, the stay and the
   next step at the top and its parts in tabs, opening on today's care, the bill so far, the health papers and the
   parent. The calendar shows how many kennels are free under each day. New booking shows what is being booked and the

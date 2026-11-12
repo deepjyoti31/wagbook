@@ -1630,6 +1630,27 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M72. Everything on the boards
+
+- [x] Finished 12 November 2026 (D61). Asked for by the owner after M71: finish what the boards show.
+
+**Build**
+
+1. The printed bill as its board: head, billed to and place of supply, the UPI code beside the totals, Paid and Due,
+   the foot.
+2. The parent's stay page: the stay's bill and Pay with UPI, who wrote each update, when care was last given. A new
+   migration (`get_public_stay()`), with a database test.
+3. A stay's head with the pet's sex, age and weight (`ageOn()`); New booking with stays before and a health papers
+   card; Reports with Remind and the months' kennels used and nights; one-tap Decline; WhatsApp openers; the boards'
+   shorter words on a tablet and a phone; four pets under In house.
+4. Every other screen at three widths: no box inside a card; a pet's and a parent's page with the stay's head card.
+
+**Done when**
+
+- `npm run check` and the walk pass; the new pieces were looked at with data.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.
