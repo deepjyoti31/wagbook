@@ -885,6 +885,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const paidOnBill = bill.data ? (bill.data.total_minor ?? 0) - (bill.data.due_minor ?? 0) : 0;
   const dueNow = bill.data ? (bill.data.due_minor ?? 0) : quote.totalMinor - advanceMinor;
   const age = pet?.date_of_birth ? ageOn(pet.date_of_birth, today) : null;
+  // Once there is a bill, its own lines are what the parent is asked to pay, not today's estimate.
+  const billLines = bill.data?.invoice_id
+    ? ((await supabase.from("invoice_lines").select("description, total_minor").eq("org_id", org.id).eq("invoice_id", bill.data.invoice_id).order("sort_order")).data ?? [])
+    : null;
   const dateTime = (at: string) =>
     new Intl.DateTimeFormat(locale, { timeZone: org.time_zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(at));
 
@@ -933,7 +937,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       {b.status !== "requested" && b.status !== "cancelled" && b.status !== "no_show" && !b.series_id ? (
         <BillSoFar
           t={t}
-          lines={quote.lines.map((l, i) => ({
+          lines={billLines ? billLines.map((l) => ({ label: l.description, totalMinor: l.total_minor })) : quote.lines.map((l, i) => ({
             label: fill(l.discountMinor > 0 ? w.costs.lineLess : w.costs.line, {
               what: i < stayCharges.length ? chargeLabel(stayCharges[i]) : l.description,
               quantity: l.quantity,
@@ -942,7 +946,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             }),
             totalMinor: l.totalMinor,
           }))}
-          taxMinor={quote.taxMinor}
+          taxMinor={bill.data ? 0 : quote.taxMinor}
           totalMinor={bill.data?.total_minor ?? quote.totalMinor}
           paidMinor={bill.data ? paidOnBill : advanceMinor}
           dueMinor={dueNow}

@@ -466,7 +466,11 @@ export function NewBookingFields({
               {w.health.title}
             </h2>
             <p className="mt-1.5 text-[15px]">
-              {warnings.map(warningText).join(" ")} {w.health.door} {chosen.parentName ? fill(w.health.ask, { parent: firstName }) : null}
+              {warnings
+                .map(warningText)
+                .map((x) => x.charAt(0).toLocaleUpperCase(locale) + x.slice(1))
+                .join(" ")}{" "}
+              {w.health.door} {chosen.parentName ? fill(w.health.ask, { parent: firstName }) : null}
             </p>
             {reminderText && chosen.parentPhone ? (
               <a href={whatsappLink(reminderText, chosen.parentPhone)} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center text-[15px] font-bold underline underline-offset-4">

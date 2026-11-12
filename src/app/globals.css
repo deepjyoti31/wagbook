@@ -188,6 +188,23 @@ html:has(.wb-parent) {
   border-radius: 0 0 1rem 1rem;
 }
 
+/*
+ * A box inside a section (a form to add something, one person of a list):
+ * a quiet fill with no edge, as the boards draw a tile inside a card, so no
+ * white card sits inside another (D61). Fields inside stay white.
+ */
+.wb-section div.border.bg-paper,
+.wb-section ul.border.bg-paper:not(.wb-ledger),
+.wb-section li.border.bg-paper,
+.wb-section form.border.bg-paper,
+.wb-section section.border.bg-paper,
+.wb-section details.border.bg-paper,
+.wb-section dl.border.bg-paper,
+.wb-section fieldset.border.bg-paper {
+  background-color: var(--color-wash);
+  border-color: transparent;
+}
+
 /* A list folded on a phone to its first rows (see FoldList). */
 @media (width < 40rem) {
   [data-fold="2"] > li:nth-child(n + 3):not(.wb-fold-more),
