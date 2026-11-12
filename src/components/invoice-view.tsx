@@ -48,6 +48,8 @@ export function InvoiceView({
   taxLabel,
   showTax,
   lineActions,
+  beside,
+  afterTotal,
   words,
 }: {
   lines: InvoiceLineView[];
@@ -60,6 +62,10 @@ export function InvoiceView({
   showTax: boolean;
   /** Something to put under a line, such as a form to change it. */
   lineActions?: (index: number) => ReactNode;
+  /** What sits to the left of the totals on a wide page: the UPI code to pay by. */
+  beside?: ReactNode;
+  /** Rows under the total, in the totals' column: what was paid, and what is due. */
+  afterTotal?: ReactNode;
   /** The reader's messages (m). */
   words: Messages;
 }) {
@@ -87,19 +93,19 @@ export function InvoiceView({
   return (
     <div className="invoice">
       {/* The lines, numbered, under a ruled heading: what, and the amount at the right. */}
-      <div className="flex gap-4 border-b border-ink px-2.5 pb-2 text-[13px] font-[650] text-slate">
+      <div className="flex gap-4 border-b-[1.5px] border-ink px-2.5 pb-2 text-xs font-bold text-[#4a5468]">
         <span className="w-6 shrink-0">{w.lineNumber}</span>
         <span className="flex-1">{w.what}</span>
         <span>{w.amount}</span>
       </div>
-      <ul className="divide-y divide-rule-strong border-b border-rule-strong">
+      <ul className="divide-y divide-[#c9cfda] border-b border-[#c9cfda] text-sm">
         {lines.map((l, i) => (
-          <li key={i} className="px-2.5 py-3">
+          <li key={i} className="px-2.5 py-2.5">
             <div className="flex items-start gap-4">
               <span className="w-6 shrink-0 tabular-nums">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <p className="font-bold">{l.description}</p>
-                <p className="mt-0.5 text-[13px] text-slate">{lineText(l)}</p>
+                <p className="mt-0.5 text-xs text-[#4a5468]">{lineText(l)}</p>
               </div>
               <p className="tabular-nums">{money(l.totalMinor)}</p>
             </div>
@@ -108,28 +114,32 @@ export function InvoiceView({
         ))}
       </ul>
 
-      <dl className="ml-auto mt-5 max-w-[280px] space-y-2 text-[15px] tabular-nums">
-        {totals.discountMinor > 0 || showTax ? <Row label={w.beforeDiscount} value={money(totals.subtotalMinor)} /> : null}
-        {totals.discountMinor > 0 ? <Row label={w.discount} value={`- ${money(totals.discountMinor)}`} /> : null}
-        {showTax ? <Row label={w.taxableValue} value={money(totals.taxableMinor)} /> : null}
-        {showTax && gst && totals.cgstMinor > 0 ? <Row label={w.cgst} value={money(totals.cgstMinor)} /> : null}
-        {showTax && gst && totals.sgstMinor > 0 ? <Row label={w.sgst} value={money(totals.sgstMinor)} /> : null}
-        {showTax && gst && totals.igstMinor > 0 ? <Row label={w.igst} value={money(totals.igstMinor)} /> : null}
-        {showTax && !gst && totals.taxMinor > 0 ? <Row label={name} value={money(totals.taxMinor)} /> : null}
-        {totals.roundOffMinor !== 0 ? <Row label={w.roundOff} value={money(totals.roundOffMinor)} /> : null}
-        <div className="flex justify-between gap-4 border-t border-ink pt-2.5 text-lg font-extrabold">
-          <dt>{w.total}</dt>
-          <dd>{money(totals.totalMinor)}</dd>
-        </div>
-        {currency === "INR" ? <p className="text-[13px] text-slate">{amountInWords(totals.totalMinor)}</p> : null}
-      </dl>
+      <div className="mt-6 flex flex-wrap items-start gap-x-8 gap-y-5">
+        {beside ? <div className="min-w-[260px] flex-1">{beside}</div> : null}
+        <dl className="ml-auto w-full max-w-[260px] text-sm tabular-nums">
+          {totals.discountMinor > 0 || showTax ? <InvoiceRow label={w.beforeDiscount} value={money(totals.subtotalMinor)} /> : null}
+          {totals.discountMinor > 0 ? <InvoiceRow label={w.discount} value={`- ${money(totals.discountMinor)}`} /> : null}
+          {showTax ? <InvoiceRow label={w.taxableValue} value={money(totals.taxableMinor)} /> : null}
+          {showTax && gst && totals.cgstMinor > 0 ? <InvoiceRow label={w.cgst} value={money(totals.cgstMinor)} /> : null}
+          {showTax && gst && totals.sgstMinor > 0 ? <InvoiceRow label={w.sgst} value={money(totals.sgstMinor)} /> : null}
+          {showTax && gst && totals.igstMinor > 0 ? <InvoiceRow label={w.igst} value={money(totals.igstMinor)} /> : null}
+          {showTax && !gst && totals.taxMinor > 0 ? <InvoiceRow label={name} value={money(totals.taxMinor)} /> : null}
+          {totals.roundOffMinor !== 0 ? <InvoiceRow label={w.roundOff} value={money(totals.roundOffMinor)} /> : null}
+          <div className="mt-1 flex justify-between gap-4 border-t-[1.5px] border-ink pt-2.5 text-lg font-extrabold">
+            <dt>{w.total}</dt>
+            <dd>{money(totals.totalMinor)}</dd>
+          </div>
+          {currency === "INR" ? <p className="py-1 text-xs text-[#4a5468]">{amountInWords(totals.totalMinor)}</p> : null}
+          {afterTotal}
+        </dl>
+      </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+export function InvoiceRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4">
+    <div className="flex justify-between gap-4 py-[5px]">
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>

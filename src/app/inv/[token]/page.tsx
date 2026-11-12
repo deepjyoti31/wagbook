@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
-import { InvoiceView } from "@/components/invoice-view";
+import { InvoiceRow, InvoiceView } from "@/components/invoice-view";
 import { PrintButton } from "@/components/print-button";
 import { Rich } from "@/components/rich";
-import { Badge, buttonStyles, Loading } from "@/components/ui";
-import { formatDate, formatMoney, GST_STATES, qrMatrix, qrSvgPath, upiLink, type ISODate } from "@/lib/core";
+import { buttonStyles, Loading } from "@/components/ui";
+import { formatDate, formatMoney, formatPhone, GST_STATES, qrMatrix, qrSvgPath, upiLink, type ISODate } from "@/lib/core";
 import { fill } from "@/lib/i18n";
 import { billWords } from "@/lib/bill-words";
 import { parentI18n } from "@/lib/i18n-server";
@@ -174,13 +174,13 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
 
   return (
     // A white sheet on the parent's page; on paper, just the page.
-    <article className="space-y-6 rounded-3xl border border-rule bg-paper p-5 sm:p-8 print:rounded-none print:border-0 print:p-0">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b-[3px] border-marigold pb-5">
-        <div>
-          <p className="text-2xl font-extrabold tracking-tight">{inv.seller.trade_name ?? inv.seller.name}</p>
+    <article className="flex flex-col gap-[26px] rounded-3xl border border-rule bg-paper p-5 sm:px-[60px] sm:py-14 print:min-h-[calc(297mm-28mm)] print:rounded-none print:border-0 print:p-0">
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 border-b-[3px] border-marigold pb-5">
+        <div className="flex flex-col gap-[3px] text-[13px]">
+          <p className="text-2xl font-extrabold tracking-[-0.01em]">{inv.seller.trade_name ?? inv.seller.name}</p>
           {inv.seller.trade_name && inv.seller.trade_name !== inv.seller.name ? <p>{inv.seller.name}</p> : null}
-          <p className="text-slate">{lines(inv.seller.address_line1, inv.seller.address_line2, inv.seller.city, inv.seller.state, inv.seller.postal_code)}</p>
-          <p className="text-slate">{lines(inv.seller.phone, inv.seller.email)}</p>
+          <p className="text-[#4a5468]">{lines(inv.seller.address_line1, inv.seller.address_line2, inv.seller.city, inv.seller.state, inv.seller.postal_code)}</p>
+          <p className="text-[#4a5468]">{[inv.seller.phone ? formatPhone(inv.seller.phone) : null, inv.seller.email].filter(Boolean).join(" · ")}</p>
           {inv.is_tax_invoice && sellerTaxId ? (
             <p>
               <Rich
@@ -190,10 +190,12 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
             </p>
           ) : null}
         </div>
-        <div className="text-right">
-          <h1 className="text-2xl font-extrabold tracking-tight">{inv.is_tax_invoice ? w.taxInvoice : w.bill}</h1>
-          <p className="font-semibold">{inv.number}</p>
-          <p className="text-slate">{formatDate(inv.issued_on, locale)}</p>
+        <div className="flex flex-col gap-[3px] text-right text-sm">
+          <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.01em]">{inv.is_tax_invoice ? w.taxInvoice : w.bill}</h1>
+          <p>
+            <Rich text={w.billNumber} parts={{ number: <strong>{inv.number}</strong> }} />
+          </p>
+          <p>{formatDate(inv.issued_on, locale)}</p>
         </div>
       </header>
 
@@ -203,18 +205,18 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
         </p>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <h2 className="font-bold">{w.billedTo}</h2>
-          <p>{inv.buyer.name}</p>
-          <p className="text-slate">{lines(inv.buyer.address, inv.buyer.city, inv.buyer.postal_code)}</p>
-          <p className="text-slate">{inv.buyer.phone}</p>
+      <section className="grid gap-5 sm:grid-cols-3">
+        <div className="flex flex-col gap-[3px] text-[13px] sm:col-span-2">
+          <h2 className="text-xs font-bold text-[#4a5468]">{w.billedTo}</h2>
+          <p className="text-[15px] font-bold">{inv.buyer.name}</p>
+          <p className="text-[#4a5468]">{inv.buyer.phone ? formatPhone(inv.buyer.phone) : null}</p>
+          <p className="text-[#4a5468]">{lines(inv.buyer.address, inv.buyer.city, inv.buyer.postal_code)}</p>
           {inv.buyer.tax_id ? <p>{fill(w.buyerGstin, { id: inv.buyer.tax_id })}</p> : null}
         </div>
         {inv.is_tax_invoice && gst ? (
-          <div>
-            <h2 className="font-bold">{w.placeOfSupply}</h2>
-            <p>{stateName(inv.place_of_supply_state_code)}</p>
+          <div className="flex flex-col gap-[3px]">
+            <h2 className="text-xs font-bold text-[#4a5468]">{w.placeOfSupply}</h2>
+            <p className="text-[15px] font-bold">{stateName(inv.place_of_supply_state_code)}</p>
           </div>
         ) : null}
       </section>
@@ -228,11 +230,51 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
         taxMode={inv.seller.tax_mode}
         taxLabel={inv.seller.tax_label}
         showTax={inv.is_tax_invoice}
+        beside={
+          pay ? (
+            // To pay by: the code to scan on paper and a laptop, and a button on a phone.
+            <section className="flex flex-wrap gap-4 rounded-[10px] border-[1.5px] border-ink p-4">
+              <svg
+                role="img"
+                aria-label={fill(w.qrLabel, { amount: money(due) })}
+                viewBox={`0 0 ${pay.qr.size} ${pay.qr.size}`}
+                className="size-28 shrink-0 text-ink"
+                shapeRendering="crispEdges"
+              >
+                <rect width={pay.qr.size} height={pay.qr.size} fill="var(--color-paper)" />
+                <path d={pay.qr.d} fill="currentColor" />
+              </svg>
+              <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
+                <h2 className="text-base font-extrabold">{fill(w.payByUpi, { amount: money(due) })}</h2>
+                <p className="text-[13px] text-[#4a5468]">{fill(w.scanHint, { payee: inv.upi?.payee_name ?? "", vpa: inv.upi?.vpa ?? "" })}</p>
+                <a href={pay.link} className={`${buttonStyles.primary} no-print mt-1 sm:hidden`}>
+                  {w.payWithUpi}
+                </a>
+              </div>
+            </section>
+          ) : undefined
+        }
+        afterTotal={
+          inv.status === "issued" ? (
+            <>
+              {credited > 0 ? <InvoiceRow label={w.creditedLabel} value={`- ${money(credited)}`} /> : null}
+              <InvoiceRow label={w.paidLabel} value={money(Number(inv.paid_minor))} />
+              {due > 0 ? (
+                <div className="mt-1.5 flex justify-between gap-4 rounded-lg border-[1.5px] border-marigold bg-marigold-soft px-3 py-2.5 text-base font-extrabold">
+                  <dt>{w.dueLabel}</dt>
+                  <dd>{money(due)}</dd>
+                </div>
+              ) : (
+                <p className="mt-1.5 rounded-lg border-[1.5px] border-leaf bg-leaf-soft px-3 py-2.5 text-base font-extrabold text-leaf-ink">{w.paidInFull}</p>
+              )}
+            </>
+          ) : undefined
+        }
       />
 
       {(inv.credit_notes ?? []).length > 0 ? (
         <section className="space-y-2">
-          <h2 className="font-bold">{w.creditNotes}</h2>
+          <h2 className="text-xs font-bold text-[#4a5468]">{w.creditNotes}</h2>
           <ul className="space-y-1">
             {inv.credit_notes.map((c) => (
               <li key={c.number}>
@@ -245,40 +287,16 @@ async function Invoice({ params, searchParams }: Pick<PageProps<"/inv/[token]">,
         </section>
       ) : null}
 
-      {inv.status === "issued" ? (
-        <section className="rounded-xl border border-rule bg-paper px-4 py-3">
-          <p className="flex flex-wrap items-center justify-between gap-2 text-lg">
-            <span>{fill(w.paid, { amount: money(Number(inv.paid_minor)) })}</span>
-            {due > 0 ? <Badge tone="attention">{fill(w.due, { amount: money(due) })}</Badge> : <Badge tone="good">{w.paidInFull}</Badge>}
-          </p>
-        </section>
-      ) : null}
+      {inv.notes ? <p className="whitespace-pre-line text-[13px] text-[#4a5468]">{inv.notes}</p> : null}
 
-      {pay ? (
-        <section className="flex flex-col items-center gap-3 rounded-xl border border-rule bg-paper p-4 text-center">
-          <h2 className="text-lg font-bold">{fill(w.payByUpi, { amount: money(due) })}</h2>
-          <a href={pay.link} className={`${buttonStyles.primary} no-print w-full sm:hidden`}>
-            {w.payWithUpi}
-          </a>
-          <svg
-            role="img"
-            aria-label={fill(w.qrLabel, { amount: money(due) })}
-            viewBox={`0 0 ${pay.qr.size} ${pay.qr.size}`}
-            className="h-56 w-56 text-ink"
-            shapeRendering="crispEdges"
-          >
-            <rect width={pay.qr.size} height={pay.qr.size} fill="var(--color-paper)" />
-            <path d={pay.qr.d} fill="currentColor" />
-          </svg>
-          <p className="text-sm text-slate">{fill(w.scanHint, { payee: inv.upi?.payee_name ?? "", vpa: inv.upi?.vpa ?? "" })}</p>
-        </section>
-      ) : null}
-
-      {inv.notes ? <p className="whitespace-pre-line text-slate">{inv.notes}</p> : null}
-
-      <div className="flex flex-wrap gap-2">
+      <div className="no-print flex flex-wrap gap-2">
         <PrintButton label={m.common.print} />
       </div>
+
+      <footer className="mt-auto flex flex-wrap justify-between gap-x-6 gap-y-1 border-t border-[#c9cfda] pt-4 text-[13px] text-[#4a5468]">
+        <span>{fill(w.thanks, { kennel: inv.seller.trade_name ?? inv.seller.name })}</span>
+        <span>{fill(w.billNumber, { number: inv.number })}</span>
+      </footer>
     </article>
   );
 }

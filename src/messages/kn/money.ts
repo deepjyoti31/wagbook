@@ -197,6 +197,11 @@ export const moneyArea: typeof English = {
     lineNumber: "#",
     what: "ವಿವರ",
     amount: "ಮೊತ್ತ",
+    paidLabel: "ಪಾವತಿಸಿದ್ದು",
+    dueLabel: "ಬಾಕಿ",
+    creditedLabel: "ಕ್ರೆಡಿಟ್ ನೋಟ್‌ಗಳು",
+    thanks: "{kennel} ನಲ್ಲಿ ತಂಗಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು.",
+    billNumber: "ಬಿಲ್ {number}",
   },
   reports: {
     title: "ವರದಿಗಳು",

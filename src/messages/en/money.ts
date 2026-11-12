@@ -209,6 +209,11 @@ export const moneyArea = {
     lineNumber: "#",
     what: "What",
     amount: "Amount",
+    paidLabel: "Paid",
+    dueLabel: "Due",
+    creditedLabel: "Credit notes",
+    thanks: "Thank you for staying with {kennel}.",
+    billNumber: "Bill {number}",
   },
   reports: {
     title: "Reports",

@@ -207,6 +207,11 @@ export const moneyArea: typeof English = {
     lineNumber: "#",
     what: "विवरण",
     amount: "राशि",
+    paidLabel: "चुकाया",
+    dueLabel: "बाकी",
+    creditedLabel: "क्रेडिट नोट",
+    thanks: "{kennel} में ठहरने के लिए धन्यवाद।",
+    billNumber: "बिल {number}",
   },
   reports: {
     title: "रिपोर्ट",
