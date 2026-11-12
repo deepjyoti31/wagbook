@@ -347,7 +347,7 @@ test("check out, make the bill, issue it, and the parent sees it with a UPI QR c
   const parent = await privateWindow(browser);
   await parent.page.goto(link);
   await expect(parent.page.getByRole("heading", { name: "Bill", exact: true })).toBeVisible();
-  await expect(parent.page.getByText(number)).toBeVisible();
+  await expect(parent.page.getByText(number, { exact: true })).toBeVisible();
   await expect(parent.page.getByRole("img", { name: /QR code to pay/ })).toBeVisible();
   await expect(parent.page.getByRole("link", { name: "Pay with UPI" })).toHaveAttribute("href", /^upi:\/\/pay\?pa=demokennel%40okdemo/);
   await expect(parent.page.getByText(/Rupees One Thousand Two Hundred Only/)).toBeVisible();
