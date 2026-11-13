@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { text, type FormState } from "@/lib/forms";
@@ -149,6 +150,25 @@ export async function setNewPassword(_state: FormState, form: FormData): Promise
   redirect("/app");
 }
 
+
+/**
+ * A visitor picks the language of the pages before the app (the panel of
+ * AuthShell). Remembered on this browser; nobody is signed in yet. The
+ * browser is sent back to the page it came from.
+ */
+export async function chooseLanguage(form: FormData): Promise<void> {
+  const language = form.get("language");
+  if (isLanguage(language)) await rememberLanguage(language);
+  const from = (await headers()).get("referer");
+  let back = "/login";
+  try {
+    // Only the path is kept, so the browser stays on this site whatever the header says.
+    if (from) back = safeDestination(new URL(from).pathname + new URL(from).search, await siteOrigin(), "/login");
+  } catch {
+    // Not an address: go to the sign-in page.
+  }
+  redirect(back);
+}
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();

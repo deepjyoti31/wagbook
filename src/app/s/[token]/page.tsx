@@ -3,11 +3,11 @@ import { Icon } from "@/components/icons";
 import { HtmlLang } from "@/components/html-lang";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
-import { Badge, buttonStyles, Loading, Section } from "@/components/ui";
-import { datesText } from "@/lib/bookings";
-import { formatDate, stayReport, whatsappLink, type ISODate } from "@/lib/core";
+import { buttonStyles, Loading, Meter, Section } from "@/components/ui";
+import { datesText, shortStayText } from "@/lib/bookings";
+import { formatDate, formatMoney, localClock, localDate, stayReport, todayIn, whatsappLink, type ISODate } from "@/lib/core";
 import { ReportFigures } from "@/components/report-figures";
-import { fill } from "@/lib/i18n";
+import { fill, isLanguage, LANGUAGE_NAMES, LANGUAGE_SHORT, LANGUAGES } from "@/lib/i18n";
 import { parentI18n } from "@/lib/i18n-server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createAnonClient } from "@/lib/supabase/server";
@@ -16,7 +16,11 @@ interface PublicStay {
   kennel: { name: string; time_zone?: string; locale?: string; language?: string; whatsapp_phone: string | null; phone: string | null; check_in_time: string; check_out_time: string };
   pet: { name: string; species: string; breed: string | null; photo: string | null };
   booking: { kind: "boarding" | "daycare"; status: string; start_date: ISODate; end_date: ISODate; checked_in_at: string | null; checked_out_at: string | null };
-  updates: { at: string; body: string; photos: string[] | null }[];
+  updates: { at: string; body: string; photos: string[] | null; by?: string | null }[];
+  /** The stay's issued bill (M72), if it has one. */
+  bill?: { number: string; total_minor: number; due_minor: number; currency: string; token: string } | null;
+  /** When care was last ticked on this stay. */
+  care_until?: string | null;
   care: { date: ISODate; kind: string; done: number; total: number }[];
   /** Once the pet has gone home (M53): the kennel's words and photos, and the records the report is worked out from. */
   report: {
@@ -50,11 +54,11 @@ export async function generateMetadata({ params }: PageProps<"/s/[token]">): Pro
 }
 
 /** What a parent sees when they open the link the kennel sent them. No sign-in. */
-export default function StayPage({ params }: PageProps<"/s/[token]">) {
+export default function StayPage({ params, searchParams }: PageProps<"/s/[token]">) {
   return (
-    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+    <main className="wb-parent mx-auto w-full max-w-2xl flex-1 px-4 pt-3">
       <Suspense fallback={<Loading />}>
-        <Stay params={params} />
+        <Stay params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -70,12 +74,14 @@ function clock(locale = "en-IN", timeZone = "Asia/Kolkata"): Intl.DateTimeFormat
   }
 }
 
-async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
+async function Stay({ params, searchParams }: Pick<PageProps<"/s/[token]">, "params" | "searchParams">) {
   const { token } = await params;
   const found = await loadStay(token);
   if (!found) notFound();
   const { supabase, stay } = found;
-  const t = parentI18n(stay.kennel.language, stay.kennel.locale);
+  // The page opens in the kennel's language for parents; a parent can read it in another (?lang=).
+  const asked = (await searchParams).lang;
+  const t = parentI18n(isLanguage(asked) ? asked : stay.kennel.language, stay.kennel.locale);
   const { m } = t;
   const w = m.stayPage;
 
@@ -99,28 +105,115 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
   for (const c of stay.care) days.set(c.date, [...(days.get(c.date) ?? []), c]);
 
   const when = clock(t.locale, stay.kennel.time_zone);
+  const [latest, ...earlierDays] = [...days.entries()];
+  let today = "";
+  try {
+    today = todayIn(stay.kennel.time_zone ?? "Asia/Kolkata");
+  } catch {
+    // A time zone the server does not know: the care is shown with its date.
+  }
+  const FIRST_UPDATES = 3;
+  const update = (u: PublicStay["updates"][number], i: number) => (
+    <li key={i} className="rounded-2xl border border-rule bg-paper px-[18px] py-4">
+      <p className="text-[13.5px] font-[650] text-slate">{u.by ? fill(w.fromWho, { when: when.format(new Date(u.at)), who: u.by }) : when.format(new Date(u.at))}</p>
+      <p className="mt-2 whitespace-pre-line">{u.body}</p>
+      {(u.photos ?? []).some((p) => links.get(p)?.small) ? (
+        <div className={`mt-3 grid gap-2 ${(u.photos ?? []).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {(u.photos ?? []).map((p) => {
+            const l = links.get(p);
+            return l?.small ? (
+              <a key={p} href={l.full ?? l.small} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
+                <img src={l.small} alt={fill(w.photoOf, { pet: stay.pet.name })} className={`w-full rounded-xl bg-ground object-cover ${(u.photos ?? []).length > 1 ? "aspect-square" : "aspect-[4/3]"}`} />
+              </a>
+            ) : null;
+          })}
+        </div>
+      ) : null}
+    </li>
+  );
 
   return (
     <>
       <HtmlLang lang={t.language} />
-      <p className="mb-5 flex items-center gap-2.5 font-extrabold">
-        <span aria-hidden="true" className="inline-flex size-10 items-center justify-center rounded-full bg-ink text-paper">
+      <header className="mb-3 flex items-center gap-2.5">
+        <span aria-hidden="true" className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-ink font-extrabold text-paper">
           {stay.kennel.name.trim().charAt(0).toUpperCase()}
         </span>
-        {stay.kennel.name}
-      </p>
+        <p className="min-w-0 flex-1 truncate font-extrabold">{stay.kennel.name}</p>
+        <nav aria-label={w.language} className="flex gap-0.5">
+          {LANGUAGES.map((l) => (
+            <a
+              key={l}
+              href={`/s/${token}?lang=${l}`}
+              lang={l}
+              aria-label={LANGUAGE_NAMES[l]}
+              aria-current={l === t.language ? "true" : undefined}
+              className={`inline-flex size-11 items-center justify-center rounded-[10px] text-sm font-bold ${l === t.language ? "border border-rule bg-paper text-ink" : "text-slate"}`}
+            >
+              {LANGUAGE_SHORT[l]}
+            </a>
+          ))}
+        </nav>
+      </header>
       {stay.pet.photo && links.get(stay.pet.photo)?.small ? (
         // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file
-        <img src={links.get(stay.pet.photo)?.full ?? links.get(stay.pet.photo)?.small} alt={stay.pet.name} className="mb-5 aspect-[16/11] w-full rounded-3xl bg-ground object-cover" />
+        <img src={links.get(stay.pet.photo)?.full ?? links.get(stay.pet.photo)?.small} alt={stay.pet.name} className="mb-4 aspect-[16/11] w-full rounded-3xl bg-ground object-cover" />
       ) : null}
       <p>
-        <Badge tone={status.tone}>{status.label}</Badge>
+        <span className={`inline-flex min-h-[30px] items-center gap-2 rounded-full px-3 text-sm font-bold ${status.tone === "good" ? "bg-leaf-soft text-leaf-ink" : status.tone === "attention" ? "bg-marigold-soft text-marigold-ink" : "bg-fog text-steel"}`}>
+          <span aria-hidden="true" className="size-2 rounded-full bg-current" />
+          {status.label}
+        </span>
       </p>
-      <h1 className="mt-2 text-[2rem] font-extrabold leading-tight tracking-tight">{fill(w.heading, { pet: stay.pet.name })}</h1>
-      <p className="mb-7 mt-2 text-lg">
-        {datesText(t, stay.booking.start_date, stay.booking.end_date)}
-        <span className="block text-base text-slate">{fill(w.times, { checkIn: stay.kennel.check_in_time, checkOut: stay.kennel.check_out_time })}</span>
+      <h1 className="mt-2.5 text-[30px] font-extrabold leading-[1.15] tracking-[-0.02em]">{fill(w.heading, { pet: stay.pet.name })}</h1>
+      <p className="mb-5 mt-2 text-[17px]">
+        {today ? shortStayText(t, stay.booking.kind, stay.booking.start_date, stay.booking.end_date, today) : datesText(t, stay.booking.start_date, stay.booking.end_date)}
+        <span className="mt-1 block text-sm text-slate">{fill(w.times, { checkIn: stay.kennel.check_in_time, checkOut: stay.kennel.check_out_time })}</span>
       </p>
+
+      {latest ? (
+        <section aria-labelledby="care-given" className="mb-6 rounded-2xl border border-rule bg-paper px-[18px] py-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="care-given" className="text-[17px] font-[750]">
+              {latest[0] === today ? w.careToday : w.careGiven}
+            </h2>
+            {latest[0] === today ? (
+              stay.care_until && localDate(stay.care_until, stay.kennel.time_zone ?? "Asia/Kolkata") === today ? (
+                <span className="text-sm text-slate">{fill(w.upTo, { time: localClock(stay.care_until, stay.kennel.time_zone ?? "Asia/Kolkata") })}</span>
+              ) : null
+            ) : (
+              <span className="text-sm text-slate">{formatDate(latest[0], t.locale)}</span>
+            )}
+          </div>
+          <ul className="mt-1 divide-y divide-rule">
+            {latest[1].map((c) => (
+              <li key={c.kind} className="flex items-center gap-3 py-3 last:pb-0">
+                <span className="w-[42%] font-bold">{w.careKinds[c.kind as keyof typeof w.careKinds] ?? w.careKinds.other}</span>
+                <span className="min-w-0 flex-1">
+                  <Meter value={c.done} total={c.total} tone="leaf" />
+                </span>
+                <span className="text-sm text-slate">{fill(w.doneOf, { done: c.done, total: c.total })}</span>
+              </li>
+            ))}
+          </ul>
+          {earlierDays.length > 0 ? (
+            <details className="mt-2 border-t border-rule pt-1">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center text-[15px] font-[650] underline underline-offset-4">{w.earlierDays}</summary>
+              <ul className="divide-y divide-rule">
+                {earlierDays.map(([date, items]) => (
+                  <li key={date} className="py-2.5">
+                    <span className="font-bold">{formatDate(date, t.locale)}</span>
+                    <span className="block text-sm text-slate">
+                      {items.map((c) => fill(w.careDone[c.kind as keyof typeof w.careDone] ?? w.careDone.other, { done: c.done, total: c.total })).join(", ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
 
       {stay.report ? (
         <Section title={fill(m.stayReport.pageTitle, { pet: stay.pet.name })}>
@@ -163,52 +256,59 @@ async function Stay({ params }: Pick<PageProps<"/s/[token]">, "params">) {
         </Section>
       ) : null}
 
-      <Section title={w.updates}>
+      <section aria-labelledby="updates" className="mb-6">
+        <h2 id="updates" className="mb-3 text-xl font-extrabold tracking-[-0.01em]">
+          {w.updates}
+        </h2>
         {stay.updates.length === 0 ? (
           <p className="text-slate">{w.noUpdates}</p>
         ) : (
-          <ul className="space-y-3">
-            {stay.updates.map((u, i) => (
-              <li key={i} className="rounded-2xl border border-rule bg-paper p-4">
-                {(u.photos ?? []).length > 0 ? (
-                  <div className="mb-3 grid grid-cols-2 gap-2">
-                    {(u.photos ?? []).map((p) => {
-                      const l = links.get(p);
-                      return l?.small ? (
-                        <a key={p} href={l.full ?? l.small} target="_blank" rel="noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file */}
-                          <img src={l.small} alt={`${stay.pet.name}`} className="aspect-square w-full rounded-lg object-cover" />
-                        </a>
-                      ) : null;
-                    })}
-                  </div>
-                ) : null}
-                <p className="whitespace-pre-line">{u.body}</p>
-                <p className="mt-1 text-sm text-slate">{when.format(new Date(u.at))}</p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-3">{stay.updates.slice(0, FIRST_UPDATES).map(update)}</ul>
+            {stay.updates.length > FIRST_UPDATES ? (
+              <details className="group mt-3">
+                <summary className="flex min-h-[50px] cursor-pointer list-none items-center justify-center rounded-2xl border border-rule bg-paper text-[15px] font-bold group-open:hidden [&::-webkit-details-marker]:hidden">
+                  {fill(w.earlierUpdates, { n: stay.updates.length - FIRST_UPDATES })}
+                </summary>
+                <ul className="space-y-3">{stay.updates.slice(FIRST_UPDATES).map((u, i) => update(u, i + FIRST_UPDATES))}</ul>
+              </details>
+            ) : null}
+          </>
         )}
-      </Section>
+      </section>
 
-      {days.size > 0 ? (
-        <Section title={w.careGiven}>
-          <ul className="wb-ledger divide-y divide-rule overflow-hidden rounded-2xl border border-rule bg-paper">
-            {[...days.entries()].map(([date, items]) => (
-              <li key={date} className="px-4 py-3">
-                <span className="font-bold">{formatDate(date, t.locale)}</span>
-                <span className="block text-slate">
-                  {items.map((c) => fill(w.careDone[c.kind as keyof typeof w.careDone] ?? w.careDone.other, { done: c.done, total: c.total })).join(", ")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Section>
+      {stay.bill ? (
+        <section aria-labelledby="your-bill" className="mb-6 rounded-2xl border border-rule bg-paper px-[18px] py-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="your-bill" className="text-[17px] font-[750]">
+              {w.bill.title}
+            </h2>
+            <a href={`/inv/${stay.bill.token}`} className="inline-flex min-h-11 items-center text-[15px] font-[650] underline underline-offset-4">
+              {w.bill.see}
+            </a>
+          </div>
+          {stay.bill.due_minor > 0 ? (
+            <>
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-marigold-soft px-4 py-3.5 text-[#3d2a00]">
+                <span className="font-bold">{fill(w.bill.due, { number: stay.bill.number })}</span>
+                <strong className="text-2xl font-extrabold tabular-nums">{formatMoney(stay.bill.due_minor, { currency: stay.bill.currency, locale: t.locale, trimZeros: true })}</strong>
+              </div>
+              {/* The bill's page has the code to scan and the UPI link for exactly what is due. */}
+              <a href={`/inv/${stay.bill.token}`} className={`${buttonStyles.primary} mt-3 w-full`}>
+                {w.bill.pay}
+              </a>
+            </>
+          ) : (
+            <p className="mt-2 rounded-xl bg-leaf-soft px-4 py-3.5 font-bold text-leaf-ink">{fill(w.bill.paid, { number: stay.bill.number })}</p>
+          )}
+        </section>
       ) : null}
+
+      <p className="pb-6 text-center text-[13px] text-slate">{w.madeWith}</p>
 
       {contact ? (
         // Kept in reach at the foot of the screen while the parent scrolls the updates.
-        <div className="sticky bottom-0 -mx-4 mt-6 border-t border-rule bg-cream px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="sticky bottom-0 -mx-4 border-t border-rule bg-cream px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <a
             href={whatsappLink(fill(m.whatsapp.askAbout, { pet: stay.pet.name }), contact)}
             target="_blank"

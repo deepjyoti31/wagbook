@@ -5,7 +5,7 @@
  * so a long list is easier to scan. Server-safe.
  */
 export function PetAvatar({ name, url, size = "md" }: { name: string; url?: string | null; size?: "md" | "lg" }) {
-  const box = size === "lg" ? "size-24 rounded-3xl text-3xl" : "size-11 rounded-[0.875rem] text-lg";
+  const box = size === "lg" ? "size-[76px] rounded-[20px] text-[30px]" : "size-11 rounded-[13px] text-base sm:size-[46px] sm:rounded-[14px] sm:text-[17px]";
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file; next/image would re-host it
     return <img src={url} alt="" className={`${box} shrink-0 bg-ground object-cover`} loading="lazy" />;

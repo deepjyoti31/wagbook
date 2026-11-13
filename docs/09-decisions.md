@@ -1507,3 +1507,42 @@ languages, and nobody has to choose between two buttons before work.
 the panel beside the form. The project's README does that job.
 
 **Look again** if Wagbook is offered as a hosted service to kennels that do not know it yet.
+
+## D61. The design boards are the reference, board for board
+
+**Context.** M70 built the redesign into the shared pieces, so every screen changed together, but the twelve screens
+that had been drawn were only brought close to their boards. The owner compared the two and found them different: a
+stay's page was one long column where the board had a head and tabs, the calendar had a row of counts where the board
+had the free kennels in each day's heading, the new booking form was a column of boxes where the board had cards and a
+summary beside them, and Today, Care, Reports, More, sign in and the parent's stay page each differed in smaller ways.
+
+**Decision.**
+
+- **The boards are matched, not approached.** Each of the twelve screens was rebuilt against its board at the board's
+  own width (1440, 820 and 390 pixels), with the board's sizes, spacing and colours, and a screenshot beside the board.
+- **The wiring is kept.** A page's queries, its Server Actions and its words stay; its markup is what was rewritten.
+  The frontend was not deleted and built again, because in this app the page files are also where the kennel's data is
+  read and its rules are called, and sixty-five screens have no board.
+- **A stay's page is in tabs**: Today, Updates, Bill, Health, Extras and trips, Stay page, and Change booking (the
+  board has six; changing and cancelling a booking needed a place, so there are seven). Every section the long page had
+  is under a tab. `?tab=all` is the whole page at once; the browser walk reads it that way, by a cookie
+  (`wb_stay_view=all`).
+- **Lists fold on a phone** (`FoldList`): Today's Arriving shows three and Going home two, with "See 2 more".
+- **Care opens on what is still to do**, with what is late in a group of its own (`isLate()`, more than half an hour
+  past its time) and the rest grouped by time and task. Skip is on late tasks and medicines; any task can be skipped
+  from its stay's Today tab.
+- **Short dates in lists**: "2 to 6 Nov, 4 nights" (`shortStayText()`), with the year only when the stay is not all in
+  this year. Bills and anything sent to a parent keep the full date.
+- **What is waiting is counted beside its link** in the sidebar and on the phone's bar: requests from parents, care
+  still to do today, and new forms.
+
+**Why.** The boards were agreed with the owner before any code changed, so they are what the owner expects to see.
+
+**Cost.** Three more small queries on every signed-in page, for the counts in the navigation. The screens that were
+not drawn follow the same pieces but were not checked one by one. Where a board shows something the data does not hold
+(who wrote an update, "3 stays before", a bill on the parent's stay page), it is left out and listed in
+`docs/HANDOFF.md`.
+
+**Look again** if the counts in the navigation slow a busy kennel's pages, or a kennel finds the tabs hide something
+it used every day.
+

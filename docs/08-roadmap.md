@@ -1602,6 +1602,55 @@ and messaging many parents at once (not needed).
 
 ---
 
+## M71. The twelve boards, board for board
+
+- [x] Finished 12 November 2026 (G in `02`, D61). Asked for by the owner: the screens built in M70 did not match the
+  boards they were built from.
+
+**Build**
+
+1. The shell: counts beside the links, the search that wraps, the tablet bar's search, the phone's dark bar with the
+   kennel's name, search and New booking, and pips on the bottom bar.
+2. Today at 1440, 820 and 390 pixels: figures with what is under each, the care round as a card (tiles on a tablet,
+   chips on a phone), incidents with Tell the parent, short rows with short dates, lists folded on a phone.
+3. Care: the count on a dark bar, Still to do and Everything, chips with what is left, Late, tasks by time.
+4. The calendar: bars on a grid, free kennels in each day's heading, a legend, and the requests and waiting list.
+5. A stay: the head with its actions and tabs, and the Today tab's cards.
+6. New booking: the pet card, the stay cards, kennel beside price, and the summary and free kennels beside the form.
+7. Reports, sign in, More, the parent's stay page and the lines of a bill.
+
+**Rules**
+
+- No database change, no new dependency, every word from the message files in three languages.
+- The data loading and the Server Actions of each page are kept.
+
+**Done when**
+
+- `npm run check` passes; each of the twelve screens was looked at beside its board at the board's width.
+
+---
+
+## M72. Everything on the boards
+
+- [x] Finished 12 November 2026 (D61). Asked for by the owner after M71: finish what the boards show.
+
+**Build**
+
+1. The printed bill as its board: head, billed to and place of supply, the UPI code beside the totals, Paid and Due,
+   the foot.
+2. The parent's stay page: the stay's bill and Pay with UPI, who wrote each update, when care was last given. A new
+   migration (`get_public_stay()`), with a database test.
+3. A stay's head with the pet's sex, age and weight (`ageOn()`); New booking with stays before and a health papers
+   card; Reports with Remind and the months' kennels used and nights; one-tap Decline; WhatsApp openers; the boards'
+   shorter words on a tablet and a phone; four pets under In house.
+4. Every other screen at three widths: no box inside a card; a pet's and a parent's page with the stay's head card.
+
+**Done when**
+
+- `npm run check` and the walk pass; the new pieces were looked at with data.
+
+---
+
 ## Ideas not scheduled
 
 Kept so they are not lost. Each needs an issue and a kennel reason before it becomes a milestone.

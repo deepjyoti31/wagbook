@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { Badge, buttonStyles, DoorTag, Field, Input, Ledger, LedgerRow, Section } from "@/components/ui";
+import { Badge, buttonStyles, DoorTag, Field, Input, Ledger, LedgerRow, Meter, Section } from "@/components/ui";
 import { markCleaned, markFlowersSent, tickHouseJob } from "@/app/app/day-actions";
 import { requireOrg } from "@/lib/auth";
 import { formatDate, houseJobsOn, localClock, supplyAmount, whatsappLink } from "@/lib/core";
@@ -31,14 +31,11 @@ export async function ToClean({ t }: { t: I18n }) {
   if (error || data.length === 0) return null;
   return (
     <Section title={w.title} count={data.length}>
-      <p className="mb-3 text-sm text-slate">{w.about}</p>
       <Ledger>
         {data.map((c) => (
           <LedgerRow key={c.id}>
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <DoorTag name={c.kennels.name} empty={t.m.common.noKennel} />
-              <span className="text-slate">{fill(w.left, { time: localClock(c.left_at, org.time_zone) })}</span>
-            </span>
+            <DoorTag name={c.kennels.name} empty={t.m.common.noKennel} />
+            <span className="min-w-0 flex-1 text-sm text-slate">{fill(w.left, { time: localClock(c.left_at, org.time_zone) })}</span>
             <ActionForm action={markCleaned} className="contents">
               <input type="hidden" name="cleanId" value={c.id} />
               <SubmitButton variant="secondary" pendingLabel={w.cleaning}>
@@ -78,18 +75,12 @@ export async function HouseJobs({ t, today, lists }: { t: I18n; today: string; l
         if (mine.length === 0) return null;
         const finished = mine.filter((j) => done.has(j.id)).length;
         return (
-          <Section key={list} title={fill(w.count, { list: w.lists[list], done: finished, total: mine.length })}>
-            {finished === mine.length ? <p className="mb-2 font-semibold text-leaf">{w.allDone}</p> : null}
-            {/* What is left first; the done ones folded away, with Undo. */}
-            {mine.some((j) => !done.has(j.id)) ? <JobList t={t} jobs={mine.filter((j) => !done.has(j.id))} done={false} /> : null}
-            {finished > 0 ? (
-              <details className="mt-2">
-                <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold text-slate underline underline-offset-4">
-                  {fill(w.doneCount, { n: finished })}
-                </summary>
-                <JobList t={t} jobs={mine.filter((j) => done.has(j.id))} done />
-              </details>
-            ) : null}
+          <Section key={list} title={w.lists[list]} meta={fill(t.m.today.doneOf, { done: finished, total: mine.length })}>
+            <div className="mb-3">
+              <Meter value={finished} total={mine.length} tone="leaf" />
+            </div>
+            {/* What is left first; then what is done, struck through, with Undo. */}
+            <JobList t={t} jobs={[...mine.filter((j) => !done.has(j.id)), ...mine.filter((j) => done.has(j.id))]} done={done} />
           </Section>
         );
       })}
@@ -98,31 +89,34 @@ export async function HouseJobs({ t, today, lists }: { t: I18n; today: string; l
 }
 
 /** House jobs with a Done button each, or Undo once done. */
-function JobList({ t, jobs, done }: { t: I18n; jobs: { id: string; label: string; due_time: string | null }[]; done: boolean }) {
+function JobList({ t, jobs, done }: { t: I18n; jobs: { id: string; label: string; due_time: string | null }[]; done: Set<string> }) {
   const w = t.m.house;
   return (
     <Ledger>
-      {jobs.map((j) => (
-        <LedgerRow key={j.id}>
-          <span className="min-w-0 flex-1">
-            {j.due_time ? <span className="font-bold tabular-nums">{j.due_time.slice(0, 5)} </span> : null}
-            <span className={done ? "text-slate line-through" : "font-semibold"}>{j.label}</span>
-          </span>
-          <ActionForm action={tickHouseJob} className="contents">
-            <input type="hidden" name="jobId" value={j.id} />
-            {done ? <input type="hidden" name="undo" value="1" /> : null}
-            {done ? (
-              <SubmitButton variant="quiet" pendingLabel={w.undoing}>
-                {w.undo}
-              </SubmitButton>
-            ) : (
-              <button type="submit" className={`${buttonStyles.primary} min-w-28`} aria-label={fill(w.tickLabel, { job: j.label })}>
-                {w.tick}
-              </button>
-            )}
-          </ActionForm>
-        </LedgerRow>
-      ))}
+      {jobs.map((j) => {
+        const ticked = done.has(j.id);
+        return (
+          <li key={j.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-(--wb-pad) py-2.5 ${ticked ? "text-slate" : ""}`}>
+            <span className={`min-w-0 flex-1 ${ticked ? "line-through" : "font-[650]"}`}>
+              {j.due_time ? <strong className="font-bold tabular-nums">{j.due_time.slice(0, 5)} </strong> : null}
+              {j.label}
+            </span>
+            <ActionForm action={tickHouseJob} className="contents">
+              <input type="hidden" name="jobId" value={j.id} />
+              {ticked ? <input type="hidden" name="undo" value="1" /> : null}
+              {ticked ? (
+                <SubmitButton variant="quiet" pendingLabel={w.undoing}>
+                  {w.undo}
+                </SubmitButton>
+              ) : (
+                <button type="submit" className={`${buttonStyles.primary} min-w-24`} aria-label={fill(w.tickLabel, { job: j.label })}>
+                  {w.tick}
+                </button>
+              )}
+            </ActionForm>
+          </li>
+        );
+      })}
     </Ledger>
   );
 }
@@ -176,7 +170,7 @@ export async function SuppliesRunningOut({ t }: { t: I18n }) {
                   </a>
                 ) : null}
                 {s.kind === "food" ? (
-                  <Link href={`/app/bookings/${s.booking_id}#extras`} className={buttonStyles.quiet}>
+                  <Link href={`/app/bookings/${s.booking_id}?tab=extras`} className={buttonStyles.quiet}>
                     {w.useOurs}
                   </Link>
                 ) : null}

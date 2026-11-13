@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmStep } from "@/components/confirm-step";
 import { CopyButton } from "@/components/copy-button";
-import { Badge, buttonStyles, Columns, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Notice, Section, Select, Textarea } from "@/components/ui";
+import { Badge, buttonStyles, Columns, Count, DoorTag, Empty, Field, Input, Ledger, LedgerRow, Loading, Narrow, Notice, Section, Select, Textarea } from "@/components/ui";
+import { BillSoFar, HealthCard, ParentCard, StayCareToday, StayIncidents } from "@/components/stay-today";
 import { Rich } from "@/components/rich";
 import { checkIn, checkOut, undoCheckOut } from "@/app/app/actions";
 import { stopRoutine } from "@/app/app/care/actions";
@@ -17,13 +19,13 @@ import { RoutineForm } from "@/components/routine-form";
 import { makeBill } from "@/app/app/bills/actions";
 import { removeUpdatePhoto } from "@/app/app/media/actions";
 import { requireOrg } from "@/lib/auth";
-import { flagText, stayText } from "@/lib/bookings";
+import { flagText, shortDatesText, shortStayText } from "@/lib/bookings";
 import { clockText } from "@/lib/care";
 import {
-  addDays, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, localDate, peaksTouching, quoteStay,
+  addDays, ageOn, appointmentLines, bookingConfirmedMessage, chargeableUnits, formatDate, formatMoney, formatPhone, isOverstaying, leavingEarly, localDate, peaksTouching, quoteStay,
   sharedWith, todayIn, toDecimalString, toStayCharges, vaccinationWarnings, whatsappLink, type StayCharge,
 } from "@/lib/core";
-import { fill } from "@/lib/i18n";
+import { fill, plural } from "@/lib/i18n";
 import { appTitle, getAppI18n, parentI18n, type I18n } from "@/lib/i18n-server";
 import { familyHolds, peakPeriods, toPeak } from "@/lib/queries";
 import { siteOrigin } from "@/lib/site";
@@ -48,7 +50,7 @@ export default function BookingPage({ params, searchParams }: PageProps<"/app/bo
 }
 
 const BOOKING =
-  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, is_trial, trial_outcome, trial_note, packages(name), pets(id, name, breed, species, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
+  "id, kind, status, start_date, end_date, kennel_id, public_token, rate_minor, alone_rate_minor, boarding_from, day_rate_minor, series_id, pass_id, discount_minor, tax_rate_bp, sac_code, expected_arrival, expected_departure, cancel_reason, belongings, gate_notes, vaccinations_checked_at, notes, group_id, waitlisted_at, checked_in_at, checked_out_at, pet_id, package_id, package_price_minor, is_trial, trial_outcome, trial_note, packages(name), pets(id, name, breed, species, sex, date_of_birth, weight_g, flags, food_notes, medical_notes, allergies, behaviour_notes, photo_path), clients(id, full_name, phone), kennels(id, name)" as const;
 
 async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -71,7 +73,7 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
   const pet = b.pets;
   const parent = b.clients;
 
-  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs, waiting] = await Promise.all([
+  const [items, extras, peaks, family, kennels, siblingHolds, vaccinations, routines, bill, advances, updates, charges, nightPrice, origin, series, packs, waiting, careToday, openIncidents] = await Promise.all([
     supabase.from("booking_items").select("id, description, quantity, unit_price_minor, tax_rate_bp, sac_code, in_package").eq("org_id", org.id).eq("booking_id", b.id).order("created_at"),
     supabase.from("services").select("id, name, price_minor").eq("org_id", org.id).eq("kind", "addon").eq("is_active", true).order("sort_order").order("name"),
     peakPeriods(supabase, org.id, b.start_date, b.end_date),
@@ -130,7 +132,18 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
       : Promise.resolve({ data: [], error: null }),
     // The waiting list (D42), for this request's place in line.
     b.waitlisted_at ? supabase.rpc("waiting_list", { p_org: org.id }) : Promise.resolve({ data: [], error: null }),
+    // Today's care for this pet, for the Today tab (the care round makes the day's tasks; they are only read here).
+    b.status === "checked_in"
+      ? supabase.from("care_tasks").select("id, kind, label, details, due_time, status, note, done_at, done_by, needs_photo").eq("org_id", org.id).eq("booking_id", id).eq("task_date", today).order("due_time", { nullsFirst: false })
+      : Promise.resolve({ data: [], error: null }),
+    // Incidents of this pet that are still open.
+    supabase.from("incidents").select("id, occurred_at, severity, description, action_taken, parent_notified_at").eq("org_id", org.id).eq("pet_id", b.pet_id).is("resolved_at", null).order("occurred_at", { ascending: false }).limit(5),
   ]);
+  // Who did each of today's tasks, by name.
+  const doers = [...new Set((careToday.data ?? []).flatMap((x) => (x.done_by ? [x.done_by] : [])))];
+  const doneBy = new Map(
+    doers.length > 0 ? ((await supabase.from("memberships").select("user_id, display_name").eq("org_id", org.id).in("user_id", doers)).data ?? []).map((x) => [x.user_id, x.display_name ?? ""]) : [],
+  );
   if (items.error || extras.error || peaks.error || family.error || siblingHolds.error || vaccinations.error || routines.error || bill.error || advances.error || updates.error || charges.error || nightPrice.error || series.error || packs.error || waiting.error) {
     throw new Error("Could not load the booking.");
   }
@@ -328,84 +341,25 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </div>
         ) : null
       ) : bill.data?.status !== "issued" ? (
-        <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} />
+        <div id="pay" className="scroll-mt-4">
+          <PaymentForm words={m} bookingId={b.id} defaultAmount="" today={today} canRefund={false} />
+        </div>
       ) : null}
     </Section>
   ) : null;
   // Checked out by mistake: put back the same day, while no bill is issued.
   const undoable = b.status === "checked_out" && b.checked_out_at !== null && localDate(b.checked_out_at, org.time_zone) === today && bill.data?.status !== "issued";
 
-  return (
+  // The page in parts (D61): Today is what the front desk needs now, and the rest is one tap away. `?tab=all` is
+  // every part on one long page, as it was before the tabs (the browser walk reads it that way).
+  const TABS = ["today", "updates", "bill", "health", "extras", "page", "change"] as const;
+  // A browser that carries the cookie wb_stay_view=all opens on the long page (the walk does); a tab asked for still wins.
+  const longPage = (await cookies()).get("wb_stay_view")?.value === "all";
+  const tab = query.tab === "all" || (longPage && query.tab === undefined) ? "all" : (TABS.find((x) => x === query.tab) ?? "today");
+  const sNext = (
     <>
-      <Link href="/app/bookings" className="no-print mb-2 inline-flex min-h-11 items-center gap-1.5 font-semibold text-slate hover:text-ink">
-        <Icon name="back" className="size-4.5" />
-        {w.allBookings}
-      </Link>
-      <header className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-4 rounded-2xl border border-rule bg-paper p-5 lg:p-6">
-        {pet ? <PetAvatar name={pet.name} url={pet.photo_path ? media.get(pet.photo_path) : null} size="lg" /> : null}
-        <div className="min-w-0 flex-1 basis-72 space-y-2">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight lg:text-[2rem]">{pet?.name ?? w.title}</h1>
-          <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
-          <Badge tone={b.status === "checked_in" ? "good" : b.status === "requested" ? "attention" : "neutral"}>{m.labels.bookingStatus[b.status]}</Badge>
-          {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
-          {b.waitlisted_at ? <Badge tone="attention">{w.waitlist.badge}</Badge> : null}
-          {overstay ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
-          {touching.map((period) => (
-            <Badge key={period.name} tone="attention">
-              {period.noRefund ? fill(w.peakNoRefund, { name: period.name }) : period.name}
-            </Badge>
-          ))}
-          {(pet?.flags ?? []).map((f) => (
-            <Badge key={f} tone="alert">
-              {flagText(m, f)}
-            </Badge>
-          ))}
-        </div>
-        <p className="text-lg">{stayText(t, b.kind, b.start_date, b.end_date)}</p>
-        {b.boarding_from ? (
-          <p className="font-semibold">
-            {fill(w.dayThenBoarding, { date: formatDate(addDays(b.boarding_from, -1), locale), night: formatDate(b.boarding_from, locale) })}
-          </p>
-        ) : null}
-        {b.series_id ? <p className="font-semibold">{fill(w.seriesNote, { n: (series.data ?? []).length, left: seriesLeft })}</p> : null}
-        {paidFrom ? <p className="font-semibold">{fill(w.fromPackNote, { name: paidFrom.name ?? "" })}</p> : null}
-        {sharesWith && b.kennels ? <p className="font-semibold">{fill(w.sharesWith, { kennel: b.kennels.name, pets: sharesWith.join(", ") })}</p> : null}
-        {parent ? (
-          <p className="text-slate">
-            {parent.full_name},{" "}
-            <a href={`tel:${parent.phone}`} className="underline underline-offset-4">
-              {formatPhone(parent.phone)}
-            </a>
-          </p>
-        ) : null}
-        {b.cancel_reason && b.status === "cancelled" ? <p className="text-slate">{fill(w.cancelledBecause, { reason: b.cancel_reason })}</p> : null}
-        </div>
-      </header>
-
-      {justBooked ? (
-        <Notice tone="ok">
-          {b.status === "requested" ? w.savedAsRequest : w.booked}
-          {family.data.length > 0 ? ` ${fill(w.bookedTogether, { n: family.data.length + 1 })}` : ""}
-        </Notice>
-      ) : null}
-
-      {done ? <Notice tone="ok">{done}</Notice> : null}
-      {query.ask === "clean" && b.status === "confirmed" && typeof query.kennel === "string" && /^[0-9a-f-]{36}$/.test(query.kennel) ? (
-        <CleanQuestion t={t} bookingId={b.id} kennelId={query.kennel} />
-      ) : null}
-      {b.status === "confirmed" && pet ? <LastTrial t={t} petId={pet.id} exceptBooking={b.id} /> : null}
-      {b.status === "requested" || b.status === "confirmed" ? (
-        <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
-      ) : null}
-      {(b.status === "requested" || b.status === "confirmed") && pet ? (
-        <HealthAtTheDoor t={t} petId={pet.id} on={b.start_date > today ? b.start_date : today} bookingId={b.id} />
-      ) : null}
-
-      <Columns
-      main={
-      <>
       {open ? (
+        <div id="next" className="scroll-mt-4">
         <Section title={w.next}>
           <NextStep
             t={t}
@@ -417,12 +371,16 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
             stayEnds={b.end_date}
             noRefund={noRefundText}
             waitPlace={waitPlace}
-            updateLink={b.status === "checked_in" ? `/app/bookings/${b.id}/update` : null}
+            // Write update is at the head of the page; the long page keeps it here too.
+            updateLink={b.status === "checked_in" && tab === "all" ? `/app/bookings/${b.id}/update` : null}
           />
         </Section>
+        </div>
       ) : null}
-
-      {b.status === "checked_out" ? billSection : null}
+    </>
+  );
+  const sUndo = (
+    <>
       {undoable ? (
         <ActionForm action={undoCheckOut} className="mb-7 space-y-2">
           <input type="hidden" name="bookingId" value={b.id} />
@@ -432,7 +390,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </SubmitButton>
         </ActionForm>
       ) : null}
-
+    </>
+  );
+  const sStayPage = (
+    <>
       {b.status !== "cancelled" && b.status !== "no_show" ? (
         <Section title={w.stayPage}>
           <p className="mb-3 break-all text-slate">{stayUrl}</p>
@@ -449,7 +410,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </div>
         </Section>
       ) : null}
-
+    </>
+  );
+  const sFamily = (
+    <>
       {family.data.length > 0 ? (
         <Section title={w.bookedTogetherTitle} count={family.data.length}>
           <Ledger>
@@ -464,8 +428,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </Ledger>
         </Section>
       ) : null}
-
-      <div id="extras" />
+    </>
+  );
+  const sCosts = (
+    <>
       <Section title={w.costs.title}>
         <Ledger>
           {quote.lines.map((l, i) => (
@@ -545,7 +511,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         ) : null}
       </Section>
-
+    </>
+  );
+  const sAppointments = (
+    <>
       {org.offers_appointments || b.package_id ? (
         <StayAppointments
           t={t}
@@ -556,29 +525,50 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           notice={query.package === "applied" || query.package === "left" ? query.package : null}
         />
       ) : null}
-
+    </>
+  );
+  const sTrips = (
+    <>
       {org.offers_food_delivery && parent && b.status !== "no_show" ? (
         <StayTrips t={t} booking={{ ...b, client_id: parent.id, clients: parent }} open={b.status === "requested" || b.status === "confirmed" || b.status === "checked_in"} />
       ) : null}
-
+    </>
+  );
+  const sShop = (
+    <>
       {org.offers_shop && b.status !== "requested" ? (
         <StayShop t={t} org={org} bookingId={b.id} open={b.status === "confirmed" || b.status === "checked_in"} canManage={canManage} cancelled={query.done === "sale-cancelled"} />
       ) : null}
-
+    </>
+  );
+  const sSupplies = (
+    <>
       {pet && (b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") ? (
         <StaySupplies t={t} bookingId={b.id} petId={pet.id} status={b.status} />
       ) : null}
-
+    </>
+  );
+  const sTrial = (
+    <>
       <TrialPanel t={t} booking={b} />
-
+    </>
+  );
+  const sVet = (
+    <>
       {pet && (b.status === "checked_in" || b.status === "checked_out") ? (
         <VetVisits t={t} bookingId={b.id} petName={pet.name} parent={parent} open={b.status === "checked_in"} />
       ) : null}
-
+    </>
+  );
+  const sReport = (
+    <>
       {pet && b.status === "checked_out" ? (
         <StayReportPanel t={t} booking={b} petName={pet.name} parent={parent} stayUrl={stayUrl} />
       ) : null}
-
+    </>
+  );
+  const sCancelMoney = (
+    <>
       {b.status === "cancelled" && !bill.data ? (
         <StayCancellation
           t={t}
@@ -587,9 +577,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           settled={query.money === "settled"}
         />
       ) : null}
-
-      {b.status === "checked_out" ? null : billSection}
-
+    </>
+  );
+  const sChange = (
+    <>
       {open ? (
         <Section title={w.change.title}>
           <ActionForm action={updateBooking} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
@@ -660,7 +651,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         </Section>
       ) : null}
-
+    </>
+  );
+  const sPack = (
+    <>
       {canPayFrom ? (
         <ActionForm action={payFromPack} className="mb-6">
           <input type="hidden" name="bookingId" value={b.id} />
@@ -669,7 +663,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </SubmitButton>
         </ActionForm>
       ) : null}
-
+    </>
+  );
+  const sSeries = (
+    <>
       {b.series_id && open && seriesLeft > 0 ? (
         <details className="mb-6 rounded-xl border border-rule bg-paper p-4">
           <summary className="inline-flex min-h-12 cursor-pointer items-center font-semibold">{w.cancelRest}</summary>
@@ -685,7 +682,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         </details>
       ) : null}
-
+    </>
+  );
+  const sOvernight = (
+    <>
       {open && canManage && b.kind === "daycare" && !b.series_id && !b.pass_id ? (
         <Section title={w.overnight.title}>
           <ActionForm action={switchToBoarding} className="space-y-4 rounded-xl border border-rule bg-paper p-4">
@@ -713,11 +713,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         </Section>
       ) : null}
-
-      </>
-      }
-      side={
-      <>
+    </>
+  );
+  const sRoutines = (
+    <>
       {pet ? (
         <Section title={fill(w.routines.title, { pet: pet.name })} count={routines.data.length}>
           {routines.data.length === 0 ? (
@@ -755,7 +754,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           <RoutineForm petId={pet.id} />
         </Section>
       ) : null}
-
+    </>
+  );
+  const sUpdates = (
+    <>
       {b.status !== "cancelled" && b.status !== "no_show" ? (
         <Section title={w.updates.title} count={updates.data.length}>
           {updates.data.length === 0 ? (
@@ -812,7 +814,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </Link>
         </Section>
       ) : null}
-
+    </>
+  );
+  const sAbout = (
+    <>
       {pet ? (
         <Section title={fill(w.about.title, { pet: pet.name })}>
           <div className="mb-4 rounded-xl border border-rule bg-paper p-4">
@@ -837,7 +842,10 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           ) : null}
         </Section>
       ) : null}
-
+    </>
+  );
+  const sCancel = (
+    <>
       {b.status === "requested" || b.status === "confirmed" ? (
         <Section title={w.cancel.title}>
           {noRefund.length > 0 ? (
@@ -865,9 +873,317 @@ async function Booking({ params, searchParams }: Pick<PageProps<"/app/bookings/[
           </ActionForm>
         </Section>
       ) : null}
-      </>
-      }
-      />
+    </>
+  );
+  const here = `/app/bookings/${b.id}`;
+  const skipId = typeof query.skip === "string" ? query.skip : null;
+  const hasStayPage = b.status !== "cancelled" && b.status !== "no_show";
+  // A pet in house is checked out from the head of the page; the step itself opens when asked for, or when the stay has run over.
+  const showNext = open && (tab === "all" || b.status !== "checked_in" || overstay || query.step === "out");
+  const early = leavingEarly({ status: b.status, endDate: b.end_date }, today);
+  const lastUpdate = updates.data.find((u) => u.is_visible_to_parent) ?? null;
+  const paidOnBill = bill.data ? (bill.data.total_minor ?? 0) - (bill.data.due_minor ?? 0) : 0;
+  const dueNow = bill.data ? (bill.data.due_minor ?? 0) : quote.totalMinor - advanceMinor;
+  const age = pet?.date_of_birth ? ageOn(pet.date_of_birth, today) : null;
+  // Once there is a bill, its own lines are what the parent is asked to pay, not today's estimate.
+  const billLines = bill.data?.invoice_id
+    ? ((await supabase.from("invoice_lines").select("description, total_minor").eq("org_id", org.id).eq("invoice_id", bill.data.invoice_id).order("sort_order")).data ?? [])
+    : null;
+  const dateTime = (at: string) =>
+    new Intl.DateTimeFormat(locale, { timeZone: org.time_zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(at));
+
+  const todayMain = (
+    <>
+      {showNext ? sNext : null}
+      {b.status === "checked_out" ? billSection : null}
+      {sUndo}
+      {pet ? <StayIncidents
+          t={t}
+          incidents={openIncidents.data ?? []}
+          phone={parent?.phone ?? null}
+          timeZone={org.time_zone}
+          opener={fill(p.m.whatsapp.incident, { parent: parent?.full_name.split(" ")[0] ?? "", kennel: org.name, pet: pet.name })}
+        /> : null}
+      {b.status === "checked_in" ? (
+        <StayCareToday t={t} tasks={careToday.data ?? []} names={doneBy} timeZone={org.time_zone} skipId={skipId} href={here} />
+      ) : null}
+      {lastUpdate && hasStayPage ? (
+        <Section
+          title={fill(w.lastUpdate.title, { name: parent?.full_name.split(" ")[0] ?? "" })}
+          meta={dateTime(lastUpdate.created_at)}
+          action={
+            <Link href={`${here}?tab=updates`} className={buttonStyles.quiet}>
+              {w.lastUpdate.all}
+            </Link>
+          }
+        >
+          <p className="whitespace-pre-line">{lastUpdate.body}</p>
+          {lastUpdate.media_paths.some((path) => media.get(path)) ? (
+            <div className="mt-3.5 grid grid-cols-3 gap-2.5">
+              {lastUpdate.media_paths.slice(0, 3).map((path) =>
+                media.get(path) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed link to a private file
+                  <img key={path} src={media.get(path)} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-xl bg-mist object-cover" />
+                ) : null,
+              )}
+            </div>
+          ) : null}
+        </Section>
+      ) : null}
+    </>
+  );
+  const todaySide = (
+    <>
+      {b.status !== "requested" && b.status !== "cancelled" && b.status !== "no_show" && !b.series_id ? (
+        <BillSoFar
+          t={t}
+          lines={billLines ? billLines.map((l) => ({ label: l.description, totalMinor: l.total_minor })) : quote.lines.map((l, i) => ({
+            label: fill(l.discountMinor > 0 ? w.costs.lineLess : w.costs.line, {
+              what: i < stayCharges.length ? chargeLabel(stayCharges[i]) : l.description,
+              quantity: l.quantity,
+              price: money(l.unitPriceMinor),
+              discount: money(l.discountMinor),
+            }),
+            totalMinor: l.totalMinor,
+          }))}
+          taxMinor={bill.data ? 0 : quote.taxMinor}
+          totalMinor={bill.data?.total_minor ?? quote.totalMinor}
+          paidMinor={bill.data ? paidOnBill : advanceMinor}
+          dueMinor={dueNow}
+          status={<Badge tone={bill.data?.status === "issued" ? (dueNow > 0 ? "attention" : "good") : "neutral"}>{bill.data?.status === "issued" ? (bill.data.number ?? "") : w.bill.notIssued}</Badge>}
+          money={money}
+        >
+          {bill.data ? (
+            <Link href={`/app/bills/${bill.data.invoice_id}`} className={buttonStyles.primary}>
+              {w.billSoFar.open}
+            </Link>
+          ) : (
+            <>
+              <ActionForm action={makeBill} className="contents">
+                <input type="hidden" name="bookingId" value={b.id} />
+                <SubmitButton pendingLabel={w.bill.making}>{w.billSoFar.make}</SubmitButton>
+              </ActionForm>
+              <Link href={`${here}?tab=bill#pay`} className={buttonStyles.secondary}>
+                {w.billSoFar.pay}
+              </Link>
+            </>
+          )}
+        </BillSoFar>
+      ) : null}
+      {pet ? <HealthCard t={t} vaccinations={vaccinations.data} allergies={pet.allergies} stayEnds={b.end_date} href={`${here}?tab=health`} /> : null}
+      {parent ? <ParentCard
+          t={t}
+          parent={parent}
+          notes={b.notes}
+          stayUrl={hasStayPage ? stayUrl : null}
+          hello={fill(p.m.whatsapp.hello, { parent: parent.full_name.split(" ")[0], kennel: org.name, pet: pet?.name ?? p.m.whatsapp.yourPet })}
+        /> : null}
+    </>
+  );
+
+  return (
+    <>
+      <Link href="/app/bookings" className="no-print mb-2 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-[650] text-steel hover:text-ink">
+        <Icon name="back" className="size-[18px]" />
+        {w.allBookings}
+      </Link>
+      <header className="mb-(--wb-gap) rounded-2xl border border-rule bg-paper px-(--wb-pad) pt-5 lg:px-6 lg:pt-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          {pet ? <PetAvatar name={pet.name} url={pet.photo_path ? media.get(pet.photo_path) : null} size="lg" /> : null}
+          <div className="min-w-0 flex-[1_1_320px]">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-[28px] font-extrabold leading-[1.1] tracking-[-0.02em] lg:text-[34px]">{pet?.name ?? w.title}</h1>
+              <DoorTag name={b.kennels?.name} empty={m.common.noKennel} />
+              <Badge tone={b.status === "checked_in" ? "good" : b.status === "requested" ? "attention" : "neutral"}>{m.labels.bookingStatus[b.status]}</Badge>
+              {b.kind === "daycare" ? <Badge>{m.labels.bookingKind.daycare}</Badge> : null}
+              {b.waitlisted_at ? <Badge tone="attention">{w.waitlist.badge}</Badge> : null}
+              {(openIncidents.data ?? []).length > 0 ? <Badge tone="alert">{m.today.incidents}</Badge> : null}
+              {overstay ? <Badge tone="alert">{fill(m.today.wasDueToLeave, { date: formatDate(b.end_date, locale) })}</Badge> : null}
+              {touching.map((period) => (
+                <Badge key={period.name} tone="attention">
+                  {period.noRefund ? fill(w.peakNoRefund, { name: period.name }) : period.name}
+                </Badge>
+              ))}
+              {(pet?.flags ?? []).map((f) => (
+                <Badge key={f} tone="alert">
+                  {flagText(m, f)}
+                </Badge>
+              ))}
+            </div>
+            {pet ? (
+              <p className="mt-1.5 text-[15px] text-slate">
+                {[
+                  pet.breed,
+                  pet.sex !== "unknown" ? m.labels.sex[pet.sex].toLowerCase() : null,
+                  age ? ("years" in age ? plural(t.language, age.years, w.aboutPet.years) : plural(t.language, age.months, w.aboutPet.months)) : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                {pet.weight_g ? ` · ${fill(w.aboutPet.kg, { kg: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(pet.weight_g / 1000) })}` : null}
+              </p>
+            ) : null}
+            <p className="mt-1.5 text-[15px]">
+              <strong>{shortDatesText(t, b.start_date, b.end_date, today)}</strong>
+              {shortStayText(t, b.kind, b.start_date, b.end_date, today).slice(shortDatesText(t, b.start_date, b.end_date, today).length)}
+              {" · "}
+              {fill(b.kind === "boarding" ? w.priceNightShort : w.priceDayShort, { price: money(b.rate_minor) })}
+              {parent ? (
+                <>
+                  {" · "}
+                  <Link href={`/app/clients/${parent.id}`} className="font-bold underline underline-offset-4">
+                    {parent.full_name}
+                  </Link>
+                  ,{" "}
+                  <a href={`tel:${parent.phone}`} className="underline-offset-4 hover:underline">
+                    {formatPhone(parent.phone)}
+                  </a>
+                </>
+              ) : null}
+            </p>
+            {b.boarding_from ? (
+              <p className="mt-1 font-semibold">{fill(w.dayThenBoarding, { date: formatDate(addDays(b.boarding_from, -1), locale), night: formatDate(b.boarding_from, locale) })}</p>
+            ) : null}
+            {b.series_id ? <p className="mt-1 font-semibold">{fill(w.seriesNote, { n: (series.data ?? []).length, left: seriesLeft })}</p> : null}
+            {paidFrom ? <p className="mt-1 font-semibold">{fill(w.fromPackNote, { name: paidFrom.name ?? "" })}</p> : null}
+            {sharesWith && b.kennels ? <p className="mt-1 font-semibold">{fill(w.sharesWith, { kennel: b.kennels.name, pets: sharesWith.join(", ") })}</p> : null}
+            {b.cancel_reason && b.status === "cancelled" ? <p className="mt-1 text-slate">{fill(w.cancelledBecause, { reason: b.cancel_reason })}</p> : null}
+          </div>
+          {b.status === "checked_in" && tab !== "all" ? (
+            <div className="no-print flex flex-wrap gap-2">
+              <Link href={`${here}/update`} className={buttonStyles.whatsapp}>
+                {w.step.writeUpdate}
+              </Link>
+              {pet ? (
+                <Link href={`/app/dogs/${pet.id}/incident`} className={buttonStyles.secondary}>
+                  {m.today.incident}
+                </Link>
+              ) : null}
+              <Link href={`${here}?step=out#next`} className={buttonStyles.secondary}>
+                {early ? m.today.checkOutEarly : m.today.checkOut}
+              </Link>
+            </div>
+          ) : null}
+        </div>
+        <nav aria-label={w.tabs.label} className="no-print -mx-1 mt-5 flex gap-1 overflow-x-auto">
+          {TABS.map((x) => {
+            const on = tab === x;
+            return (
+              <Link
+                key={x}
+                href={x === "today" ? here : `${here}?tab=${x}`}
+                aria-current={on ? "page" : undefined}
+                className={`inline-flex min-h-12 items-center gap-2 whitespace-nowrap border-b-[3px] px-3.5 text-[15px] ${on ? "border-ink font-bold text-ink" : "border-transparent font-[650] text-slate hover:text-ink"}`}
+              >
+                {w.tabs[x]}
+                {x === "updates" && updates.data.length > 0 ? <Count n={updates.data.length} /> : null}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
+
+      {justBooked ? (
+        <Notice tone="ok">
+          {b.status === "requested" ? w.savedAsRequest : w.booked}
+          {family.data.length > 0 ? ` ${fill(w.bookedTogether, { n: family.data.length + 1 })}` : ""}
+        </Notice>
+      ) : null}
+
+      {done ? <Notice tone="ok">{done}</Notice> : null}
+      {query.ask === "clean" && b.status === "confirmed" && typeof query.kennel === "string" && /^[0-9a-f-]{36}$/.test(query.kennel) ? (
+        <CleanQuestion t={t} bookingId={b.id} kennelId={query.kennel} />
+      ) : null}
+      {b.status === "confirmed" && pet ? <LastTrial t={t} petId={pet.id} exceptBooking={b.id} /> : null}
+      {b.status === "requested" || b.status === "confirmed" ? (
+        <VaccinationWarnings t={t} warnings={vaccinationWarnings(vaccinations.data, { startDate: b.start_date, endDate: b.end_date })} />
+      ) : null}
+      {(b.status === "requested" || b.status === "confirmed") && pet ? (
+        <HealthAtTheDoor t={t} petId={pet.id} on={b.start_date > today ? b.start_date : today} bookingId={b.id} />
+      ) : null}
+
+      {tab === "all" ? (
+        <Columns
+          main={
+            <>
+              {showNext ? sNext : null}
+              {b.status === "checked_out" ? billSection : null}
+              {sUndo}
+              {sStayPage}
+              {sFamily}
+              <div id="extras" />
+              {sCosts}
+              {sAppointments}
+              {sTrips}
+              {sShop}
+              {sSupplies}
+              {sTrial}
+              {sVet}
+              {sReport}
+              {sCancelMoney}
+              {b.status === "checked_out" ? null : billSection}
+              {sChange}
+              {sPack}
+              {sSeries}
+              {sOvernight}
+            </>
+          }
+          side={
+            <>
+              {sRoutines}
+              {sUpdates}
+              {sAbout}
+              {sCancel}
+            </>
+          }
+        />
+      ) : tab === "today" ? (
+        <Columns main={todayMain} side={todaySide} />
+      ) : tab === "updates" ? (
+        <Narrow>
+          {sUpdates}
+          {sReport}
+        </Narrow>
+      ) : tab === "bill" ? (
+        <Narrow>
+          {billSection}
+          {sCancelMoney}
+          {sPack}
+          {sCosts}
+        </Narrow>
+      ) : tab === "health" ? (
+        <Columns
+          main={
+            <>
+              <div id="routines" />
+              {sRoutines}
+              {sSupplies}
+              {sVet}
+              {sTrial}
+            </>
+          }
+          side={sAbout}
+        />
+      ) : tab === "extras" ? (
+        <Narrow>
+          <div id="extras" />
+          {sCosts}
+          {sAppointments}
+          {sTrips}
+          {sShop}
+        </Narrow>
+      ) : tab === "page" ? (
+        <Narrow>
+          {sStayPage}
+          {sFamily}
+        </Narrow>
+      ) : (
+        <Narrow>
+          {sChange}
+          {sSeries}
+          {sOvernight}
+          {sCancel}
+        </Narrow>
+      )}
     </>
   );
 }

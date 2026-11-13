@@ -1,5 +1,5 @@
 import type { Enums } from "./supabase/database.types";
-import { formatDate, nightsBetween, type ISODate } from "./core";
+import { formatDate, nightsBetween, shortRange, type ISODate } from "./core";
 import { fill, plural, type Language } from "./i18n";
 import type { Messages } from "@/messages";
 
@@ -18,6 +18,26 @@ export function stayText(t: Words, kind: Enums<"booking_kind">, startDate: ISODa
     dates: datesText(t, startDate, endDate),
     length: plural(t.language, units, kind === "boarding" ? t.m.stay.nights : t.m.stay.days),
   });
+}
+
+/**
+ * A stay in a row of a list: "2 to 6 Nov, 4 nights" or "2 Nov, 1 day". The
+ * year is left out while the stay is in the year of `today`.
+ */
+export function shortStayText(t: Words, kind: Enums<"booking_kind">, startDate: ISODate, endDate: ISODate, today: ISODate): string {
+  const nights = nightsBetween(startDate, endDate);
+  const units = kind === "boarding" ? nights : nights + 1;
+  return fill(t.m.stay.withLength, {
+    dates: shortDatesText(t, startDate, endDate, today),
+    length: plural(t.language, units, kind === "boarding" ? t.m.stay.nights : t.m.stay.days),
+  });
+}
+
+/** "2 to 6 Nov", or "2 Nov" when the two dates are the same. */
+export function shortDatesText(t: Words, startDate: ISODate, endDate: ISODate, today: ISODate): string {
+  const year = Number(today.slice(0, 4));
+  const [start, end] = shortRange(startDate, endDate, year, t.locale);
+  return startDate === endDate ? end : fill(t.m.stay.dates, { start, end });
 }
 
 /** "14 Apr 2027 to 17 Apr 2027", or one date when they are the same. */

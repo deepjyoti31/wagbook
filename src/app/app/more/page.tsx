@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Icon } from "@/components/icons";
+import { MoreMenu, type MoreGroup } from "@/components/more-menu";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { buttonStyles, Field, Ledger, Loading, Notice, PageTitle, Section, Select } from "@/components/ui";
+import { buttonStyles, Field, Loading, Notice, PageTitle, Select } from "@/components/ui";
 import { switchOrganisation } from "@/app/app/actions";
 import { getMemberships, requireOrg } from "@/lib/auth";
 import { fill, LANGUAGE_NAMES, LANGUAGES, plural } from "@/lib/i18n";
@@ -20,7 +20,7 @@ export default function MorePage({ searchParams }: PageProps<"/app/more">) {
       <Suspense fallback={<Loading />}>
         <Menu searchParams={searchParams} />
       </Suspense>
-      <div className="mt-2 max-w-3xl rounded-2xl border border-rule bg-paper p-5 lg:p-6">
+      <div id="account" className="mt-2 max-w-3xl scroll-mt-4 rounded-2xl border border-rule bg-paper p-5 lg:p-6">
         <Suspense fallback={<Loading />}>
           <Account />
         </Suspense>
@@ -31,35 +31,62 @@ export default function MorePage({ searchParams }: PageProps<"/app/more">) {
 
 async function Menu({ searchParams }: Pick<PageProps<"/app/more">, "searchParams">) {
   const done = (await searchParams).done;
-  const { org, canManage } = await requireOrg();
-  const { m } = await getAppI18n();
+  const { org, canManage, role, displayName } = await requireOrg();
+  const { m, language } = await getAppI18n();
+  const supabase = await createClient();
+  const [forms, level, memberships] = await Promise.all([
+    supabase.from("intake_submissions").select("id", { count: "exact", head: true }).eq("org_id", org.id).eq("status", "new"),
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+    getMemberships(),
+  ]);
+  const links = menuFor(org, canManage);
+  const groups: MoreGroup[] = [
+    ...MENU_GROUPS.map((group) => ({
+      key: group,
+      title: m.more.groups[group],
+      // The day's work and the money say what each page is for; what is set up once is named only.
+      describe: group === "daily" || group === "money",
+      fold: group === "setup" ? 5 : undefined,
+      links: links
+        .filter((l) => l.group === group)
+        .map((l) => ({ href: l.href, title: m.more.links[l.key].title, about: m.more.links[l.key].about, count: l.key === "intake" ? (forms.count ?? 0) : undefined })),
+    })),
+    {
+      key: "you",
+      title: m.more.you,
+      describe: false,
+      links: [
+        { href: "/app/more#account", title: m.language.title, about: "", value: LANGUAGE_NAMES[language] },
+        { href: "/app/more/two-step", title: m.more.twoStepLink, about: "", value: level.data?.nextLevel === "aal2" ? m.more.twoStepOn : m.more.twoStepOff },
+        { href: "/app/more/password", title: m.account.passwordLink, about: "" },
+      ],
+    },
+  ];
+  const name = displayName || org.name;
+  const others = memberships.filter((x) => x.organizations!.id !== org.id).length;
   return (
     <>
-      <PageTitle title={m.more.title} />
-      {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
-      {/* Side by side on a laptop, one under another on a phone. */}
-      <div className="gap-6 @4xl:columns-2 [&>section]:break-inside-avoid">
-      {MENU_GROUPS.map((group) => {
-        const links = menuFor(org, canManage).filter((l) => l.group === group);
-        return links.length === 0 ? null : (
-          <Section key={group} title={m.more.groups[group]}>
-            <Ledger>
-              {links.map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} className="flex min-h-14 items-center gap-3 px-5 py-3.5 hover:bg-wash">
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-bold">{m.more.links[l.key].title}</span>
-                      <span className="block text-sm text-slate">{m.more.links[l.key].about}</span>
-                    </span>
-                    <Icon name="forward" className="size-5 text-slate/60" />
-                  </Link>
-                </li>
-              ))}
-            </Ledger>
-          </Section>
-        );
-      })}
+      {/* Phone: who is signed in on a dark bar, in place of the kennel's name. */}
+      <header className="wb-dark -mx-4 -mt-[18px] mb-3.5 flex flex-col gap-3 bg-ink px-4 pb-4 pt-3.5 text-paper sm:hidden">
+        <h1 className="text-[26px] font-extrabold leading-[1.15] tracking-[-0.02em]">{m.more.title}</h1>
+        <div className="flex items-center gap-3 rounded-xl bg-ink-soft px-3 py-2.5">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-[#dfe6f3] font-extrabold text-ink">{name.trim().charAt(0).toUpperCase() || "?"}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-bold">{name}</p>
+            <p className="truncate text-[13px] text-[#c9d1e0]">{fill(m.more.roleAt, { role: m.labels.role[role], kennel: org.name })}</p>
+          </div>
+          {others > 0 ? (
+            <Link href="#account" className="inline-flex min-h-11 items-center px-1 text-sm font-bold text-marigold">
+              {m.more.switch}
+            </Link>
+          ) : null}
+        </div>
+      </header>
+      <div className="hidden sm:block">
+        <PageTitle title={m.more.title} />
       </div>
+      {done === "language" ? <Notice tone="ok">{m.language.saved}</Notice> : null}
+      <MoreMenu groups={groups} words={{ findPage: m.more.findPage, noPage: m.more.noPage, andMore: m.more.andMore }} />
     </>
   );
 }
@@ -111,16 +138,6 @@ async function Account() {
           <Notice tone="info">{m.more.ownerNudge}</Notice>
         </div>
       ) : null}
-      <p className="mt-4">
-        <Link href="/app/more/two-step" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
-          {m.more.twoStepLink}: {twoStepOn ? m.more.twoStepOn : m.more.twoStepOff}
-        </Link>
-      </p>
-      <p>
-        <Link href="/app/more/password" className="inline-flex min-h-12 items-center font-semibold underline underline-offset-4">
-          {m.account.passwordLink}
-        </Link>
-      </p>
       <ActionForm action={setMyLanguage} className="mt-6 flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <Field label={m.language.yours} hint={m.language.yoursHint}>
@@ -139,7 +156,7 @@ async function Account() {
       </ActionForm>
       {language === "en" ? null : <p className="mt-2 text-sm text-slate">{m.language.draftNote}</p>}
       <form action={signOut} className="mt-6">
-        <button type="submit" className={buttonStyles.secondary}>
+        <button type="submit" className={`${buttonStyles.secondary} w-full text-alert-ink!`}>
           {m.more.signOut}
         </button>
       </form>

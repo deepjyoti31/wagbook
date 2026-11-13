@@ -2,31 +2,30 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { NewBookingFields } from "@/components/new-booking-fields";
-import { buttonStyles, Empty, Field, Input, Loading, Narrow, PageTitle, Textarea, formActionsStyles, formCardStyles } from "@/components/ui";
+import { Empty, Loading, PageTitle } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { requireOrg } from "@/lib/auth";
 import { addDays, formatMoney, isISODate, todayIn } from "@/lib/core";
 import { fill } from "@/lib/i18n";
-import { appTitle, getAppI18n } from "@/lib/i18n-server";
+import { appTitle, getAppI18n, parentI18n } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
 import { hasPets, startingPets } from "@/lib/pet-search";
-import { createBooking, findPets } from "../actions";
+import { createBooking, findPets, petFacts } from "../actions";
 
 export const generateMetadata = () => appTitle((m) => m.newBooking.title);
 
 export default function NewBookingPage({ searchParams }: PageProps<"/app/bookings/new">) {
   return (
-    <Narrow>
-      <Suspense fallback={<Loading />}>
-        <NewBookingForm searchParams={searchParams} />
-      </Suspense>
-    </Narrow>
+    <Suspense fallback={<Loading />}>
+      <NewBookingForm searchParams={searchParams} />
+    </Suspense>
   );
 }
 
 async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/new">, "searchParams">) {
   const params = await searchParams;
   const { org, canManage } = await requireOrg();
-  const { m, locale } = await getAppI18n();
+  const { m, language, locale } = await getAppI18n();
   const w = m.newBooking;
   const supabase = await createClient();
 
@@ -82,54 +81,61 @@ async function NewBookingForm({ searchParams }: Pick<PageProps<"/app/bookings/ne
           ? fill(w.usualDaycare, { daycare })
           : "";
 
+  // The reminder goes to the parent, in the kennel's language for parents.
+  const parent = parentI18n(org.parent_language, org.locale);
+  const symbol = new Intl.NumberFormat(locale, { style: "currency", currency: org.currency }).formatToParts(0).find((part) => part.type === "currency")?.value ?? "";
+
   return (
     <>
-      <PageTitle eyebrow={m.bookings.title} title={w.title} />
-      <ActionForm action={createBooking} className={`${formCardStyles} max-w-4xl`}>
+      <Link href="/app/bookings" className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-[650] text-steel hover:text-ink">
+        <Icon name="back" className="size-[18px]" />
+        {w.back}
+      </Link>
+      <PageTitle title={w.title} />
+      <ActionForm action={createBooking} className="">
         <NewBookingFields
-          pickerWords={w.picker}
+          words={w}
+          language={language}
+          locale={locale}
           defaultPetId={askedPet}
           pets={pets}
           search={findPets}
-          stay={{
-            words: w,
-            kennels: kennels.data,
-            holds: holds.data.map((h) => ({ kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date })),
-            defaultKind: pick(params.kind) === "daycare" ? "daycare" : "boarding",
-            defaultStart: start && isISODate(start) ? start : today,
-            defaultEnd: end && isISODate(end) ? end : "",
-            defaultKennelId: kennel && kennels.data.some((k) => k.id === kennel) ? kennel : "",
-            sharedPrice: { boarding: sharedPrice("boarding"), daycare: sharedPrice("daycare") },
-            locale,
-          }}
+          facts={petFacts}
+          healthWords={{ noneOnRecord: m.vaccinations.noneOnRecord, aVaccine: m.vaccinations.aVaccine, expiredBefore: m.vaccinations.expiredBefore, runsOutDuring: m.vaccinations.runsOutDuring }}
+          reminder={{ none: parent.m.whatsapp.reminders.vaccinationNone, lapses: parent.m.whatsapp.reminders.vaccinationLapses, kennel: org.name, locale: parent.locale }}
+          kennels={kennels.data}
+          holds={holds.data.map((h) => ({ kennelId: h.kennel_id as string, clientId: h.client_id, kind: h.kind, startDate: h.start_date, endDate: h.end_date }))}
+          defaultKind={pick(params.kind) === "daycare" ? "daycare" : "boarding"}
+          defaultStart={start && isISODate(start) ? start : today}
+          defaultEnd={end && isISODate(end) ? end : ""}
+          defaultKennelId={kennel && kennels.data.some((k) => k.id === kennel) ? kennel : ""}
+          sharedPrice={{ boarding: sharedPrice("boarding"), daycare: sharedPrice("daycare") }}
+          usualPrice={{ boarding: boarding ?? null, daycare: daycare ?? null }}
+          price={
+            canManage
+              ? { canSet: true, hint: usual ? fill(w.leaveEmpty, { usual }) : w.noUsualHint, symbol }
+              : { canSet: false, text: `${usual ? fill(w.pricedAt, { usual }) : w.noUsual} ${w.onlyManagers}` }
+          }
+          notesLabel={w.notes}
+          footer={
+            <>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <SubmitButton name="intent" value="confirmed" pendingLabel={w.booking}>
+                  {w.confirm}
+                </SubmitButton>
+                <SubmitButton name="intent" value="requested" variant="secondary" pendingLabel={m.common.saving}>
+                  {w.saveAsRequest}
+                </SubmitButton>
+                <SubmitButton name="intent" value="waitlist" variant="quiet" pendingLabel={m.common.saving}>
+                  {w.addToWaitlist}
+                </SubmitButton>
+              </div>
+              <p className="mt-2.5 text-sm text-slate">
+                {w.requestNote} {w.waitlistNote}
+              </p>
+            </>
+          }
         />
-        {canManage ? (
-          <Field label={w.price} hint={usual ? fill(w.leaveEmpty, { usual }) : w.noUsualHint}>
-            <Input name="rate" inputMode="decimal" placeholder={boarding ?? undefined} />
-          </Field>
-        ) : (
-          <p className="text-slate">
-            {usual ? fill(w.pricedAt, { usual }) : w.noUsual} {w.onlyManagers}
-          </p>
-        )}
-        <Field label={w.notes}>
-          <Textarea name="notes" maxLength={2000} />
-        </Field>
-        <div className={formActionsStyles}>
-          <SubmitButton name="intent" value="confirmed" pendingLabel={w.booking}>
-            {w.confirm}
-          </SubmitButton>
-          <SubmitButton name="intent" value="requested" variant="secondary" pendingLabel={m.common.saving}>
-            {w.saveAsRequest}
-          </SubmitButton>
-          <SubmitButton name="intent" value="waitlist" variant="secondary" pendingLabel={m.common.saving}>
-            {w.addToWaitlist}
-          </SubmitButton>
-          <Link href="/app/bookings" className={buttonStyles.quiet}>
-            {w.back}
-          </Link>
-        </div>
-        <p className="text-sm text-slate">{w.requestNote} {w.waitlistNote}</p>
       </ActionForm>
     </>
   );

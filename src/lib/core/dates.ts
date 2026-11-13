@@ -76,6 +76,44 @@ export function formatDate(date: ISODate, locale = "en-IN"): string {
   }).format(new Date(toUTC(date)));
 }
 
+/** "2 Nov" style: a date this year, where the year would only be noise (a row on Today, the calendar). */
+export function formatDay(date: ISODate, locale = "en-IN"): string {
+  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(toUTC(date)));
+}
+
+/** "Monday, 2 November" style: the day a screen is about, as its heading. */
+export function formatWeekday(date: ISODate, locale = "en-IN"): string {
+  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(toUTC(date)));
+}
+
+/**
+ * The two ends of a stay, written short: ["2", "6 Nov"] within a month,
+ * ["29 Oct", "2 Nov"] across months, and with the years when the stay is not
+ * all in `thisYear` (["29 Dec 2026", "2 Jan 2027"]). The caller joins them
+ * with its own word for "to".
+ */
+export function shortRange(startDate: ISODate, endDate: ISODate, thisYear: number, locale = "en-IN"): [string, string] {
+  const [sy, sm] = startDate.split("-").map(Number);
+  const [ey, em] = endDate.split("-").map(Number);
+  if (sy !== thisYear || ey !== thisYear) return [formatDate(startDate, locale), formatDate(endDate, locale)];
+  if (sm !== em) return [formatDay(startDate, locale), formatDay(endDate, locale)];
+  const day = new Intl.DateTimeFormat(locale, { timeZone: "UTC", day: "numeric" }).format(new Date(toUTC(startDate)));
+  return [day, formatDay(endDate, locale)];
+}
+
+/**
+ * How old something born on `born` is on `on`, in whole years, or in whole
+ * months while under a year: { years: 4 } or { months: 7 }. Null when it is
+ * not born yet.
+ */
+export function ageOn(born: ISODate, on: ISODate): { years: number } | { months: number } | null {
+  const [by, bm, bd] = born.split("-").map(Number);
+  const [oy, om, od] = on.split("-").map(Number);
+  const months = (oy - by) * 12 + (om - bm) - (od < bd ? 1 : 0);
+  if (months < 0) return null;
+  return months >= 12 ? { years: Math.floor(months / 12) } : { months };
+}
+
 /**
  * Financial year label for a date.
  * India's financial year runs 1 April to 31 March, so 14 Apr 2027 is in

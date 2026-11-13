@@ -49,6 +49,12 @@ export const kennelArea = {
     twoStepOn: "on",
     twoStepOff: "off",
     ownerNudge: "You own this kennel. Turn on two-step sign-in, so that a stolen password is not enough to get in.",
+    findPage: "Find a page",
+    noPage: "No page matches that.",
+    you: "You",
+    roleAt: "{role} at {kennel}",
+    switch: "Switch",
+    andMore: "{list} and {n} more",
   },
   twoStep: {
     title: "Two-step sign-in",
@@ -524,6 +530,15 @@ export const kennelArea = {
       recoveryWrong: "That recovery code did not work, or it was used already. Check it and try again.",
       signOut: "Sign out",
     },
+    panel: {
+      headline: "Bookings, daily care, bills and parent updates for your kennel.",
+      desk: "At the front desk on a laptop, and in the yard on a phone.",
+      parents: "Parents get updates, photos and bills on WhatsApp.",
+      open: "Open source. Your records stay in your own database.",
+      language: "Language",
+    },
+    show: "Show",
+    hide: "Hide",
   },
   onboarding: {
     title: "Set up your kennel",

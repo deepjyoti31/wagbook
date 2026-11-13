@@ -16,9 +16,27 @@ test.describe.configure({ mode: "serial" });
 
 // Each test is a different visitor to the app's rate limits (src/lib/rate-limit.ts),
 // as the kennel's staff on their own phones would be. One test below shares an address on purpose.
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, baseURL }) => {
   await context.setExtraHTTPHeaders({ "x-real-ip": `198.51.100.${Math.floor(Math.random() * 250) + 1}` });
+  // A booking's page is in tabs (D61). The walk reads it as one long page, which the app shows to a browser that
+  // carries this cookie (the same page as ?tab=all). The tabs have a step of their own.
+  await context.addCookies([{ name: "wb_stay_view", value: "all", url: baseURL ?? "http://localhost:3100" }]);
 });
+
+/** Choose a pet on New booking by its full name, like "Coco, Beagle (Kavya Example)". */
+async function choosePet(page: Page, name: string) {
+  const change = page.getByRole("button", { name: "Change", exact: true });
+  if (await change.isVisible()) await change.click();
+  // Typing the pet's name finds it; a name only one pet has is chosen without a tap.
+  const pet = name.split(/[,(]/)[0].trim();
+  await page.getByLabel("Find a pet").fill(pet);
+  const chosen = page.getByText(`Book with ${pet}`);
+  const radio = page.getByRole("radio", { name, exact: true });
+  await expect(chosen.or(radio).first()).toBeVisible();
+  // A tap, not check(): the list gives way to the chosen pet's card as soon as it is tapped.
+  if (!(await chosen.isVisible())) await radio.click();
+  await expect(chosen).toBeVisible();
+}
 
 const PASSWORD = "wagbook-demo";
 
@@ -32,6 +50,8 @@ function day(offset = 0): string {
 
 async function signIn(page: Page, who: string, password = PASSWORD) {
   await page.goto("/login");
+  // Put back after a step that cleared the cookies: the walk reads a booking's long page (see beforeEach).
+  await page.context().addCookies([{ name: "wb_stay_view", value: "all", url: new URL(page.url()).origin }]);
   await page.getByLabel("Email").fill(who.includes("@") ? who : `${who}@demo.wagbook.test`);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -82,7 +102,7 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
   await signIn(page, "staff");
   // Coco is in house until day 4 in K05.
   await page.goto(`/app/bookings/new`);
-  await page.locator("select[name=petId]").selectOption({ label: "Coco, Beagle (Kavya Example)" });
+  await choosePet(page, "Coco, Beagle (Kavya Example)");
   await page.getByLabel("Check-in date").fill(day(1));
   await page.getByLabel("Check-out date").fill(day(3));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -91,9 +111,9 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
   await expect(page.getByLabel("Check-out date")).toHaveValue(day(3));
 
   // Found by typing part of the parent's phone number.
+  await page.getByRole("button", { name: "Change", exact: true }).click();
   await page.getByLabel("Find a pet").fill("00105");
-  await expect(page.locator("select[name=petId]")).toHaveValue(/.+/);
-  await expect(page.locator("select[name=petId] option:checked")).toHaveText("Tofu, Shih Tzu (Neha Placeholder)");
+  await expect(page.getByText("Book with Tofu")).toBeVisible();
   await page.getByLabel("Check-in date").fill(day(1));
   await page.getByLabel("Check-out date").fill(day(3));
   // K05 is taken on those dates, so it is not offered; it is again from the day Coco leaves.
@@ -108,10 +128,10 @@ test("double booking is refused with a clear sentence", async ({ page }) => {
 test("staff cannot set a price; a family is booked together as a request, then confirmed", async ({ page }) => {
   await signIn(page, "staff");
   await page.goto("/app/bookings/new");
-  await expect(page.getByLabel("Price")).toHaveCount(0);
+  await expect(page.getByLabel("Price", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Only an owner or manager can change a price.")).toBeVisible();
 
-  await page.locator("select[name=petId]").selectOption({ label: "Biscuit, Labrador (Priya Demo)" });
+  await choosePet(page, "Biscuit, Labrador (Priya Demo)");
   await page.getByRole("checkbox", { name: /Pepper/ }).check();
   await page.getByLabel("Check-in date").fill(day(30));
   await page.getByLabel("Check-out date").fill(day(33));
@@ -132,7 +152,7 @@ test("two pets of one parent share a kennel, the second at the shared kennel pri
 
   await signIn(page, "staff");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Rocky, Indie (Vikram Mock)" });
+  await choosePet(page, "Rocky, Indie (Vikram Mock)");
   await page.getByRole("checkbox", { name: /Luna/ }).check();
   await page.getByLabel("Check-in date").fill(day(50));
   await page.getByLabel("Check-out date").fill(day(53));
@@ -148,14 +168,14 @@ test("two pets of one parent share a kennel, the second at the shared kennel pri
 
   await page.getByRole("link", { name: /Luna/ }).first().click();
   await expect(page.getByText("Shares K09 with Rocky.")).toBeVisible();
-  await expect(page.getByText(/₹900 a night/)).toBeVisible();
+  await expect(page.getByText(/₹900 a night/).first()).toBeVisible();
 
   // Both are in K09's square on the calendar.
   await page.goto(`/app/calendar?from=${day(50)}`);
-  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) });
-  // One link a night for each of them, three nights.
-  await expect(row.getByRole("link", { name: "Rocky" })).toHaveCount(3);
-  await expect(row.getByRole("link", { name: "Luna" })).toHaveCount(3);
+  const calendar = page.getByRole("region", { name: "Kennels by day" });
+  // One bar across the three nights for each of them, one above the other.
+  await expect(calendar.getByRole("link", { name: /^Rocky/ })).toHaveCount(1);
+  await expect(calendar.getByRole("link", { name: /^Luna/ })).toHaveCount(1);
 });
 
 test("a pet that overstays is extended to today", async ({ page }) => {
@@ -168,12 +188,12 @@ test("a pet that overstays is extended to today", async ({ page }) => {
 
 test("the care round: one tap, and safe to tap twice", async ({ page }) => {
   await signIn(page, "staff");
-  await page.goto("/app/care?kind=medication");
+  await page.goto("/app/care?kind=medication&show=all");
   const tablet = page.getByRole("listitem").filter({ hasText: "Thyroid tablet" });
   await tablet.getByRole("button", { name: "Done" }).dblclick();
   await expect(tablet.getByText("Done", { exact: true }).first()).toBeVisible();
   await page.goto("/app");
-  await expect(page.getByRole("link", { name: /Medicines 1 of 1/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Medicines done/ })).toBeVisible();
 
   await page.goto("/app/care?kind=meal&show=pending");
   const lunch = page.getByRole("listitem").filter({ hasText: "Mango" }).filter({ hasText: "Lunch" });
@@ -327,7 +347,7 @@ test("check out, make the bill, issue it, and the parent sees it with a UPI QR c
   const parent = await privateWindow(browser);
   await parent.page.goto(link);
   await expect(parent.page.getByRole("heading", { name: "Bill", exact: true })).toBeVisible();
-  await expect(parent.page.getByText(number)).toBeVisible();
+  await expect(parent.page.getByText(number, { exact: true })).toBeVisible();
   await expect(parent.page.getByRole("img", { name: /QR code to pay/ })).toBeVisible();
   await expect(parent.page.getByRole("link", { name: "Pay with UPI" })).toHaveAttribute("href", /^upi:\/\/pay\?pa=demokennel%40okdemo/);
   await expect(parent.page.getByText(/Rupees One Thousand Two Hundred Only/)).toBeVisible();
@@ -464,7 +484,7 @@ test("a pet's details change, and an incident shows on Today until it is dealt w
 
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: /Incidents to deal with/ })).toBeVisible();
-  await page.getByRole("link", { name: /Bruno.*High/ }).click();
+  await page.getByRole("listitem").filter({ hasText: "Bruno" }).filter({ hasText: "High" }).getByRole("link", { name: "Open", exact: true }).click();
   await page.getByRole("button", { name: "Parent has been told" }).click();
   await expect(page.getByText("Marked as told.")).toBeVisible();
   await page.getByRole("button", { name: "Dealt with" }).click();
@@ -713,7 +733,8 @@ test("a person reads Wagbook in Hindi, and parents read the kennel's pages in Ka
   const parent = await privateWindow(browser);
   await parent.page.goto(link.trim());
   await expect(parent.page.getByText(kn.stayPage.status.checked_in)).toBeVisible();
-  expect(await parent.page.evaluate(() => document.documentElement.lang)).toBe("kn");
+  // Set once the page has woken up in the browser, so it is waited for.
+  await expect(parent.page.locator("html")).toHaveAttribute("lang", "kn");
   await parent.context.close();
 
   // Back to English for whoever runs next.
@@ -906,7 +927,7 @@ test("an owner turns on two-step sign-in, and then a password alone is not enoug
   await page.getByRole("button", { name: en.auth.code.continue }).click();
   await page.waitForURL(/\/app/);
   await page.goto("/app/more");
-  await expect(page.getByRole("link", { name: `${en.more.twoStepLink}: ${en.more.twoStepOn}` })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`${en.more.twoStepLink}\\s*${en.more.twoStepOn}`) })).toBeVisible();
   await expect(page.getByText(en.more.ownerNudge)).toHaveCount(0);
 
   // And off again.
@@ -1012,7 +1033,7 @@ test("a sibling leaves early, and the pet left on its own pays the usual price f
   // Rocky and Luna share K09 for three nights (booked above); Rocky goes home a night early.
   await page.goto(`/app/calendar?from=${day(50)}`);
   // Followed by its address: on a phone the sticky kennel column and the bottom bar can sit over the square.
-  const rocky = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "K09" }) }).getByRole("link", { name: "Rocky" }).first();
+  const rocky = page.getByRole("region", { name: "Kennels by day" }).getByRole("link", { name: /^Rocky/ }).first();
   await page.goto((await rocky.getAttribute("href"))!);
   await expect(page.getByRole("heading", { level: 1, name: "Rocky" })).toBeVisible();
   await page.getByLabel("Check-out date").fill(day(52));
@@ -1030,8 +1051,8 @@ test("a sibling leaves early, and the pet left on its own pays the usual price f
 test("day boarding turns into boarding, and is priced as days and then nights", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
-  await page.locator("select[name=kind]").selectOption("daycare");
+  await choosePet(page, "Tofu, Shih Tzu (Neha Placeholder)");
+  await page.getByRole("radio", { name: /^Day boarding/ }).check();
   await page.getByLabel("Check-in date").fill(day(70));
   await page.getByLabel("Check-out date").fill(day(70));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -1112,8 +1133,8 @@ test("a manager takes back part of a paid bill with a credit note, and the paren
 test("Today lists the reminders to send, and one sent leaves the list", async ({ page, context }) => {
   await signIn(page, "staff");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
-  await page.locator("select[name=kind]").selectOption("daycare");
+  await choosePet(page, "Tofu, Shih Tzu (Neha Placeholder)");
+  await page.getByRole("radio", { name: /^Day boarding/ }).check();
   await page.getByLabel("Check-in date").fill(day(1));
   await page.getByLabel("Check-out date").fill(day(1));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -1162,7 +1183,7 @@ test("a parent asks for a stay through their own link, and it waits as a request
   await parent.context.close();
 
   await page.goto("/app");
-  await expect(page.getByText("One request from a parent is waiting.")).toBeVisible();
+  await expect(page.getByText("One request from a parent is waiting.").first()).toBeVisible();
   // A new link, and the old one stops working.
   await openPet(page, "Rocky");
   await page.getByRole("link", { name: "Vikram Mock" }).click();
@@ -1197,8 +1218,8 @@ test("a regular buys a pack of days, and repeating day boarding is paid from it"
   await expect(page.getByText(/^Issued\./)).toBeVisible();
 
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Tofu, Shih Tzu (Neha Placeholder)" });
-  await page.locator("select[name=kind]").selectOption("daycare");
+  await choosePet(page, "Tofu, Shih Tzu (Neha Placeholder)");
+  await page.getByRole("radio", { name: /^Day boarding/ }).check();
   await page.getByLabel("Check-in date").fill(day(91));
   await page.getByText(en.newBooking.repeat, { exact: true }).click();
   for (const box of await page.locator("input[name=repeat_day]").all()) await box.check();
@@ -1235,7 +1256,7 @@ test("a pet goes home early: billed to today, the paid bill credited for the nig
   await signIn(page, "manager");
   await addPet(page, "9800000411", "Ravi Sample", "Juno");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
+  await choosePet(page, "Juno (Ravi Sample)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(3));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -1315,7 +1336,7 @@ test("an owner takes a photo posted by mistake off an update, and the parent no 
 test("a request waits on the waiting list, is shown on the calendar, and Today offers it once a kennel is free", async ({ page }) => {
   await signIn(page, "staff");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
+  await choosePet(page, "Juno (Ravi Sample)");
   await page.getByLabel("Check-in date").fill(day(120));
   await page.getByLabel("Check-out date").fill(day(123));
   await page.getByRole("button", { name: en.newBooking.addToWaitlist }).click();
@@ -1327,10 +1348,8 @@ test("a request waits on the waiting list, is shown on the calendar, and Today o
   const request = new URL(page.url()).pathname;
 
   await page.goto(`/app/calendar?from=${day(120)}`);
-  await expect(page.getByText(en.calendar.requestsTitle)).toBeVisible();
-  const row = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: /Juno/ }) });
-  await expect(row.getByRole("rowheader")).toContainText(en.calendar.waiting);
-  await expect(row.getByRole("link").first()).toHaveAttribute("title", "Juno, on the waiting list");
+  await expect(page.getByRole("heading", { name: en.calendar.waitlist.title })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Juno, asked/ }).first()).toHaveAttribute("title", "Juno, on the waiting list");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
   await page.goto("/app");
@@ -1346,8 +1365,8 @@ test("a request waits on the waiting list, is shown on the calendar, and Today o
 test("the days of a repeating series are billed together, a month at a time", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Juno (Ravi Sample)" });
-  await page.locator("select[name=kind]").selectOption("daycare");
+  await choosePet(page, "Juno (Ravi Sample)");
+  await page.getByRole("radio", { name: /^Day boarding/ }).check();
   await page.getByLabel("Check-in date").fill(day(150));
   await page.getByText(en.newBooking.repeat, { exact: true }).click();
   for (const box of await page.locator("input[name=repeat_day]").all()) await box.check();
@@ -1446,6 +1465,8 @@ test("a kennel with a kitchen delivers: areas served, a parent's address, weight
   await shot(page, "m25-settings");
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.areas.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.areas.title) }).click();
   await page.getByLabel(en.areas.pin).fill("560 038");
   await page.getByLabel(en.areas.name).fill("Indiranagar");
@@ -1523,6 +1544,8 @@ const narrow = async (page: Page) => expect(await page.evaluate(() => document.d
 test("a manager sets up the kitchen: stock, a supplier, a recipe in the rotation and food prices", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.kitchen.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.kitchen.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.kitchen.title })).toBeVisible();
   await page.getByRole("link", { name: en.kitchen.links.stock }).click();
@@ -1879,6 +1902,8 @@ test("appointments: a manager sets up places, services priced by coat, an add-on
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.appointmentSetup.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.appointmentSetup.title) }).click();
   const s = en.appointmentSetup;
   const placeForm = page.locator("form").filter({ has: page.getByRole("button", { name: s.addPlaceButton }) });
@@ -2008,7 +2033,7 @@ test("appointments: a boarder's groom before going home is on its stay's bill, a
   await signIn(page, "manager");
   await addPet(page, "9800000414", "Neel Sample", "Simba");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Simba (Neel Sample)" });
+  await choosePet(page, "Simba (Neel Sample)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(2));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2051,7 +2076,7 @@ test("appointments: a stay with a package is billed as one line, its swim and gr
   await signIn(page, "manager");
   await addPet(page, "9800000415", "Ira Sample", "Toby");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Toby (Ira Sample)" });
+  await choosePet(page, "Toby (Ira Sample)");
   await page.getByLabel("Check-in date").fill(day(5));
   await page.getByLabel("Check-out date").fill(day(9));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2076,6 +2101,8 @@ test("appointments: a stay with a package is billed as one line, its swim and gr
 test("cancellation: the kennel cancels a paid stay, the parent keeps it as credit, and a manager adds goodwill", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.cancellation.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.cancellation.title) }).click();
   await page.locator("input[name='boarding.hours']").fill("48");
   await page.getByRole("button", { name: en.cancelSetup.save }).click();
@@ -2085,7 +2112,7 @@ test("cancellation: the kennel cancels a paid stay, the parent keeps it as credi
 
   await addPet(page, "9800000416", "Asha Sample", "Mitra");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Mitra (Asha Sample)" });
+  await choosePet(page, "Mitra (Asha Sample)");
   await page.getByLabel("Check-in date").fill(day(10));
   await page.getByLabel("Check-out date").fill(day(13));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2134,7 +2161,7 @@ test("health papers: a pet with no rabies card is refused at check-in until a ma
 
   await addPet(page, "9800000417", "Dev Sample", "Kiwi");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Kiwi (Dev Sample)" });
+  await choosePet(page, "Kiwi (Dev Sample)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(1));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2172,7 +2199,7 @@ test("pick-up from home: a trip on a stay, priced by the area, goes on the day's
   await expect(page.getByText(en.addresses.added)).toBeVisible();
 
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Zuzu (Meera Sample)" });
+  await choosePet(page, "Zuzu (Meera Sample)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(2));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2249,6 +2276,8 @@ test("the team: shifts and the rota, clocking in from Today, leave asked for and
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.rota.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.rota.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.rota.title })).toBeVisible();
   await page.getByRole("button", { name: en.rota.shifts.addUsual }).click();
@@ -2489,6 +2518,8 @@ test("M45: a person who forgot their password chooses a new one from an emailed 
 test("M47: a manager brings in parents and pets from a spreadsheet; staff cannot", async ({ page }) => {
   await signIn(page, "manager");
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.import.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.import.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.importing.title })).toBeVisible();
   const template = await page.request.get("/app/more/import/template");
@@ -2620,7 +2651,7 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await signIn(page, "manager");
   await addPet(page, "9800000601", "Asha Sample", "Nori");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Nori (Asha Sample)" });
+  await choosePet(page, "Nori (Asha Sample)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(3));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2665,7 +2696,7 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await routine.locator("input[name=needsPhoto]").check();
   await routine.getByRole("button", { name: en.routines.add }).click();
   await expect(page.getByText(/^Added Clean the wound at 09:00/)).toBeVisible();
-  await page.goto("/app/care?kind=medication");
+  await page.goto("/app/care?kind=medication&show=all");
   const task = page.getByRole("listitem").filter({ hasText: "Nori" }).filter({ hasText: "Clean the wound" });
   // No plain Done on a task that asks for a photo: only "Done with photo". The row first, so the check is not made
   // before the list has loaded.
@@ -2729,10 +2760,10 @@ test("M50, M53 to M55, M57: food from home, a photo task, a vet visit, the kenne
   await expect(page.getByRole("heading", { name: en.cleaning.title })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: kennelName }).getByRole("button", { name: en.cleaning.cleaned })).toBeVisible();
   await page.goto(`/app/calendar?from=${day(0)}`);
-  await expect(page.getByRole("rowheader", { name: new RegExp(`^${kennelName}`) }).getByText(en.cleaning.badge)).toBeVisible();
+  await expect(page.getByRole("link", { name: en.calendar.clean, exact: true }).first()).toBeVisible();
   await addPet(page, "9800000602", "Asha Sample Two", "Pip");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Pip (Asha Sample Two)" });
+  await choosePet(page, "Pip (Asha Sample Two)");
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(1));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2770,9 +2801,9 @@ test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed 
   await shot(page, "m51-house");
 
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Opening 0 of 4" })).toBeVisible();
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Opening", exact: true }) }).getByText("0 of 4", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Mark Lights on done" }).click();
-  await expect(page.getByRole("heading", { name: "Opening 1 of 4" })).toBeVisible();
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Opening", exact: true }) }).getByText("1 of 4", { exact: true })).toBeVisible();
   await narrow(page);
   await shot(page, "m51-today");
   await page.goto("/app/care");
@@ -2781,8 +2812,8 @@ test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed 
   // M56: a trial day, how it went, and the result on the pet's page.
   await addPet(page, "9800000603", "Ravi Sample", "Bean");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Bean (Ravi Sample)" });
-  await page.locator("select[name=kind]").selectOption("daycare");
+  await choosePet(page, "Bean (Ravi Sample)");
+  await page.getByRole("radio", { name: /^Day boarding/ }).check();
   await page.getByLabel("Check-in date").fill(day(0));
   await page.getByLabel("Check-out date").fill(day(0));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2800,7 +2831,7 @@ test("M51, M52, M56: checklists and repairs, a trial day, and a pet that passed 
 
   // M52: Bean has a stay to come; marked as passed away, it is cancelled, flowers are on Today, and it can be undone.
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Bean (Ravi Sample)" });
+  await choosePet(page, "Bean (Ravi Sample)");
   await page.getByLabel("Check-in date").fill(day(40));
   await page.getByLabel("Check-out date").fill(day(42));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -2999,6 +3030,8 @@ test("M61: a person chooses alerts, and a push wakes the phone with what happene
     await navigator.serviceWorker.ready;
   });
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.alerts.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.alerts.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.alerts.title })).toBeVisible();
   await expect(page.getByText(en.alerts.off)).toBeVisible();
@@ -3053,6 +3086,8 @@ test("M62: a walk-in buys the last chew bones, more than is left is refused, and
   await expect(page.getByText(en.settings.saved)).toBeVisible();
 
   await page.goto("/app/more");
+  // Found by typing, as a long group folds its last pages away.
+  await page.getByPlaceholder(en.more.findPage).fill(en.more.links.shop.title);
   await page.getByRole("link", { name: new RegExp(en.more.links.shop.title) }).click();
   await expect(page.getByRole("heading", { level: 1, name: en.shop.title })).toBeVisible();
   const add = page.locator("form").filter({ has: page.getByRole("button", { name: en.shop.addButton }) });
@@ -3272,7 +3307,7 @@ test("the bug review: a discount above the stay is refused, and a cancelled stay
   await signIn(page, "manager");
   await addPet(page, "9800000917", "Ira Sample", "Tara");
   await page.goto("/app/bookings/new");
-  await page.locator("select[name=petId]").selectOption({ label: "Tara (Ira Sample)" });
+  await choosePet(page, "Tara (Ira Sample)");
   await page.getByLabel("Check-in date").fill(day(20));
   await page.getByLabel("Check-out date").fill(day(21));
   await page.getByRole("button", { name: "Confirm booking" }).click();
@@ -3307,4 +3342,26 @@ test("the bug review: a discount above the stay is refused, and a cancelled stay
   await expect(page.getByText(en.booking.refund.paid.replace("{amount}", "₹7,800"))).toBeVisible();
   await expect(page.getByRole("heading", { name: en.cancelRules.title })).toHaveCount(0);
   await expect(settle).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// M71 (D61): a booking's page in tabs.
+// ---------------------------------------------------------------------------
+
+test("a booking's page opens on Today, and its other parts are a tab away", async ({ page }) => {
+  await signIn(page, "manager");
+  // Without the walk's cookie, as a kennel sees the page.
+  await page.context().clearCookies({ name: "wb_stay_view" });
+  await page.goto("/app/bookings");
+  await page.locator("main").getByRole("link").filter({ hasText: en.labels.bookingStatus.confirmed }).first().click();
+  const tabs = page.getByRole("navigation", { name: en.booking.tabs.label });
+  await expect(tabs.getByRole("link", { name: en.booking.tabs.today })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: en.booking.parentCard.title, exact: true })).toBeVisible();
+  // Changing the booking is not on Today; it has a tab of its own.
+  await expect(page.getByRole("heading", { name: en.booking.change.title })).toHaveCount(0);
+  await tabs.getByRole("link", { name: en.booking.tabs.change }).click();
+  await expect(page.getByRole("heading", { name: en.booking.change.title })).toBeVisible();
+  await tabs.getByRole("link", { name: en.booking.tabs.extras }).click();
+  await expect(page.getByRole("heading", { name: en.booking.costs.title })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
